@@ -1,0 +1,142 @@
+#ifndef HPP_GUARD_LIEPP_LIE_SO2_H
+#define HPP_GUARD_LIEPP_LIE_SO2_H
+
+#include "liepp/types.h"
+#include "liepp/detail/epsilon.h"
+
+#include "liepp/lie/policy.h"
+
+#include <cmath>
+#include <string>
+#include <cassert>
+#include <expected>
+
+namespace liepp
+{
+
+/// 2D rotation group SO(2), parameterized by scalar type and policy.
+/// Internal representation: (cos(theta), sin(theta)) pair.
+/// Reference: Lynch & Park, Modern Robotics, Ch. 3.2.1, p. 68-69.
+template <typename Scalar, typename Policy = strict_policy>
+class so2
+{
+public:
+    /// Construct from cos/sin pair. Strict policy normalizes to unit circle.
+    so2(Scalar cos_val, Scalar sin_val)
+        : m_cos(cos_val)
+        , m_sin(sin_val)
+    {
+        if constexpr (Policy::normalize_on_construct)
+        {
+            Scalar n = std::hypot(m_cos, m_sin);
+            if constexpr (Policy::assert_valid)
+            {
+                assert(n > detail::epsilon_v<Scalar>);
+            }
+            m_cos /= n;
+            m_sin /= n;
+        }
+    }
+
+    /// Exponential map: angle -> SO(2) rotation.
+    /// Reference: Lynch & Park, Modern Robotics, Def. 3.2, p. 68.
+    [[nodiscard]] static so2 exp(Scalar theta)
+    {
+        return so2(std::cos(theta), std::sin(theta));
+    }
+
+    /// Logarithmic map: SO(2) rotation -> angle in (-pi, pi].
+    /// Reference: Lynch & Park, Modern Robotics, p. 69.
+    [[nodiscard]] Scalar log() const
+    {
+        return std::atan2(m_sin, m_cos);
+    }
+
+    /// Group inverse: R^{-1} = R^T, which negates the sine component.
+    /// Reference: Rotation inverse is transpose for orthogonal matrices.
+    [[nodiscard]] so2 inverse() const
+    {
+        return so2(m_cos, -m_sin);
+    }
+
+    /// Group composition: R1 * R2 via angle-addition formulas.
+    /// Result uses the stricter of the two policies (D-08).
+    /// Reference: Lynch & Park, Modern Robotics, rotation composition, p. 68.
+    template <typename P2>
+    [[nodiscard]] auto operator*(const so2<Scalar, P2>& rhs) const
+        -> so2<Scalar, stricter_policy<Policy, P2>>
+    {
+        return so2<Scalar, stricter_policy<Policy, P2>>(
+            m_cos * rhs.cos_angle() - m_sin * rhs.sin_angle(),
+            m_sin * rhs.cos_angle() + m_cos * rhs.sin_angle());
+    }
+
+    /// Convert to 2x2 rotation matrix: [[c, -s], [s, c]].
+    /// Reference: Lynch & Park, Modern Robotics, Eq. 3.10, p. 68.
+    [[nodiscard]] matrix2<Scalar> matrix() const
+    {
+        matrix2<Scalar> R;
+        R << m_cos, -m_sin,
+             m_sin,  m_cos;
+        return R;
+    }
+
+    /// Angle accessor (same as log).
+    [[nodiscard]] Scalar angle() const
+    {
+        return log();
+    }
+
+    /// Identity element: zero rotation.
+    [[nodiscard]] static so2 identity()
+    {
+        return so2(Scalar(1), Scalar(0));
+    }
+
+    /// Construct from 2x2 rotation matrix with validation (D-09).
+    /// Checks orthogonality (R^T * R ~= I) and det(R) ~= 1.
+    /// Returns std::unexpected with message on failure.
+    /// Reference: Rotation matrix properties, Lynch & Park, p. 23-24.
+    [[nodiscard]] static std::expected<so2, std::string>
+    from_matrix(const matrix2<Scalar>& R)
+    {
+        Scalar tol = detail::sqrt_epsilon_v<Scalar>;
+
+        // Check orthogonality: R^T * R ~= I
+        matrix2<Scalar> RtR = R.transpose() * R;
+        if ((RtR - matrix2<Scalar>::Identity()).norm() > tol)
+        {
+            return std::unexpected("Matrix is not orthogonal: R^T * R deviates from identity");
+        }
+
+        // Check determinant ~= +1 (not a reflection)
+        Scalar det = R.determinant();
+        if (std::abs(det - Scalar(1)) > tol)
+        {
+            return std::unexpected("Matrix has determinant != 1: not a proper rotation");
+        }
+
+        return so2(R(0, 0), R(1, 0));
+    }
+
+    /// Direct access to cosine component.
+    [[nodiscard]] Scalar cos_angle() const { return m_cos; }
+
+    /// Direct access to sine component.
+    [[nodiscard]] Scalar sin_angle() const { return m_sin; }
+
+    /// Rotate a 2D vector: R * v.
+    /// Reference: 2D rotation action on R^2.
+    [[nodiscard]] vector2<Scalar> act(const vector2<Scalar>& v) const
+    {
+        return matrix() * v;
+    }
+
+private:
+    Scalar m_cos;
+    Scalar m_sin;
+};
+
+} // namespace liepp
+
+#endif
