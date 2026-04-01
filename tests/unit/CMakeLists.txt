@@ -6,6 +6,9 @@ function(liepp_add_test TEST_NAME TEST_SOURCE)
         Catch2::Catch2WithMain
     )
     target_compile_options(${TEST_NAME} PRIVATE ${LIEPP_WARNING_FLAGS})
+    if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        target_compile_options(${TEST_NAME} PRIVATE -Wno-c2y-extensions)
+    endif ()
     add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
 endfunction()
 
