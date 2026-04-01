@@ -57,4 +57,10 @@ if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/trac_ik_lib/CMakeLists.txt")
         target_compile_definitions(ik_native_benchmarks PRIVATE LIEPP_HAS_NLOPT)
         target_link_libraries(ik_native_benchmarks PRIVATE NLopt::nlopt)
     endif()
+
+    liepp_add_benchmark(fk_comparison_benchmarks fk_comparison_benchmarks.cpp)
+    target_link_libraries(fk_comparison_benchmarks PRIVATE orocos-kdl)
+
+    liepp_add_benchmark(jacobian_comparison_benchmarks jacobian_comparison_benchmarks.cpp)
+    target_link_libraries(jacobian_comparison_benchmarks PRIVATE orocos-kdl)
 endif ()
