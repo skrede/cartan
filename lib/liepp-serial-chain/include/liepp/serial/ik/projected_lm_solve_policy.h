@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_IK_PROJECTED_LM_SOLVE_POLICY_H
-#define HPP_GUARD_LIEPP_IK_PROJECTED_LM_SOLVE_POLICY_H
+#ifndef HPP_GUARD_LIEPP_SERIAL_IK_PROJECTED_LM_SOLVE_POLICY_H
+#define HPP_GUARD_LIEPP_SERIAL_IK_PROJECTED_LM_SOLVE_POLICY_H
 
 /// @file projected_lm_solve_policy.h
 /// @brief Projected Levenberg-Marquardt IK solve policy with active-set box
@@ -16,19 +16,19 @@
 
 #include "liepp/types.h"
 
-#include "liepp/ik/ik_types.h"
-#include "liepp/ik/limits_policy.h"
-#include "liepp/ik/error_weight.h"
-#include "liepp/ik/ik_solve_policy.h"
-#include "liepp/ik/detail/convergence.h"
-#include "liepp/ik/detail/stall_detection.h"
-#include "liepp/ik/detail/limit_enforcement.h"
+#include "liepp/serial/ik/ik_types.h"
+#include "liepp/serial/ik/limits_policy.h"
+#include "liepp/serial/ik/error_weight.h"
+#include "liepp/serial/ik/ik_solve_policy.h"
+#include "liepp/serial/ik/detail/convergence.h"
+#include "liepp/serial/ik/detail/stall_detection.h"
+#include "liepp/serial/ik/detail/limit_enforcement.h"
 
 #include "liepp/lie/se3.h"
-#include "liepp/chain/joint_state.h"
-#include "liepp/chain/kinematic_chain.h"
-#include "liepp/kinematics/jacobian.h"
-#include "liepp/kinematics/forward_kinematics.h"
+#include "liepp/serial/chain/joint_state.h"
+#include "liepp/serial/chain/kinematic_chain.h"
+#include "liepp/serial/fk/jacobian.h"
+#include "liepp/serial/fk/forward_kinematics.h"
 
 #include <Eigen/Dense>
 

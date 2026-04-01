@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_IK_BASIC_IK_SOLVER_H
-#define HPP_GUARD_LIEPP_IK_BASIC_IK_SOLVER_H
+#ifndef HPP_GUARD_LIEPP_SERIAL_IK_BASIC_IK_SOLVER_H
+#define HPP_GUARD_LIEPP_SERIAL_IK_BASIC_IK_SOLVER_H
 
 /// @file basic_ik_solver.h
 /// @brief Variadic policy-based IK solver with cooperative interleaved racing.
@@ -15,15 +15,15 @@
 /// Reference: Lynch & Park, Modern Robotics, Ch. 6.2, p. 227-233.
 ///            Phase 13 decisions D-01 through D-09.
 
-#include "liepp/ik/ik_types.h"
-#include "liepp/ik/ik_solve_policy.h"
-#include "liepp/ik/halton_seed_generator.h"
+#include "liepp/serial/ik/ik_types.h"
+#include "liepp/serial/ik/ik_solve_policy.h"
+#include "liepp/serial/ik/halton_seed_generator.h"
 
 #include "liepp/lie/se3.h"
-#include "liepp/chain/joint_state.h"
-#include "liepp/kinematics/jacobian.h"
-#include "liepp/chain/kinematic_chain.h"
-#include "liepp/kinematics/forward_kinematics.h"
+#include "liepp/serial/chain/joint_state.h"
+#include "liepp/serial/fk/jacobian.h"
+#include "liepp/serial/chain/kinematic_chain.h"
+#include "liepp/serial/fk/forward_kinematics.h"
 
 #include <Eigen/SVD>
 

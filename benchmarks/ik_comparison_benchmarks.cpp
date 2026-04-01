@@ -11,9 +11,9 @@
 
 #include "benchmark_utils.h"
 
-#include <liepp/ik/basic_ik_solver.h>
-#include <liepp/ik/lm_solve_policy.h>
-#include <liepp/ik/ik_types.h>
+#include <liepp/serial/ik/basic_ik_solver.h>
+#include <liepp/serial/ik/lm_solve_policy.h>
+#include <liepp/serial/ik/ik_types.h>
 
 #include <trac_ik/trac_ik.hpp>
 

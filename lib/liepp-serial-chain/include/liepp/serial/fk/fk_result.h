@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_KINEMATICS_FK_RESULT_H
-#define HPP_GUARD_LIEPP_KINEMATICS_FK_RESULT_H
+#ifndef HPP_GUARD_LIEPP_SERIAL_FK_FK_RESULT_H
+#define HPP_GUARD_LIEPP_SERIAL_FK_FK_RESULT_H
 
 /// @file fk_result.h
 /// @brief Forward kinematics result with intermediate product caching.
@@ -14,7 +14,7 @@
 /// Intermediate product T_i = exp([S1]q1) * ... * exp([Si]qi).
 
 #include "liepp/lie/se3.h"
-#include "liepp/chain/storage_trait.h"
+#include "liepp/serial/chain/storage_trait.h"
 
 #include <utility>
 #include <type_traits>

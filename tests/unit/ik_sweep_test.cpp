@@ -3,11 +3,11 @@
 #include "../test_utils.h"
 
 #include <liepp/types.h>
-#include <liepp/ik/ik.h>
+#include <liepp/serial/ik/ik.h>
 #include <liepp/lie/se3.h>
 #include <liepp/lie/so3.h>
-#include <liepp/chain/kinematic_chain.h>
-#include <liepp/kinematics/forward_kinematics.h>
+#include <liepp/serial/chain/kinematic_chain.h>
+#include <liepp/serial/fk/forward_kinematics.h>
 
 #include <numbers>
 #include <type_traits>

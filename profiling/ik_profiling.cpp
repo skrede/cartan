@@ -4,22 +4,22 @@
 
 #include "chain_factories.h"
 
-#include <liepp/ik/ik_types.h>
-#include <liepp/ik/lm_solve_policy.h>
-#include <liepp/ik/limits_policy.h>
-#include <liepp/ik/basic_ik_solver.h>
-#include <liepp/ik/default_solvers.h>
-#include <liepp/ik/dls_solve_policy.h>
-#include <liepp/ik/slsqp_solve_policy.h>
-#include <liepp/ik/bobyqa_solve_policy.h>
-#include <liepp/ik/lbfgsb_solve_policy.h>
-#include <liepp/ik/restart_solve_policy.h>
-#include <liepp/ik/projected_lm_solve_policy.h>
-#include <liepp/ik/newton_raphson_solve_policy.h>
+#include <liepp/serial/ik/ik_types.h>
+#include <liepp/serial/ik/lm_solve_policy.h>
+#include <liepp/serial/ik/limits_policy.h>
+#include <liepp/serial/ik/basic_ik_solver.h>
+#include <liepp/serial/ik/default_solvers.h>
+#include <liepp/serial/ik/dls_solve_policy.h>
+#include <liepp/serial/ik/slsqp_solve_policy.h>
+#include <liepp/serial/ik/bobyqa_solve_policy.h>
+#include <liepp/serial/ik/lbfgsb_solve_policy.h>
+#include <liepp/serial/ik/restart_solve_policy.h>
+#include <liepp/serial/ik/projected_lm_solve_policy.h>
+#include <liepp/serial/ik/newton_raphson_solve_policy.h>
 
 #ifdef LIEPP_HAS_NLOPT
-#include <liepp/ik/nlopt_slsqp_solve_policy.h>
-#include <liepp/ik/nlopt_bobyqa_solve_policy.h>
+#include <liepp/serial/ik/nlopt_slsqp_solve_policy.h>
+#include <liepp/serial/ik/nlopt_bobyqa_solve_policy.h>
 #endif
 
 #include <benchmark/benchmark.h>

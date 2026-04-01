@@ -1,4 +1,4 @@
-#include "liepp/kinematics.h"
+#include "liepp/serial_chain.h"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>

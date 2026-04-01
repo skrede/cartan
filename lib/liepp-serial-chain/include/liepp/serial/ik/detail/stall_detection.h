@@ -1,7 +1,7 @@
-#ifndef HPP_GUARD_LIEPP_IK_DETAIL_STALL_DETECTION_H
-#define HPP_GUARD_LIEPP_IK_DETAIL_STALL_DETECTION_H
+#ifndef HPP_GUARD_LIEPP_SERIAL_IK_DETAIL_STALL_DETECTION_H
+#define HPP_GUARD_LIEPP_SERIAL_IK_DETAIL_STALL_DETECTION_H
 
-#include "liepp/ik/ik_types.h"
+#include "liepp/serial/ik/ik_types.h"
 
 #include <cmath>
 #include <vector>

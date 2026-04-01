@@ -4,7 +4,7 @@
 
 #include "benchmark_utils.h"
 
-#include <liepp/kinematics/forward_kinematics.h>
+#include <liepp/serial/fk/forward_kinematics.h>
 
 #include <kdl/chainfksolverpos_recursive.hpp>
 

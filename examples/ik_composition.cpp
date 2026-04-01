@@ -4,7 +4,7 @@
 /// Shows: variadic basic_ik_solver with two policies (cooperative racing),
 /// preset factory functions with .build(), and the composable solver builder.
 
-#include "liepp/kinematics.h"
+#include "liepp/serial_chain.h"
 
 #include <iostream>
 #include <numbers>

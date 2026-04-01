@@ -1,10 +1,10 @@
-#include <liepp/ik/halton_seed_generator.h>
+#include <liepp/serial/ik/halton_seed_generator.h>
 
 #include <liepp/lie/se3.h>
 #include <liepp/lie/so3.h>
-#include <liepp/chain/screw_axis.h>
-#include <liepp/chain/joint_limits.h>
-#include <liepp/chain/kinematic_chain.h>
+#include <liepp/serial/chain/screw_axis.h>
+#include <liepp/serial/chain/joint_limits.h>
+#include <liepp/serial/chain/kinematic_chain.h>
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>

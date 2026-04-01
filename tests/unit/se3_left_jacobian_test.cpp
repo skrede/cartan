@@ -1,5 +1,5 @@
 #include <liepp/lie/se3_left_jacobian.h>
-#include <liepp/ik/error_weight.h>
+#include <liepp/serial/ik/error_weight.h>
 #include <liepp/lie/se3.h>
 
 #include <catch2/catch_approx.hpp>

@@ -14,9 +14,9 @@
 
 #include <liepp/lie/se3.h>
 #include <liepp/lie/so3.h>
-#include <liepp/chain/screw_axis.h>
-#include <liepp/chain/joint_limits.h>
-#include <liepp/chain/kinematic_chain.h>
+#include <liepp/serial/chain/screw_axis.h>
+#include <liepp/serial/chain/joint_limits.h>
+#include <liepp/serial/chain/kinematic_chain.h>
 
 #include <limits>
 #include <numbers>

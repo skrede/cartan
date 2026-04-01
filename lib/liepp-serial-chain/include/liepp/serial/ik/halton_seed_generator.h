@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_IK_HALTON_SEED_GENERATOR_H
-#define HPP_GUARD_LIEPP_IK_HALTON_SEED_GENERATOR_H
+#ifndef HPP_GUARD_LIEPP_SERIAL_IK_HALTON_SEED_GENERATOR_H
+#define HPP_GUARD_LIEPP_SERIAL_IK_HALTON_SEED_GENERATOR_H
 
 /// @file halton_seed_generator.h
 /// @brief Halton sequence seed generator with Beeson-Ames joint wrapping.
@@ -12,9 +12,9 @@
 /// Reference: Beeson & Ames, "TRAC-IK: An Open-Source Library for Improved
 /// Solving of Generic Inverse Kinematics", 2015.
 
-#include "liepp/chain/joint_state.h"
-#include "liepp/chain/joint_limits.h"
-#include "liepp/chain/kinematic_chain.h"
+#include "liepp/serial/chain/joint_state.h"
+#include "liepp/serial/chain/joint_limits.h"
+#include "liepp/serial/chain/kinematic_chain.h"
 
 #include <array>
 #include <cmath>

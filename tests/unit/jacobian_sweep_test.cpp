@@ -4,9 +4,9 @@
 
 #include <liepp/types.h>
 #include <liepp/lie/se3.h>
-#include <liepp/chain/kinematic_chain.h>
-#include <liepp/kinematics/forward_kinematics.h>
-#include <liepp/kinematics/jacobian.h>
+#include <liepp/serial/chain/kinematic_chain.h>
+#include <liepp/serial/fk/forward_kinematics.h>
+#include <liepp/serial/fk/jacobian.h>
 
 #include <numbers>
 #include <type_traits>

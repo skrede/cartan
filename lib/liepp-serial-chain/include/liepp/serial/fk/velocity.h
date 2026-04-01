@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_KINEMATICS_VELOCITY_H
-#define HPP_GUARD_LIEPP_KINEMATICS_VELOCITY_H
+#ifndef HPP_GUARD_LIEPP_SERIAL_FK_VELOCITY_H
+#define HPP_GUARD_LIEPP_SERIAL_FK_VELOCITY_H
 
 /// @file velocity.h
 /// @brief End-effector velocity kinematics.
@@ -9,10 +9,10 @@
 ///
 /// Reference: Lynch & Park, Modern Robotics, Eq. 5.10, p. 178.
 
-#include "liepp/kinematics/jacobian.h"
-#include "liepp/kinematics/forward_kinematics.h"
+#include "liepp/serial/fk/jacobian.h"
+#include "liepp/serial/fk/forward_kinematics.h"
 
-#include "liepp/chain/joint_state.h"
+#include "liepp/serial/chain/joint_state.h"
 
 namespace liepp
 {

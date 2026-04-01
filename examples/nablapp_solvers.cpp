@@ -4,7 +4,7 @@
 /// Shows: slsqp_solve_policy, bobyqa_solve_policy, restart wrapping,
 /// and racing a nablapp solver against a native liepp solver.
 
-#include "liepp/kinematics.h"
+#include "liepp/serial_chain.h"
 
 #include <iostream>
 #include <numbers>

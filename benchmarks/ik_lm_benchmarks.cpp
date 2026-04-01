@@ -4,9 +4,9 @@
 /// Reports custom counters: success_rate, avg_iterations,
 /// avg_position_error, avg_orientation_error per D-08.
 
-#include <liepp/ik/basic_ik_solver.h>
-#include <liepp/ik/lm_solve_policy.h>
-#include <liepp/ik/ik_types.h>
+#include <liepp/serial/ik/basic_ik_solver.h>
+#include <liepp/serial/ik/lm_solve_policy.h>
+#include <liepp/serial/ik/ik_types.h>
 
 #include "benchmark_utils.h"
 

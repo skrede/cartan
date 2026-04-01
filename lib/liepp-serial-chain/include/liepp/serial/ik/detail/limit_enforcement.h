@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_IK_DETAIL_LIMIT_ENFORCEMENT_H
-#define HPP_GUARD_LIEPP_IK_DETAIL_LIMIT_ENFORCEMENT_H
+#ifndef HPP_GUARD_LIEPP_SERIAL_IK_DETAIL_LIMIT_ENFORCEMENT_H
+#define HPP_GUARD_LIEPP_SERIAL_IK_DETAIL_LIMIT_ENFORCEMENT_H
 
 /// @file detail/limit_enforcement.h
 /// @brief Shared limit enforcement utility for IK solve policies.
@@ -10,12 +10,12 @@
 ///
 /// Reference: Decision D-13.
 
-#include "liepp/ik/limits_policy.h"
+#include "liepp/serial/ik/limits_policy.h"
 
-#include "liepp/chain/joint_state.h"
-#include "liepp/kinematics/jacobian.h"
-#include "liepp/chain/kinematic_chain.h"
-#include "liepp/kinematics/forward_kinematics.h"
+#include "liepp/serial/chain/joint_state.h"
+#include "liepp/serial/fk/jacobian.h"
+#include "liepp/serial/chain/kinematic_chain.h"
+#include "liepp/serial/fk/forward_kinematics.h"
 
 #include <Eigen/SVD>
 

@@ -1,14 +1,14 @@
-#ifndef HPP_GUARD_LIEPP_IK_ANALYTICAL_GRADIENT_H
-#define HPP_GUARD_LIEPP_IK_ANALYTICAL_GRADIENT_H
+#ifndef HPP_GUARD_LIEPP_SERIAL_IK_ANALYTICAL_GRADIENT_H
+#define HPP_GUARD_LIEPP_SERIAL_IK_ANALYTICAL_GRADIENT_H
 
 #include "liepp/types.h"
 
 #include "liepp/lie/se3.h"
-#include "liepp/ik/error_weight.h"
+#include "liepp/serial/ik/error_weight.h"
 #include "liepp/lie/se3_left_jacobian.h"
-#include "liepp/chain/kinematic_chain.h"
-#include "liepp/kinematics/jacobian.h"
-#include "liepp/kinematics/forward_kinematics.h"
+#include "liepp/serial/chain/kinematic_chain.h"
+#include "liepp/serial/fk/jacobian.h"
+#include "liepp/serial/fk/forward_kinematics.h"
 
 namespace liepp
 {

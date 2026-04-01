@@ -1,12 +1,12 @@
-#include <liepp/ik/basic_ik_solver.h>
+#include <liepp/serial/ik/basic_ik_solver.h>
 
-#include <liepp/ik/dls_solve_policy.h>
-#include <liepp/ik/limits_policy.h>
+#include <liepp/serial/ik/dls_solve_policy.h>
+#include <liepp/serial/ik/limits_policy.h>
 
 #include <liepp/lie/se3.h>
-#include <liepp/chain/joint_state.h>
-#include <liepp/chain/joint_limits.h>
-#include <liepp/chain/kinematic_chain.h>
+#include <liepp/serial/chain/joint_state.h>
+#include <liepp/serial/chain/joint_limits.h>
+#include <liepp/serial/chain/kinematic_chain.h>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>

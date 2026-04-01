@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_CHAIN_STORAGE_TRAIT_H
-#define HPP_GUARD_LIEPP_CHAIN_STORAGE_TRAIT_H
+#ifndef HPP_GUARD_LIEPP_SERIAL_CHAIN_STORAGE_TRAIT_H
+#define HPP_GUARD_LIEPP_SERIAL_CHAIN_STORAGE_TRAIT_H
 
 /// @file storage_trait.h
 /// @brief Fixed/dynamic storage selector for kinematic chain containers.

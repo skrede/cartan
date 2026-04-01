@@ -1,5 +1,5 @@
 #include "liepp/lie.h"
-#include "liepp/kinematics.h"
+#include "liepp/serial_chain.h"
 
 int main()
 {

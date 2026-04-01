@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_IK_DETAIL_NABLAPP_PROBLEM_H
-#define HPP_GUARD_LIEPP_IK_DETAIL_NABLAPP_PROBLEM_H
+#ifndef HPP_GUARD_LIEPP_SERIAL_IK_DETAIL_NABLAPP_PROBLEM_H
+#define HPP_GUARD_LIEPP_SERIAL_IK_DETAIL_NABLAPP_PROBLEM_H
 
 /// @file detail/nablapp_problem.h
 /// @brief Adapter wrapping liepp IK problem as nablapp problem formulation.
@@ -8,11 +8,11 @@
 /// nablapp::bound_constrained concepts so that nablapp solvers
 /// (kraft_slsqp_policy, bobyqa_policy) can optimize liepp IK objectives.
 
-#include "liepp/ik/error_weight.h"
-#include "liepp/ik/analytical_gradient.h"
+#include "liepp/serial/ik/error_weight.h"
+#include "liepp/serial/ik/analytical_gradient.h"
 
 #include "liepp/lie/se3.h"
-#include "liepp/chain/kinematic_chain.h"
+#include "liepp/serial/chain/kinematic_chain.h"
 
 #include <Eigen/Core>
 

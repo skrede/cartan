@@ -1,8 +1,8 @@
-#ifndef HPP_GUARD_LIEPP_IK_DETAIL_CONVERGENCE_H
-#define HPP_GUARD_LIEPP_IK_DETAIL_CONVERGENCE_H
+#ifndef HPP_GUARD_LIEPP_SERIAL_IK_DETAIL_CONVERGENCE_H
+#define HPP_GUARD_LIEPP_SERIAL_IK_DETAIL_CONVERGENCE_H
 
-#include "liepp/ik/ik_types.h"
-#include "liepp/ik/error_weight.h"
+#include "liepp/serial/ik/ik_types.h"
+#include "liepp/serial/ik/error_weight.h"
 
 #include <Eigen/Core>
 

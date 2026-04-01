@@ -10,7 +10,7 @@
 /// multi-policy basic_ik_solver runs all strategies cooperatively via step().
 /// M worker threads can service many requests without thread proliferation.
 
-#include "liepp/kinematics.h"
+#include "liepp/serial_chain.h"
 
 #include <chrono>
 #include <deque>

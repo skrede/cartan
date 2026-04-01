@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_IK_NLOPT_SLSQP_SOLVE_POLICY_H
-#define HPP_GUARD_LIEPP_IK_NLOPT_SLSQP_SOLVE_POLICY_H
+#ifndef HPP_GUARD_LIEPP_SERIAL_IK_NLOPT_SLSQP_SOLVE_POLICY_H
+#define HPP_GUARD_LIEPP_SERIAL_IK_NLOPT_SLSQP_SOLVE_POLICY_H
 
 /// @file nlopt_slsqp_solve_policy.h
 /// @brief NLopt SLSQP gradient-based IK solve policy with box constraints.
@@ -17,15 +17,15 @@
 
 #ifdef LIEPP_HAS_NLOPT
 
-#include "liepp/ik/ik_types.h"
-#include "liepp/ik/limits_policy.h"
-#include "liepp/ik/ik_solve_policy.h"
-#include "liepp/ik/analytical_gradient.h"
-#include "liepp/ik/detail/nlopt_common.h"
+#include "liepp/serial/ik/ik_types.h"
+#include "liepp/serial/ik/limits_policy.h"
+#include "liepp/serial/ik/ik_solve_policy.h"
+#include "liepp/serial/ik/analytical_gradient.h"
+#include "liepp/serial/ik/detail/nlopt_common.h"
 
 #include "liepp/lie/se3.h"
-#include "liepp/chain/joint_state.h"
-#include "liepp/chain/kinematic_chain.h"
+#include "liepp/serial/chain/joint_state.h"
+#include "liepp/serial/chain/kinematic_chain.h"
 
 #include <nlopt.hpp>
 

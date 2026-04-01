@@ -12,11 +12,11 @@
 #include <liepp/types.h>
 #include <liepp/lie/se3.h>
 #include <liepp/lie/so3.h>
-#include <liepp/chain/screw_axis.h>
-#include <liepp/chain/joint_limits.h>
-#include <liepp/chain/kinematic_chain.h>
-#include <liepp/chain/storage_trait.h>
-#include <liepp/kinematics/forward_kinematics.h>
+#include <liepp/serial/chain/screw_axis.h>
+#include <liepp/serial/chain/joint_limits.h>
+#include <liepp/serial/chain/kinematic_chain.h>
+#include <liepp/serial/chain/storage_trait.h>
+#include <liepp/serial/fk/forward_kinematics.h>
 
 #include <cmath>
 #include <random>

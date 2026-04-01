@@ -5,7 +5,7 @@
 /// IK requests, solves them using liepp's lm_solve_policy, and returns results.
 /// The main thread submits requests and collects responses.
 
-#include "liepp/kinematics.h"
+#include "liepp/serial_chain.h"
 
 #include <condition_variable>
 #include <iostream>

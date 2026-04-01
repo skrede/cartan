@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_CHAIN_SCREW_AXIS_H
-#define HPP_GUARD_LIEPP_CHAIN_SCREW_AXIS_H
+#ifndef HPP_GUARD_LIEPP_SERIAL_CHAIN_SCREW_AXIS_H
+#define HPP_GUARD_LIEPP_SERIAL_CHAIN_SCREW_AXIS_H
 
 /// @file screw_axis.h
 /// @brief Screw axis representation for kinematic chain joints.

@@ -4,7 +4,7 @@
 /// Shows: kinematic_chain construction, basic_ik_solver with lm_solve_policy,
 /// std::expected result handling, FK verification of the IK solution.
 
-#include "liepp/kinematics.h"
+#include "liepp/serial_chain.h"
 
 #include <iostream>
 #include <numbers>

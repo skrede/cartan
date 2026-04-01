@@ -1,12 +1,12 @@
-#ifndef HPP_GUARD_LIEPP_CHAIN_JOINT_STATE_H
-#define HPP_GUARD_LIEPP_CHAIN_JOINT_STATE_H
+#ifndef HPP_GUARD_LIEPP_SERIAL_CHAIN_JOINT_STATE_H
+#define HPP_GUARD_LIEPP_SERIAL_CHAIN_JOINT_STATE_H
 
 /// @file joint_state.h
 /// @brief Joint state (position and optional velocity) for kinematic chains.
 ///
 /// Parameterized by joint count N (fixed or liepp::dynamic) and scalar type.
 
-#include "liepp/chain/storage_trait.h"
+#include "liepp/serial/chain/storage_trait.h"
 
 #include <Eigen/Dense>
 

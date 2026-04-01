@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_CHAIN_JOINT_LIMITS_H
-#define HPP_GUARD_LIEPP_CHAIN_JOINT_LIMITS_H
+#ifndef HPP_GUARD_LIEPP_SERIAL_CHAIN_JOINT_LIMITS_H
+#define HPP_GUARD_LIEPP_SERIAL_CHAIN_JOINT_LIMITS_H
 
 /// @file joint_limits.h
 /// @brief Joint limits for kinematic chain joints.

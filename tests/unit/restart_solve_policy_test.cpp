@@ -1,18 +1,18 @@
-#include <liepp/ik/basic_ik_solver.h>
-#include <liepp/ik/restart_solve_policy.h>
-#include <liepp/ik/projected_lm_solve_policy.h>
+#include <liepp/serial/ik/basic_ik_solver.h>
+#include <liepp/serial/ik/restart_solve_policy.h>
+#include <liepp/serial/ik/projected_lm_solve_policy.h>
 
 #include <liepp/types.h>
 
 #include <liepp/lie/se3.h>
 #include <liepp/lie/so3.h>
 
-#include <liepp/chain/screw_axis.h>
-#include <liepp/chain/joint_state.h>
-#include <liepp/chain/joint_limits.h>
-#include <liepp/chain/kinematic_chain.h>
+#include <liepp/serial/chain/screw_axis.h>
+#include <liepp/serial/chain/joint_state.h>
+#include <liepp/serial/chain/joint_limits.h>
+#include <liepp/serial/chain/kinematic_chain.h>
 
-#include <liepp/kinematics/forward_kinematics.h>
+#include <liepp/serial/fk/forward_kinematics.h>
 
 #include <catch2/catch_test_macros.hpp>
 

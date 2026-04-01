@@ -1,6 +1,6 @@
-#include <liepp/chain/kinematic_chain.h>
+#include <liepp/serial/chain/kinematic_chain.h>
 
-#include <liepp/chain/joint_state.h>
+#include <liepp/serial/chain/joint_state.h>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>

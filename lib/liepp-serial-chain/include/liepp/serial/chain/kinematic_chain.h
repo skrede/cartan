@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_CHAIN_KINEMATIC_CHAIN_H
-#define HPP_GUARD_LIEPP_CHAIN_KINEMATIC_CHAIN_H
+#ifndef HPP_GUARD_LIEPP_SERIAL_CHAIN_KINEMATIC_CHAIN_H
+#define HPP_GUARD_LIEPP_SERIAL_CHAIN_KINEMATIC_CHAIN_H
 
 /// @file kinematic_chain.h
 /// @brief Product of Exponentials (PoE) kinematic chain model.
@@ -13,9 +13,9 @@
 ///
 /// Reference: Lynch & Park, Modern Robotics, Ch. 4, p. 119-158.
 
-#include "liepp/chain/screw_axis.h"
-#include "liepp/chain/joint_limits.h"
-#include "liepp/chain/storage_trait.h"
+#include "liepp/serial/chain/screw_axis.h"
+#include "liepp/serial/chain/joint_limits.h"
+#include "liepp/serial/chain/storage_trait.h"
 
 #include "liepp/lie/se3.h"
 

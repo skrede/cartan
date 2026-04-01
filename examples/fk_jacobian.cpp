@@ -4,7 +4,7 @@
 /// Shows: kinematic_chain construction, forward_kinematics, space_jacobian,
 /// body_jacobian. Uses UR3e PoE screw parameters (hardcoded).
 
-#include "liepp/kinematics.h"
+#include "liepp/serial_chain.h"
 
 #include <iostream>
 #include <numbers>

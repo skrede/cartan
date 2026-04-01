@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_IK_RESTART_SOLVE_POLICY_H
-#define HPP_GUARD_LIEPP_IK_RESTART_SOLVE_POLICY_H
+#ifndef HPP_GUARD_LIEPP_SERIAL_IK_RESTART_SOLVE_POLICY_H
+#define HPP_GUARD_LIEPP_SERIAL_IK_RESTART_SOLVE_POLICY_H
 
 /// @file restart_solve_policy.h
 /// @brief Restart wrapper solve policy that re-seeds from Halton sequences on
@@ -15,16 +15,16 @@
 ///            Decisions D-07 (restart as stepper), D-08 (step intercept),
 ///            D-11 (warm-start lambda), MULTI-01, MULTI-04.
 
-#include "liepp/ik/ik_types.h"
-#include "liepp/ik/error_weight.h"
-#include "liepp/ik/ik_solve_policy.h"
-#include "liepp/ik/halton_seed_generator.h"
-#include "liepp/ik/projected_lm_solve_policy.h"
+#include "liepp/serial/ik/ik_types.h"
+#include "liepp/serial/ik/error_weight.h"
+#include "liepp/serial/ik/ik_solve_policy.h"
+#include "liepp/serial/ik/halton_seed_generator.h"
+#include "liepp/serial/ik/projected_lm_solve_policy.h"
 
 #include "liepp/lie/se3.h"
 
-#include "liepp/chain/joint_state.h"
-#include "liepp/chain/kinematic_chain.h"
+#include "liepp/serial/chain/joint_state.h"
+#include "liepp/serial/chain/kinematic_chain.h"
 
 #include <limits>
 #include <concepts>

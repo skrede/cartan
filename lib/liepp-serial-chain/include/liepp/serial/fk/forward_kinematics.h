@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_KINEMATICS_FORWARD_KINEMATICS_H
-#define HPP_GUARD_LIEPP_KINEMATICS_FORWARD_KINEMATICS_H
+#ifndef HPP_GUARD_LIEPP_SERIAL_FK_FORWARD_KINEMATICS_H
+#define HPP_GUARD_LIEPP_SERIAL_FK_FORWARD_KINEMATICS_H
 
 /// @file forward_kinematics.h
 /// @brief Forward kinematics via Product of Exponentials (PoE).
@@ -14,10 +14,10 @@
 ///
 /// Reference: Lynch & Park, Modern Robotics, Ch. 4, p. 119-158.
 
-#include "liepp/kinematics/fk_result.h"
+#include "liepp/serial/fk/fk_result.h"
 
-#include "liepp/chain/joint_state.h"
-#include "liepp/chain/kinematic_chain.h"
+#include "liepp/serial/chain/joint_state.h"
+#include "liepp/serial/chain/kinematic_chain.h"
 
 #include <utility>
 

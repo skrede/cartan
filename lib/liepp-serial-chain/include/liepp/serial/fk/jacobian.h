@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_KINEMATICS_JACOBIAN_H
-#define HPP_GUARD_LIEPP_KINEMATICS_JACOBIAN_H
+#ifndef HPP_GUARD_LIEPP_SERIAL_FK_JACOBIAN_H
+#define HPP_GUARD_LIEPP_SERIAL_FK_JACOBIAN_H
 
 /// @file jacobian.h
 /// @brief Space and body Jacobian computation for kinematic chains.
@@ -13,9 +13,9 @@
 
 #include "liepp/types.h"
 
-#include "liepp/kinematics/fk_result.h"
+#include "liepp/serial/fk/fk_result.h"
 
-#include "liepp/chain/kinematic_chain.h"
+#include "liepp/serial/chain/kinematic_chain.h"
 
 #include <utility>
 #include <type_traits>

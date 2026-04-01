@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_IK_LIMITS_POLICY_H
-#define HPP_GUARD_LIEPP_IK_LIMITS_POLICY_H
+#ifndef HPP_GUARD_LIEPP_SERIAL_IK_LIMITS_POLICY_H
+#define HPP_GUARD_LIEPP_SERIAL_IK_LIMITS_POLICY_H
 
 /// @file limits_policy.h
 /// @brief Joint limit enforcement policies for IK solvers.
@@ -11,9 +11,9 @@
 /// Reference: Lynch & Park, Modern Robotics, Ch. 6.3 (null-space).
 ///            Decisions D-06, D-07 (IK-08).
 
-#include "liepp/chain/joint_state.h"
-#include "liepp/kinematics/jacobian.h"
-#include "liepp/chain/kinematic_chain.h"
+#include "liepp/serial/chain/joint_state.h"
+#include "liepp/serial/fk/jacobian.h"
+#include "liepp/serial/chain/kinematic_chain.h"
 
 #include <Eigen/SVD>
 

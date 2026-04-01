@@ -1,5 +1,5 @@
-#include <liepp/ik/lm_solve_policy.h>
-#include <liepp/ik/dls_solve_policy.h>
+#include <liepp/serial/ik/lm_solve_policy.h>
+#include <liepp/serial/ik/dls_solve_policy.h>
 
 #include <catch2/catch_test_macros.hpp>
 

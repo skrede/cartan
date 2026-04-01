@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_IK_DETAIL_NLOPT_COMMON_H
-#define HPP_GUARD_LIEPP_IK_DETAIL_NLOPT_COMMON_H
+#ifndef HPP_GUARD_LIEPP_SERIAL_IK_DETAIL_NLOPT_COMMON_H
+#define HPP_GUARD_LIEPP_SERIAL_IK_DETAIL_NLOPT_COMMON_H
 
 /// @file detail/nlopt_common.h
 /// @brief Shared NLopt wrapper helpers for NLopt-backed IK solve policies.
@@ -16,14 +16,14 @@
 
 #include "liepp/types.h"
 
-#include "liepp/ik/ik_types.h"
-#include "liepp/ik/limits_policy.h"
-#include "liepp/ik/detail/limit_enforcement.h"
+#include "liepp/serial/ik/ik_types.h"
+#include "liepp/serial/ik/limits_policy.h"
+#include "liepp/serial/ik/detail/limit_enforcement.h"
 
 #include "liepp/lie/se3.h"
-#include "liepp/chain/joint_state.h"
-#include "liepp/chain/kinematic_chain.h"
-#include "liepp/kinematics/forward_kinematics.h"
+#include "liepp/serial/chain/joint_state.h"
+#include "liepp/serial/chain/kinematic_chain.h"
+#include "liepp/serial/fk/forward_kinematics.h"
 
 #include <nlopt.hpp>
 

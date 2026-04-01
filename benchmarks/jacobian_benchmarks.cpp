@@ -1,7 +1,7 @@
 #include "benchmark_utils.h"
 
-#include <liepp/kinematics/forward_kinematics.h>
-#include <liepp/kinematics/jacobian.h>
+#include <liepp/serial/fk/forward_kinematics.h>
+#include <liepp/serial/fk/jacobian.h>
 
 #include <benchmark/benchmark.h>
 

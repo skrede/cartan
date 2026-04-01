@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_IK_IK_SOLVE_POLICY_H
-#define HPP_GUARD_LIEPP_IK_IK_SOLVE_POLICY_H
+#ifndef HPP_GUARD_LIEPP_SERIAL_IK_IK_SOLVE_POLICY_H
+#define HPP_GUARD_LIEPP_SERIAL_IK_IK_SOLVE_POLICY_H
 
 /// @file ik_solve_policy.h
 /// @brief Single-parameter concept for IK solve policies.
@@ -10,11 +10,11 @@
 ///
 /// Reference: Decision D-09.
 
-#include "liepp/ik/ik_types.h"
+#include "liepp/serial/ik/ik_types.h"
 
 #include "liepp/lie/se3.h"
-#include "liepp/chain/joint_state.h"
-#include "liepp/chain/kinematic_chain.h"
+#include "liepp/serial/chain/joint_state.h"
+#include "liepp/serial/chain/kinematic_chain.h"
 
 #include <concepts>
 
