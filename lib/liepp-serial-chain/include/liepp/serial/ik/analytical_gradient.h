@@ -6,7 +6,7 @@
 #include "liepp/lie/se3.h"
 #include "liepp/serial/ik/error_weight.h"
 #include "liepp/lie/se3_left_jacobian.h"
-#include "liepp/serial/chain/kinematic_chain.h"
+#include "liepp/serial/chain/chain_concept.h"
 #include "liepp/serial/fk/jacobian.h"
 #include "liepp/serial/fk/forward_kinematics.h"
 
@@ -35,15 +35,17 @@ struct gradient_result
 ///       W = diag(weights).
 ///
 /// Per Phase 09 fix: the gradient through log() requires J_log_inv.
-/// This is the default ObjectivePolicy for L-BFGS-B (per D-05).
-template <typename Scalar = double, int N = dynamic>
+/// This is the default ObjectivePolicy for L-BFGS-B.
+template <chain Chain>
 struct ik_se3_objective
 {
+    using Scalar = typename Chain::scalar_type;
+    static constexpr int N = Chain::joints;
     using position_type = typename joint_state<Scalar, N>::position_type;
 
     /// Evaluate objective only (no gradient computation).
     [[nodiscard]] static gradient_result<Scalar> evaluate(
-        const kinematic_chain<Scalar, N>& chain,
+        const Chain& chain,
         const se3<Scalar>& target,
         const position_type& q,
         const error_weight<Scalar>& weight = {})
@@ -59,7 +61,7 @@ struct ik_se3_objective
 
     /// Evaluate objective and analytical gradient w.r.t. q.
     [[nodiscard]] static auto evaluate_with_gradient(
-        const kinematic_chain<Scalar, N>& chain,
+        const Chain& chain,
         const se3<Scalar>& target,
         const position_type& q,
         const error_weight<Scalar>& weight = {})

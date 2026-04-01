@@ -7,14 +7,12 @@
 /// Extracts the limit enforcement logic from ik_solver into a reusable
 /// free function template. Policies call this in their step() method
 /// instead of relying on post-hoc enforcement by the solver.
-///
-/// Reference: Decision D-13.
 
 #include "liepp/serial/ik/limits_policy.h"
 
 #include "liepp/serial/chain/joint_state.h"
 #include "liepp/serial/fk/jacobian.h"
-#include "liepp/serial/chain/kinematic_chain.h"
+#include "liepp/serial/chain/chain_concept.h"
 #include "liepp/serial/fk/forward_kinematics.h"
 
 #include <Eigen/SVD>
@@ -34,20 +32,22 @@ namespace detail
 /// Otherwise, calls the simple enforce method.
 ///
 /// @tparam LimitsPolicy  Limit enforcement policy type.
-/// @tparam Scalar        Floating-point type.
-/// @tparam N             Number of joints (compile-time), or liepp::dynamic.
+/// @tparam Chain         A type satisfying the chain concept.
 /// @param q              Joint configuration to enforce limits on (modified in place).
-/// @param chain          Kinematic chain providing joint limits.
-template <typename LimitsPolicy, typename Scalar, int N>
+/// @param chain          Chain providing joint limits.
+template <typename LimitsPolicy, chain Chain>
 void enforce_limits(
-    typename joint_state<Scalar, N>::position_type& q,
-    const kinematic_chain<Scalar, N>& chain)
+    typename joint_state<typename Chain::scalar_type, Chain::joints>::position_type& q,
+    const Chain& chain)
 {
+    using Scalar = typename Chain::scalar_type;
+    static constexpr int N = Chain::joints;
+
     if constexpr (std::same_as<LimitsPolicy, no_limits>)
     {
         return;
     }
-    else if constexpr (has_extended_enforce<LimitsPolicy, Scalar, N>)
+    else if constexpr (has_extended_enforce<LimitsPolicy, Chain>)
     {
         auto fk = forward_kinematics(chain, q);
         auto J_b = body_jacobian(chain, fk);
@@ -57,12 +57,12 @@ void enforce_limits(
             : (Eigen::ComputeFullU | Eigen::ComputeFullV);
         Eigen::JacobiSVD<jacobian_matrix<Scalar, N>> svd(J_b, svd_options);
 
-        LimitsPolicy::template enforce_extended<Scalar, N>(
+        LimitsPolicy::template enforce_extended<Chain>(
             q, chain.limits(), J_b, svd);
     }
     else
     {
-        LimitsPolicy::template enforce<Scalar, N>(q, chain.limits());
+        LimitsPolicy::template enforce<Chain>(q, chain.limits());
     }
 }
 

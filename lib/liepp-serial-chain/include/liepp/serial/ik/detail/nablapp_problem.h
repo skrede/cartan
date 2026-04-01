@@ -12,7 +12,7 @@
 #include "liepp/serial/ik/analytical_gradient.h"
 
 #include "liepp/lie/se3.h"
-#include "liepp/serial/chain/kinematic_chain.h"
+#include "liepp/serial/chain/chain_concept.h"
 
 #include <Eigen/Core>
 
@@ -24,14 +24,16 @@ namespace liepp::detail
 ///
 /// Uses ik_se3_objective for consistent objective and gradient evaluation
 /// with SE(3) log Jacobian analytical gradient.
-template <typename Scalar, int N>
+template <chain Chain>
 class nablapp_ik_problem
 {
+    using Scalar = typename Chain::scalar_type;
+    static constexpr int N = Chain::joints;
     using position_type = typename joint_state<Scalar, N>::position_type;
 
 public:
     nablapp_ik_problem(
-        const kinematic_chain<Scalar, N>& chain,
+        const Chain& chain,
         const se3<Scalar>& target,
         const error_weight<Scalar>& weight)
         : m_chain{&chain}
@@ -47,14 +49,14 @@ public:
     double value(const Eigen::VectorXd& x) const
     {
         auto q = to_position(x);
-        auto result = ik_se3_objective<Scalar, N>::evaluate(*m_chain, m_target, q, m_weight);
+        auto result = ik_se3_objective<Chain>::evaluate(*m_chain, m_target, q, m_weight);
         return static_cast<double>(result.objective);
     }
 
     void gradient(const Eigen::VectorXd& x, Eigen::VectorXd& g) const
     {
         auto q = to_position(x);
-        auto result = ik_se3_objective<Scalar, N>::evaluate_with_gradient(
+        auto result = ik_se3_objective<Chain>::evaluate_with_gradient(
             *m_chain, m_target, q, m_weight);
 
         int n = m_chain->num_joints();
@@ -111,7 +113,7 @@ private:
         }
     }
 
-    const kinematic_chain<Scalar, N>* m_chain;
+    const Chain* m_chain;
     se3<Scalar> m_target;
     error_weight<Scalar> m_weight;
 };

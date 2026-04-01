@@ -14,7 +14,7 @@
 
 #include "liepp/serial/chain/joint_state.h"
 #include "liepp/serial/chain/joint_limits.h"
-#include "liepp/serial/chain/kinematic_chain.h"
+#include "liepp/serial/chain/chain_concept.h"
 
 #include <array>
 #include <cmath>
@@ -80,11 +80,13 @@ template <typename Scalar>
 /// joint space. The first `skip_count` entries are dropped to reduce
 /// initial correlation between dimensions.
 ///
-/// @tparam Scalar Floating-point type.
-/// @tparam N      Number of joints (compile-time) or liepp::dynamic.
-template <typename Scalar = double, int N = dynamic>
+/// @tparam Chain  A type satisfying the chain concept.
+template <chain Chain>
 class halton_seed_generator
 {
+    using Scalar = typename Chain::scalar_type;
+    static constexpr int N = Chain::joints;
+
 public:
     using position_type = typename joint_state<Scalar, N>::position_type;
 
@@ -94,8 +96,8 @@ public:
     /// Drop first 20 entries to reduce initial correlation between dimensions.
     static constexpr int skip_count = 20;
 
-    /// Construct from a kinematic chain (borrows reference; chain must outlive generator).
-    explicit halton_seed_generator(const kinematic_chain<Scalar, N>& chain)
+    /// Construct from a chain (borrows reference; chain must outlive generator).
+    explicit halton_seed_generator(const Chain& chain)
         : m_chain(&chain)
     {
     }
@@ -125,7 +127,7 @@ public:
     }
 
 private:
-    const kinematic_chain<Scalar, N>* m_chain;
+    const Chain* m_chain;
 };
 
 }

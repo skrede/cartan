@@ -9,11 +9,10 @@
 /// toward joint midpoints for redundant chains.
 ///
 /// Reference: Lynch & Park, Modern Robotics, Ch. 6.3 (null-space).
-///            Decisions D-06, D-07 (IK-08).
 
 #include "liepp/serial/chain/joint_state.h"
 #include "liepp/serial/fk/jacobian.h"
-#include "liepp/serial/chain/kinematic_chain.h"
+#include "liepp/serial/chain/chain_concept.h"
 
 #include <Eigen/SVD>
 
@@ -25,24 +24,24 @@ namespace liepp
 
 /// Concept detecting whether a limits policy has an extended enforce signature
 /// that accepts the body Jacobian and its SVD (for null-space projection).
-template <typename P, typename Scalar, int N>
+template <typename P, chain Chain>
 concept has_extended_enforce = requires(
-    typename joint_state<Scalar, N>::position_type& q,
-    const typename kinematic_chain<Scalar, N>::limits_storage& limits,
-    const jacobian_matrix<Scalar, N>& J_b,
-    const Eigen::JacobiSVD<jacobian_matrix<Scalar, N>>& svd)
+    typename joint_state<typename Chain::scalar_type, Chain::joints>::position_type& q,
+    const decltype(std::declval<const Chain&>().limits())& limits,
+    const jacobian_matrix<typename Chain::scalar_type, Chain::joints>& J_b,
+    const Eigen::JacobiSVD<jacobian_matrix<typename Chain::scalar_type, Chain::joints>>& svd)
 {
-    { P::template enforce_extended<Scalar, N>(q, limits, J_b, svd) };
+    { P::template enforce_extended<Chain>(q, limits, J_b, svd) };
 };
 
 /// No-op limit policy: applies no enforcement.
 /// Use when the stepper itself handles constraints (e.g., SQP with box bounds).
 struct no_limits
 {
-    template <typename Scalar, int N>
+    template <chain Chain>
     static void enforce(
-        typename joint_state<Scalar, N>::position_type&,
-        const typename kinematic_chain<Scalar, N>::limits_storage&)
+        typename joint_state<typename Chain::scalar_type, Chain::joints>::position_type&,
+        const auto&)
     {
     }
 };
@@ -51,10 +50,10 @@ struct no_limits
 /// Simple and robust, but may cause discontinuities at boundaries.
 struct clamp_limits
 {
-    template <typename Scalar, int N>
+    template <chain Chain>
     static void enforce(
-        typename joint_state<Scalar, N>::position_type& q,
-        const typename kinematic_chain<Scalar, N>::limits_storage& limits)
+        typename joint_state<typename Chain::scalar_type, Chain::joints>::position_type& q,
+        const auto& limits)
     {
         for (int i = 0; i < static_cast<int>(q.size()); ++i)
         {
@@ -80,12 +79,12 @@ struct clamp_limits
 struct null_space_limits
 {
     /// Simple fallback: just clamp (when Jacobian/SVD not available).
-    template <typename Scalar, int N>
+    template <chain Chain>
     static void enforce(
-        typename joint_state<Scalar, N>::position_type& q,
-        const typename kinematic_chain<Scalar, N>::limits_storage& limits)
+        typename joint_state<typename Chain::scalar_type, Chain::joints>::position_type& q,
+        const auto& limits)
     {
-        clamp_limits::enforce<Scalar, N>(q, limits);
+        clamp_limits::enforce<Chain>(q, limits);
     }
 
     /// Extended enforce with null-space projection.
@@ -93,14 +92,17 @@ struct null_space_limits
     /// Gradient: dq_null(i) = -gain * (q(i) - q_mid(i)) / (q_range(i)^2)
     /// Projection: dq_proj = V_null * V_null^T * dq_null
     /// Then safety clamp.
-    template <typename Scalar, int N>
+    template <chain Chain>
     static void enforce_extended(
-        typename joint_state<Scalar, N>::position_type& q,
-        const typename kinematic_chain<Scalar, N>::limits_storage& limits,
-        const jacobian_matrix<Scalar, N>&,
-        const Eigen::JacobiSVD<jacobian_matrix<Scalar, N>>& svd,
-        Scalar gain = Scalar(0.5))
+        typename joint_state<typename Chain::scalar_type, Chain::joints>::position_type& q,
+        const auto& limits,
+        const jacobian_matrix<typename Chain::scalar_type, Chain::joints>&,
+        const Eigen::JacobiSVD<jacobian_matrix<typename Chain::scalar_type, Chain::joints>>& svd,
+        typename Chain::scalar_type gain = typename Chain::scalar_type(0.5))
     {
+        using Scalar = typename Chain::scalar_type;
+        static constexpr int N = Chain::joints;
+
         int n = static_cast<int>(q.size());
         using vec_type = typename joint_state<Scalar, N>::position_type;
 
@@ -132,7 +134,7 @@ struct null_space_limits
         }
 
         // Safety clamp
-        clamp_limits::enforce<Scalar, N>(q, limits);
+        clamp_limits::enforce<Chain>(q, limits);
     }
 };
 
