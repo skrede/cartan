@@ -15,11 +15,14 @@
 /// Reference: Lynch & Park, Modern Robotics, Ch. 4, p. 119-158.
 
 #include "liepp/serial/fk/fk_result.h"
+#include "liepp/serial/fk/detail/axis_specializations.h"
 
 #include "liepp/serial/chain/joint_state.h"
 #include "liepp/serial/chain/chain_concept.h"
+#include "liepp/serial/chain/static_chain.h"
 #include "liepp/serial/chain/kinematic_chain.h"
 
+#include <tuple>
 #include <utility>
 
 namespace liepp
@@ -124,6 +127,41 @@ fk_result<Scalar, N> forward_kinematics(
     {
         return detail::fk_loop(chain, q);
     }
+}
+
+/// Specialized forward kinematics for static_chain exploiting compile-time
+/// joint tag knowledge. Each joint's SE3 exponential uses axis-specific
+/// quaternion construction and sparse left Jacobian entries instead of the
+/// generic Rodrigues exponential map.
+///
+/// Wins over the generic chain overload via partial ordering on
+/// static_chain<Scalar, Joints...>.
+template <typename Scalar, joint_tag... Joints>
+[[nodiscard]] fk_result<Scalar, static_cast<int>(sizeof...(Joints))>
+forward_kinematics(
+    const static_chain<Scalar, Joints...>& chain,
+    const typename joint_state<Scalar, static_cast<int>(sizeof...(Joints))>::position_type& q)
+{
+    constexpr int N = static_cast<int>(sizeof...(Joints));
+    fk_result<Scalar, N> result;
+    auto accum = se3<Scalar>::identity();
+
+    [&]<std::size_t... Is>(std::index_sequence<Is...>)
+    {
+        using joint_tuple = std::tuple<Joints...>;
+        ((
+            [&]<std::size_t I>()
+            {
+                using Joint = std::tuple_element_t<I, joint_tuple>;
+                accum = accum * detail::exp_joint<Joint>(
+                    q(static_cast<int>(I)), chain.axis(static_cast<int>(I)));
+                result.intermediates[I] = accum;
+            }.template operator()<Is>()
+        ), ...);
+    }(std::make_index_sequence<static_cast<std::size_t>(N)>{});
+
+    result.end_effector = accum * chain.home();
+    return result;
 }
 
 /// Generic forward kinematics for any chain type satisfying the chain concept.

@@ -14,10 +14,13 @@
 #include "liepp/types.h"
 
 #include "liepp/serial/fk/fk_result.h"
+#include "liepp/serial/fk/detail/axis_specializations.h"
 
 #include "liepp/serial/chain/chain_concept.h"
+#include "liepp/serial/chain/static_chain.h"
 #include "liepp/serial/chain/kinematic_chain.h"
 
+#include <tuple>
 #include <utility>
 #include <type_traits>
 
@@ -142,6 +145,58 @@ template <typename Scalar, int N>
 jacobian_matrix<Scalar, N> body_jacobian(
     const kinematic_chain<Scalar, N>& chain,
     const fk_result<Scalar, N>& fk)
+{
+    auto J_s = space_jacobian(chain, fk);
+    matrix6<Scalar> Ad_inv = fk.end_effector.inverse().adjoint();
+    return Ad_inv * J_s;
+}
+
+/// Specialized space Jacobian for static_chain exploiting compile-time
+/// joint tag knowledge. Computes each column via axis-specific adjoint-screw
+/// helpers that use column extraction and sparse multiply instead of the
+/// full 6x6 adjoint matrix.
+template <typename Scalar, joint_tag... Joints>
+[[nodiscard]] jacobian_matrix<Scalar, static_cast<int>(sizeof...(Joints))>
+space_jacobian(
+    const static_chain<Scalar, Joints...>& chain,
+    const fk_result<Scalar, static_cast<int>(sizeof...(Joints))>& fk)
+{
+    constexpr int N = static_cast<int>(sizeof...(Joints));
+    jacobian_matrix<Scalar, N> J;
+
+    [&]<std::size_t... Is>(std::index_sequence<Is...>)
+    {
+        using joint_tuple = std::tuple<Joints...>;
+        ((
+            [&]<std::size_t I>()
+            {
+                using Joint = std::tuple_element_t<I, joint_tuple>;
+                if constexpr (I == 0)
+                {
+                    detail::jacobian_column_identity<Joint>(
+                        J.col(0), chain.axis(0));
+                }
+                else
+                {
+                    detail::jacobian_column<Joint>(
+                        J.col(static_cast<int>(I)),
+                        fk.intermediates[I - 1],
+                        chain.axis(static_cast<int>(I)));
+                }
+            }.template operator()<Is>()
+        ), ...);
+    }(std::make_index_sequence<static_cast<std::size_t>(N)>{});
+
+    return J;
+}
+
+/// Specialized body Jacobian for static_chain.
+/// Delegates to the specialized space_jacobian and applies Ad_{T^{-1}}.
+template <typename Scalar, joint_tag... Joints>
+[[nodiscard]] jacobian_matrix<Scalar, static_cast<int>(sizeof...(Joints))>
+body_jacobian(
+    const static_chain<Scalar, Joints...>& chain,
+    const fk_result<Scalar, static_cast<int>(sizeof...(Joints))>& fk)
 {
     auto J_s = space_jacobian(chain, fk);
     matrix6<Scalar> Ad_inv = fk.end_effector.inverse().adjoint();
