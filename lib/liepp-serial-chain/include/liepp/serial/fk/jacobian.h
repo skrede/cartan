@@ -15,6 +15,7 @@
 
 #include "liepp/serial/fk/fk_result.h"
 
+#include "liepp/serial/chain/chain_concept.h"
 #include "liepp/serial/chain/kinematic_chain.h"
 
 #include <utility>
@@ -147,6 +148,51 @@ jacobian_matrix<Scalar, N> body_jacobian(
     return Ad_inv * J_s;
 }
 
-} // namespace liepp
+/// Generic space Jacobian for any chain type satisfying the chain concept.
+///
+/// J_si(q) = Ad_{T_{i-1}}(S_i), where T_0 = I (identity).
+/// The existing kinematic_chain overload wins via partial ordering.
+///
+/// Reference: Lynch & Park, Modern Robotics, Eq. 5.11, p. 178.
+template <chain Chain>
+[[nodiscard]] jacobian_matrix<typename Chain::scalar_type, Chain::joints>
+space_jacobian(
+    const Chain& chain,
+    const fk_result<typename Chain::scalar_type, Chain::joints>& fk)
+{
+    using Scalar = typename Chain::scalar_type;
+    constexpr int N = Chain::joints;
+    int n = chain.num_joints();
+
+    jacobian_matrix<Scalar, N> J;
+
+    J.col(0) = chain.axis(0).to_vector();
+
+    for (int i = 1; i < n; ++i)
+    {
+        J.col(i) = fk.intermediates[static_cast<std::size_t>(i - 1)].adjoint()
+                    * chain.axis(i).to_vector();
+    }
+
+    return J;
+}
+
+/// Generic body Jacobian for any chain type satisfying the chain concept.
+///
+/// J_b(q) = [Ad_{T^{-1}}] * J_s(q).
+///
+/// Reference: Lynch & Park, Modern Robotics, Eq. 5.22, p. 185.
+template <chain Chain>
+[[nodiscard]] jacobian_matrix<typename Chain::scalar_type, Chain::joints>
+body_jacobian(
+    const Chain& chain,
+    const fk_result<typename Chain::scalar_type, Chain::joints>& fk)
+{
+    auto J_s = space_jacobian(chain, fk);
+    matrix6<typename Chain::scalar_type> Ad_inv = fk.end_effector.inverse().adjoint();
+    return Ad_inv * J_s;
+}
+
+}
 
 #endif

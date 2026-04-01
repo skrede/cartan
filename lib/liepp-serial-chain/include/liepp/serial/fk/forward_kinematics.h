@@ -17,6 +17,7 @@
 #include "liepp/serial/fk/fk_result.h"
 
 #include "liepp/serial/chain/joint_state.h"
+#include "liepp/serial/chain/chain_concept.h"
 #include "liepp/serial/chain/kinematic_chain.h"
 
 #include <utility>
@@ -125,6 +126,37 @@ fk_result<Scalar, N> forward_kinematics(
     }
 }
 
-} // namespace liepp
+/// Generic forward kinematics for any chain type satisfying the chain concept.
+///
+/// Uses per-element axis(i) access and a runtime loop. The existing
+/// kinematic_chain overload is more constrained and wins for kinematic_chain
+/// arguments via partial ordering; this overload handles static_chain and
+/// any future chain types.
+///
+/// Lynch & Park, Modern Robotics, Eq. 4.10, p. 138.
+template <chain Chain>
+[[nodiscard]] fk_result<typename Chain::scalar_type, Chain::joints>
+forward_kinematics(
+    const Chain& chain,
+    const typename joint_state<typename Chain::scalar_type, Chain::joints>::position_type& q)
+{
+    using Scalar = typename Chain::scalar_type;
+    constexpr int N = Chain::joints;
+
+    fk_result<Scalar, N> result;
+    auto accum = se3<Scalar>::identity();
+    int n = chain.num_joints();
+
+    for (int i = 0; i < n; ++i)
+    {
+        accum = accum * se3<Scalar>::exp(chain.axis(i).to_vector() * q(i));
+        result.intermediates[static_cast<std::size_t>(i)] = accum;
+    }
+
+    result.end_effector = accum * chain.home();
+    return result;
+}
+
+}
 
 #endif
