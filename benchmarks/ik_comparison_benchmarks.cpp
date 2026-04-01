@@ -4,16 +4,20 @@
 /// Both solvers use the same random seed (42), same 10,000 targets (FK-generated,
 /// guaranteed reachable), and same convergence tolerance (eps = 1e-5).
 /// TRAC-IK uses maxtime=10.0 for convergence-based termination (Pitfall 3).
-/// liepp uses LM stepper (closest algorithmic match to TRAC-IK's Newton methods).
+/// liepp uses LM stepper (closest algorithmic match to TRAC-IK's Newton methods)
+/// and restart+LM (random-restart wrapper, closer to TRAC-IK's actual strategy).
 ///
 /// Reference: Beeson, P., & Ames, B. (2015). TRAC-IK: An open-source library
 ///            for improved solving of generic inverse kinematics.
 
 #include "benchmark_utils.h"
 
+#include <liepp/serial/ik/ik_types.h>
+#include <liepp/serial/ik/limits_policy.h>
+#include <liepp/serial/ik/default_solvers.h>
 #include <liepp/serial/ik/basic_ik_solver.h>
 #include <liepp/serial/ik/lm_solve_policy.h>
-#include <liepp/serial/ik/ik_types.h>
+#include <liepp/serial/ik/restart_solve_policy.h>
 
 #include <trac_ik/trac_ik.hpp>
 
@@ -96,7 +100,171 @@ void bm_liepp_comparison(
     }
 
     auto total = static_cast<int>(idx);
-    state.counters["success_rate"] = benchmark::Counter(
+    state.counters["Success_rate"] = benchmark::Counter(
+        100.0 * static_cast<double>(successes) / std::max(total, 1),
+        benchmark::Counter::kAvgThreads);
+    state.counters["avg_iterations"] = benchmark::Counter(
+        static_cast<double>(total_iterations) / std::max(successes, 1),
+        benchmark::Counter::kAvgThreads);
+    state.counters["avg_position_error"] = benchmark::Counter(
+        total_pos_error / std::max(successes, 1),
+        benchmark::Counter::kAvgThreads);
+    state.counters["avg_orientation_error"] = benchmark::Counter(
+        total_ori_error / std::max(successes, 1),
+        benchmark::Counter::kAvgThreads);
+}
+
+/// liepp restart+LM benchmark for a fixed-N chain.
+template <int N, typename LimitsPolicy = liepp::no_limits>
+void bm_liepp_restart_lm_comparison(
+    benchmark::State& state,
+    const liepp::kinematic_chain<double, N>& chain,
+    const target_set<double, N>& ts)
+{
+    using chain_t = liepp::kinematic_chain<double, N>;
+    using restart_lm = liepp::restart_solve_policy<
+        chain_t, liepp::lm_solve_policy<chain_t, LimitsPolicy>>;
+
+    liepp::convergence_criteria<double> criteria{1e-5, 1e-5, 200};
+
+    std::size_t idx = 0;
+    int successes = 0;
+    int total_iterations = 0;
+    double total_pos_error = 0.0;
+    double total_ori_error = 0.0;
+
+    for (auto _ : state)
+    {
+        auto& target = ts.targets[idx % static_cast<std::size_t>(num_targets)];
+        auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
+        ++idx;
+
+        liepp::basic_ik_solver<restart_lm> solver;
+        solver.setup(chain, target, q_seed, criteria);
+        auto result = solver.solve();
+
+        if (result.has_value())
+        {
+            ++successes;
+            total_iterations += result->iterations;
+            auto [pos_err, ori_err] = liepp::benchmarks::compute_pose_errors(
+                chain, result->solution.position, target);
+            total_pos_error += pos_err;
+            total_ori_error += ori_err;
+        }
+        benchmark::DoNotOptimize(result);
+    }
+
+    auto total = static_cast<int>(idx);
+    state.counters["Success_rate"] = benchmark::Counter(
+        100.0 * static_cast<double>(successes) / std::max(total, 1),
+        benchmark::Counter::kAvgThreads);
+    state.counters["avg_iterations"] = benchmark::Counter(
+        static_cast<double>(total_iterations) / std::max(successes, 1),
+        benchmark::Counter::kAvgThreads);
+    state.counters["avg_position_error"] = benchmark::Counter(
+        total_pos_error / std::max(successes, 1),
+        benchmark::Counter::kAvgThreads);
+    state.counters["avg_orientation_error"] = benchmark::Counter(
+        total_ori_error / std::max(successes, 1),
+        benchmark::Counter::kAvgThreads);
+}
+
+/// liepp speed solver (restart+projected LM with joint limits) benchmark.
+template <int N>
+void bm_liepp_speed_comparison(
+    benchmark::State& state,
+    const liepp::kinematic_chain<double, N>& chain,
+    const target_set<double, N>& ts)
+{
+    using chain_t = liepp::kinematic_chain<double, N>;
+
+    liepp::convergence_criteria<double> criteria{1e-5, 1e-5, 200};
+
+    std::size_t idx = 0;
+    int successes = 0;
+    int total_iterations = 0;
+    double total_pos_error = 0.0;
+    double total_ori_error = 0.0;
+
+    for (auto _ : state)
+    {
+        auto& target = ts.targets[idx % static_cast<std::size_t>(num_targets)];
+        auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
+        ++idx;
+
+        liepp::basic_ik_solver<liepp::speed_solver<chain_t>> solver;
+        solver.setup(chain, target, q_seed, criteria);
+        auto result = solver.solve();
+
+        if (result.has_value())
+        {
+            ++successes;
+            total_iterations += result->iterations;
+            auto [pos_err, ori_err] = liepp::benchmarks::compute_pose_errors(
+                chain, result->solution.position, target);
+            total_pos_error += pos_err;
+            total_ori_error += ori_err;
+        }
+        benchmark::DoNotOptimize(result);
+    }
+
+    auto total = static_cast<int>(idx);
+    state.counters["Success_rate"] = benchmark::Counter(
+        100.0 * static_cast<double>(successes) / std::max(total, 1),
+        benchmark::Counter::kAvgThreads);
+    state.counters["avg_iterations"] = benchmark::Counter(
+        static_cast<double>(total_iterations) / std::max(successes, 1),
+        benchmark::Counter::kAvgThreads);
+    state.counters["avg_position_error"] = benchmark::Counter(
+        total_pos_error / std::max(successes, 1),
+        benchmark::Counter::kAvgThreads);
+    state.counters["avg_orientation_error"] = benchmark::Counter(
+        total_ori_error / std::max(successes, 1),
+        benchmark::Counter::kAvgThreads);
+}
+
+/// liepp racing solver (speed + convergence, both limit-respecting) benchmark.
+template <int N>
+void bm_liepp_racing_comparison(
+    benchmark::State& state,
+    const liepp::kinematic_chain<double, N>& chain,
+    const target_set<double, N>& ts)
+{
+    using chain_t = liepp::kinematic_chain<double, N>;
+
+    liepp::convergence_criteria<double> criteria{1e-5, 1e-5, 500};
+
+    std::size_t idx = 0;
+    int successes = 0;
+    int total_iterations = 0;
+    double total_pos_error = 0.0;
+    double total_ori_error = 0.0;
+
+    for (auto _ : state)
+    {
+        auto& target = ts.targets[idx % static_cast<std::size_t>(num_targets)];
+        auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
+        ++idx;
+
+        liepp::default_solver<chain_t> solver;
+        solver.setup(chain, target, q_seed, criteria);
+        auto result = solver.solve();
+
+        if (result.has_value())
+        {
+            ++successes;
+            total_iterations += result->iterations;
+            auto [pos_err, ori_err] = liepp::benchmarks::compute_pose_errors(
+                chain, result->solution.position, target);
+            total_pos_error += pos_err;
+            total_ori_error += ori_err;
+        }
+        benchmark::DoNotOptimize(result);
+    }
+
+    auto total = static_cast<int>(idx);
+    state.counters["Success_rate"] = benchmark::Counter(
         100.0 * static_cast<double>(successes) / std::max(total, 1),
         benchmark::Counter::kAvgThreads);
     state.counters["avg_iterations"] = benchmark::Counter(
@@ -162,9 +330,12 @@ void bm_trac_ik_comparison(
     }
 
     auto total = static_cast<int>(idx);
-    state.counters["success_rate"] = benchmark::Counter(
+    state.counters["Success_rate"] = benchmark::Counter(
         100.0 * static_cast<double>(successes) / std::max(total, 1),
         benchmark::Counter::kAvgThreads);
+    state.counters["avg_iterations"] = benchmark::Counter(0, benchmark::Counter::kAvgThreads);
+    state.counters["avg_position_error"] = benchmark::Counter(0, benchmark::Counter::kAvgThreads);
+    state.counters["avg_orientation_error"] = benchmark::Counter(0, benchmark::Counter::kAvgThreads);
 }
 
 // ============================================================================
@@ -192,6 +363,38 @@ static void bm_comparison_ur3e_trac_ik(benchmark::State& state)
 }
 BENCHMARK(bm_comparison_ur3e_trac_ik)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
+static void bm_comparison_ur3e_liepp_restart_lm(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_ur3e_chain<double>();
+    static const target_set<double, 6> ts(chain, num_targets, 42);
+    bm_liepp_restart_lm_comparison<6>(state, chain, ts);
+}
+BENCHMARK(bm_comparison_ur3e_liepp_restart_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_ur3e_liepp_restart_lm_clamped(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_ur3e_chain<double>();
+    static const target_set<double, 6> ts(chain, num_targets, 42);
+    bm_liepp_restart_lm_comparison<6, liepp::clamp_limits>(state, chain, ts);
+}
+BENCHMARK(bm_comparison_ur3e_liepp_restart_lm_clamped)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_ur3e_liepp_speed(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_ur3e_chain<double>();
+    static const target_set<double, 6> ts(chain, num_targets, 42);
+    bm_liepp_speed_comparison<6>(state, chain, ts);
+}
+BENCHMARK(bm_comparison_ur3e_liepp_speed)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_ur3e_liepp_racing(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_ur3e_chain<double>();
+    static const target_set<double, 6> ts(chain, num_targets, 42);
+    bm_liepp_racing_comparison<6>(state, chain, ts);
+}
+BENCHMARK(bm_comparison_ur3e_liepp_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
 // --- KR 6 SIXX ---
 
 static void bm_comparison_kr6_sixx_liepp(benchmark::State& state)
@@ -212,6 +415,38 @@ static void bm_comparison_kr6_sixx_trac_ik(benchmark::State& state)
     bm_trac_ik_comparison<6>(state, kdl_chain, q_min, q_max, ts);
 }
 BENCHMARK(bm_comparison_kr6_sixx_trac_ik)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_kr6_sixx_liepp_restart_lm(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_kr6_sixx_chain<double>();
+    static const target_set<double, 6> ts(chain, num_targets, 42);
+    bm_liepp_restart_lm_comparison<6>(state, chain, ts);
+}
+BENCHMARK(bm_comparison_kr6_sixx_liepp_restart_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_kr6_sixx_liepp_restart_lm_clamped(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_kr6_sixx_chain<double>();
+    static const target_set<double, 6> ts(chain, num_targets, 42);
+    bm_liepp_restart_lm_comparison<6, liepp::clamp_limits>(state, chain, ts);
+}
+BENCHMARK(bm_comparison_kr6_sixx_liepp_restart_lm_clamped)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_kr6_sixx_liepp_speed(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_kr6_sixx_chain<double>();
+    static const target_set<double, 6> ts(chain, num_targets, 42);
+    bm_liepp_speed_comparison<6>(state, chain, ts);
+}
+BENCHMARK(bm_comparison_kr6_sixx_liepp_speed)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_kr6_sixx_liepp_racing(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_kr6_sixx_chain<double>();
+    static const target_set<double, 6> ts(chain, num_targets, 42);
+    bm_liepp_racing_comparison<6>(state, chain, ts);
+}
+BENCHMARK(bm_comparison_kr6_sixx_liepp_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 // --- ABB IRB 120 ---
 
@@ -234,6 +469,38 @@ static void bm_comparison_abb_irb120_trac_ik(benchmark::State& state)
 }
 BENCHMARK(bm_comparison_abb_irb120_trac_ik)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
+static void bm_comparison_abb_irb120_liepp_restart_lm(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_abb_irb120_chain<double>();
+    static const target_set<double, 6> ts(chain, num_targets, 42);
+    bm_liepp_restart_lm_comparison<6>(state, chain, ts);
+}
+BENCHMARK(bm_comparison_abb_irb120_liepp_restart_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_abb_irb120_liepp_restart_lm_clamped(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_abb_irb120_chain<double>();
+    static const target_set<double, 6> ts(chain, num_targets, 42);
+    bm_liepp_restart_lm_comparison<6, liepp::clamp_limits>(state, chain, ts);
+}
+BENCHMARK(bm_comparison_abb_irb120_liepp_restart_lm_clamped)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_abb_irb120_liepp_speed(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_abb_irb120_chain<double>();
+    static const target_set<double, 6> ts(chain, num_targets, 42);
+    bm_liepp_speed_comparison<6>(state, chain, ts);
+}
+BENCHMARK(bm_comparison_abb_irb120_liepp_speed)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_abb_irb120_liepp_racing(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_abb_irb120_chain<double>();
+    static const target_set<double, 6> ts(chain, num_targets, 42);
+    bm_liepp_racing_comparison<6>(state, chain, ts);
+}
+BENCHMARK(bm_comparison_abb_irb120_liepp_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
 // --- Jaco2 ---
 
 static void bm_comparison_jaco2_liepp(benchmark::State& state)
@@ -254,6 +521,38 @@ static void bm_comparison_jaco2_trac_ik(benchmark::State& state)
     bm_trac_ik_comparison<6>(state, kdl_chain, q_min, q_max, ts);
 }
 BENCHMARK(bm_comparison_jaco2_trac_ik)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_jaco2_liepp_restart_lm(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_jaco2_chain<double>();
+    static const target_set<double, 6> ts(chain, num_targets, 42);
+    bm_liepp_restart_lm_comparison<6>(state, chain, ts);
+}
+BENCHMARK(bm_comparison_jaco2_liepp_restart_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_jaco2_liepp_restart_lm_clamped(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_jaco2_chain<double>();
+    static const target_set<double, 6> ts(chain, num_targets, 42);
+    bm_liepp_restart_lm_comparison<6, liepp::clamp_limits>(state, chain, ts);
+}
+BENCHMARK(bm_comparison_jaco2_liepp_restart_lm_clamped)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_jaco2_liepp_speed(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_jaco2_chain<double>();
+    static const target_set<double, 6> ts(chain, num_targets, 42);
+    bm_liepp_speed_comparison<6>(state, chain, ts);
+}
+BENCHMARK(bm_comparison_jaco2_liepp_speed)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_jaco2_liepp_racing(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_jaco2_chain<double>();
+    static const target_set<double, 6> ts(chain, num_targets, 42);
+    bm_liepp_racing_comparison<6>(state, chain, ts);
+}
+BENCHMARK(bm_comparison_jaco2_liepp_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 // ============================================================================
 // 7-DOF robots
@@ -280,6 +579,38 @@ static void bm_comparison_lbr_med14_trac_ik(benchmark::State& state)
 }
 BENCHMARK(bm_comparison_lbr_med14_trac_ik)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
+static void bm_comparison_lbr_med14_liepp_restart_lm(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_lbr_med14_chain<double>();
+    static const target_set<double, 7> ts(chain, num_targets, 42);
+    bm_liepp_restart_lm_comparison<7>(state, chain, ts);
+}
+BENCHMARK(bm_comparison_lbr_med14_liepp_restart_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_lbr_med14_liepp_restart_lm_clamped(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_lbr_med14_chain<double>();
+    static const target_set<double, 7> ts(chain, num_targets, 42);
+    bm_liepp_restart_lm_comparison<7, liepp::clamp_limits>(state, chain, ts);
+}
+BENCHMARK(bm_comparison_lbr_med14_liepp_restart_lm_clamped)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_lbr_med14_liepp_speed(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_lbr_med14_chain<double>();
+    static const target_set<double, 7> ts(chain, num_targets, 42);
+    bm_liepp_speed_comparison<7>(state, chain, ts);
+}
+BENCHMARK(bm_comparison_lbr_med14_liepp_speed)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_lbr_med14_liepp_racing(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_lbr_med14_chain<double>();
+    static const target_set<double, 7> ts(chain, num_targets, 42);
+    bm_liepp_racing_comparison<7>(state, chain, ts);
+}
+BENCHMARK(bm_comparison_lbr_med14_liepp_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
 // --- Panda ---
 
 static void bm_comparison_panda_liepp(benchmark::State& state)
@@ -300,6 +631,38 @@ static void bm_comparison_panda_trac_ik(benchmark::State& state)
     bm_trac_ik_comparison<7>(state, kdl_chain, q_min, q_max, ts);
 }
 BENCHMARK(bm_comparison_panda_trac_ik)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_panda_liepp_restart_lm(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_panda_chain<double>();
+    static const target_set<double, 7> ts(chain, num_targets, 42);
+    bm_liepp_restart_lm_comparison<7>(state, chain, ts);
+}
+BENCHMARK(bm_comparison_panda_liepp_restart_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_panda_liepp_restart_lm_clamped(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_panda_chain<double>();
+    static const target_set<double, 7> ts(chain, num_targets, 42);
+    bm_liepp_restart_lm_comparison<7, liepp::clamp_limits>(state, chain, ts);
+}
+BENCHMARK(bm_comparison_panda_liepp_restart_lm_clamped)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_panda_liepp_speed(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_panda_chain<double>();
+    static const target_set<double, 7> ts(chain, num_targets, 42);
+    bm_liepp_speed_comparison<7>(state, chain, ts);
+}
+BENCHMARK(bm_comparison_panda_liepp_speed)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_panda_liepp_racing(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_panda_chain<double>();
+    static const target_set<double, 7> ts(chain, num_targets, 42);
+    bm_liepp_racing_comparison<7>(state, chain, ts);
+}
+BENCHMARK(bm_comparison_panda_liepp_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 // --- Fetch ---
 
@@ -322,6 +685,38 @@ static void bm_comparison_fetch_trac_ik(benchmark::State& state)
 }
 BENCHMARK(bm_comparison_fetch_trac_ik)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
+static void bm_comparison_fetch_liepp_restart_lm(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_fetch_chain<double>();
+    static const target_set<double, 7> ts(chain, num_targets, 42);
+    bm_liepp_restart_lm_comparison<7>(state, chain, ts);
+}
+BENCHMARK(bm_comparison_fetch_liepp_restart_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_fetch_liepp_restart_lm_clamped(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_fetch_chain<double>();
+    static const target_set<double, 7> ts(chain, num_targets, 42);
+    bm_liepp_restart_lm_comparison<7, liepp::clamp_limits>(state, chain, ts);
+}
+BENCHMARK(bm_comparison_fetch_liepp_restart_lm_clamped)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_fetch_liepp_speed(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_fetch_chain<double>();
+    static const target_set<double, 7> ts(chain, num_targets, 42);
+    bm_liepp_speed_comparison<7>(state, chain, ts);
+}
+BENCHMARK(bm_comparison_fetch_liepp_speed)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_fetch_liepp_racing(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_fetch_chain<double>();
+    static const target_set<double, 7> ts(chain, num_targets, 42);
+    bm_liepp_racing_comparison<7>(state, chain, ts);
+}
+BENCHMARK(bm_comparison_fetch_liepp_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
 // --- Baxter ---
 
 static void bm_comparison_baxter_liepp(benchmark::State& state)
@@ -343,6 +738,38 @@ static void bm_comparison_baxter_trac_ik(benchmark::State& state)
 }
 BENCHMARK(bm_comparison_baxter_trac_ik)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
+static void bm_comparison_baxter_liepp_restart_lm(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_baxter_chain<double>();
+    static const target_set<double, 7> ts(chain, num_targets, 42);
+    bm_liepp_restart_lm_comparison<7>(state, chain, ts);
+}
+BENCHMARK(bm_comparison_baxter_liepp_restart_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_baxter_liepp_restart_lm_clamped(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_baxter_chain<double>();
+    static const target_set<double, 7> ts(chain, num_targets, 42);
+    bm_liepp_restart_lm_comparison<7, liepp::clamp_limits>(state, chain, ts);
+}
+BENCHMARK(bm_comparison_baxter_liepp_restart_lm_clamped)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_baxter_liepp_speed(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_baxter_chain<double>();
+    static const target_set<double, 7> ts(chain, num_targets, 42);
+    bm_liepp_speed_comparison<7>(state, chain, ts);
+}
+BENCHMARK(bm_comparison_baxter_liepp_speed)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_baxter_liepp_racing(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_baxter_chain<double>();
+    static const target_set<double, 7> ts(chain, num_targets, 42);
+    bm_liepp_racing_comparison<7>(state, chain, ts);
+}
+BENCHMARK(bm_comparison_baxter_liepp_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
 // --- KUKA LWR 4+ ---
 
 static void bm_comparison_kuka_lwr4_liepp(benchmark::State& state)
@@ -363,5 +790,37 @@ static void bm_comparison_kuka_lwr4_trac_ik(benchmark::State& state)
     bm_trac_ik_comparison<7>(state, kdl_chain, q_min, q_max, ts);
 }
 BENCHMARK(bm_comparison_kuka_lwr4_trac_ik)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_kuka_lwr4_liepp_restart_lm(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_kuka_lwr4_chain<double>();
+    static const target_set<double, 7> ts(chain, num_targets, 42);
+    bm_liepp_restart_lm_comparison<7>(state, chain, ts);
+}
+BENCHMARK(bm_comparison_kuka_lwr4_liepp_restart_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_kuka_lwr4_liepp_restart_lm_clamped(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_kuka_lwr4_chain<double>();
+    static const target_set<double, 7> ts(chain, num_targets, 42);
+    bm_liepp_restart_lm_comparison<7, liepp::clamp_limits>(state, chain, ts);
+}
+BENCHMARK(bm_comparison_kuka_lwr4_liepp_restart_lm_clamped)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_kuka_lwr4_liepp_speed(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_kuka_lwr4_chain<double>();
+    static const target_set<double, 7> ts(chain, num_targets, 42);
+    bm_liepp_speed_comparison<7>(state, chain, ts);
+}
+BENCHMARK(bm_comparison_kuka_lwr4_liepp_speed)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_kuka_lwr4_liepp_racing(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_kuka_lwr4_chain<double>();
+    static const target_set<double, 7> ts(chain, num_targets, 42);
+    bm_liepp_racing_comparison<7>(state, chain, ts);
+}
+BENCHMARK(bm_comparison_kuka_lwr4_liepp_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 } // anonymous namespace
