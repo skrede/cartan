@@ -16,6 +16,7 @@
 #include "liepp/serial/chain/screw_axis.h"
 #include "liepp/serial/chain/joint_limits.h"
 #include "liepp/serial/chain/storage_trait.h"
+#include "liepp/serial/chain/chain_concept.h"
 
 #include "liepp/lie/se3.h"
 
@@ -37,6 +38,9 @@ class kinematic_chain
 {
     static_assert(std::is_floating_point_v<Scalar>, "kinematic_chain requires a floating-point Scalar type");
 public:
+    using scalar_type = Scalar;
+    static constexpr int joints = N;
+
     using screw_storage = detail::storage_t<N, screw_axis<Scalar>>;
     using limits_storage = detail::storage_t<N, joint_limits<Scalar>>;
 
@@ -70,6 +74,12 @@ public:
         return static_cast<int>(m_axes.size());
     }
 
+    /// Access a single screw axis by index.
+    [[nodiscard]] const screw_axis<Scalar>& axis(int i) const
+    {
+        return m_axes[static_cast<std::size_t>(i)];
+    }
+
     /// Convert a fixed-size chain to a dynamic chain.
     /// Only available when N is a fixed (non-dynamic) value.
     [[nodiscard]] kinematic_chain<Scalar, dynamic> to_dynamic() const
@@ -87,6 +97,11 @@ private:
     limits_storage m_limits;    ///< Joint limits
 };
 
-} // namespace liepp
+static_assert(chain<kinematic_chain<double, 3>>,
+    "kinematic_chain<double, 3> must satisfy chain concept");
+static_assert(chain<kinematic_chain<double, dynamic>>,
+    "kinematic_chain<double, dynamic> must satisfy chain concept");
+
+}
 
 #endif

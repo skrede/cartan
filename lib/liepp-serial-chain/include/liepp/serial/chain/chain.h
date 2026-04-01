@@ -5,9 +5,11 @@
 /// @brief Convenience include-all for the chain module.
 
 #include "liepp/serial/chain/screw_axis.h"
+#include "liepp/serial/chain/joint_tags.h"
 #include "liepp/serial/chain/joint_state.h"
 #include "liepp/serial/chain/joint_limits.h"
 #include "liepp/serial/chain/storage_trait.h"
+#include "liepp/serial/chain/chain_concept.h"
 #include "liepp/serial/chain/kinematic_chain.h"
 
 #endif
