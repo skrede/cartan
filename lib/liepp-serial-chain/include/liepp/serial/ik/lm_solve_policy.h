@@ -23,9 +23,9 @@
 #include "liepp/serial/ik/detail/limit_enforcement.h"
 
 #include "liepp/lie/se3.h"
-#include "liepp/serial/chain/joint_state.h"
 #include "liepp/serial/fk/jacobian.h"
-#include "liepp/serial/chain/kinematic_chain.h"
+#include "liepp/serial/chain/joint_state.h"
+#include "liepp/serial/chain/chain_concept.h"
 #include "liepp/serial/fk/forward_kinematics.h"
 
 #include <Eigen/Dense>
@@ -45,24 +45,25 @@ namespace liepp
 ///
 /// Reference: Lynch & Park, Modern Robotics, Ch. 6.2.
 ///            Nielsen, Damping Parameter in Marquardt's Method, 1999.
-template <typename Scalar = double, int N = dynamic, typename LimitsPolicy = clamp_limits>
+template <chain Chain, typename LimitsPolicy = clamp_limits>
 class lm_solve_policy
 {
 public:
-    static_assert(std::is_floating_point_v<Scalar>, "lm_solve_policy requires a floating-point Scalar type");
-
-    using scalar_type = Scalar;
-    static constexpr int joints = N;
+    using chain_type = Chain;
+    using scalar_type = typename Chain::scalar_type;
+    static constexpr int joints = Chain::joints;
     using limits_type = LimitsPolicy;
 
-    using position_type = typename joint_state<Scalar, N>::position_type;
+    using position_type = typename joint_state<scalar_type, joints>::position_type;
+
+    static_assert(std::is_floating_point_v<scalar_type>, "lm_solve_policy requires a floating-point Scalar type");
 
     /// Tunable parameters for the LM solve policy.
     struct options
     {
-        Scalar initial_lambda_factor{Scalar(1e-3)};
-        Scalar stall_threshold{Scalar(1e-6)};
-        Scalar divergence_factor{Scalar(10)};
+        scalar_type initial_lambda_factor{scalar_type(1e-3)};
+        scalar_type stall_threshold{scalar_type(1e-6)};
+        scalar_type divergence_factor{scalar_type(10)};
         int stall_window{5};
     };
 
@@ -76,17 +77,17 @@ public:
     /// Initialize the solve policy with chain, target pose, seed configuration,
     /// and convergence criteria.
     void setup(
-        const kinematic_chain<Scalar, N>& chain,
-        const se3<Scalar>& target,
+        const Chain& chain,
+        const se3<scalar_type>& target,
         const position_type& q0,
-        const convergence_criteria<Scalar>& criteria)
+        const convergence_criteria<scalar_type>& criteria)
     {
         m_target = target;
         m_q = q0;
         m_criteria = criteria;
         m_iterations = 0;
         m_status = ik_status::running;
-        m_nu = Scalar(2);
+        m_nu = scalar_type(2);
         m_error_history.clear();
 
         auto fk = forward_kinematics(chain, m_q);
@@ -98,22 +99,22 @@ public:
         auto J_b = body_jacobian(chain, fk);
         int n = static_cast<int>(J_b.cols());
         auto JtJ = (J_b.transpose() * J_b).eval();
-        Scalar max_diag{0};
+        scalar_type max_diag{0};
         for (int i = 0; i < n; ++i)
         {
             max_diag = std::max(max_diag, JtJ(i, i));
         }
         m_lambda = m_options.initial_lambda_factor * max_diag;
-        if (m_lambda < std::numeric_limits<Scalar>::epsilon())
+        if (m_lambda < std::numeric_limits<scalar_type>::epsilon())
         {
-            m_lambda = Scalar(1e-4);
+            m_lambda = scalar_type(1e-4);
         }
     }
 
     /// Execute one Levenberg-Marquardt iteration.
     ///
     /// Lynch & Park, Modern Robotics, Ch. 6.2, with Nielsen lambda update.
-    ik_status step(const kinematic_chain<Scalar, N>& chain)
+    ik_status step(const Chain& chain)
     {
         if (m_status != ik_status::running)
         {
@@ -151,9 +152,9 @@ public:
 
         // (f) Solve (H + lambda * I) dq = g
         using dq_matrix = std::conditional_t<
-            N == dynamic,
-            Eigen::MatrixX<Scalar>,
-            Eigen::Matrix<Scalar, N, N>>;
+            joints == dynamic,
+            Eigen::MatrixX<scalar_type>,
+            Eigen::Matrix<scalar_type, joints, joints>>;
 
         dq_matrix A = H;
         for (int i = 0; i < n; ++i)
@@ -196,7 +197,7 @@ public:
     [[nodiscard]] const position_type& solution() const { return m_q; }
 
     /// Current error norm (body-frame twist magnitude).
-    [[nodiscard]] Scalar error_norm() const { return m_error_norm; }
+    [[nodiscard]] scalar_type error_norm() const { return m_error_norm; }
 
     /// Number of iterations executed so far.
     [[nodiscard]] int iterations() const { return m_iterations; }
@@ -205,7 +206,7 @@ public:
     void abort() {}
 
     /// Current damping parameter lambda.
-    [[nodiscard]] Scalar lambda() const { return m_lambda; }
+    [[nodiscard]] scalar_type lambda() const { return m_lambda; }
 
     /// Current solve policy status.
     [[nodiscard]] ik_status status() const { return m_status; }
@@ -216,42 +217,42 @@ private:
         const position_type& dq,
         const auto& g,
         const position_type& q_trial,
-        const vector6<Scalar>& V_b_trial)
+        const vector6<scalar_type>& V_b_trial)
     {
-        Scalar error_old_sq = m_V_b.squaredNorm();
-        Scalar error_new_sq = V_b_trial.squaredNorm();
-        Scalar predicted_reduction = (dq.transpose() * (m_lambda * dq + g)).value();
-        Scalar rho{0};
-        if (std::abs(predicted_reduction) > std::numeric_limits<Scalar>::epsilon())
+        scalar_type error_old_sq = m_V_b.squaredNorm();
+        scalar_type error_new_sq = V_b_trial.squaredNorm();
+        scalar_type predicted_reduction = (dq.transpose() * (m_lambda * dq + g)).value();
+        scalar_type rho{0};
+        if (std::abs(predicted_reduction) > std::numeric_limits<scalar_type>::epsilon())
         {
             rho = (error_old_sq - error_new_sq) / predicted_reduction;
         }
 
-        if (rho > Scalar(0))
+        if (rho > scalar_type(0))
         {
             m_q = q_trial;
             m_V_b = V_b_trial;
-            Scalar factor = Scalar(1) - std::pow(Scalar(2) * rho - Scalar(1), Scalar(3));
-            m_lambda *= std::max(Scalar(1) / Scalar(3), factor);
-            m_nu = Scalar(2);
+            scalar_type factor = scalar_type(1) - std::pow(scalar_type(2) * rho - scalar_type(1), scalar_type(3));
+            m_lambda *= std::max(scalar_type(1) / scalar_type(3), factor);
+            m_nu = scalar_type(2);
         }
         else
         {
             m_lambda *= m_nu;
-            m_nu *= Scalar(2);
+            m_nu *= scalar_type(2);
         }
     }
 
-    se3<Scalar> m_target{se3<Scalar>::identity()};
+    se3<scalar_type> m_target{se3<scalar_type>::identity()};
     position_type m_q{};
-    vector6<Scalar> m_V_b{vector6<Scalar>::Zero()};
-    convergence_criteria<Scalar> m_criteria{};
+    vector6<scalar_type> m_V_b{vector6<scalar_type>::Zero()};
+    convergence_criteria<scalar_type> m_criteria{};
     options m_options{};
-    std::vector<Scalar> m_error_history;
-    Scalar m_initial_error{};
-    Scalar m_error_norm{};
-    Scalar m_lambda{};
-    Scalar m_nu{Scalar(2)};
+    std::vector<scalar_type> m_error_history;
+    scalar_type m_initial_error{};
+    scalar_type m_error_norm{};
+    scalar_type m_lambda{};
+    scalar_type m_nu{scalar_type(2)};
     int m_iterations{};
     ik_status m_status{ik_status::running};
 };

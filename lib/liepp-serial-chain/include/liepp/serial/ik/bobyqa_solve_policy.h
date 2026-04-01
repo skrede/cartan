@@ -21,7 +21,7 @@
 
 #include "liepp/lie/se3.h"
 #include "liepp/serial/chain/joint_state.h"
-#include "liepp/serial/chain/kinematic_chain.h"
+#include "liepp/serial/chain/chain_concept.h"
 #include "liepp/serial/fk/forward_kinematics.h"
 
 #include <nablapp/solver/basic_solver.h>
@@ -46,23 +46,24 @@ namespace liepp
 ///
 /// This is the default (unprefixed) BOBYQA policy. The NLopt-backed variant
 /// is available as nlopt_bobyqa_solve_policy behind LIEPP_HAS_NLOPT.
-template <typename Scalar = double, int N = dynamic, typename LimitsPolicy = clamp_limits>
+template <chain Chain, typename LimitsPolicy = clamp_limits>
 class bobyqa_solve_policy
 {
 public:
-    static_assert(std::is_floating_point_v<Scalar>, "bobyqa_solve_policy requires a floating-point Scalar type");
-
-    using scalar_type = Scalar;
-    static constexpr int joints = N;
+    using chain_type = Chain;
+    using scalar_type = typename Chain::scalar_type;
+    static constexpr int joints = Chain::joints;
     using limits_type = LimitsPolicy;
 
-    using position_type = typename joint_state<Scalar, N>::position_type;
+    using position_type = typename joint_state<scalar_type, joints>::position_type;
+
+    static_assert(std::is_floating_point_v<scalar_type>, "bobyqa_solve_policy requires a floating-point Scalar type");
 
     struct options
     {
         int budget_per_step{50};
-        Scalar stall_threshold{Scalar(1e-10)};
-        Scalar divergence_factor{Scalar(10)};
+        scalar_type stall_threshold{scalar_type(1e-10)};
+        scalar_type divergence_factor{scalar_type(10)};
         int stall_window{5};
     };
 
@@ -73,16 +74,16 @@ public:
     {}
 
     void setup(
-        const kinematic_chain<Scalar, N>& chain,
-        const se3<Scalar>& target,
+        const Chain& chain,
+        const se3<scalar_type>& target,
         const position_type& q0,
-        const convergence_criteria<Scalar>& criteria)
+        const convergence_criteria<scalar_type>& criteria)
     {
         m_chain = &chain;
         m_target = target;
         m_criteria = criteria;
         m_iterations = 0;
-        m_error_norm = std::numeric_limits<Scalar>::max();
+        m_error_norm = std::numeric_limits<scalar_type>::max();
         m_status = ik_status::running;
         m_error_history.clear();
 
@@ -108,7 +109,7 @@ public:
         m_solver.emplace(*m_problem, x0, nab_opts);
     }
 
-    ik_status step(const kinematic_chain<Scalar, N>& chain)
+    ik_status step(const Chain& chain)
     {
         if (m_status != ik_status::running)
         {
@@ -163,7 +164,7 @@ public:
 
     [[nodiscard]] bool converged() const { return m_status == ik_status::converged; }
     [[nodiscard]] const position_type& solution() const { return m_q; }
-    [[nodiscard]] Scalar error_norm() const { return m_error_norm; }
+    [[nodiscard]] scalar_type error_norm() const { return m_error_norm; }
     [[nodiscard]] int iterations() const { return m_iterations; }
     [[nodiscard]] ik_status status() const { return m_status; }
     void abort() { m_status = ik_status::stalled; }
@@ -175,35 +176,30 @@ private:
     {
         const auto& x = m_solver->state().x;
         int n = m_chain->num_joints();
-        if constexpr (N == dynamic)
+        if constexpr (joints == dynamic)
         {
             m_q.resize(n);
         }
         for (int i = 0; i < n; ++i)
         {
-            m_q[i] = static_cast<Scalar>(x[i]);
+            m_q[i] = static_cast<scalar_type>(x[i]);
         }
     }
 
-    const kinematic_chain<Scalar, N>* m_chain{nullptr};
-    se3<Scalar> m_target{se3<Scalar>::identity()};
-    convergence_criteria<Scalar> m_criteria{};
-    error_weight<Scalar> m_weight{};
+    const Chain* m_chain{nullptr};
+    se3<scalar_type> m_target{se3<scalar_type>::identity()};
+    convergence_criteria<scalar_type> m_criteria{};
+    error_weight<scalar_type> m_weight{};
     options m_options{};
     position_type m_q{};
-    std::vector<Scalar> m_error_history;
-    Scalar m_initial_error{};
-    Scalar m_error_norm{std::numeric_limits<Scalar>::max()};
+    std::vector<scalar_type> m_error_history;
+    scalar_type m_initial_error{};
+    scalar_type m_error_norm{std::numeric_limits<scalar_type>::max()};
     int m_iterations{};
     ik_status m_status{ik_status::running};
-    std::optional<detail::nablapp_ik_problem<Scalar, N>> m_problem;
+    std::optional<detail::nablapp_ik_problem<Chain>> m_problem;
     std::optional<nablapp_solver> m_solver;
 };
-
-template <typename Scalar, int N, typename LimitsPolicy>
-bobyqa_solve_policy(const kinematic_chain<Scalar, N>&, const se3<Scalar>&,
-                    const typename joint_state<Scalar, N>::position_type&,
-                    LimitsPolicy) -> bobyqa_solve_policy<Scalar, N, LimitsPolicy>;
 
 }
 

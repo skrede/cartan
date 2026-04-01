@@ -24,8 +24,8 @@ namespace liepp
 
 /// Concept detecting whether a limits policy has an extended enforce signature
 /// that accepts the body Jacobian and its SVD (for null-space projection).
-template <typename P, chain Chain>
-concept has_extended_enforce = requires(
+template <typename P, typename Chain>
+concept has_extended_enforce = chain<Chain> && requires(
     typename joint_state<typename Chain::scalar_type, Chain::joints>::position_type& q,
     const decltype(std::declval<const Chain&>().limits())& limits,
     const jacobian_matrix<typename Chain::scalar_type, Chain::joints>& J_b,

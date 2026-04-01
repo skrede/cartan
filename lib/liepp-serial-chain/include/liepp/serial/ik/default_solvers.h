@@ -20,38 +20,40 @@
 #include "liepp/serial/ik/restart_solve_policy.h"
 #include "liepp/serial/ik/projected_lm_solve_policy.h"
 
+#include "liepp/serial/chain/chain_concept.h"
+
 #include <tuple>
 
 namespace liepp
 {
 
 // ---------------------------------------------------------------------------
-// Type aliases (D-11)
+// Type aliases
 // ---------------------------------------------------------------------------
 
 /// Speed-optimized: restart-wrapped projected LM (fast per-iteration, multi-start).
-template <typename Scalar = double, int N = dynamic>
-using speed_solver = restart_solve_policy<Scalar, N,
-    projected_lm_solve_policy<Scalar, N, no_limits>, no_limits>;
+template <chain Chain>
+using speed_solver = restart_solve_policy<Chain,
+    projected_lm_solve_policy<Chain, no_limits>, no_limits>;
 
 /// Convergence-optimized: restart-wrapped L-BFGS-B (robust convergence, multi-start).
-template <typename Scalar = double, int N = dynamic>
-using convergence_solver = restart_solve_policy<Scalar, N,
-    lbfgsb_solve_policy<Scalar, N, no_limits>, no_limits>;
+template <chain Chain>
+using convergence_solver = restart_solve_policy<Chain,
+    lbfgsb_solve_policy<Chain, no_limits>, no_limits>;
 
 /// Default: races speed_solver against convergence_solver via variadic basic_ik_solver.
-template <typename Scalar = double, int N = dynamic>
-using default_solver = basic_ik_solver<speed_solver<Scalar, N>, convergence_solver<Scalar, N>>;
+template <chain Chain>
+using default_solver = basic_ik_solver<speed_solver<Chain>, convergence_solver<Chain>>;
 
 // ---------------------------------------------------------------------------
-// Composable builder (D-10)
+// Composable builder
 // ---------------------------------------------------------------------------
 
 /// Type-accumulating solver builder for custom policy compositions.
 ///
-/// Usage: `auto solver = make_solver<double, 7>().policy(p1).policy(p2).build();`
-/// `.build()` is the materialization point — everything before it is configuration.
-template <typename Scalar, int N, typename... Policies>
+/// Usage: `auto solver = make_solver<MyChain>().policy(p1).policy(p2).build();`
+/// `.build()` is the materialization point -- everything before it is configuration.
+template <chain Chain, typename... Policies>
 class solver_builder
 {
 public:
@@ -65,7 +67,7 @@ public:
         requires ik_solve_policy<Policy>
     auto policy(Policy p) &&
     {
-        return solver_builder<Scalar, N, Policies..., Policy>{
+        return solver_builder<Chain, Policies..., Policy>{
             std::tuple_cat(std::move(m_policies), std::make_tuple(std::move(p)))
         };
     }
@@ -83,15 +85,15 @@ private:
 };
 
 // ---------------------------------------------------------------------------
-// Preset builders (D-10)
+// Preset builders
 // ---------------------------------------------------------------------------
 
-/// Preset solver builder — wraps a fixed single-policy configuration.
+/// Preset solver builder -- wraps a fixed single-policy configuration.
 ///
 /// Exposes parameter tuning (restart count, etc.) but NOT policy composition.
 /// Call `.build()` to materialize the solver. This enables future extensions
 /// like `.from_config(cfg).build()`.
-template <typename Scalar, int N, typename Policy>
+template <chain Chain, typename Policy>
 class preset_solver_builder
 {
 public:
@@ -111,7 +113,7 @@ private:
 };
 
 /// Preset builder for two-policy racing configurations.
-template <typename Scalar, int N, typename Policy1, typename Policy2>
+template <chain Chain, typename Policy1, typename Policy2>
 class preset_racing_builder
 {
 public:
@@ -133,45 +135,45 @@ private:
 };
 
 // ---------------------------------------------------------------------------
-// Preset factory functions (D-10, D-12)
+// Preset factory functions
 // ---------------------------------------------------------------------------
 
 /// Create a speed-optimized solver builder (restart-wrapped projected LM).
 /// Call `.build()` to materialize the solver.
-template <typename Scalar = double, int N = dynamic>
+template <chain Chain>
 auto make_speed_solver()
 {
-    return preset_solver_builder<Scalar, N, speed_solver<Scalar, N>>{
-        speed_solver<Scalar, N>{}
+    return preset_solver_builder<Chain, speed_solver<Chain>>{
+        speed_solver<Chain>{}
     };
 }
 
 /// Create a convergence-optimized solver builder (restart-wrapped L-BFGS-B).
 /// Call `.build()` to materialize the solver.
-template <typename Scalar = double, int N = dynamic>
+template <chain Chain>
 auto make_convergence_solver()
 {
-    return preset_solver_builder<Scalar, N, convergence_solver<Scalar, N>>{
-        convergence_solver<Scalar, N>{}
+    return preset_solver_builder<Chain, convergence_solver<Chain>>{
+        convergence_solver<Chain>{}
     };
 }
 
 /// Create the default solver builder (races speed + convergence policies).
 /// Call `.build()` to materialize the solver.
-template <typename Scalar = double, int N = dynamic>
+template <chain Chain>
 auto make_default_solver()
 {
-    return preset_racing_builder<Scalar, N,
-        speed_solver<Scalar, N>, convergence_solver<Scalar, N>>{
-        speed_solver<Scalar, N>{}, convergence_solver<Scalar, N>{}
+    return preset_racing_builder<Chain,
+        speed_solver<Chain>, convergence_solver<Chain>>{
+        speed_solver<Chain>{}, convergence_solver<Chain>{}
     };
 }
 
 /// Create a composable solver builder. Chain .policy(p) calls, finish with .build().
-template <typename Scalar = double, int N = dynamic>
+template <chain Chain>
 auto make_solver()
 {
-    return solver_builder<Scalar, N>{std::tuple<>{}};
+    return solver_builder<Chain>{std::tuple<>{}};
 }
 
 }

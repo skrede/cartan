@@ -22,9 +22,8 @@
 #include "liepp/serial/ik/projected_lm_solve_policy.h"
 
 #include "liepp/lie/se3.h"
-
 #include "liepp/serial/chain/joint_state.h"
-#include "liepp/serial/chain/kinematic_chain.h"
+#include "liepp/serial/chain/chain_concept.h"
 
 #include <limits>
 #include <concepts>
@@ -61,24 +60,25 @@ concept has_lambda = requires(const S& s)
 /// Halton sequences. The best lambda from near-miss attempts is carried
 /// forward to accelerate convergence on subsequent restarts.
 ///
-/// @tparam Scalar       Floating-point type.
-/// @tparam N            Number of joints (compile-time) or liepp::dynamic.
+/// @tparam Chain        Chain type satisfying the chain concept.
 /// @tparam InnerPolicy  Policy type satisfying ik_solve_policy concept.
 /// @tparam LimitsPolicy Limit enforcement policy (defaults to inner policy's limits_type).
-template <typename Scalar = double, int N = dynamic,
-          typename InnerPolicy = projected_lm_solve_policy<Scalar, N>,
+template <chain Chain,
+          typename InnerPolicy = projected_lm_solve_policy<Chain>,
           typename LimitsPolicy = typename InnerPolicy::limits_type>
 class restart_solve_policy
 {
-    static_assert(std::is_floating_point_v<Scalar>,
+    using scalar_type_impl = typename Chain::scalar_type;
+    static_assert(std::is_floating_point_v<scalar_type_impl>,
         "restart_solve_policy requires a floating-point Scalar type");
 
 public:
-    using scalar_type = Scalar;
-    static constexpr int joints = N;
+    using chain_type = Chain;
+    using scalar_type = scalar_type_impl;
+    static constexpr int joints = Chain::joints;
     using limits_type = LimitsPolicy;
 
-    using position_type = typename joint_state<Scalar, N>::position_type;
+    using position_type = typename joint_state<scalar_type, joints>::position_type;
 
     struct options
     {
@@ -105,10 +105,10 @@ public:
 
     /// Initialize the policy (satisfies ik_solve_policy concept).
     void setup(
-        const kinematic_chain<Scalar, N>& chain,
-        const se3<Scalar>& target,
+        const Chain& chain,
+        const se3<scalar_type>& target,
         const position_type& q0,
-        const convergence_criteria<Scalar>& criteria)
+        const convergence_criteria<scalar_type>& criteria)
     {
         m_chain = &chain;
         m_target = target;
@@ -117,8 +117,8 @@ public:
         m_seed_gen.emplace(chain);
         m_restart_count = 0;
         m_total_iterations = 0;
-        m_best_lambda = Scalar(0);
-        m_best_error = std::numeric_limits<Scalar>::max();
+        m_best_lambda = scalar_type(0);
+        m_best_error = std::numeric_limits<scalar_type>::max();
         m_aborted = false;
 
         m_inner.setup(chain, target, q0, criteria);
@@ -126,11 +126,11 @@ public:
 
     /// Initialize with error weighting for position/orientation emphasis.
     void setup(
-        const kinematic_chain<Scalar, N>& chain,
-        const se3<Scalar>& target,
+        const Chain& chain,
+        const se3<scalar_type>& target,
         const position_type& q0,
-        const convergence_criteria<Scalar>& criteria,
-        const error_weight<Scalar>& weight)
+        const convergence_criteria<scalar_type>& criteria,
+        const error_weight<scalar_type>& weight)
     {
         m_chain = &chain;
         m_target = target;
@@ -139,8 +139,8 @@ public:
         m_seed_gen.emplace(chain);
         m_restart_count = 0;
         m_total_iterations = 0;
-        m_best_lambda = Scalar(0);
-        m_best_error = std::numeric_limits<Scalar>::max();
+        m_best_lambda = scalar_type(0);
+        m_best_error = std::numeric_limits<scalar_type>::max();
         m_aborted = false;
 
         if constexpr (requires { m_inner.setup(chain, target, q0, criteria, weight); })
@@ -158,7 +158,7 @@ public:
     /// Per D-08: delegates to inner policy, intercepts stalled/diverged/
     /// iteration_limit to trigger re-seed from Halton sequence.
     /// Per D-11: preserves best lambda from near-miss attempts.
-    ik_status step(const kinematic_chain<Scalar, N>& chain)
+    ik_status step(const Chain& chain)
     {
         if (m_aborted)
         {
@@ -216,7 +216,7 @@ public:
 
     [[nodiscard]] bool converged() const { return m_inner.converged(); }
     [[nodiscard]] position_type solution() const { return m_inner.solution(); }
-    [[nodiscard]] Scalar error_norm() const { return m_inner.error_norm(); }
+    [[nodiscard]] scalar_type error_norm() const { return m_inner.error_norm(); }
     [[nodiscard]] int iterations() const { return m_total_iterations; }
 
     void abort()
@@ -229,7 +229,7 @@ private:
     /// Track best lambda from near-miss attempts for warm-start.
     void track_best_lambda()
     {
-        Scalar current_error = m_inner.error_norm();
+        scalar_type current_error = m_inner.error_norm();
         if (current_error < m_best_error)
         {
             m_best_error = current_error;
@@ -245,7 +245,7 @@ private:
     {
         if constexpr (detail::has_set_lambda<InnerPolicy>)
         {
-            if (m_best_lambda > Scalar(0))
+            if (m_best_lambda > scalar_type(0))
             {
                 m_inner.set_lambda(m_best_lambda);
             }
@@ -254,36 +254,33 @@ private:
 
     InnerPolicy m_inner{};
     options m_options{};
-    const kinematic_chain<Scalar, N>* m_chain{nullptr};
-    se3<Scalar> m_target{se3<Scalar>::identity()};
-    convergence_criteria<Scalar> m_criteria{};
-    std::optional<error_weight<Scalar>> m_weight{};
-    std::optional<halton_seed_generator<Scalar, N>> m_seed_gen{};
+    const Chain* m_chain{nullptr};
+    se3<scalar_type> m_target{se3<scalar_type>::identity()};
+    convergence_criteria<scalar_type> m_criteria{};
+    std::optional<error_weight<scalar_type>> m_weight{};
+    std::optional<halton_seed_generator<Chain>> m_seed_gen{};
     int m_restart_count{};
     int m_total_iterations{};
-    Scalar m_best_lambda{};
-    Scalar m_best_error{std::numeric_limits<Scalar>::max()};
+    scalar_type m_best_lambda{};
+    scalar_type m_best_error{std::numeric_limits<scalar_type>::max()};
     bool m_aborted{false};
 };
 
 // Deduction guide: deduce everything from inner policy
 template <typename InnerPolicy>
 restart_solve_policy(InnerPolicy) -> restart_solve_policy<
-    typename InnerPolicy::scalar_type,
-    InnerPolicy::joints,
+    typename InnerPolicy::chain_type,
     InnerPolicy,
     typename InnerPolicy::limits_type>;
 
 // Deduction guide: deduce from options + inner policy
 template <typename InnerPolicy>
 restart_solve_policy(typename restart_solve_policy<
-    typename InnerPolicy::scalar_type,
-    InnerPolicy::joints,
+    typename InnerPolicy::chain_type,
     InnerPolicy,
     typename InnerPolicy::limits_type>::options,
     InnerPolicy) -> restart_solve_policy<
-    typename InnerPolicy::scalar_type,
-    InnerPolicy::joints,
+    typename InnerPolicy::chain_type,
     InnerPolicy,
     typename InnerPolicy::limits_type>;
 

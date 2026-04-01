@@ -20,9 +20,9 @@
 #include "liepp/serial/ik/halton_seed_generator.h"
 
 #include "liepp/lie/se3.h"
-#include "liepp/serial/chain/joint_state.h"
 #include "liepp/serial/fk/jacobian.h"
-#include "liepp/serial/chain/kinematic_chain.h"
+#include "liepp/serial/chain/joint_state.h"
+#include "liepp/serial/chain/chain_concept.h"
 #include "liepp/serial/fk/forward_kinematics.h"
 
 #include <Eigen/SVD>
@@ -39,7 +39,7 @@
 namespace liepp
 {
 
-/// Check that all policies in a variadic pack agree on scalar_type and joints.
+/// Check that all policies in a variadic pack agree on chain_type, scalar_type, and joints.
 template <typename First, typename... Rest>
 consteval bool all_policies_agree()
 {
@@ -47,6 +47,7 @@ consteval bool all_policies_agree()
         return true;
     else
         return ((std::same_as<typename First::scalar_type, typename Rest::scalar_type>
+                 && std::same_as<typename First::chain_type, typename Rest::chain_type>
                  && First::joints == Rest::joints) && ...);
 }
 
@@ -58,7 +59,7 @@ consteval bool all_policies_agree()
 /// result selection.
 ///
 /// Thread safety: Different solver instances may safely operate concurrently
-/// on the same const kinematic_chain. A single solver instance must not be
+/// on the same const chain. A single solver instance must not be
 /// used from multiple threads without synchronization.
 ///
 /// @tparam Policies  One or more IK solve policies satisfying ik_solve_policy.
@@ -71,9 +72,10 @@ class basic_ik_solver
     static_assert(std::is_floating_point_v<typename first_policy::scalar_type>,
         "basic_ik_solver requires a floating-point Scalar type");
     static_assert(all_policies_agree<Policies...>(),
-        "All policies must agree on scalar_type and joints");
+        "All policies must agree on chain_type, scalar_type, and joints");
 
 public:
+    using chain_type = typename first_policy::chain_type;
     using scalar_type = typename first_policy::scalar_type;
     static constexpr int joints = first_policy::joints;
 
@@ -91,7 +93,7 @@ public:
     /// The first policy receives the user's q0. Remaining policies (if any)
     /// receive deterministic Halton seeds within joint limits.
     void setup(
-        const kinematic_chain<scalar_type, joints>& chain,
+        const chain_type& chain,
         const se3<scalar_type>& target,
         const position_type& q0,
         const convergence_criteria<scalar_type>& criteria,
@@ -235,7 +237,7 @@ private:
         bool converged;
     };
 
-    // ── Single-policy fast path ──────────────────────────────────────────
+    // -- Single-policy fast path --
 
     ik_status step_single()
     {
@@ -277,7 +279,7 @@ private:
         return ik_status::running;
     }
 
-    // ── Multi-policy racing path ─────────────────────────────────────────
+    // -- Multi-policy racing path --
 
     ik_status step_multi()
         requires (sizeof...(Policies) > 1)
@@ -366,11 +368,11 @@ private:
         m_parked.fill(true);
     }
 
-    // ── Setup helpers ────────────────────────────────────────────────────
+    // -- Setup helpers --
 
     template <std::size_t... Is>
     void setup_remaining_policies(
-        const kinematic_chain<scalar_type, joints>& chain,
+        const chain_type& chain,
         const se3<scalar_type>& target,
         const convergence_criteria<scalar_type>& criteria,
         unsigned int halton_seed_offset,
@@ -381,7 +383,7 @@ private:
 
     template <std::size_t I>
     void setup_policy(
-        const kinematic_chain<scalar_type, joints>& chain,
+        const chain_type& chain,
         const se3<scalar_type>& target,
         const convergence_criteria<scalar_type>& criteria,
         unsigned int halton_seed_offset,
@@ -391,7 +393,7 @@ private:
         std::get<I>(m_policies).setup(chain, target, seed, criteria);
     }
 
-    // ── Objective tracking (single-policy) ───────────────────────────────
+    // -- Objective tracking (single-policy) --
 
     void update_best(const position_type& q)
     {
@@ -457,7 +459,7 @@ private:
         }
     }
 
-    // ── Result construction ──────────────────────────────────────────────
+    // -- Result construction --
 
     std::expected<ik_result<scalar_type, joints>, ik_error<scalar_type, joints>> build_result()
     {
@@ -602,7 +604,7 @@ private:
         return std::unexpected(err);
     }
 
-    // ── Accessor helpers ─────────────────────────────────────────────────
+    // -- Accessor helpers --
 
     template <std::size_t... Is>
     void find_best_error(scalar_type& best, std::index_sequence<Is...>) const
@@ -640,10 +642,10 @@ private:
         (std::get<Is>(m_policies).abort(), ...);
     }
 
-    // ── Data members ─────────────────────────────────────────────────────
+    // -- Data members --
 
     std::tuple<Policies...> m_policies{};
-    const kinematic_chain<scalar_type, joints>* m_chain{nullptr};
+    const chain_type* m_chain{nullptr};
     se3<scalar_type> m_target{se3<scalar_type>::identity()};
     convergence_criteria<scalar_type> m_criteria{};
     position_type m_best_q{};
@@ -659,7 +661,7 @@ private:
     // declared unconditionally for simplicity; if constexpr gates all usage).
     std::array<bool, sizeof...(Policies)> m_parked{};
     std::array<std::optional<parked_result>, sizeof...(Policies)> m_results{};
-    std::optional<halton_seed_generator<scalar_type, joints>> m_seed_gen{};
+    std::optional<halton_seed_generator<chain_type>> m_seed_gen{};
     int m_max_total_iterations{500};
     int m_best_solver_index{-1};
     bool m_early_stop{false};

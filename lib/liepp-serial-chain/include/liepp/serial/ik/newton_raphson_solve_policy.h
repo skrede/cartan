@@ -32,9 +32,9 @@
 #include "liepp/serial/ik/detail/limit_enforcement.h"
 
 #include "liepp/lie/se3.h"
-#include "liepp/serial/chain/joint_state.h"
-#include "liepp/serial/chain/kinematic_chain.h"
 #include "liepp/serial/fk/jacobian.h"
+#include "liepp/serial/chain/joint_state.h"
+#include "liepp/serial/chain/chain_concept.h"
 #include "liepp/serial/fk/forward_kinematics.h"
 
 #include <Eigen/Dense>
@@ -58,29 +58,30 @@ namespace liepp
 /// 7. Stall/divergence detection
 ///
 /// Reference: Nocedal & Wright, Numerical Optimization, Ch. 3, 10.
-template <typename Scalar = double, int N = dynamic, typename LimitsPolicy = clamp_limits,
-          typename ObjectivePolicy = ik_se3_objective<Scalar, N>>
+template <chain Chain, typename LimitsPolicy = clamp_limits,
+          typename ObjectivePolicy = ik_se3_objective<Chain>>
 class newton_raphson_solve_policy
 {
 public:
-    static_assert(std::is_floating_point_v<Scalar>, "newton_raphson_solve_policy requires a floating-point Scalar type");
-
-    using scalar_type = Scalar;
-    static constexpr int joints = N;
+    using chain_type = Chain;
+    using scalar_type = typename Chain::scalar_type;
+    static constexpr int joints = Chain::joints;
     using limits_type = LimitsPolicy;
 
-    using position_type = typename joint_state<Scalar, N>::position_type;
+    using position_type = typename joint_state<scalar_type, joints>::position_type;
+
+    static_assert(std::is_floating_point_v<scalar_type>, "newton_raphson_solve_policy requires a floating-point Scalar type");
 
     /// Tunable parameters for the Newton-Raphson solve policy.
     struct options
     {
-        Scalar epsilon{Scalar(1e-8)};             ///< Diagonal regularization for singular J^T J
-        Scalar line_search_c{Scalar(1e-4)};       ///< Armijo sufficient decrease constant
-        Scalar line_search_shrink{Scalar(0.5)};   ///< Step size reduction factor
-        int max_line_search_steps{20};             ///< Max backtracking iterations
-        Scalar stall_threshold{Scalar(1e-10)};    ///< Min error improvement
-        Scalar divergence_factor{Scalar(10)};     ///< Max error growth before diverged
-        int stall_window{10};                     ///< Consecutive stall iterations before stalled
+        scalar_type epsilon{scalar_type(1e-8)};             ///< Diagonal regularization for singular J^T J
+        scalar_type line_search_c{scalar_type(1e-4)};       ///< Armijo sufficient decrease constant
+        scalar_type line_search_shrink{scalar_type(0.5)};   ///< Step size reduction factor
+        int max_line_search_steps{20};                      ///< Max backtracking iterations
+        scalar_type stall_threshold{scalar_type(1e-10)};    ///< Min error improvement
+        scalar_type divergence_factor{scalar_type(10)};     ///< Max error growth before diverged
+        int stall_window{10};                               ///< Consecutive stall iterations before stalled
     };
 
     newton_raphson_solve_policy() = default;
@@ -92,21 +93,21 @@ public:
 
     /// Initialize the solve policy (satisfies ik_solve_policy concept).
     void setup(
-        const kinematic_chain<Scalar, N>& chain,
-        const se3<Scalar>& target,
+        const Chain& chain,
+        const se3<scalar_type>& target,
         const position_type& q0,
-        const convergence_criteria<Scalar>& criteria)
+        const convergence_criteria<scalar_type>& criteria)
     {
-        setup(chain, target, q0, criteria, error_weight<Scalar>{});
+        setup(chain, target, q0, criteria, error_weight<scalar_type>{});
     }
 
     /// Initialize with error weighting for position/orientation emphasis.
     void setup(
-        const kinematic_chain<Scalar, N>& chain,
-        const se3<Scalar>& target,
+        const Chain& chain,
+        const se3<scalar_type>& target,
         const position_type& q0,
-        const convergence_criteria<Scalar>& criteria,
-        const error_weight<Scalar>& weight)
+        const convergence_criteria<scalar_type>& criteria,
+        const error_weight<scalar_type>& weight)
     {
         m_target = target;
         m_q = q0;
@@ -118,7 +119,7 @@ public:
         m_error_history.clear();
 
         int n = chain.num_joints();
-        if constexpr (N == dynamic)
+        if constexpr (joints == dynamic)
         {
             m_lower.resize(n);
             m_upper.resize(n);
@@ -139,7 +140,7 @@ public:
     }
 
     /// Execute one Newton-Raphson iteration with Armijo line search.
-    ik_status step(const kinematic_chain<Scalar, N>& chain)
+    ik_status step(const Chain& chain)
     {
         if (m_status != ik_status::running)
         {
@@ -149,7 +150,7 @@ public:
         // (1) Evaluate objective, gradient, and body error
         auto result = ObjectivePolicy::evaluate_with_gradient(
             chain, m_target, m_q, m_weight);
-        Scalar f_current = result.info.objective;
+        scalar_type f_current = result.info.objective;
         auto& grad = result.gradient;
         auto& body_error = result.info.body_error;
 
@@ -186,8 +187,8 @@ public:
         position_type dq = -H.ldlt().solve(grad);
 
         // (7) Backtracking Armijo line search with bound clamping
-        Scalar directional_derivative = grad.dot(dq); // Should be negative
-        Scalar alpha = Scalar(1);
+        scalar_type directional_derivative = grad.dot(dq); // Should be negative
+        scalar_type alpha = scalar_type(1);
         bool step_accepted = false;
         position_type q_trial = m_q;
 
@@ -196,7 +197,7 @@ public:
             q_trial = (m_q + alpha * dq).cwiseMax(m_lower).cwiseMin(m_upper);
 
             auto trial = ObjectivePolicy::evaluate(chain, m_target, q_trial, m_weight);
-            Scalar f_trial = trial.objective;
+            scalar_type f_trial = trial.objective;
 
             if (f_trial <= f_current + m_options.line_search_c * alpha * directional_derivative)
             {
@@ -236,22 +237,22 @@ public:
 
     [[nodiscard]] bool converged() const { return m_status == ik_status::converged; }
     [[nodiscard]] const position_type& solution() const { return m_q; }
-    [[nodiscard]] Scalar error_norm() const { return m_error_norm; }
+    [[nodiscard]] scalar_type error_norm() const { return m_error_norm; }
     [[nodiscard]] int iterations() const { return m_iterations; }
     void abort() {}
     [[nodiscard]] ik_status status() const { return m_status; }
 
 private:
-    se3<Scalar> m_target{se3<Scalar>::identity()};
+    se3<scalar_type> m_target{se3<scalar_type>::identity()};
     position_type m_q{};
     position_type m_lower{};
     position_type m_upper{};
-    convergence_criteria<Scalar> m_criteria{};
-    error_weight<Scalar> m_weight{};
+    convergence_criteria<scalar_type> m_criteria{};
+    error_weight<scalar_type> m_weight{};
     options m_options{};
-    std::vector<Scalar> m_error_history;
-    Scalar m_initial_error{std::numeric_limits<Scalar>::max()};
-    Scalar m_error_norm{std::numeric_limits<Scalar>::max()};
+    std::vector<scalar_type> m_error_history;
+    scalar_type m_initial_error{std::numeric_limits<scalar_type>::max()};
+    scalar_type m_error_norm{std::numeric_limits<scalar_type>::max()};
     int m_iterations{};
     int m_stall_count{};
     ik_status m_status{ik_status::running};

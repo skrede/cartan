@@ -26,7 +26,7 @@
 
 #include "liepp/lie/se3.h"
 #include "liepp/serial/chain/joint_state.h"
-#include "liepp/serial/chain/kinematic_chain.h"
+#include "liepp/serial/chain/chain_concept.h"
 
 #include <Eigen/Dense>
 
@@ -50,28 +50,29 @@ namespace liepp
 /// 7. Stall/divergence detection
 ///
 /// Reference: Byrd, Lu, Nocedal, Zhu, SIAM J. Sci. Comput., 1995.
-template <typename Scalar = double, int N = dynamic, typename LimitsPolicy = clamp_limits,
-          typename ObjectivePolicy = ik_se3_objective<Scalar, N>>
+template <chain Chain, typename LimitsPolicy = clamp_limits,
+          typename ObjectivePolicy = ik_se3_objective<Chain>>
 class lbfgsb_solve_policy
 {
 public:
-    static_assert(std::is_floating_point_v<Scalar>, "lbfgsb_solve_policy requires a floating-point Scalar type");
-
-    using scalar_type = Scalar;
-    static constexpr int joints = N;
+    using chain_type = Chain;
+    using scalar_type = typename Chain::scalar_type;
+    static constexpr int joints = Chain::joints;
     using limits_type = LimitsPolicy;
 
-    using position_type = typename joint_state<Scalar, N>::position_type;
+    using position_type = typename joint_state<scalar_type, joints>::position_type;
+
+    static_assert(std::is_floating_point_v<scalar_type>, "lbfgsb_solve_policy requires a floating-point Scalar type");
 
     /// Tunable parameters for the L-BFGS-B solve policy.
     struct options
     {
         int history_depth{5};
-        Scalar line_search_c{Scalar(1e-4)};
-        Scalar line_search_shrink{Scalar(0.5)};
+        scalar_type line_search_c{scalar_type(1e-4)};
+        scalar_type line_search_shrink{scalar_type(0.5)};
         int max_line_search_steps{20};
-        Scalar stall_threshold{Scalar(1e-10)};
-        Scalar divergence_factor{Scalar(10)};
+        scalar_type stall_threshold{scalar_type(1e-10)};
+        scalar_type divergence_factor{scalar_type(10)};
         int stall_window{15};
     };
 
@@ -84,21 +85,21 @@ public:
 
     /// Initialize with chain, target, seed, and convergence criteria.
     void setup(
-        const kinematic_chain<Scalar, N>& chain,
-        const se3<Scalar>& target,
+        const Chain& chain,
+        const se3<scalar_type>& target,
         const position_type& q0,
-        const convergence_criteria<Scalar>& criteria)
+        const convergence_criteria<scalar_type>& criteria)
     {
-        setup(chain, target, q0, criteria, error_weight<Scalar>{});
+        setup(chain, target, q0, criteria, error_weight<scalar_type>{});
     }
 
     /// Initialize with chain, target, seed, criteria, and error weight.
     void setup(
-        const kinematic_chain<Scalar, N>& chain,
-        const se3<Scalar>& target,
+        const Chain& chain,
+        const se3<scalar_type>& target,
         const position_type& q0,
-        const convergence_criteria<Scalar>& criteria,
-        const error_weight<Scalar>& weight)
+        const convergence_criteria<scalar_type>& criteria,
+        const error_weight<scalar_type>& weight)
     {
         m_target = target;
         m_q = q0;
@@ -107,7 +108,7 @@ public:
         m_iterations = 0;
         m_status = ik_status::running;
         m_error_history.clear();
-        m_gamma = Scalar(1);
+        m_gamma = scalar_type(1);
 
         int n = chain.num_joints();
         m_lower.resize(n);
@@ -137,7 +138,7 @@ public:
     }
 
     /// Execute one L-BFGS-B iteration (per D-06).
-    ik_status step(const kinematic_chain<Scalar, N>& chain)
+    ik_status step(const Chain& chain)
     {
         if (m_status != ik_status::running)
         {
@@ -163,8 +164,8 @@ public:
 
         // (3) Compute descent direction with fallback to projected gradient
         auto [direction, directional_derivative, max_alpha] = compute_descent_direction(n);
-        if (max_alpha < std::numeric_limits<Scalar>::epsilon() ||
-            directional_derivative >= Scalar(0))
+        if (max_alpha < std::numeric_limits<scalar_type>::epsilon() ||
+            directional_derivative >= scalar_type(0))
         {
             update_stall_detection();
             return m_status;
@@ -173,7 +174,7 @@ public:
         // (4) Backtracking Armijo line search with bound clamping
         position_type q_old = m_q;
         position_type g_old = m_gradient;
-        Scalar f_old = m_f;
+        scalar_type f_old = m_f;
 
         if (!armijo_line_search(chain, direction, directional_derivative, max_alpha, f_old))
         {
@@ -193,7 +194,7 @@ public:
 
     [[nodiscard]] bool converged() const { return m_status == ik_status::converged; }
     [[nodiscard]] const position_type& solution() const { return m_q; }
-    [[nodiscard]] Scalar error_norm() const { return m_error_norm; }
+    [[nodiscard]] scalar_type error_norm() const { return m_error_norm; }
     [[nodiscard]] int iterations() const { return m_iterations; }
     void abort() {}
     [[nodiscard]] ik_status status() const { return m_status; }
@@ -203,24 +204,24 @@ private:
     struct descent_result
     {
         position_type direction;
-        Scalar directional_derivative;
-        Scalar max_alpha;
+        scalar_type directional_derivative;
+        scalar_type max_alpha;
     };
 
     descent_result compute_descent_direction(int n)
     {
         position_type direction = compute_lbfgs_direction(n);
-        Scalar max_alpha = compute_max_step(direction, n);
+        scalar_type max_alpha = compute_max_step(direction, n);
 
-        if (max_alpha < std::numeric_limits<Scalar>::epsilon())
+        if (max_alpha < std::numeric_limits<scalar_type>::epsilon())
         {
-            return {direction, Scalar(0), max_alpha};
+            return {direction, scalar_type(0), max_alpha};
         }
 
-        Scalar dd = m_gradient.dot(direction);
+        scalar_type dd = m_gradient.dot(direction);
 
         // If not a descent direction, fallback to projected negative gradient
-        if (dd >= Scalar(0))
+        if (dd >= scalar_type(0))
         {
             direction = projected_negative_gradient(n);
             dd = m_gradient.dot(direction);
@@ -232,13 +233,13 @@ private:
 
     /// Backtracking Armijo line search with bound clamping. Returns true if accepted.
     bool armijo_line_search(
-        const kinematic_chain<Scalar, N>& chain,
+        const Chain& chain,
         const position_type& direction,
-        Scalar directional_derivative,
-        Scalar max_alpha,
-        Scalar f_old)
+        scalar_type directional_derivative,
+        scalar_type max_alpha,
+        scalar_type f_old)
     {
-        Scalar alpha = std::min(Scalar(1), max_alpha);
+        scalar_type alpha = std::min(scalar_type(1), max_alpha);
 
         for (int ls = 0; ls < m_options.max_line_search_steps; ++ls)
         {
@@ -247,7 +248,7 @@ private:
 
             auto result = ObjectivePolicy::evaluate_with_gradient(
                 chain, m_target, q_trial, m_weight);
-            Scalar f_trial = result.info.objective;
+            scalar_type f_trial = result.info.objective;
 
             if (f_trial <= f_old + m_options.line_search_c * alpha * directional_derivative)
             {
@@ -271,9 +272,9 @@ private:
     {
         position_type s_k = m_q - q_old;
         position_type y_k = m_gradient - g_old;
-        Scalar ys = y_k.dot(s_k);
+        scalar_type ys = y_k.dot(s_k);
 
-        if (ys > std::numeric_limits<Scalar>::epsilon())
+        if (ys > std::numeric_limits<scalar_type>::epsilon())
         {
             if (static_cast<int>(m_s_history.size()) >= m_options.history_depth)
             {
@@ -283,10 +284,10 @@ private:
             }
             m_s_history.push_back(s_k);
             m_y_history.push_back(y_k);
-            m_rho_history.push_back(Scalar(1) / ys);
+            m_rho_history.push_back(scalar_type(1) / ys);
 
-            Scalar yy = y_k.squaredNorm();
-            if (yy > std::numeric_limits<Scalar>::epsilon())
+            scalar_type yy = y_k.squaredNorm();
+            if (yy > std::numeric_limits<scalar_type>::epsilon())
             {
                 m_gamma = ys / yy;
             }
@@ -308,7 +309,7 @@ private:
         position_type q_r = m_gradient;
 
         std::size_t m = m_s_history.size();
-        std::vector<Scalar> alpha_store(m);
+        std::vector<scalar_type> alpha_store(m);
 
         // First loop (backward)
         for (std::size_t i = m; i-- > 0;)
@@ -323,7 +324,7 @@ private:
         // Second loop (forward)
         for (std::size_t i = 0; i < m; ++i)
         {
-            Scalar beta = m_rho_history[i] * m_y_history[i].dot(q_r);
+            scalar_type beta = m_rho_history[i] * m_y_history[i].dot(q_r);
             q_r += (alpha_store[i] - beta) * m_s_history[i];
         }
 
@@ -334,16 +335,16 @@ private:
         for (int i = 0; i < n; ++i)
         {
             // At lower bound and direction pushes further below
-            if (m_q(i) <= m_lower(i) + std::numeric_limits<Scalar>::epsilon() &&
-                direction(i) < Scalar(0))
+            if (m_q(i) <= m_lower(i) + std::numeric_limits<scalar_type>::epsilon() &&
+                direction(i) < scalar_type(0))
             {
-                direction(i) = Scalar(0);
+                direction(i) = scalar_type(0);
             }
             // At upper bound and direction pushes further above
-            if (m_q(i) >= m_upper(i) - std::numeric_limits<Scalar>::epsilon() &&
-                direction(i) > Scalar(0))
+            if (m_q(i) >= m_upper(i) - std::numeric_limits<scalar_type>::epsilon() &&
+                direction(i) > scalar_type(0))
             {
-                direction(i) = Scalar(0);
+                direction(i) = scalar_type(0);
             }
         }
 
@@ -356,34 +357,34 @@ private:
         position_type direction = -m_gradient;
         for (int i = 0; i < n; ++i)
         {
-            if (m_q(i) <= m_lower(i) + std::numeric_limits<Scalar>::epsilon() &&
-                direction(i) < Scalar(0))
+            if (m_q(i) <= m_lower(i) + std::numeric_limits<scalar_type>::epsilon() &&
+                direction(i) < scalar_type(0))
             {
-                direction(i) = Scalar(0);
+                direction(i) = scalar_type(0);
             }
-            if (m_q(i) >= m_upper(i) - std::numeric_limits<Scalar>::epsilon() &&
-                direction(i) > Scalar(0))
+            if (m_q(i) >= m_upper(i) - std::numeric_limits<scalar_type>::epsilon() &&
+                direction(i) > scalar_type(0))
             {
-                direction(i) = Scalar(0);
+                direction(i) = scalar_type(0);
             }
         }
         return direction;
     }
 
     /// Compute maximum step size before hitting any bound.
-    Scalar compute_max_step(const position_type& direction, int n)
+    scalar_type compute_max_step(const position_type& direction, int n)
     {
-        Scalar max_alpha = std::numeric_limits<Scalar>::max();
+        scalar_type max_alpha = std::numeric_limits<scalar_type>::max();
         for (int i = 0; i < n; ++i)
         {
-            if (direction(i) > std::numeric_limits<Scalar>::epsilon())
+            if (direction(i) > std::numeric_limits<scalar_type>::epsilon())
             {
-                Scalar t = (m_upper(i) - m_q(i)) / direction(i);
+                scalar_type t = (m_upper(i) - m_q(i)) / direction(i);
                 max_alpha = std::min(max_alpha, t);
             }
-            else if (direction(i) < -std::numeric_limits<Scalar>::epsilon())
+            else if (direction(i) < -std::numeric_limits<scalar_type>::epsilon())
             {
-                Scalar t = (m_lower(i) - m_q(i)) / direction(i);
+                scalar_type t = (m_lower(i) - m_q(i)) / direction(i);
                 max_alpha = std::min(max_alpha, t);
             }
         }
@@ -403,24 +404,24 @@ private:
         }
     }
 
-    se3<Scalar> m_target{se3<Scalar>::identity()};
+    se3<scalar_type> m_target{se3<scalar_type>::identity()};
     position_type m_q{};
     position_type m_gradient{};
     position_type m_lower{};
     position_type m_upper{};
-    vector6<Scalar> m_body_error{vector6<Scalar>::Zero()};
-    vector6<Scalar> m_weighted_error{vector6<Scalar>::Zero()};
-    convergence_criteria<Scalar> m_criteria{};
-    error_weight<Scalar> m_weight{};
+    vector6<scalar_type> m_body_error{vector6<scalar_type>::Zero()};
+    vector6<scalar_type> m_weighted_error{vector6<scalar_type>::Zero()};
+    convergence_criteria<scalar_type> m_criteria{};
+    error_weight<scalar_type> m_weight{};
     options m_options{};
-    std::vector<Scalar> m_error_history;
+    std::vector<scalar_type> m_error_history;
     std::vector<position_type> m_s_history;
     std::vector<position_type> m_y_history;
-    std::vector<Scalar> m_rho_history;
-    Scalar m_initial_error{};
-    Scalar m_error_norm{};
-    Scalar m_f{};
-    Scalar m_gamma{Scalar(1)};
+    std::vector<scalar_type> m_rho_history;
+    scalar_type m_initial_error{};
+    scalar_type m_error_norm{};
+    scalar_type m_f{};
+    scalar_type m_gamma{scalar_type(1)};
     int m_iterations{};
     ik_status m_status{ik_status::running};
 };
