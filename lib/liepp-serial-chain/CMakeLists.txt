@@ -19,16 +19,16 @@ else ()
     find_package(nablapp CONFIG REQUIRED)
 endif ()
 
-add_library(liepp_kinematics INTERFACE)
-add_library(liepp::kinematics ALIAS liepp_kinematics)
+add_library(liepp_serial_chain INTERFACE)
+add_library(liepp::serial_chain ALIAS liepp_serial_chain)
 
-target_include_directories(liepp_kinematics
+target_include_directories(liepp_serial_chain
     INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
-target_link_libraries(liepp_kinematics
+target_link_libraries(liepp_serial_chain
     INTERFACE
     liepp::lie
     nablapp::nablapp
@@ -55,7 +55,7 @@ if (LIEPP_BUILD_NLOPT)
 
     target_link_libraries(liepp_nlopt
         INTERFACE
-        liepp::kinematics
+        liepp::serial_chain
         nlopt
     )
 

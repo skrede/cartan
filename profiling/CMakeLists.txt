@@ -14,7 +14,7 @@ endif()
 add_executable(ik_profiling ik_profiling.cpp)
 target_link_libraries(ik_profiling
     PRIVATE
-    liepp::kinematics
+    liepp::serial_chain
     benchmark::benchmark
     benchmark::benchmark_main
 )
