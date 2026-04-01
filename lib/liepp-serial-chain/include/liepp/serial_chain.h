@@ -14,6 +14,7 @@
 #include "liepp/serial/chain/storage_trait.h"
 #include "liepp/serial/chain/chain_concept.h"
 #include "liepp/serial/chain/kinematic_chain.h"
+#include "liepp/serial/chain/static_chain.h"
 
 #include "liepp/serial/fk/velocity.h"
 #include "liepp/serial/fk/jacobian.h"

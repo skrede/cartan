@@ -1,0 +1,92 @@
+#ifndef HPP_GUARD_LIEPP_SERIAL_CHAIN_STATIC_CHAIN_H
+#define HPP_GUARD_LIEPP_SERIAL_CHAIN_STATIC_CHAIN_H
+
+/// @file static_chain.h
+/// @brief Compile-time parameterized serial chain with joint type tags.
+///
+/// static_chain encodes joint types (revolute/prismatic and axis direction)
+/// as template parameters while storing runtime link data (home pose, screw
+/// axes, joint limits) in fixed-size arrays. This enables compile-time
+/// dispatch and specialization in FK/Jacobian/IK while retaining full
+/// runtime flexibility for link geometry.
+
+#include "liepp/serial/chain/joint_tags.h"
+#include "liepp/serial/chain/screw_axis.h"
+#include "liepp/serial/chain/joint_limits.h"
+#include "liepp/serial/chain/chain_concept.h"
+
+#include "liepp/lie/se3.h"
+
+#include <array>
+#include <cstddef>
+#include <type_traits>
+
+namespace liepp
+{
+
+/// Compile-time parameterized serial kinematic chain.
+///
+/// Joint types are encoded as template parameters via joint tags (revolute_x,
+/// revolute_y, revolute_z, prismatic_x, prismatic_y, prismatic_z). Runtime
+/// link data (home pose, screw axes, joint limits) is stored in fixed-size
+/// std::array containers sized by the parameter pack.
+///
+/// @tparam Scalar   Floating-point type for all geometric quantities.
+/// @tparam Joints   Pack of joint_tag types encoding each joint's type and axis.
+template <typename Scalar, joint_tag... Joints>
+class static_chain
+{
+    static_assert(std::is_floating_point_v<Scalar>,
+        "static_chain requires a floating-point Scalar type");
+    static_assert(sizeof...(Joints) > 0,
+        "static_chain requires at least one joint");
+
+public:
+    using scalar_type = Scalar;
+    static constexpr int joints = static_cast<int>(sizeof...(Joints));
+    using limits_storage = std::array<joint_limits<Scalar>, sizeof...(Joints)>;
+    using axes_storage = std::array<screw_axis<Scalar>, sizeof...(Joints)>;
+
+    /// Construct a static chain from home configuration, screw axes, and limits.
+    /// @param home   End-effector pose at zero configuration (the M matrix).
+    /// @param axes   Space-frame screw axes S1..Sn.
+    /// @param limits Joint position/velocity limits.
+    static_chain(
+        const se3<Scalar>& home,
+        axes_storage axes,
+        limits_storage limits)
+        : m_home(home)
+        , m_axes(std::move(axes))
+        , m_limits(std::move(limits))
+    {}
+
+    /// Home configuration (M matrix): end-effector pose at zero joint angles.
+    [[nodiscard]] const se3<Scalar>& home() const { return m_home; }
+
+    /// Number of joints in the chain.
+    [[nodiscard]] int num_joints() const { return joints; }
+
+    /// Access a single screw axis by index.
+    [[nodiscard]] const screw_axis<Scalar>& axis(int i) const
+    {
+        return m_axes[static_cast<std::size_t>(i)];
+    }
+
+    /// Space-frame screw axes.
+    [[nodiscard]] const axes_storage& axes() const { return m_axes; }
+
+    /// Joint limits.
+    [[nodiscard]] const limits_storage& limits() const { return m_limits; }
+
+private:
+    se3<Scalar> m_home;
+    axes_storage m_axes;
+    limits_storage m_limits;
+};
+
+static_assert(chain<static_chain<double, revolute_z, revolute_y, revolute_z>>,
+    "static_chain must satisfy chain concept");
+
+}
+
+#endif

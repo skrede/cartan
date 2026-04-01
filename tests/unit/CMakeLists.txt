@@ -46,6 +46,7 @@ liepp_add_test(variadic_solver_test variadic_solver_test.cpp)
 liepp_add_test(solver_factory_test solver_factory_test.cpp)
 liepp_add_test(ik_integration_test ik_integration_test.cpp)
 liepp_add_test(halton_seed_generator_test halton_seed_generator_test.cpp)
+liepp_add_test(static_chain_test static_chain_test.cpp)
 
 liepp_add_test(fk_sweep_test fk_sweep_test.cpp)
 liepp_add_test(jacobian_sweep_test jacobian_sweep_test.cpp)
