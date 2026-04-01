@@ -40,8 +40,8 @@ int main()
     // --- Multi-policy solver: races speed + convergence ---
     {
         auto solver = liepp::basic_ik_solver{
-            liepp::speed_solver<double, 7>{},
-            liepp::convergence_solver<double, 7>{}
+            liepp::speed_solver<liepp::kinematic_chain<double, 7>>{},
+            liepp::convergence_solver<liepp::kinematic_chain<double, 7>>{}
         };
         solver.setup(chain, target, q0, criteria);
         auto result = solver.solve();
@@ -60,7 +60,7 @@ int main()
 
     // --- Factory function: make_default_solver().build() ---
     {
-        auto solver = liepp::make_default_solver<double, 7>().build();
+        auto solver = liepp::make_default_solver<liepp::kinematic_chain<double, 7>>().build();
         solver.setup(chain, target, q0, criteria);
         auto result = solver.solve();
         if (result.has_value())
@@ -71,7 +71,7 @@ int main()
 
     // --- Single-policy presets with .build() ---
     {
-        auto solver = liepp::make_speed_solver<double, 7>().build();
+        auto solver = liepp::make_speed_solver<liepp::kinematic_chain<double, 7>>().build();
         solver.setup(chain, target, q0, criteria);
         auto result = solver.solve();
         if (result.has_value())
@@ -80,7 +80,7 @@ int main()
         }
     }
     {
-        auto solver = liepp::make_convergence_solver<double, 7>().build();
+        auto solver = liepp::make_convergence_solver<liepp::kinematic_chain<double, 7>>().build();
         solver.setup(chain, target, q0, criteria);
         auto result = solver.solve();
         if (result.has_value())
@@ -91,9 +91,9 @@ int main()
 
     // --- Composable builder: make_solver ---
     {
-        auto solver = liepp::make_solver<double, 7>()
-            .policy(liepp::speed_solver<double, 7>{})
-            .policy(liepp::convergence_solver<double, 7>{})
+        auto solver = liepp::make_solver<liepp::kinematic_chain<double, 7>>()
+            .policy(liepp::speed_solver<liepp::kinematic_chain<double, 7>>{})
+            .policy(liepp::convergence_solver<liepp::kinematic_chain<double, 7>>{})
             .build();
         solver.setup(chain, target, q0, criteria);
         auto result = solver.solve();

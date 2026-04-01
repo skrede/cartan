@@ -79,7 +79,7 @@ void bm_liepp_comparison(
         auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
         ++idx;
 
-        liepp::basic_ik_solver<liepp::lm_solve_policy<double, N>> solver;
+        liepp::basic_ik_solver<liepp::lm_solve_policy<liepp::kinematic_chain<double, N>>> solver;
         solver.setup(chain, target, q_seed, criteria);
         auto result = solver.solve();
 

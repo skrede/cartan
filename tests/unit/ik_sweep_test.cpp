@@ -34,7 +34,7 @@
 
 /// LM-based IK solver alias for sweep testing.
 template <typename Scalar, int N>
-using lm_ik_solver = liepp::basic_ik_solver<liepp::lm_solve_policy<Scalar, N>>;
+using lm_ik_solver = liepp::basic_ik_solver<liepp::lm_solve_policy<liepp::kinematic_chain<Scalar, N>>>;
 
 TEMPLATE_TEST_CASE("IK sweep: DOF 1-7", "[ik][sweep]", double, float)
 {

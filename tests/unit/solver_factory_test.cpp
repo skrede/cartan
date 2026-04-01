@@ -71,7 +71,7 @@ TEST_CASE("make_speed_solver().build() compiles and converges", "[ik][solver_fac
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
     auto target = reachable_target(chain, q_known);
 
-    auto solver = spp::make_speed_solver<double, 6>().build();
+    auto solver = spp::make_speed_solver<spp::kinematic_chain<double, 6>>().build();
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria{1e-6, 1e-6, 200};
@@ -98,7 +98,7 @@ TEST_CASE("make_convergence_solver().build() compiles and converges", "[ik][solv
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
     auto target = reachable_target(chain, q_known);
 
-    auto solver = spp::make_convergence_solver<double, 6>().build();
+    auto solver = spp::make_convergence_solver<spp::kinematic_chain<double, 6>>().build();
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria{1e-6, 1e-6, 200};
@@ -125,7 +125,7 @@ TEST_CASE("make_default_solver().build() compiles and converges", "[ik][solver_f
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
     auto target = reachable_target(chain, q_known);
 
-    auto solver = spp::make_default_solver<double, 6>().build();
+    auto solver = spp::make_default_solver<spp::kinematic_chain<double, 6>>().build();
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria{1e-6, 1e-6, 200};
@@ -152,8 +152,8 @@ TEST_CASE("make_solver builder constructs single-policy solver", "[ik][solver_fa
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
     auto target = reachable_target(chain, q_known);
 
-    auto solver = spp::make_solver<double, 6>()
-        .policy(spp::speed_solver<double, 6>{})
+    auto solver = spp::make_solver<spp::kinematic_chain<double, 6>>()
+        .policy(spp::speed_solver<spp::kinematic_chain<double, 6>>{})
         .build();
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
@@ -181,9 +181,9 @@ TEST_CASE("make_solver builder constructs two-policy solver", "[ik][solver_facto
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
     auto target = reachable_target(chain, q_known);
 
-    auto solver = spp::make_solver<double, 6>()
-        .policy(spp::speed_solver<double, 6>{})
-        .policy(spp::convergence_solver<double, 6>{})
+    auto solver = spp::make_solver<spp::kinematic_chain<double, 6>>()
+        .policy(spp::speed_solver<spp::kinematic_chain<double, 6>>{})
+        .policy(spp::convergence_solver<spp::kinematic_chain<double, 6>>{})
         .build();
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
@@ -206,8 +206,8 @@ TEST_CASE("make_solver builder constructs two-policy solver", "[ik][solver_facto
 TEST_CASE("default_solver alias matches make_default_solver().build() type", "[ik][solver_factory]")
 {
     static_assert(std::same_as<
-        spp::default_solver<double, 6>,
-        decltype(spp::make_default_solver<double, 6>().build())>);
+        spp::default_solver<spp::kinematic_chain<double, 6>>,
+        decltype(spp::make_default_solver<spp::kinematic_chain<double, 6>>().build())>);
 }
 
 // ============================================================================
@@ -217,6 +217,6 @@ TEST_CASE("default_solver alias matches make_default_solver().build() type", "[i
 TEST_CASE("preset builders are not solvers -- .build() required", "[ik][solver_factory]")
 {
     static_assert(!std::same_as<
-        decltype(spp::make_speed_solver<double, 6>()),
-        spp::basic_ik_solver<spp::speed_solver<double, 6>>>);
+        decltype(spp::make_speed_solver<spp::kinematic_chain<double, 6>>()),
+        spp::basic_ik_solver<spp::speed_solver<spp::kinematic_chain<double, 6>>>>);
 }

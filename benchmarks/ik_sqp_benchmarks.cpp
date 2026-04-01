@@ -32,7 +32,7 @@ static void bm_ik_sqp_3r_planar(benchmark::State& state)
         auto target = liepp::benchmarks::random_reachable_target(chain, rng);
         auto q_seed = liepp::benchmarks::random_joint_config(chain, rng);
 
-        liepp::basic_ik_solver<liepp::nlopt_bobyqa_solve_policy<double, 3>> solver;
+        liepp::basic_ik_solver<liepp::nlopt_bobyqa_solve_policy<liepp::kinematic_chain<double, 3>>> solver;
         solver.setup(chain, target, q_seed, criteria);
         auto result = solver.solve();
 
@@ -81,7 +81,7 @@ static void bm_ik_sqp_ur3e(benchmark::State& state)
         auto target = liepp::benchmarks::random_reachable_target(chain, rng);
         auto q_seed = liepp::benchmarks::random_joint_config(chain, rng);
 
-        liepp::basic_ik_solver<liepp::nlopt_bobyqa_solve_policy<double, 6>> solver;
+        liepp::basic_ik_solver<liepp::nlopt_bobyqa_solve_policy<liepp::kinematic_chain<double, 6>>> solver;
         solver.setup(chain, target, q_seed, criteria);
         auto result = solver.solve();
 
@@ -130,7 +130,7 @@ static void bm_ik_sqp_lbr_med14(benchmark::State& state)
         auto target = liepp::benchmarks::random_reachable_target(chain, rng);
         auto q_seed = liepp::benchmarks::random_joint_config(chain, rng);
 
-        liepp::basic_ik_solver<liepp::nlopt_bobyqa_solve_policy<double, 7>> solver;
+        liepp::basic_ik_solver<liepp::nlopt_bobyqa_solve_policy<liepp::kinematic_chain<double, 7>>> solver;
         solver.setup(chain, target, q_seed, criteria);
         auto result = solver.solve();
 

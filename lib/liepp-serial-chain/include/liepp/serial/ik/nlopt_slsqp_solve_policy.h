@@ -25,6 +25,7 @@
 
 #include "liepp/lie/se3.h"
 #include "liepp/serial/chain/joint_state.h"
+#include "liepp/serial/chain/chain_concept.h"
 #include "liepp/serial/chain/kinematic_chain.h"
 
 #include <nlopt.hpp>
@@ -45,26 +46,27 @@ namespace liepp
 /// cooperative scheduling with other solvers.
 ///
 /// Reference: D-04 (NLopt LD_SLSQP), D-11 (gradient via log Jacobian).
-template <typename Scalar = double, int N = dynamic, typename LimitsPolicy = clamp_limits>
+template <chain Chain, typename LimitsPolicy = clamp_limits>
 class nlopt_slsqp_solve_policy
 {
 public:
-    static_assert(std::is_floating_point_v<Scalar>, "nlopt_slsqp_solve_policy requires a floating-point Scalar type");
-
-    using scalar_type = Scalar;
-    static constexpr int joints = N;
+    using chain_type = Chain;
+    using scalar_type = typename Chain::scalar_type;
+    static constexpr int joints = Chain::joints;
     using limits_type = LimitsPolicy;
 
-    using position_type = typename joint_state<Scalar, N>::position_type;
+    using position_type = typename joint_state<scalar_type, joints>::position_type;
+
+    static_assert(std::is_floating_point_v<scalar_type>, "nlopt_slsqp_solve_policy requires a floating-point Scalar type");
 
     /// Tunable parameters for the SLSQP solve policy.
     struct options
     {
-        Scalar xtol_rel{Scalar(1e-8)};
-        Scalar ftol_rel{Scalar(1e-12)};
+        scalar_type xtol_rel{scalar_type(1e-8)};
+        scalar_type ftol_rel{scalar_type(1e-12)};
         int budget_per_step{500};
         int max_restarts{10};
-        Scalar restart_scale{Scalar(0.5)};
+        scalar_type restart_scale{scalar_type(0.5)};
     };
 
     nlopt_slsqp_solve_policy() = default;
@@ -76,23 +78,23 @@ public:
 
     /// Initialize the solve policy with chain, target, seed, and criteria.
     void setup(
-        const kinematic_chain<Scalar, N>& chain,
-        const se3<Scalar>& target,
+        const chain_type& chain,
+        const se3<scalar_type>& target,
         const position_type& q0,
-        const convergence_criteria<Scalar>& criteria)
+        const convergence_criteria<scalar_type>& criteria)
     {
         m_chain = &chain;
         m_target = target;
         m_criteria = criteria;
         m_iterations = 0;
         m_restart_count = 0;
-        m_error_norm = std::numeric_limits<Scalar>::max();
+        m_error_norm = std::numeric_limits<scalar_type>::max();
         m_status = ik_status::running;
 
-        m_q_vec = detail::eigen_to_stdvec<Scalar, N>(q0);
+        m_q_vec = detail::eigen_to_stdvec<scalar_type, joints>(q0);
 
         m_opt = nlopt::opt(nlopt::LD_SLSQP, static_cast<unsigned>(chain.num_joints()));
-        detail::set_nlopt_bounds<Scalar, N>(m_opt, chain);
+        detail::set_nlopt_bounds<scalar_type, joints>(m_opt, chain);
         m_opt.set_min_objective(objective_func, this);
         m_opt.set_xtol_rel(static_cast<double>(m_options.xtol_rel));
         m_opt.set_ftol_rel(static_cast<double>(m_options.ftol_rel));
@@ -101,7 +103,7 @@ public:
     }
 
     /// Execute one SLSQP optimization round with budget_per_step evaluations.
-    ik_status step(const kinematic_chain<Scalar, N>& chain)
+    ik_status step(const chain_type& chain)
     {
         if (m_status != ik_status::running)
         {
@@ -124,8 +126,8 @@ public:
         }
         if (result == nlopt::ROUNDOFF_LIMITED)
         {
-            m_error_norm = detail::compute_body_error_norm<Scalar, N>(*m_chain, m_target, m_q_vec);
-            bool conv = detail::check_nlopt_convergence<Scalar, N>(*m_chain, m_target, m_criteria, m_q_vec);
+            m_error_norm = detail::compute_body_error_norm<scalar_type, joints>(*m_chain, m_target, m_q_vec);
+            bool conv = detail::check_nlopt_convergence<scalar_type, joints>(*m_chain, m_target, m_criteria, m_q_vec);
             m_status = conv ? ik_status::converged : ik_status::stalled;
             return m_status;
         }
@@ -133,11 +135,11 @@ public:
         ++m_iterations;
 
         m_prev_error = m_error_norm;
-        m_error_norm = detail::compute_body_error_norm<Scalar, N>(*m_chain, m_target, m_q_vec);
+        m_error_norm = detail::compute_body_error_norm<scalar_type, joints>(*m_chain, m_target, m_q_vec);
 
-        bool conv = detail::check_nlopt_convergence<Scalar, N>(*m_chain, m_target, m_criteria, m_q_vec);
+        bool conv = detail::check_nlopt_convergence<scalar_type, joints>(*m_chain, m_target, m_criteria, m_q_vec);
         bool error_stalled = std::abs(m_error_norm - m_prev_error) <
-            Scalar(1e-10) * (Scalar(1) + m_error_norm);
+            scalar_type(1e-10) * (scalar_type(1) + m_error_norm);
         bool can_restart = m_restart_count < m_options.max_restarts;
 
         if (detail::needs_restart(result, conv, error_stalled))
@@ -150,14 +152,14 @@ public:
 
         if (m_status == ik_status::running && detail::needs_restart(result, conv, error_stalled))
         {
-            detail::perturb_nlopt_solution<Scalar, N>(m_q_vec, *m_chain, m_options.restart_scale, m_rng);
-            detail::reset_nlopt_optimizer<Scalar, N>(
+            detail::perturb_nlopt_solution<scalar_type, joints>(m_q_vec, *m_chain, m_options.restart_scale, m_rng);
+            detail::reset_nlopt_optimizer<scalar_type, joints>(
                 m_opt, nlopt::LD_SLSQP, *m_chain, objective_func, this,
                 static_cast<double>(m_options.xtol_rel), m_options.budget_per_step, m_eval_count);
             m_opt.set_ftol_rel(static_cast<double>(m_options.ftol_rel));
         }
 
-        detail::enforce_and_sync_limits<LimitsPolicy, Scalar, N>(m_q_vec, chain);
+        detail::enforce_and_sync_limits<LimitsPolicy, scalar_type, joints>(m_q_vec, chain);
 
         return m_status;
     }
@@ -166,10 +168,10 @@ public:
 
     [[nodiscard]] position_type solution() const
     {
-        return detail::stdvec_to_eigen<Scalar, N>(m_q_vec);
+        return detail::stdvec_to_eigen<scalar_type, joints>(m_q_vec);
     }
 
-    [[nodiscard]] Scalar error_norm() const { return m_error_norm; }
+    [[nodiscard]] scalar_type error_norm() const { return m_error_norm; }
 
     [[nodiscard]] int iterations() const { return m_iterations; }
 
@@ -190,11 +192,11 @@ private:
     {
         auto* self = static_cast<nlopt_slsqp_solve_policy*>(data);
         int n = static_cast<int>(x.size());
-        auto q = detail::stdvec_to_eigen<Scalar, N>(x);
+        auto q = detail::stdvec_to_eigen<scalar_type, joints>(x);
 
         if (!grad.empty())
         {
-            auto result = ik_se3_objective<Scalar, N>::evaluate_with_gradient(
+            auto result = ik_se3_objective<chain_type>::evaluate_with_gradient(
                 *self->m_chain, self->m_target, q);
 
             for (int i = 0; i < n; ++i)
@@ -205,19 +207,19 @@ private:
             return static_cast<double>(result.info.objective);
         }
 
-        auto result = ik_se3_objective<Scalar, N>::evaluate(
+        auto result = ik_se3_objective<chain_type>::evaluate(
             *self->m_chain, self->m_target, q);
         return static_cast<double>(result.objective);
     }
 
     nlopt::opt m_opt{nlopt::LD_SLSQP, 1};
-    const kinematic_chain<Scalar, N>* m_chain{nullptr};
-    se3<Scalar> m_target{se3<Scalar>::identity()};
-    convergence_criteria<Scalar> m_criteria{};
+    const chain_type* m_chain{nullptr};
+    se3<scalar_type> m_target{se3<scalar_type>::identity()};
+    convergence_criteria<scalar_type> m_criteria{};
     std::vector<double> m_q_vec;
     options m_options{};
-    Scalar m_error_norm{std::numeric_limits<Scalar>::max()};
-    Scalar m_prev_error{std::numeric_limits<Scalar>::max()};
+    scalar_type m_error_norm{std::numeric_limits<scalar_type>::max()};
+    scalar_type m_prev_error{std::numeric_limits<scalar_type>::max()};
     int m_iterations{};
     int m_eval_count{};
     int m_restart_count{};

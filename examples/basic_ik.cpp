@@ -33,7 +33,7 @@ int main()
     Eigen::Vector3d q0{0.0, 0.0, 0.0};
     liepp::convergence_criteria<double> criteria{1e-6, 1e-6, 200};
 
-    liepp::basic_ik_solver<liepp::lm_solve_policy<double, 3>> solver;
+    liepp::basic_ik_solver<liepp::lm_solve_policy<liepp::kinematic_chain<double, 3>>> solver;
     solver.setup(chain, target, q0, criteria);
     auto result = solver.solve();
 

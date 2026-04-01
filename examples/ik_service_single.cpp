@@ -105,7 +105,7 @@ private:
             lock.unlock();
 
             // Solve IK using LM solve policy
-            liepp::basic_ik_solver<liepp::lm_solve_policy<double, 6>> solver;
+            liepp::basic_ik_solver<liepp::lm_solve_policy<liepp::kinematic_chain<double, 6>>> solver;
             solver.setup(m_chain, req.target, req.q0, criteria);
             auto result = solver.solve();
 

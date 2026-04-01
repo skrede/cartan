@@ -88,7 +88,7 @@ spp::ik_status run_stepper(
 
 TEST_CASE("projected_lm_solve_policy concept satisfaction", "[ik][projected_lm]")
 {
-    static_assert(spp::ik_solve_policy<spp::projected_lm_solve_policy<double, 6>>);
+    static_assert(spp::ik_solve_policy<spp::projected_lm_solve_policy<spp::kinematic_chain<double, 6>>>);
 }
 
 // ============================================================================
@@ -105,7 +105,7 @@ TEST_CASE("projected_lm_solve_policy FK roundtrip", "[ik][projected_lm]")
     auto fk_target = spp::forward_kinematics(chain, q_known);
     auto target = fk_target.end_effector;
 
-    spp::projected_lm_solve_policy<double, 6> stepper;
+    spp::projected_lm_solve_policy<spp::kinematic_chain<double, 6>> stepper;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations = 200;
@@ -137,7 +137,7 @@ TEST_CASE("projected_lm_solve_policy respects tight limits", "[ik][projected_lm]
     auto fk_target = spp::forward_kinematics(chain, q_known);
     auto target = fk_target.end_effector;
 
-    spp::projected_lm_solve_policy<double, 6> stepper;
+    spp::projected_lm_solve_policy<spp::kinematic_chain<double, 6>> stepper;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations = 300;
@@ -168,7 +168,7 @@ TEST_CASE("projected_lm_solve_policy active set holds joints at limits", "[ik][p
     auto fk_target = spp::forward_kinematics(chain, q_known);
     auto target = fk_target.end_effector;
 
-    spp::projected_lm_solve_policy<double, 6> stepper;
+    spp::projected_lm_solve_policy<spp::kinematic_chain<double, 6>> stepper;
     Eigen::Vector<double, 6> q0;
     q0 << 0.0, 0.0, 0.5, 0.0, 0.0, 0.0;  // joint 3 at upper limit
 
@@ -198,9 +198,9 @@ TEST_CASE("projected_lm_solve_policy dogleg converges", "[ik][projected_lm]")
     auto fk_target = spp::forward_kinematics(chain, q_known);
     auto target = fk_target.end_effector;
 
-    spp::projected_lm_solve_policy<double, 6>::options opts;
+    spp::projected_lm_solve_policy<spp::kinematic_chain<double, 6>>::options opts;
     opts.use_dogleg = true;
-    spp::projected_lm_solve_policy<double, 6> stepper(opts);
+    spp::projected_lm_solve_policy<spp::kinematic_chain<double, 6>> stepper(opts);
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
@@ -235,7 +235,7 @@ TEST_CASE("projected_lm_solve_policy with error weight", "[ik][projected_lm]")
     spp::error_weight<double> weight;
     weight.weights << 1.0, 1.0, 1.0, 100.0, 100.0, 100.0;
 
-    spp::projected_lm_solve_policy<double, 6> stepper;
+    spp::projected_lm_solve_policy<spp::kinematic_chain<double, 6>> stepper;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations = 200;
@@ -264,10 +264,10 @@ TEST_CASE("projected_lm_solve_policy stall detection", "[ik][projected_lm]")
     far_trans << 100.0, 100.0, 100.0;
     auto target = spp::se3<double>(spp::so3<double>::identity(), far_trans);
 
-    spp::projected_lm_solve_policy<double, 6>::options opts;
+    spp::projected_lm_solve_policy<spp::kinematic_chain<double, 6>>::options opts;
     opts.stall_threshold = 1e-4;  // generous threshold to trigger stall
     opts.stall_window = 3;
-    spp::projected_lm_solve_policy<double, 6> stepper(opts);
+    spp::projected_lm_solve_policy<spp::kinematic_chain<double, 6>> stepper(opts);
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
@@ -295,9 +295,9 @@ TEST_CASE("projected_lm_solve_policy divergence detection", "[ik][projected_lm]"
     far_trans << 100.0, 100.0, 100.0;
     auto target = spp::se3<double>(spp::so3<double>::identity(), far_trans);
 
-    spp::projected_lm_solve_policy<double, 6>::options opts;
+    spp::projected_lm_solve_policy<spp::kinematic_chain<double, 6>>::options opts;
     opts.divergence_factor = 1.01;  // very tight -- triggers divergence quickly
-    spp::projected_lm_solve_policy<double, 6> stepper(opts);
+    spp::projected_lm_solve_policy<spp::kinematic_chain<double, 6>> stepper(opts);
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;

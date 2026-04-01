@@ -289,11 +289,12 @@ void bm_lbfgsb_aggressive(
     const liepp::kinematic_chain<double, N>& chain,
     const target_set<double, N>& ts)
 {
-    typename liepp::lbfgsb_solve_policy<double, N>::options lbfgsb_opts{
+    using chain_t = liepp::kinematic_chain<double, N>;
+    typename liepp::lbfgsb_solve_policy<chain_t>::options lbfgsb_opts{
         .history_depth = 10,
         .stall_window = 20
     };
-    typename liepp::restart_solve_policy<double, N, liepp::lbfgsb_solve_policy<double, N>>::options restart_opts{
+    typename liepp::restart_solve_policy<chain_t, liepp::lbfgsb_solve_policy<chain_t>>::options restart_opts{
         .max_restarts = 5
     };
     liepp::convergence_criteria<double> criteria{1e-5, 1e-5, 1000};
@@ -310,8 +311,8 @@ void bm_lbfgsb_aggressive(
         auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
         ++idx;
 
-        liepp::lbfgsb_solve_policy<double, N> inner(lbfgsb_opts);
-        liepp::restart_solve_policy<double, N, liepp::lbfgsb_solve_policy<double, N>> stepper(
+        liepp::lbfgsb_solve_policy<chain_t> inner(lbfgsb_opts);
+        liepp::restart_solve_policy<chain_t, liepp::lbfgsb_solve_policy<chain_t>> stepper(
             restart_opts, std::move(inner));
         liepp::basic_ik_solver solver(std::move(stepper));
         solver.setup(chain, target, q_seed, criteria);
@@ -351,10 +352,11 @@ void bm_gauss_newton(
     const liepp::kinematic_chain<double, N>& chain,
     const target_set<double, N>& ts)
 {
-    typename liepp::projected_lm_solve_policy<double, N>::options plm_opts{
+    using chain_t = liepp::kinematic_chain<double, N>;
+    typename liepp::projected_lm_solve_policy<chain_t>::options plm_opts{
         .initial_lambda_factor = 0.0
     };
-    typename liepp::restart_solve_policy<double, N, liepp::projected_lm_solve_policy<double, N>>::options restart_opts{
+    typename liepp::restart_solve_policy<chain_t, liepp::projected_lm_solve_policy<chain_t>>::options restart_opts{
         .max_restarts = 20
     };
     liepp::convergence_criteria<double> criteria{1e-5, 1e-5, 200};
@@ -371,8 +373,8 @@ void bm_gauss_newton(
         auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
         ++idx;
 
-        liepp::projected_lm_solve_policy<double, N> inner(plm_opts);
-        liepp::restart_solve_policy<double, N, liepp::projected_lm_solve_policy<double, N>> stepper(
+        liepp::projected_lm_solve_policy<chain_t> inner(plm_opts);
+        liepp::restart_solve_policy<chain_t, liepp::projected_lm_solve_policy<chain_t>> stepper(
             restart_opts, std::move(inner));
         liepp::basic_ik_solver solver(std::move(stepper));
         solver.setup(chain, target, q_seed, criteria);
@@ -409,37 +411,41 @@ void bm_gauss_newton(
 // Solver type aliases
 // ============================================================================
 
+// Chain alias for convenience
+template <int N>
+using chain_t = liepp::kinematic_chain<double, N>;
+
 // Individual policies (no restart wrapper)
 template <int N>
-using dls_ik_solver = liepp::basic_ik_solver<liepp::dls_solve_policy<double, N>>;
+using dls_ik_solver = liepp::basic_ik_solver<liepp::dls_solve_policy<chain_t<N>>>;
 
 template <int N>
-using lm_ik_solver = liepp::basic_ik_solver<liepp::lm_solve_policy<double, N>>;
+using lm_ik_solver = liepp::basic_ik_solver<liepp::lm_solve_policy<chain_t<N>>>;
 
 template <int N>
-using projected_lm_ik_solver = liepp::basic_ik_solver<liepp::projected_lm_solve_policy<double, N>>;
+using projected_lm_ik_solver = liepp::basic_ik_solver<liepp::projected_lm_solve_policy<chain_t<N>>>;
 
 template <int N>
-using lbfgsb_ik_solver = liepp::basic_ik_solver<liepp::lbfgsb_solve_policy<double, N>>;
+using lbfgsb_ik_solver = liepp::basic_ik_solver<liepp::lbfgsb_solve_policy<chain_t<N>>>;
 
 // Restart-wrapped variants
 template <int N>
-using speed_ik_solver = liepp::basic_ik_solver<liepp::speed_solver<double, N>>;
+using speed_ik_solver = liepp::basic_ik_solver<liepp::speed_solver<chain_t<N>>>;
 
 template <int N>
-using tuned_lbfgsb = liepp::restart_solve_policy<double, N, liepp::lbfgsb_solve_policy<double, N>>;
+using tuned_lbfgsb = liepp::restart_solve_policy<chain_t<N>, liepp::lbfgsb_solve_policy<chain_t<N>>>;
 
 template <int N>
 using convergence_ik_solver = liepp::basic_ik_solver<tuned_lbfgsb<N>>;
 
 template <int N>
-using restart_lm = liepp::restart_solve_policy<double, N, liepp::lm_solve_policy<double, N, liepp::no_limits>>;
+using restart_lm = liepp::restart_solve_policy<chain_t<N>, liepp::lm_solve_policy<chain_t<N>, liepp::no_limits>>;
 
 template <int N>
 using restart_lm_ik_solver = liepp::basic_ik_solver<restart_lm<N>>;
 
 template <int N>
-using nr_restart = liepp::restart_solve_policy<double, N, liepp::newton_raphson_solve_policy<double, N, liepp::no_limits>>;
+using nr_restart = liepp::restart_solve_policy<chain_t<N>, liepp::newton_raphson_solve_policy<chain_t<N>, liepp::no_limits>>;
 
 template <int N>
 using nr_ik_solver = liepp::basic_ik_solver<nr_restart<N>>;
@@ -447,13 +453,13 @@ using nr_ik_solver = liepp::basic_ik_solver<nr_restart<N>>;
 // NLopt solvers
 #ifdef LIEPP_HAS_NLOPT
 template <int N>
-using bobyqa_restart = liepp::restart_solve_policy<double, N, liepp::nlopt_bobyqa_solve_policy<double, N>>;
+using bobyqa_restart = liepp::restart_solve_policy<chain_t<N>, liepp::nlopt_bobyqa_solve_policy<chain_t<N>>>;
 
 template <int N>
 using bobyqa_ik_solver = liepp::basic_ik_solver<bobyqa_restart<N>>;
 
 template <int N>
-using slsqp_restart = liepp::restart_solve_policy<double, N, liepp::nlopt_slsqp_solve_policy<double, N>>;
+using slsqp_restart = liepp::restart_solve_policy<chain_t<N>, liepp::nlopt_slsqp_solve_policy<chain_t<N>>>;
 
 template <int N>
 using slsqp_ik_solver = liepp::basic_ik_solver<slsqp_restart<N>>;
@@ -461,20 +467,20 @@ using slsqp_ik_solver = liepp::basic_ik_solver<slsqp_restart<N>>;
 
 // nablapp solvers (always available)
 template <int N>
-using nablapp_bobyqa_restart = liepp::restart_solve_policy<double, N, liepp::bobyqa_solve_policy<double, N>>;
+using nablapp_bobyqa_restart = liepp::restart_solve_policy<chain_t<N>, liepp::bobyqa_solve_policy<chain_t<N>>>;
 
 template <int N>
 using nablapp_bobyqa_ik_solver = liepp::basic_ik_solver<nablapp_bobyqa_restart<N>>;
 
 template <int N>
-using nablapp_slsqp_restart = liepp::restart_solve_policy<double, N, liepp::slsqp_solve_policy<double, N>>;
+using nablapp_slsqp_restart = liepp::restart_solve_policy<chain_t<N>, liepp::slsqp_solve_policy<chain_t<N>>>;
 
 template <int N>
 using nablapp_slsqp_ik_solver = liepp::basic_ik_solver<nablapp_slsqp_restart<N>>;
 
 // Racing: variadic solver (speed + convergence policies)
 template <int N>
-using racing_solver = liepp::default_solver<double, N>;
+using racing_solver = liepp::default_solver<chain_t<N>>;
 
 // ============================================================================
 // Convergence criteria per solver type

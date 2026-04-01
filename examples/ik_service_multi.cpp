@@ -138,7 +138,7 @@ private:
             // Multi-policy solver: two policies race cooperatively.
             // step() advances each active policy once per call (round-robin).
             // No additional threads -- cooperative scheduling in this worker thread.
-            auto solver = liepp::make_default_solver<double, 7>().build();
+            auto solver = liepp::make_default_solver<liepp::kinematic_chain<double, 7>>().build();
 
             // Generate random initial configuration
             Eigen::Vector<double, 7> q0;

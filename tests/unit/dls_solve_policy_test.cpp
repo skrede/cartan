@@ -93,7 +93,7 @@ TEST_CASE("DLS converges on reachable 6R target", "[ik][dls]")
     auto target = fk_target.end_effector;
 
     // Solve IK from zero seed
-    spp::dls_solve_policy<double, 6> stepper;
+    spp::dls_solve_policy<spp::kinematic_chain<double, 6>> stepper;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations = 200;
@@ -124,7 +124,7 @@ TEST_CASE("DLS converges on 3R planar target", "[ik][dls]")
     auto fk_target = spp::forward_kinematics(chain, q_known);
     auto target = fk_target.end_effector;
 
-    spp::dls_solve_policy<double, 3> stepper;
+    spp::dls_solve_policy<spp::kinematic_chain<double, 3>> stepper;
     Eigen::Vector3d q0 = Eigen::Vector3d::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations = 200;
@@ -153,7 +153,7 @@ TEST_CASE("DLS returns iteration_limit on unreachable target", "[ik][dls]")
     far_trans << 100, 100, 100;
     auto target = spp::se3<double>(spp::so3<double>::identity(), far_trans);
 
-    spp::dls_solve_policy<double, 6> stepper;
+    spp::dls_solve_policy<spp::kinematic_chain<double, 6>> stepper;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations = 50;
@@ -179,7 +179,7 @@ TEST_CASE("DLS near-singular convergence", "[ik][dls]")
     auto fk_target = spp::forward_kinematics(chain, q_known);
     auto target = fk_target.end_effector;
 
-    spp::dls_solve_policy<double, 6> stepper;
+    spp::dls_solve_policy<spp::kinematic_chain<double, 6>> stepper;
     Eigen::Vector<double, 6> q0;
     q0 << 0.1, 0.1, 0.1, 0.1, 0.1, 0.1;
     spp::convergence_criteria<double> criteria;
@@ -207,7 +207,7 @@ TEST_CASE("DLS separate angular/linear convergence", "[ik][dls]")
     auto target = fk_target.end_effector;
 
     // Loose position tolerance, tight orientation tolerance
-    spp::dls_solve_policy<double, 6> stepper;
+    spp::dls_solve_policy<spp::kinematic_chain<double, 6>> stepper;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.position_tol = 1.0;
@@ -233,7 +233,7 @@ TEST_CASE("DLS condition_number returns positive value", "[ik][dls]")
 
     auto fk_target = spp::forward_kinematics(chain, q_known);
 
-    spp::dls_solve_policy<double, 6> stepper;
+    spp::dls_solve_policy<spp::kinematic_chain<double, 6>> stepper;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
 
@@ -255,7 +255,7 @@ TEST_CASE("DLS iterations count", "[ik][dls]")
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
     auto fk_target = spp::forward_kinematics(chain, q_known);
 
-    spp::dls_solve_policy<double, 6> stepper;
+    spp::dls_solve_policy<spp::kinematic_chain<double, 6>> stepper;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations = 200;

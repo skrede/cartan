@@ -40,7 +40,7 @@ int main()
 
     liepp::basic_ik_solver slsqp_solver{
         liepp::restart_solve_policy{
-            liepp::slsqp_solve_policy<double, 6>{}}};
+            liepp::slsqp_solve_policy<liepp::kinematic_chain<double, 6>>{}}};
 
     slsqp_solver.setup(chain, target, q0, criteria);
     auto slsqp_result = slsqp_solver.solve();
@@ -61,7 +61,7 @@ int main()
 
     liepp::basic_ik_solver bobyqa_solver{
         liepp::restart_solve_policy{
-            liepp::bobyqa_solve_policy<double, 6>{}}};
+            liepp::bobyqa_solve_policy<liepp::kinematic_chain<double, 6>>{}}};
 
     bobyqa_solver.setup(chain, target, q0, criteria);
     auto bobyqa_result = bobyqa_solver.solve();
@@ -81,8 +81,8 @@ int main()
     // --- Section 3: Racing nablapp SLSQP against native projected LM ---
 
     liepp::basic_ik_solver racing_solver{
-        liepp::restart_solve_policy{liepp::slsqp_solve_policy<double, 6>{}},
-        liepp::restart_solve_policy{liepp::projected_lm_solve_policy<double, 6>{}}};
+        liepp::restart_solve_policy{liepp::slsqp_solve_policy<liepp::kinematic_chain<double, 6>>{}},
+        liepp::restart_solve_policy{liepp::projected_lm_solve_policy<liepp::kinematic_chain<double, 6>>{}}};
 
     racing_solver.setup(chain, target, q0, criteria);
     auto racing_result = racing_solver.solve();

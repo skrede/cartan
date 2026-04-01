@@ -56,7 +56,7 @@ spp::ik_status run_stepper(
 
 TEST_CASE("nlopt_slsqp_solve_policy satisfies ik_solve_policy concept", "[ik][slsqp]")
 {
-    static_assert(spp::ik_solve_policy<spp::nlopt_slsqp_solve_policy<double, 6>>);
+    static_assert(spp::ik_solve_policy<spp::nlopt_slsqp_solve_policy<spp::kinematic_chain<double, 6>>>);
     SUCCEED();
 }
 
@@ -77,7 +77,7 @@ TEST_CASE("nlopt_slsqp_solve_policy converges on UR5-like chain", "[ik][slsqp]")
     criteria.position_tol = 1e-4;
     criteria.orientation_tol = 1e-4;
 
-    spp::nlopt_slsqp_solve_policy<double, 6> stepper;
+    spp::nlopt_slsqp_solve_policy<spp::kinematic_chain<double, 6>> stepper;
     stepper.setup(chain, target, q_seed, criteria);
 
     run_stepper(stepper, chain, 50);
@@ -103,8 +103,8 @@ TEST_CASE("nlopt_slsqp_solve_policy composes with restart_solve_policy", "[ik][s
     criteria.position_tol = 1e-4;
     criteria.orientation_tol = 1e-4;
 
-    using inner_t = spp::nlopt_slsqp_solve_policy<double, 6>;
-    using restart_t = spp::restart_solve_policy<double, 6, inner_t>;
+    using inner_t = spp::nlopt_slsqp_solve_policy<spp::kinematic_chain<double, 6>>;
+    using restart_t = spp::restart_solve_policy<spp::kinematic_chain<double, 6>, inner_t>;
 
     restart_t stepper({.max_restarts = 10});
     stepper.setup(chain, target, q_seed, criteria);

@@ -66,7 +66,7 @@ TEST_CASE("halton_element base 3 values", "[halton][element]")
 TEST_CASE("halton_seed_generator produces seeds within limits", "[halton][generator]")
 {
     auto chain = make_ur5_like_chain();
-    spp::halton_seed_generator<double, 6> gen(chain);
+    spp::halton_seed_generator<spp::kinematic_chain<double, 6>> gen(chain);
 
     for (int i = 0; i < 100; ++i)
     {
@@ -84,7 +84,7 @@ TEST_CASE("halton_seed_generator produces seeds within limits", "[halton][genera
 TEST_CASE("halton_seed_generator is deterministic", "[halton][generator]")
 {
     auto chain = make_ur5_like_chain();
-    spp::halton_seed_generator<double, 6> gen(chain);
+    spp::halton_seed_generator<spp::kinematic_chain<double, 6>> gen(chain);
 
     auto seed_a = gen(42);
     auto seed_b = gen(42);
@@ -98,7 +98,7 @@ TEST_CASE("halton_seed_generator is deterministic", "[halton][generator]")
 TEST_CASE("halton_seed_generator seeds have low discrepancy", "[halton][generator]")
 {
     auto chain = make_ur5_like_chain();
-    spp::halton_seed_generator<double, 6> gen(chain);
+    spp::halton_seed_generator<spp::kinematic_chain<double, 6>> gen(chain);
 
     // Generate seeds at indices 21-30 and check no two are within epsilon
     std::vector<Eigen::Vector<double, 6>> seeds;
