@@ -7,5 +7,6 @@
 
 #include "liepp/analytical/solver_2r.h"
 #include "liepp/analytical/solver_3r.h"
+#include "liepp/analytical/solver_6r.h"
 
 #endif
