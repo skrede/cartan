@@ -105,10 +105,10 @@ public:
         nab_opts.set_objective_threshold(1e-16);
         nab_opts.set_step_threshold(1e-16);
 
-        nablapp::cmaes_policy<>::options_type policy_opts;
+        typename nablapp::cmaes_policy<joints>::options_type policy_opts;
         policy_opts.initial_sigma = static_cast<double>(m_options.initial_sigma);
 
-        m_solver.emplace(nablapp::cmaes_policy<>{}, *m_problem, x0, nab_opts, policy_opts);
+        m_solver.emplace(nablapp::cmaes_policy<joints>{}, *m_problem, x0, nab_opts, policy_opts);
     }
 
     ik_status step(const Chain& chain)
@@ -176,7 +176,7 @@ public:
     void abort() { m_status = ik_status::stalled; }
 
 private:
-    using nablapp_solver = nablapp::basic_solver<nablapp::cmaes_policy<>>;
+    using nablapp_solver = nablapp::basic_solver<nablapp::cmaes_policy<joints>, joints>;
 
     void sync_solution_from_solver()
     {

@@ -176,7 +176,7 @@ public:
 
 private:
     using nablapp_solver = nablapp::basic_solver<
-        nablapp::augmented_lagrangian_policy<nablapp::lbfgsb_policy<>>>;
+        nablapp::augmented_lagrangian_policy<nablapp::lbfgsb_policy<joints>>, joints>;
 
     void sync_solution_from_solver()
     {

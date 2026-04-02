@@ -48,74 +48,60 @@ public:
         return m_chain->num_joints();
     }
 
-    double value(const Eigen::VectorXd& x) const
+    template <typename Derived>
+    double value(const Eigen::MatrixBase<Derived>& x) const
     {
         auto q = to_position(x);
         auto result = ik_se3_objective<Chain>::evaluate(*m_chain, m_target, q, m_weight);
         return static_cast<double>(result.objective);
     }
 
-    void gradient(const Eigen::VectorXd& x, Eigen::VectorXd& g) const
+    template <typename DerivedIn, typename DerivedOut>
+    void gradient(const Eigen::MatrixBase<DerivedIn>& x, Eigen::MatrixBase<DerivedOut>& g) const
     {
         auto q = to_position(x);
         auto result = ik_se3_objective<Chain>::evaluate_with_gradient(
             *m_chain, m_target, q, m_weight);
 
         int n = m_chain->num_joints();
-        g.resize(n);
         for (int i = 0; i < n; ++i)
         {
             g[i] = static_cast<double>(result.gradient(i));
         }
     }
 
-    Eigen::VectorXd lower_bounds() const
+    Eigen::Vector<double, N> lower_bounds() const
     {
         int n = m_chain->num_joints();
-        if constexpr (N != dynamic)
+        Eigen::Vector<double, N> lb;
+        if constexpr (N == dynamic)
         {
-            Eigen::Vector<double, N> lb;
-            for (int i = 0; i < n; ++i)
-            {
-                lb[i] = static_cast<double>(m_chain->limits()[static_cast<std::size_t>(i)].position_min);
-            }
-            return lb;
+            lb.resize(n);
         }
-        else
+        for (int i = 0; i < n; ++i)
         {
-            Eigen::VectorXd lb(n);
-            for (int i = 0; i < n; ++i)
-            {
-                lb[i] = static_cast<double>(m_chain->limits()[static_cast<std::size_t>(i)].position_min);
-            }
-            return lb;
+            lb[i] = static_cast<double>(m_chain->limits()[static_cast<std::size_t>(i)].position_min);
         }
+        return lb;
     }
 
-    Eigen::VectorXd upper_bounds() const
+    Eigen::Vector<double, N> upper_bounds() const
     {
         int n = m_chain->num_joints();
-        if constexpr (N != dynamic)
+        Eigen::Vector<double, N> ub;
+        if constexpr (N == dynamic)
         {
-            Eigen::Vector<double, N> ub;
-            for (int i = 0; i < n; ++i)
-            {
-                ub[i] = static_cast<double>(m_chain->limits()[static_cast<std::size_t>(i)].position_max);
-            }
-            return ub;
+            ub.resize(n);
         }
-        else
+        for (int i = 0; i < n; ++i)
         {
-            Eigen::VectorXd ub(n);
-            for (int i = 0; i < n; ++i)
-            {
-                ub[i] = static_cast<double>(m_chain->limits()[static_cast<std::size_t>(i)].position_max);
-            }
-            return ub;
+            ub[i] = static_cast<double>(m_chain->limits()[static_cast<std::size_t>(i)].position_max);
         }
+        return ub;
     }
 
-    position_type to_position(const Eigen::VectorXd& x) const
+    template <typename Derived>
+    position_type to_position(const Eigen::MatrixBase<Derived>& x) const
     {
         int n = m_chain->num_joints();
         if constexpr (N == dynamic)

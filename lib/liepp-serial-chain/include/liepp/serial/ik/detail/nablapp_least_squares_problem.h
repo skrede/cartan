@@ -52,7 +52,8 @@ public:
         return 6;
     }
 
-    double value(const Eigen::VectorXd& x) const
+    template <typename Derived>
+    double value(const Eigen::MatrixBase<Derived>& x) const
     {
         auto q = to_position(x);
         auto fk = forward_kinematics(*m_chain, q);
@@ -60,25 +61,25 @@ public:
         return 0.5 * static_cast<double>(V_b.squaredNorm());
     }
 
-    void residuals(const Eigen::VectorXd& x, Eigen::VectorXd& r) const
+    template <typename DerivedIn, typename DerivedOut>
+    void residuals(const Eigen::MatrixBase<DerivedIn>& x, Eigen::MatrixBase<DerivedOut>& r) const
     {
         auto q = to_position(x);
         auto fk = forward_kinematics(*m_chain, q);
         auto V_b = (m_target.inverse() * fk.end_effector).log();
-        r.resize(6);
         for (int i = 0; i < 6; ++i)
         {
             r[i] = static_cast<double>(V_b(i));
         }
     }
 
-    void jacobian(const Eigen::VectorXd& x, Eigen::MatrixXd& J) const
+    template <typename DerivedIn, typename DerivedOut>
+    void jacobian(const Eigen::MatrixBase<DerivedIn>& x, Eigen::MatrixBase<DerivedOut>& J) const
     {
         auto q = to_position(x);
         auto fk = forward_kinematics(*m_chain, q);
         auto J_b = body_jacobian(*m_chain, fk);
         int n = m_chain->num_joints();
-        J.resize(6, n);
         for (int i = 0; i < 6; ++i)
         {
             for (int j = 0; j < n; ++j)
@@ -89,7 +90,8 @@ public:
     }
 
 private:
-    position_type to_position(const Eigen::VectorXd& x) const
+    template <typename Derived>
+    position_type to_position(const Eigen::MatrixBase<Derived>& x) const
     {
         int n = m_chain->num_joints();
         if constexpr (N == dynamic)
