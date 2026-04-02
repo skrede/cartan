@@ -17,7 +17,16 @@
 #include <liepp/serial/ik/default_solvers.h>
 #include <liepp/serial/ik/basic_ik_solver.h>
 #include <liepp/serial/ik/lm_solve_policy.h>
+#include <liepp/serial/ik/slsqp_solve_policy.h>
+#include <liepp/serial/ik/bobyqa_solve_policy.h>
+#include <liepp/serial/ik/nw_sqp_solve_policy.h>
 #include <liepp/serial/ik/restart_solve_policy.h>
+#include <liepp/serial/ik/nablapp_lbfgsb_solve_policy.h>
+
+#ifdef LIEPP_HAS_NLOPT
+#include <liepp/serial/ik/nlopt_bobyqa_solve_policy.h>
+#include <liepp/serial/ik/nlopt_slsqp_solve_policy.h>
+#endif
 
 #include <trac_ik/trac_ik.hpp>
 
@@ -822,5 +831,224 @@ static void bm_comparison_kuka_lwr4_liepp_racing(benchmark::State& state)
     bm_liepp_racing_comparison<7>(state, chain, ts);
 }
 BENCHMARK(bm_comparison_kuka_lwr4_liepp_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+// ============================================================================
+// nablapp comparison benchmarks (three D-10 axes)
+// ============================================================================
+
+/// Generic nablapp-backed solver comparison benchmark.
+template <int N, typename Solver>
+void bm_nablapp_comparison(
+    benchmark::State& state,
+    const liepp::kinematic_chain<double, N>& chain,
+    const target_set<double, N>& ts,
+    const liepp::convergence_criteria<double>& criteria)
+{
+    std::size_t idx = 0;
+    int successes = 0;
+    int total_iterations = 0;
+    double total_pos_error = 0.0;
+    double total_ori_error = 0.0;
+
+    for (auto _ : state)
+    {
+        auto& target = ts.targets[idx % static_cast<std::size_t>(num_targets)];
+        auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
+        ++idx;
+
+        Solver solver;
+        solver.setup(chain, target, q_seed, criteria);
+        auto result = solver.solve();
+
+        if (result.has_value())
+        {
+            ++successes;
+            total_iterations += result->iterations;
+            auto [pos_err, ori_err] = liepp::benchmarks::compute_pose_errors(
+                chain, result->solution.position, target);
+            total_pos_error += pos_err;
+            total_ori_error += ori_err;
+        }
+        benchmark::DoNotOptimize(result);
+    }
+
+    auto total = static_cast<int>(idx);
+    state.counters["Success_rate"] = benchmark::Counter(
+        100.0 * static_cast<double>(successes) / std::max(total, 1),
+        benchmark::Counter::kAvgThreads);
+    state.counters["avg_iterations"] = benchmark::Counter(
+        static_cast<double>(total_iterations) / std::max(successes, 1),
+        benchmark::Counter::kAvgThreads);
+    state.counters["avg_position_error"] = benchmark::Counter(
+        total_pos_error / std::max(successes, 1),
+        benchmark::Counter::kAvgThreads);
+    state.counters["avg_orientation_error"] = benchmark::Counter(
+        total_ori_error / std::max(successes, 1),
+        benchmark::Counter::kAvgThreads);
+}
+
+// Chain alias for convenience
+template <int N>
+using chain_t = liepp::kinematic_chain<double, N>;
+
+// nablapp solver type aliases for comparison benchmarks
+template <int N>
+using nablapp_slsqp_solver = liepp::basic_ik_solver<
+    liepp::restart_solve_policy<chain_t<N>, liepp::slsqp_solve_policy<chain_t<N>>>>;
+
+template <int N>
+using nablapp_bobyqa_solver = liepp::basic_ik_solver<
+    liepp::restart_solve_policy<chain_t<N>, liepp::bobyqa_solve_policy<chain_t<N>>>>;
+
+template <int N>
+using nablapp_lbfgsb_solver = liepp::basic_ik_solver<
+    liepp::restart_solve_policy<chain_t<N>, liepp::nablapp_lbfgsb_solve_policy<chain_t<N>>>>;
+
+template <int N>
+using nablapp_nw_sqp_solver = liepp::basic_ik_solver<
+    liepp::restart_solve_policy<chain_t<N>, liepp::nw_sqp_solve_policy<chain_t<N>>>>;
+
+// NLopt solver type aliases (gated behind LIEPP_HAS_NLOPT)
+#ifdef LIEPP_HAS_NLOPT
+template <int N>
+using nlopt_slsqp_solver = liepp::basic_ik_solver<
+    liepp::restart_solve_policy<chain_t<N>, liepp::nlopt_slsqp_solve_policy<chain_t<N>>>>;
+
+template <int N>
+using nlopt_bobyqa_solver = liepp::basic_ik_solver<
+    liepp::restart_solve_policy<chain_t<N>, liepp::nlopt_bobyqa_solve_policy<chain_t<N>>>>;
+#endif
+
+// Convergence criteria shared across comparison benchmarks
+inline liepp::convergence_criteria<double> nablapp_comparison_criteria() { return {1e-5, 1e-5, 500}; }
+
+// ============================================================================
+// Axis 1: Formulation comparison (bound-constrained vs inequality-constrained)
+// ============================================================================
+// UR3e representative: nablapp SLSQP (bound-constrained) vs NW-SQP (inequality)
+
+static void bm_comparison_ur3e_nablapp_slsqp_bounded(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_ur3e_chain<double>();
+    static const target_set<double, 6> ts(chain, num_targets, 42);
+    bm_nablapp_comparison<6, nablapp_slsqp_solver<6>>(state, chain, ts, nablapp_comparison_criteria());
+}
+BENCHMARK(bm_comparison_ur3e_nablapp_slsqp_bounded)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_ur3e_nw_sqp_inequality(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_ur3e_chain<double>();
+    static const target_set<double, 6> ts(chain, num_targets, 42);
+    bm_nablapp_comparison<6, nablapp_nw_sqp_solver<6>>(state, chain, ts, nablapp_comparison_criteria());
+}
+BENCHMARK(bm_comparison_ur3e_nw_sqp_inequality)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+// ============================================================================
+// Axis 2: Backend head-to-head (nablapp vs NLopt same-algorithm)
+// ============================================================================
+
+static void bm_comparison_ur3e_nablapp_slsqp(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_ur3e_chain<double>();
+    static const target_set<double, 6> ts(chain, num_targets, 42);
+    bm_nablapp_comparison<6, nablapp_slsqp_solver<6>>(state, chain, ts, nablapp_comparison_criteria());
+}
+BENCHMARK(bm_comparison_ur3e_nablapp_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_ur3e_nablapp_bobyqa(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_ur3e_chain<double>();
+    static const target_set<double, 6> ts(chain, num_targets, 42);
+    bm_nablapp_comparison<6, nablapp_bobyqa_solver<6>>(state, chain, ts, nablapp_comparison_criteria());
+}
+BENCHMARK(bm_comparison_ur3e_nablapp_bobyqa)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+#ifdef LIEPP_HAS_NLOPT
+static void bm_comparison_ur3e_nlopt_slsqp(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_ur3e_chain<double>();
+    static const target_set<double, 6> ts(chain, num_targets, 42);
+    bm_nablapp_comparison<6, nlopt_slsqp_solver<6>>(state, chain, ts, nablapp_comparison_criteria());
+}
+BENCHMARK(bm_comparison_ur3e_nlopt_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_ur3e_nlopt_bobyqa(benchmark::State& state)
+{
+    auto chain = liepp::benchmarks::make_ur3e_chain<double>();
+    static const target_set<double, 6> ts(chain, num_targets, 42);
+    bm_nablapp_comparison<6, nlopt_bobyqa_solver<6>>(state, chain, ts, nablapp_comparison_criteria());
+}
+BENCHMARK(bm_comparison_ur3e_nlopt_bobyqa)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+#endif
+
+// ============================================================================
+// Axis 3: Headline comparison (best nablapp configs vs TRAC-IK)
+// ============================================================================
+// Registers nablapp SLSQP, L-BFGS-B, and NW-SQP for all 9 robots alongside
+// the existing TRAC-IK entries. Uses same target set (seed 42) for fair comparison.
+
+#define REGISTER_6DOF_NABLAPP_COMPARISON(ROBOT, CHAIN_FN)                                             \
+                                                                                                      \
+static void bm_comparison_##ROBOT##_nablapp_slsqp(benchmark::State& state)                           \
+{                                                                                                     \
+    auto chain = liepp::benchmarks::CHAIN_FN<double>();                                               \
+    static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
+    bm_nablapp_comparison<6, nablapp_slsqp_solver<6>>(state, chain, ts, nablapp_comparison_criteria()); \
+}                                                                                                     \
+BENCHMARK(bm_comparison_##ROBOT##_nablapp_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);    \
+                                                                                                      \
+static void bm_comparison_##ROBOT##_nablapp_lbfgsb(benchmark::State& state)                          \
+{                                                                                                     \
+    auto chain = liepp::benchmarks::CHAIN_FN<double>();                                               \
+    static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
+    bm_nablapp_comparison<6, nablapp_lbfgsb_solver<6>>(state, chain, ts, nablapp_comparison_criteria()); \
+}                                                                                                     \
+BENCHMARK(bm_comparison_##ROBOT##_nablapp_lbfgsb)->Iterations(1000)->Unit(benchmark::kMicrosecond);   \
+                                                                                                      \
+static void bm_comparison_##ROBOT##_nw_sqp(benchmark::State& state)                                  \
+{                                                                                                     \
+    auto chain = liepp::benchmarks::CHAIN_FN<double>();                                               \
+    static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
+    bm_nablapp_comparison<6, nablapp_nw_sqp_solver<6>>(state, chain, ts, nablapp_comparison_criteria()); \
+}                                                                                                     \
+BENCHMARK(bm_comparison_##ROBOT##_nw_sqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+#define REGISTER_7DOF_NABLAPP_COMPARISON(ROBOT, CHAIN_FN)                                             \
+                                                                                                      \
+static void bm_comparison_##ROBOT##_nablapp_slsqp(benchmark::State& state)                           \
+{                                                                                                     \
+    auto chain = liepp::benchmarks::CHAIN_FN<double>();                                               \
+    static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
+    bm_nablapp_comparison<7, nablapp_slsqp_solver<7>>(state, chain, ts, nablapp_comparison_criteria()); \
+}                                                                                                     \
+BENCHMARK(bm_comparison_##ROBOT##_nablapp_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);    \
+                                                                                                      \
+static void bm_comparison_##ROBOT##_nablapp_lbfgsb(benchmark::State& state)                          \
+{                                                                                                     \
+    auto chain = liepp::benchmarks::CHAIN_FN<double>();                                               \
+    static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
+    bm_nablapp_comparison<7, nablapp_lbfgsb_solver<7>>(state, chain, ts, nablapp_comparison_criteria()); \
+}                                                                                                     \
+BENCHMARK(bm_comparison_##ROBOT##_nablapp_lbfgsb)->Iterations(1000)->Unit(benchmark::kMicrosecond);   \
+                                                                                                      \
+static void bm_comparison_##ROBOT##_nw_sqp(benchmark::State& state)                                  \
+{                                                                                                     \
+    auto chain = liepp::benchmarks::CHAIN_FN<double>();                                               \
+    static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
+    bm_nablapp_comparison<7, nablapp_nw_sqp_solver<7>>(state, chain, ts, nablapp_comparison_criteria()); \
+}                                                                                                     \
+BENCHMARK(bm_comparison_##ROBOT##_nw_sqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+// 6-DOF headline nablapp entries
+REGISTER_6DOF_NABLAPP_COMPARISON(kr6_sixx,   make_kr6_sixx_chain)
+REGISTER_6DOF_NABLAPP_COMPARISON(abb_irb120, make_abb_irb120_chain)
+REGISTER_6DOF_NABLAPP_COMPARISON(jaco2,      make_jaco2_chain)
+
+// 7-DOF headline nablapp entries
+REGISTER_7DOF_NABLAPP_COMPARISON(lbr_med14,  make_lbr_med14_chain)
+REGISTER_7DOF_NABLAPP_COMPARISON(panda,      make_panda_chain)
+REGISTER_7DOF_NABLAPP_COMPARISON(fetch,      make_fetch_chain)
+REGISTER_7DOF_NABLAPP_COMPARISON(baxter,     make_baxter_chain)
+REGISTER_7DOF_NABLAPP_COMPARISON(kuka_lwr4,  make_kuka_lwr4_chain)
 
 } // anonymous namespace
