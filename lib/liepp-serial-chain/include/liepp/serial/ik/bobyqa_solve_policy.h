@@ -24,6 +24,7 @@
 #include "liepp/serial/chain/chain_concept.h"
 #include "liepp/serial/fk/forward_kinematics.h"
 
+#include <nablapp/solver/options.h>
 #include <nablapp/solver/basic_solver.h>
 #include <nablapp/solver/bobyqa_policy.h>
 
@@ -100,11 +101,11 @@ public:
             x0[i] = static_cast<double>(q0[i]);
         }
 
-        nablapp::solver_options<double> nab_opts;
+        nablapp::solver_options<> nab_opts;
         nab_opts.max_iterations = m_options.budget_per_step;
-        nab_opts.gradient_tolerance = 0.0;
-        nab_opts.objective_tolerance = 1e-14;
-        nab_opts.step_tolerance = 1e-14;
+        nab_opts.set_gradient_threshold(0.0);
+        nab_opts.set_objective_threshold(1e-14);
+        nab_opts.set_step_threshold(1e-14);
 
         m_solver.emplace(*m_problem, x0, nab_opts);
     }
@@ -151,7 +152,11 @@ public:
 
         if (result.status == nablapp::solver_status::converged
             || result.status == nablapp::solver_status::ftol_reached
-            || result.status == nablapp::solver_status::stalled)
+            || result.status == nablapp::solver_status::stalled
+            || result.status == nablapp::solver_status::xtol_reached
+            || result.status == nablapp::solver_status::roundoff_limited
+            || result.status == nablapp::solver_status::objective_stalled
+            || result.status == nablapp::solver_status::aborted)
         {
             m_status = ik_status::stalled;
             return m_status;
@@ -170,7 +175,7 @@ public:
     void abort() { m_status = ik_status::stalled; }
 
 private:
-    using nablapp_solver = nablapp::basic_solver<nablapp::bobyqa_policy>;
+    using nablapp_solver = nablapp::basic_solver<nablapp::bobyqa_policy<joints>, joints>;
 
     void sync_solution_from_solver()
     {

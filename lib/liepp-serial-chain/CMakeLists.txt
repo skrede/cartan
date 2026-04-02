@@ -1,22 +1,26 @@
-if (LIEPP_CMAKE_FETCH_DEPS)
-    FetchContent_Declare(
-        nablapp
-        GIT_REPOSITORY git@github.com:skrede/nablapp.git
-        GIT_TAG master
-    )
-    FetchContent_GetProperties(nablapp)
+option(LIEPP_BUILD_NABLAPP "Build with nablapp optimization library" ${LIEPP_CMAKE_FETCH_DEPS})
 
-    if (NOT nablapp_POPULATED)
-        FetchContent_Populate(nablapp)
-        add_library(nablapp INTERFACE)
-        add_library(nablapp::nablapp ALIAS nablapp)
-        target_include_directories(nablapp SYSTEM INTERFACE
-            "${nablapp_SOURCE_DIR}/lib/nablapp/include"
+if (LIEPP_BUILD_NABLAPP)
+    if (LIEPP_CMAKE_FETCH_DEPS)
+        FetchContent_Declare(
+            nablapp
+            GIT_REPOSITORY git@github.com:skrede/nablapp.git
+            GIT_TAG develop
         )
-        target_link_libraries(nablapp INTERFACE Eigen3::Eigen)
+        FetchContent_GetProperties(nablapp)
+
+        if (NOT nablapp_POPULATED)
+            FetchContent_Populate(nablapp)
+            add_library(nablapp INTERFACE)
+            add_library(nablapp::nablapp ALIAS nablapp)
+            target_include_directories(nablapp SYSTEM INTERFACE
+                "${nablapp_SOURCE_DIR}/lib/nablapp/include"
+            )
+            target_link_libraries(nablapp INTERFACE Eigen3::Eigen)
+        endif ()
+    else ()
+        find_package(nablapp CONFIG REQUIRED)
     endif ()
-else ()
-    find_package(nablapp CONFIG REQUIRED)
 endif ()
 
 add_library(liepp_serial_chain INTERFACE)
@@ -31,8 +35,14 @@ target_include_directories(liepp_serial_chain
 target_link_libraries(liepp_serial_chain
     INTERFACE
     liepp::lie
-    nablapp::nablapp
 )
+
+if (LIEPP_BUILD_NABLAPP)
+    target_link_libraries(liepp_serial_chain
+        INTERFACE
+        nablapp::nablapp
+    )
+endif ()
 
 # --- NLopt solver backend (optional) ---
 if (LIEPP_BUILD_NLOPT)

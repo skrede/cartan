@@ -1,12 +1,12 @@
-#ifndef HPP_GUARD_LIEPP_SERIAL_IK_DETAIL_NABLAPP_PROBLEM_H
-#define HPP_GUARD_LIEPP_SERIAL_IK_DETAIL_NABLAPP_PROBLEM_H
+#ifndef HPP_GUARD_LIEPP_SERIAL_IK_DETAIL_NABLAPP_CONSTRAINED_PROBLEM_H
+#define HPP_GUARD_LIEPP_SERIAL_IK_DETAIL_NABLAPP_CONSTRAINED_PROBLEM_H
 
-/// @file detail/nablapp_problem.h
-/// @brief Adapter wrapping liepp IK problem as nablapp problem formulation.
+/// @file detail/nablapp_constrained_problem.h
+/// @brief Inequality-constrained adapter (formulation B) for nablapp solvers.
 ///
 /// Satisfies nablapp::objective, nablapp::differentiable, and
-/// nablapp::bound_constrained concepts so that nablapp solvers
-/// (kraft_slsqp_policy, bobyqa_policy) can optimize liepp IK objectives.
+/// nablapp::constrained. Joint limits are expressed as 2n inequality
+/// constraints: q_i - q_min >= 0 and q_max - q_i >= 0.
 
 #include "liepp/serial/ik/error_weight.h"
 #include "liepp/serial/ik/analytical_gradient.h"
@@ -16,16 +16,17 @@
 
 #include <Eigen/Core>
 
+#include <cstddef>
+
 namespace liepp::detail
 {
 
-/// Adapts a liepp IK problem (chain + target + weight) to the nablapp
-/// problem formulation concepts (objective, differentiable, bound_constrained).
+/// Inequality-constrained IK problem adapter for nablapp (formulation B).
 ///
-/// Uses ik_se3_objective for consistent objective and gradient evaluation
-/// with SE(3) log Jacobian analytical gradient.
+/// Provides objective, gradient, and inequality constraints encoding
+/// joint limits as g_i(q) >= 0. No equality constraints.
 template <chain Chain>
-class nablapp_ik_problem
+class nablapp_constrained_ik_problem
 {
     using Scalar = typename Chain::scalar_type;
     static constexpr int N = Chain::joints;
@@ -34,7 +35,7 @@ class nablapp_ik_problem
 public:
     static constexpr int problem_dimension = N;
 
-    nablapp_ik_problem(
+    nablapp_constrained_ik_problem(
         const Chain& chain,
         const se3<Scalar>& target,
         const error_weight<Scalar>& weight)
@@ -69,52 +70,41 @@ public:
         }
     }
 
-    Eigen::VectorXd lower_bounds() const
+    int num_equality() const
+    {
+        return 0;
+    }
+
+    int num_inequality() const
+    {
+        return 2 * m_chain->num_joints();
+    }
+
+    void constraints(const Eigen::VectorXd& x, Eigen::VectorXd& c) const
     {
         int n = m_chain->num_joints();
-        if constexpr (N != dynamic)
+        c.resize(2 * n);
+        for (int i = 0; i < n; ++i)
         {
-            Eigen::Vector<double, N> lb;
-            for (int i = 0; i < n; ++i)
-            {
-                lb[i] = static_cast<double>(m_chain->limits()[static_cast<std::size_t>(i)].position_min);
-            }
-            return lb;
-        }
-        else
-        {
-            Eigen::VectorXd lb(n);
-            for (int i = 0; i < n; ++i)
-            {
-                lb[i] = static_cast<double>(m_chain->limits()[static_cast<std::size_t>(i)].position_min);
-            }
-            return lb;
+            c[i] = x[i] - static_cast<double>(
+                m_chain->limits()[static_cast<std::size_t>(i)].position_min);
+            c[n + i] = static_cast<double>(
+                m_chain->limits()[static_cast<std::size_t>(i)].position_max) - x[i];
         }
     }
 
-    Eigen::VectorXd upper_bounds() const
+    void constraint_jacobian(const Eigen::VectorXd& /*x*/, Eigen::MatrixXd& J) const
     {
         int n = m_chain->num_joints();
-        if constexpr (N != dynamic)
+        J.setZero(2 * n, n);
+        for (int i = 0; i < n; ++i)
         {
-            Eigen::Vector<double, N> ub;
-            for (int i = 0; i < n; ++i)
-            {
-                ub[i] = static_cast<double>(m_chain->limits()[static_cast<std::size_t>(i)].position_max);
-            }
-            return ub;
-        }
-        else
-        {
-            Eigen::VectorXd ub(n);
-            for (int i = 0; i < n; ++i)
-            {
-                ub[i] = static_cast<double>(m_chain->limits()[static_cast<std::size_t>(i)].position_max);
-            }
-            return ub;
+            J(i, i) = 1.0;
+            J(n + i, i) = -1.0;
         }
     }
 
+private:
     position_type to_position(const Eigen::VectorXd& x) const
     {
         int n = m_chain->num_joints();
@@ -138,7 +128,6 @@ public:
         }
     }
 
-private:
     const Chain* m_chain;
     se3<Scalar> m_target;
     error_weight<Scalar> m_weight;
