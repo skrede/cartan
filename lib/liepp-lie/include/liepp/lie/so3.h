@@ -10,6 +10,7 @@
 #include <cmath>
 #include <string>
 #include <cassert>
+#include <utility>
 #include <expected>
 
 namespace liepp
@@ -63,16 +64,14 @@ template <typename Scalar>
     }
 
     Scalar phi_norm = std::sqrt(phi_sq);
-    vector3<Scalar> a = phi / phi_norm;
-    matrix3<Scalar> a_hat = hat(a);
-
     Scalar s = std::sin(phi_norm);
     Scalar c = std::cos(phi_norm);
 
-    // J_l = sin(phi)/phi * I + (1 - sin(phi)/phi) * a*a^T + (1-cos(phi))/phi * hat(a)
-    return (s / phi_norm) * I
-         + (Scalar(1) - s / phi_norm) * (a * a.transpose())
-         + ((Scalar(1) - c) / phi_norm) * a_hat;
+    matrix3<Scalar> phi_hat = hat(phi);
+    Scalar c1 = (Scalar(1) - c) / phi_sq;
+    Scalar c2 = (phi_norm - s) / (phi_sq * phi_norm);
+
+    return I + c1 * phi_hat + c2 * (phi_hat * phi_hat);
 }
 
 /// SO(3) inverse left Jacobian implementation.
@@ -292,6 +291,64 @@ public:
 private:
     quaternion<Scalar> m_quaternion;
 };
+
+namespace detail
+{
+
+/// Fused SO(3) exponential map and left Jacobian computation.
+/// Shares trigonometric computation between exp and left Jacobian,
+/// saving 2 trig calls (sin(theta), cos(theta)) vs separate computation.
+/// Uses double-angle identities: sin(t) = 2*sin(t/2)*cos(t/2),
+///                                cos(t) = 2*cos^2(t/2) - 1.
+/// Ref: Barfoot, State Estimation for Robotics, Eq. 8.23 + 8.82b.
+template <typename Scalar>
+[[nodiscard]] std::pair<so3<Scalar>, matrix3<Scalar>>
+exp_with_left_jacobian(const vector3<Scalar>& phi)
+{
+    Scalar theta_sq = phi.squaredNorm();
+
+    if (theta_sq < sqrt_epsilon_v<Scalar>)
+    {
+        matrix3<Scalar> phi_hat = hat(phi);
+
+        quaternion<Scalar> q;
+        q.w() = Scalar(1) - theta_sq / Scalar(8);
+        q.vec() = (Scalar(0.5) - theta_sq / Scalar(48)) * phi;
+        q.normalize();
+
+        matrix3<Scalar> J = matrix3<Scalar>::Identity()
+            + Scalar(0.5) * phi_hat
+            + phi_hat * phi_hat / Scalar(6);
+
+        return {so3<Scalar>(q), J};
+    }
+
+    Scalar theta = std::sqrt(theta_sq);
+    Scalar half_theta = theta / Scalar(2);
+
+    Scalar sin_half = std::sin(half_theta);
+    Scalar cos_half = std::cos(half_theta);
+
+    Scalar sin_theta = Scalar(2) * sin_half * cos_half;
+    Scalar cos_theta = Scalar(2) * cos_half * cos_half - Scalar(1);
+
+    quaternion<Scalar> q;
+    q.w() = cos_half;
+    q.vec() = (sin_half / theta) * phi;
+    q.normalize();
+
+    matrix3<Scalar> phi_hat = hat(phi);
+    Scalar c1 = (Scalar(1) - cos_theta) / theta_sq;
+    Scalar c2 = (theta - sin_theta) / (theta_sq * theta);
+
+    matrix3<Scalar> J = matrix3<Scalar>::Identity()
+        + c1 * phi_hat
+        + c2 * (phi_hat * phi_hat);
+
+    return {so3<Scalar>(q), J};
+}
+
+}
 
 } // namespace liepp
 

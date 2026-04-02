@@ -40,11 +40,10 @@ public:
         vector3<Scalar> omega = v.template head<3>();
         vector3<Scalar> rho = v.template tail<3>();
 
-        auto C = so3<Scalar, Policy>::exp(omega);
-        auto J = so3<Scalar, Policy>::left_jacobian(omega);
+        auto [C, J] = detail::exp_with_left_jacobian<Scalar>(omega);
         vector3<Scalar> t = J * rho;
 
-        return se3(C, t);
+        return se3(so3<Scalar, Policy>(C.quaternion_ref()), t);
     }
 
     /// Logarithmic map: SE(3) transform -> se(3) twist.
