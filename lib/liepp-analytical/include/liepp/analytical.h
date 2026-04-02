@@ -5,6 +5,7 @@
 #include "liepp/analytical/analytical_solver.h"
 #include "liepp/analytical/paden_kahan.h"
 
+#include "liepp/analytical/solver_2r.h"
 #include "liepp/analytical/solver_3r.h"
 
 #endif
