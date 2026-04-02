@@ -5,6 +5,6 @@
 #include "liepp/analytical/analytical_solver.h"
 #include "liepp/analytical/paden_kahan.h"
 
-// Solver headers added as implemented
+#include "liepp/analytical/solver_3r.h"
 
 #endif
