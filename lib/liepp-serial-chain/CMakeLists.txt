@@ -5,19 +5,11 @@ if (LIEPP_BUILD_NABLAPP)
         FetchContent_Declare(
             nablapp
             GIT_REPOSITORY git@github.com:skrede/nablapp.git
-            GIT_TAG develop
+            GIT_TAG milestone/v0.2.0-11-intervention
+            EXCLUDE_FROM_ALL
+            SYSTEM
         )
-        FetchContent_GetProperties(nablapp)
-
-        if (NOT nablapp_POPULATED)
-            FetchContent_Populate(nablapp)
-            add_library(nablapp INTERFACE)
-            add_library(nablapp::nablapp ALIAS nablapp)
-            target_include_directories(nablapp SYSTEM INTERFACE
-                "${nablapp_SOURCE_DIR}/lib/nablapp/include"
-            )
-            target_link_libraries(nablapp INTERFACE Eigen3::Eigen)
-        endif ()
+        FetchContent_MakeAvailable(nablapp)
     else ()
         find_package(nablapp CONFIG REQUIRED)
     endif ()

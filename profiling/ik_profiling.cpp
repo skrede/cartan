@@ -11,7 +11,6 @@
 #include <liepp/serial/ik/default_solvers.h>
 #include <liepp/serial/ik/dls_solve_policy.h>
 #include <liepp/serial/ik/slsqp_solve_policy.h>
-#include <liepp/serial/ik/bobyqa_solve_policy.h>
 #include <liepp/serial/ik/lbfgsb_solve_policy.h>
 #include <liepp/serial/ik/restart_solve_policy.h>
 #include <liepp/serial/ik/projected_lm_solve_policy.h>
@@ -19,7 +18,6 @@
 
 #ifdef LIEPP_HAS_NLOPT
 #include <liepp/serial/ik/nlopt_slsqp_solve_policy.h>
-#include <liepp/serial/ik/nlopt_bobyqa_solve_policy.h>
 #endif
 
 #include <benchmark/benchmark.h>
@@ -116,48 +114,40 @@ void bm_native_solver(
 // Solver type aliases
 // ============================================================================
 
+// Chain type shorthand
+template <int N>
+using chain_t = liepp::kinematic_chain<double, N>;
+
 // Native family
 template <int N>
-using speed_ik_solver = liepp::basic_ik_solver<liepp::speed_solver<double, N>>;
+using speed_ik_solver = liepp::basic_ik_solver<liepp::speed_solver<chain_t<N>>>;
 
 template <int N>
-using convergence_ik_solver = liepp::basic_ik_solver<liepp::convergence_solver<double, N>>;
+using convergence_ik_solver = liepp::basic_ik_solver<liepp::convergence_solver<chain_t<N>>>;
 
 template <int N>
-using restart_lm = liepp::restart_solve_policy<double, N, liepp::lm_solve_policy<double, N, liepp::no_limits>>;
+using restart_lm = liepp::restart_solve_policy<chain_t<N>, liepp::lm_solve_policy<chain_t<N>, liepp::no_limits>>;
 
 template <int N>
 using restart_lm_ik_solver = liepp::basic_ik_solver<restart_lm<N>>;
 
 template <int N>
-using racing_solver = liepp::default_solver<double, N>;
+using racing_solver = liepp::default_solver<chain_t<N>>;
 
 // nablapp family (always available)
 template <int N>
-using nablapp_slsqp_restart = liepp::restart_solve_policy<double, N, liepp::slsqp_solve_policy<double, N>>;
+using nablapp_slsqp_restart = liepp::restart_solve_policy<chain_t<N>, liepp::slsqp_solve_policy<chain_t<N>>>;
 
 template <int N>
 using nablapp_slsqp_solver = liepp::basic_ik_solver<nablapp_slsqp_restart<N>>;
 
-template <int N>
-using nablapp_bobyqa_restart = liepp::restart_solve_policy<double, N, liepp::bobyqa_solve_policy<double, N>>;
-
-template <int N>
-using nablapp_bobyqa_solver = liepp::basic_ik_solver<nablapp_bobyqa_restart<N>>;
-
 // NLopt family (behind LIEPP_HAS_NLOPT)
 #ifdef LIEPP_HAS_NLOPT
 template <int N>
-using nlopt_slsqp_restart = liepp::restart_solve_policy<double, N, liepp::nlopt_slsqp_solve_policy<double, N>>;
+using nlopt_slsqp_restart = liepp::restart_solve_policy<chain_t<N>, liepp::nlopt_slsqp_solve_policy<chain_t<N>>>;
 
 template <int N>
 using nlopt_slsqp_solver = liepp::basic_ik_solver<nlopt_slsqp_restart<N>>;
-
-template <int N>
-using nlopt_bobyqa_restart = liepp::restart_solve_policy<double, N, liepp::nlopt_bobyqa_solve_policy<double, N>>;
-
-template <int N>
-using nlopt_bobyqa_solver = liepp::basic_ik_solver<nlopt_bobyqa_restart<N>>;
 #endif
 
 // ============================================================================
@@ -215,15 +205,7 @@ static void bm_profiling_##ROBOT##_nablapp_slsqp(benchmark::State& state)       
     static const target_set<double, 6> ts(chain, num_targets, 42);                                     \
     bm_native_solver<6, nablapp_slsqp_solver<6>>(state, chain, ts, nablapp_criteria());                \
 }                                                                                                      \
-BENCHMARK(bm_profiling_##ROBOT##_nablapp_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);       \
-                                                                                                       \
-static void bm_profiling_##ROBOT##_nablapp_bobyqa(benchmark::State& state)                             \
-{                                                                                                      \
-    auto chain = liepp::benchmarks::CHAIN_FN<double>();                                                \
-    static const target_set<double, 6> ts(chain, num_targets, 42);                                     \
-    bm_native_solver<6, nablapp_bobyqa_solver<6>>(state, chain, ts, nablapp_criteria());               \
-}                                                                                                      \
-BENCHMARK(bm_profiling_##ROBOT##_nablapp_bobyqa)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_profiling_##ROBOT##_nablapp_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 // Register NLopt solver benchmarks for a 6-DOF robot.
 #ifdef LIEPP_HAS_NLOPT
@@ -235,15 +217,7 @@ static void bm_profiling_##ROBOT##_nlopt_slsqp(benchmark::State& state)         
     static const target_set<double, 6> ts(chain, num_targets, 42);                                     \
     bm_native_solver<6, nlopt_slsqp_solver<6>>(state, chain, ts, nlopt_criteria());                    \
 }                                                                                                      \
-BENCHMARK(bm_profiling_##ROBOT##_nlopt_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);         \
-                                                                                                       \
-static void bm_profiling_##ROBOT##_nlopt_bobyqa(benchmark::State& state)                               \
-{                                                                                                      \
-    auto chain = liepp::benchmarks::CHAIN_FN<double>();                                                \
-    static const target_set<double, 6> ts(chain, num_targets, 42);                                     \
-    bm_native_solver<6, nlopt_bobyqa_solver<6>>(state, chain, ts, nlopt_criteria());                   \
-}                                                                                                      \
-BENCHMARK(bm_profiling_##ROBOT##_nlopt_bobyqa)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_profiling_##ROBOT##_nlopt_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 #else
 #define REGISTER_6DOF_NLOPT_PROFILING(ROBOT, CHAIN_FN)
 #endif
@@ -289,15 +263,7 @@ static void bm_profiling_##ROBOT##_nablapp_slsqp(benchmark::State& state)       
     static const target_set<double, 7> ts(chain, num_targets, 42);                                     \
     bm_native_solver<7, nablapp_slsqp_solver<7>>(state, chain, ts, nablapp_criteria());                \
 }                                                                                                      \
-BENCHMARK(bm_profiling_##ROBOT##_nablapp_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);       \
-                                                                                                       \
-static void bm_profiling_##ROBOT##_nablapp_bobyqa(benchmark::State& state)                             \
-{                                                                                                      \
-    auto chain = liepp::benchmarks::CHAIN_FN<double>();                                                \
-    static const target_set<double, 7> ts(chain, num_targets, 42);                                     \
-    bm_native_solver<7, nablapp_bobyqa_solver<7>>(state, chain, ts, nablapp_criteria());               \
-}                                                                                                      \
-BENCHMARK(bm_profiling_##ROBOT##_nablapp_bobyqa)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_profiling_##ROBOT##_nablapp_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 // Register NLopt solver benchmarks for a 7-DOF robot.
 #ifdef LIEPP_HAS_NLOPT
@@ -309,15 +275,7 @@ static void bm_profiling_##ROBOT##_nlopt_slsqp(benchmark::State& state)         
     static const target_set<double, 7> ts(chain, num_targets, 42);                                     \
     bm_native_solver<7, nlopt_slsqp_solver<7>>(state, chain, ts, nlopt_criteria());                    \
 }                                                                                                      \
-BENCHMARK(bm_profiling_##ROBOT##_nlopt_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);         \
-                                                                                                       \
-static void bm_profiling_##ROBOT##_nlopt_bobyqa(benchmark::State& state)                               \
-{                                                                                                      \
-    auto chain = liepp::benchmarks::CHAIN_FN<double>();                                                \
-    static const target_set<double, 7> ts(chain, num_targets, 42);                                     \
-    bm_native_solver<7, nlopt_bobyqa_solver<7>>(state, chain, ts, nlopt_criteria());                   \
-}                                                                                                      \
-BENCHMARK(bm_profiling_##ROBOT##_nlopt_bobyqa)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_profiling_##ROBOT##_nlopt_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 #else
 #define REGISTER_7DOF_NLOPT_PROFILING(ROBOT, CHAIN_FN)
 #endif

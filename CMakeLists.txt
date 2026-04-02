@@ -33,6 +33,7 @@ option(LIEPP_BUILD_FUZZ_TESTS "Build fuzz test targets" OFF)
 option(LIEPP_BUILD_PROPERTY_TESTS "Build property-based test targets (requires RapidCheck)" OFF)
 option(LIEPP_BUILD_NLOPT "Build NLopt solver backend for IK" OFF)
 option(LIEPP_BUILD_BENCHMARKS "Build benchmarks (requires Google Benchmark)" OFF)
+option(LIEPP_BUILD_TRAC_IK "Build TRAC-IK comparison benchmarks (requires orocos-kdl, NLopt)" OFF)
 option(LIEPP_BUILD_PROFILING "Build profiling benchmarks (no external robot library dependencies)" OFF)
 option(LIEPP_CMAKE_FETCH_DEPS "Use CMake FetchContent to download and install dependencies" OFF)
 

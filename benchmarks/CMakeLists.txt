@@ -44,27 +44,35 @@ if (LIEPP_BUILD_NLOPT)
     target_link_libraries(ik_sqp_benchmarks PRIVATE NLopt::nlopt)
 endif()
 
-# TRAC-IK comparison benchmark (requires KDL + NLopt via trac_ik)
-if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/trac_ik_lib/CMakeLists.txt")
-    add_subdirectory(trac_ik_lib)
+# TRAC-IK comparison benchmarks (requires orocos-kdl + NLopt via trac_ik)
+if (LIEPP_BUILD_TRAC_IK)
+    FetchContent_Declare(
+        trac_ik_lib
+        GIT_REPOSITORY git@github.com:skrede/trac_ik_lib.git
+        GIT_TAG master
+        EXCLUDE_FROM_ALL
+        SYSTEM
+    )
+    set(TRAC_IK_WITH_URDF OFF CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(trac_ik_lib)
 
     liepp_add_benchmark(ik_comparison_benchmarks ik_comparison_benchmarks.cpp)
-    target_link_libraries(ik_comparison_benchmarks PRIVATE trac_ik orocos-kdl)
+    target_link_libraries(ik_comparison_benchmarks PRIVATE trac_ik)
     if(LIEPP_BUILD_NLOPT)
         target_compile_definitions(ik_comparison_benchmarks PRIVATE LIEPP_HAS_NLOPT)
         target_link_libraries(ik_comparison_benchmarks PRIVATE NLopt::nlopt)
     endif()
 
     liepp_add_benchmark(ik_native_benchmarks ik_native_benchmarks.cpp)
-    target_link_libraries(ik_native_benchmarks PRIVATE trac_ik orocos-kdl)
+    target_link_libraries(ik_native_benchmarks PRIVATE trac_ik)
     if(LIEPP_BUILD_NLOPT)
         target_compile_definitions(ik_native_benchmarks PRIVATE LIEPP_HAS_NLOPT)
         target_link_libraries(ik_native_benchmarks PRIVATE NLopt::nlopt)
     endif()
 
     liepp_add_benchmark(fk_comparison_benchmarks fk_comparison_benchmarks.cpp)
-    target_link_libraries(fk_comparison_benchmarks PRIVATE orocos-kdl)
+    target_link_libraries(fk_comparison_benchmarks PRIVATE trac_ik)
 
     liepp_add_benchmark(jacobian_comparison_benchmarks jacobian_comparison_benchmarks.cpp)
-    target_link_libraries(jacobian_comparison_benchmarks PRIVATE orocos-kdl)
+    target_link_libraries(jacobian_comparison_benchmarks PRIVATE trac_ik)
 endif ()
