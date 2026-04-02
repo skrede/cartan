@@ -60,6 +60,7 @@ liepp_add_test(analytical_solver_6r_test analytical_solver_6r_test.cpp)
 
 if(LIEPP_BUILD_NABLAPP)
     liepp_add_test(nablapp_adapters_compile_test nablapp_adapters_compile_test.cpp)
+    liepp_add_test(nablapp_policies_test nablapp_policies_test.cpp)
 endif()
 
 liepp_add_test(fk_sweep_test fk_sweep_test.cpp)
