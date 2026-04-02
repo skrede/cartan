@@ -53,6 +53,8 @@ liepp_add_test(static_chain_test static_chain_test.cpp)
 liepp_add_test(static_chain_ik_parity_test static_chain_ik_parity_test.cpp)
 liepp_add_test(specialized_fk_jacobian_test specialized_fk_jacobian_test.cpp)
 
+liepp_add_test(paden_kahan_test paden_kahan_test.cpp)
+
 liepp_add_test(fk_sweep_test fk_sweep_test.cpp)
 liepp_add_test(jacobian_sweep_test jacobian_sweep_test.cpp)
 liepp_add_test(ik_sweep_test ik_sweep_test.cpp)
