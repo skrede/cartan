@@ -1,4 +1,4 @@
-#include <liepp/serial/chain/screw_axis.h>
+#include <cartan/serial/chain/screw_axis.h>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -16,7 +16,7 @@ TEST_CASE("screw_axis revolute factory", "[screw_axis]")
 {
     SECTION("axis at origin: v = 0")
     {
-        auto sa = liepp::screw_axis<double>::revolute({0, 0, 1}, {0, 0, 0});
+        auto sa = cartan::screw_axis<double>::revolute({0, 0, 1}, {0, 0, 0});
         REQUIRE(sa.omega()(0) == Approx(0.0).margin(1e-12));
         REQUIRE(sa.omega()(1) == Approx(0.0).margin(1e-12));
         REQUIRE(sa.omega()(2) == Approx(1.0).margin(1e-12));
@@ -28,7 +28,7 @@ TEST_CASE("screw_axis revolute factory", "[screw_axis]")
     SECTION("axis offset from origin: v = -omega x point")
     {
         double L = 0.5;
-        auto sa = liepp::screw_axis<double>::revolute({0, 0, 1}, {L, 0, 0});
+        auto sa = cartan::screw_axis<double>::revolute({0, 0, 1}, {L, 0, 0});
         REQUIRE(sa.omega()(2) == Approx(1.0).margin(1e-12));
         // v = -(0,0,1) x (0.5,0,0) = -(0*0-1*0, 1*0.5-0*0, 0*0-0*0.5) = -(0, 0.5, 0) = (0, -0.5, 0)
         // Wait: -(0,0,1) x (0.5,0,0) = -( (0*0-1*0), (1*0.5-0*0), (0*0-0*0.5) ) = -(0, 0.5, 0) = (0, -0.5, 0)
@@ -48,7 +48,7 @@ TEST_CASE("screw_axis revolute factory", "[screw_axis]")
 
     SECTION("normalizes non-unit axis")
     {
-        auto sa = liepp::screw_axis<double>::revolute({0, 0, 2}, {0, 0, 0});
+        auto sa = cartan::screw_axis<double>::revolute({0, 0, 2}, {0, 0, 0});
         REQUIRE(sa.omega().norm() == Approx(1.0).margin(1e-12));
         REQUIRE(sa.omega()(2) == Approx(1.0).margin(1e-12));
     }
@@ -62,7 +62,7 @@ TEST_CASE("screw_axis prismatic factory", "[screw_axis]")
 {
     SECTION("unit direction")
     {
-        auto sa = liepp::screw_axis<double>::prismatic({1, 0, 0});
+        auto sa = cartan::screw_axis<double>::prismatic({1, 0, 0});
         REQUIRE(sa.omega().norm() < 1e-12);
         REQUIRE(sa.v()(0) == Approx(1.0).margin(1e-12));
         REQUIRE(sa.v()(1) == Approx(0.0).margin(1e-12));
@@ -73,7 +73,7 @@ TEST_CASE("screw_axis prismatic factory", "[screw_axis]")
 
     SECTION("normalizes non-unit direction")
     {
-        auto sa = liepp::screw_axis<double>::prismatic({2, 0, 0});
+        auto sa = cartan::screw_axis<double>::prismatic({2, 0, 0});
         REQUIRE(sa.v()(0) == Approx(1.0).margin(1e-12));
         REQUIRE(sa.v().norm() == Approx(1.0).margin(1e-12));
     }
@@ -87,35 +87,35 @@ TEST_CASE("screw_axis from_vector validation", "[screw_axis]")
 {
     SECTION("unit omega passes")
     {
-        liepp::vector6<double> vec;
+        cartan::vector6<double> vec;
         vec << 0, 0, 1, 0, -0.5, 0;
-        auto result = liepp::screw_axis<double>::from_vector(vec);
+        auto result = cartan::screw_axis<double>::from_vector(vec);
         REQUIRE(result.has_value());
         REQUIRE(result->omega()(2) == Approx(1.0).margin(1e-12));
     }
 
     SECTION("non-unit omega fails")
     {
-        liepp::vector6<double> vec;
+        cartan::vector6<double> vec;
         vec << 0, 0, 2, 0, 0, 0;
-        auto result = liepp::screw_axis<double>::from_vector(vec);
+        auto result = cartan::screw_axis<double>::from_vector(vec);
         REQUIRE_FALSE(result.has_value());
     }
 
     SECTION("zero omega with unit v passes")
     {
-        liepp::vector6<double> vec;
+        cartan::vector6<double> vec;
         vec << 0, 0, 0, 1, 0, 0;
-        auto result = liepp::screw_axis<double>::from_vector(vec);
+        auto result = cartan::screw_axis<double>::from_vector(vec);
         REQUIRE(result.has_value());
         REQUIRE(result->is_prismatic());
     }
 
     SECTION("zero omega with non-unit v fails")
     {
-        liepp::vector6<double> vec;
+        cartan::vector6<double> vec;
         vec << 0, 0, 0, 2, 0, 0;
-        auto result = liepp::screw_axis<double>::from_vector(vec);
+        auto result = cartan::screw_axis<double>::from_vector(vec);
         REQUIRE_FALSE(result.has_value());
     }
 }
@@ -126,9 +126,9 @@ TEST_CASE("screw_axis from_vector validation", "[screw_axis]")
 
 TEST_CASE("screw_axis to_vector roundtrip", "[screw_axis]")
 {
-    auto sa = liepp::screw_axis<double>::revolute({0, 0, 1}, {0.5, 0, 0});
+    auto sa = cartan::screw_axis<double>::revolute({0, 0, 1}, {0.5, 0, 0});
     auto vec = sa.to_vector();
-    auto result = liepp::screw_axis<double>::from_vector(vec);
+    auto result = cartan::screw_axis<double>::from_vector(vec);
     REQUIRE(result.has_value());
     REQUIRE((result->omega() - sa.omega()).norm() < 1e-12);
     REQUIRE((result->v() - sa.v()).norm() < 1e-12);
@@ -140,11 +140,11 @@ TEST_CASE("screw_axis to_vector roundtrip", "[screw_axis]")
 
 TEST_CASE("screw_axis float scalar", "[screw_axis][float]")
 {
-    auto sa = liepp::screw_axis<float>::revolute({0, 0, 1}, {0, 0, 0});
+    auto sa = cartan::screw_axis<float>::revolute({0, 0, 1}, {0, 0, 0});
     REQUIRE(sa.omega()(2) == Approx(1.0f).margin(1e-6f));
     REQUIRE(sa.is_revolute());
 
-    auto sp = liepp::screw_axis<float>::prismatic({0, 1, 0});
+    auto sp = cartan::screw_axis<float>::prismatic({0, 1, 0});
     REQUIRE(sp.v()(1) == Approx(1.0f).margin(1e-6f));
     REQUIRE(sp.is_prismatic());
 }

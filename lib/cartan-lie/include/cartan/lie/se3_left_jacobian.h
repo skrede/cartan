@@ -1,20 +1,20 @@
-#ifndef HPP_GUARD_LIEPP_LIE_SE3_LEFT_JACOBIAN_H
-#define HPP_GUARD_LIEPP_LIE_SE3_LEFT_JACOBIAN_H
+#ifndef HPP_GUARD_CARTAN_LIE_SE3_LEFT_JACOBIAN_H
+#define HPP_GUARD_CARTAN_LIE_SE3_LEFT_JACOBIAN_H
 
-#include "liepp/types.h"
-#include "liepp/detail/epsilon.h"
+#include "cartan/types.h"
+#include "cartan/detail/epsilon.h"
 
-#include "liepp/lie/so3.h"
-#include "liepp/lie/hat_vee.h"
+#include "cartan/lie/so3.h"
+#include "cartan/lie/hat_vee.h"
 
 #include <cmath>
 
-namespace liepp
+namespace cartan
 {
 
 /// Q matrix for SE(3) left Jacobian computation.
 /// Adapted from Barfoot, State Estimation for Robotics, Eq. 8.91a
-/// to liepp's omega-first convention.
+/// to cartan's omega-first convention.
 template <typename Scalar>
 [[nodiscard]] matrix3<Scalar> se3_Q_matrix(const vector3<Scalar>& omega, const vector3<Scalar>& rho)
 {
@@ -53,7 +53,7 @@ template <typename Scalar>
 }
 
 /// SE(3) left Jacobian.
-/// Uses liepp's omega-first convention: top-left = J_so3, bottom-left = Q.
+/// Uses cartan's omega-first convention: top-left = J_so3, bottom-left = Q.
 /// Ref: Barfoot, State Estimation for Robotics, Eq. 8.91, adapted to omega-first.
 template <typename Scalar>
 [[nodiscard]] matrix6<Scalar> se3_left_jacobian(const vector6<Scalar>& xi)
@@ -73,7 +73,7 @@ template <typename Scalar>
 }
 
 /// SE(3) inverse left Jacobian.
-/// Uses liepp's omega-first convention.
+/// Uses cartan's omega-first convention.
 /// Ref: Barfoot, State Estimation for Robotics, Eq. 8.100b, adapted to omega-first.
 template <typename Scalar>
 [[nodiscard]] matrix6<Scalar> se3_left_jacobian_inv(const vector6<Scalar>& xi)

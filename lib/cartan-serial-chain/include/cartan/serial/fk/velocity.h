@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_SERIAL_FK_VELOCITY_H
-#define HPP_GUARD_LIEPP_SERIAL_FK_VELOCITY_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_FK_VELOCITY_H
+#define HPP_GUARD_CARTAN_SERIAL_FK_VELOCITY_H
 
 /// @file velocity.h
 /// @brief End-effector velocity kinematics.
@@ -9,12 +9,12 @@
 ///
 /// Reference: Lynch & Park, Modern Robotics, Eq. 5.10, p. 178.
 
-#include "liepp/serial/fk/jacobian.h"
-#include "liepp/serial/fk/forward_kinematics.h"
+#include "cartan/serial/fk/jacobian.h"
+#include "cartan/serial/fk/forward_kinematics.h"
 
-#include "liepp/serial/chain/joint_state.h"
+#include "cartan/serial/chain/joint_state.h"
 
-namespace liepp
+namespace cartan
 {
 
 /// End-effector spatial twist: V_s = J_s(q) * dq.
@@ -24,7 +24,7 @@ namespace liepp
 ///
 /// Reference: Lynch & Park, Modern Robotics, Eq. 5.10, p. 178.
 ///
-/// @tparam N      Number of joints (compile-time), or liepp::dynamic.
+/// @tparam N      Number of joints (compile-time), or cartan::dynamic.
 /// @tparam Scalar Floating-point type.
 /// @param chain   Kinematic chain with screw axes and home configuration.
 /// @param q       Joint position vector.
@@ -41,6 +41,6 @@ vector6<Scalar> end_effector_velocity(
     return J_s * dq;
 }
 
-} // namespace liepp
+}
 
 #endif

@@ -1,14 +1,14 @@
-#include <liepp/serial/chain/static_chain.h>
-#include <liepp/serial/chain/chain_concept.h>
-#include <liepp/serial/chain/joint_tags.h>
-#include <liepp/serial/chain/screw_axis.h>
-#include <liepp/serial/chain/joint_limits.h>
-#include <liepp/serial/chain/kinematic_chain.h>
-#include <liepp/serial/chain/joint_state.h>
-#include <liepp/serial/fk/forward_kinematics.h>
-#include <liepp/serial/fk/jacobian.h>
+#include <cartan/serial/chain/static_chain.h>
+#include <cartan/serial/chain/chain_concept.h>
+#include <cartan/serial/chain/joint_tags.h>
+#include <cartan/serial/chain/screw_axis.h>
+#include <cartan/serial/chain/joint_limits.h>
+#include <cartan/serial/chain/kinematic_chain.h>
+#include <cartan/serial/chain/joint_state.h>
+#include <cartan/serial/fk/forward_kinematics.h>
+#include <cartan/serial/fk/jacobian.h>
 
-#include <liepp/lie/se3.h>
+#include <cartan/lie/se3.h>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -24,7 +24,7 @@ using Catch::Approx;
 
 TEST_CASE("static_chain joints count is compile-time", "[static_chain]")
 {
-    static_assert(liepp::static_chain<double, liepp::revolute_z, liepp::revolute_y, liepp::revolute_z>::joints == 3);
+    static_assert(cartan::static_chain<double, cartan::revolute_z, cartan::revolute_y, cartan::revolute_z>::joints == 3);
     SUCCEED();
 }
 
@@ -34,7 +34,7 @@ TEST_CASE("static_chain joints count is compile-time", "[static_chain]")
 
 TEST_CASE("static_chain single revolute joint", "[static_chain]")
 {
-    using namespace liepp;
+    using namespace cartan;
 
     auto home = se3<double>::identity();
     auto s0 = screw_axis<double>::revolute({0, 0, 1}, {0, 0, 0});
@@ -52,7 +52,7 @@ TEST_CASE("static_chain single revolute joint", "[static_chain]")
 
 TEST_CASE("static_chain 3R axis accessors", "[static_chain]")
 {
-    using namespace liepp;
+    using namespace cartan;
 
     auto s0 = screw_axis<double>::revolute({0, 0, 1}, {0, 0, 0});
     auto s1 = screw_axis<double>::revolute({0, 1, 0}, {0, 0, 0.5});
@@ -74,7 +74,7 @@ TEST_CASE("static_chain 3R axis accessors", "[static_chain]")
 
 TEST_CASE("static_chain axes() range", "[static_chain]")
 {
-    using namespace liepp;
+    using namespace cartan;
 
     auto s0 = screw_axis<double>::revolute({0, 0, 1}, {0, 0, 0});
     auto s1 = screw_axis<double>::revolute({0, 1, 0}, {0, 0, 0.5});
@@ -99,7 +99,7 @@ TEST_CASE("static_chain axes() range", "[static_chain]")
 
 TEST_CASE("static_chain home() returns construction pose", "[static_chain]")
 {
-    using namespace liepp;
+    using namespace cartan;
 
     vector3<double> t{1.0, 2.0, 3.0};
     auto home = se3<double>(so3<double>::identity(), t);
@@ -117,7 +117,7 @@ TEST_CASE("static_chain home() returns construction pose", "[static_chain]")
 
 TEST_CASE("static_chain limits() returns construction limits", "[static_chain]")
 {
-    using namespace liepp;
+    using namespace cartan;
 
     auto home = se3<double>::identity();
     auto s0 = screw_axis<double>::revolute({0, 0, 1}, {0, 0, 0});
@@ -141,7 +141,7 @@ TEST_CASE("static_chain limits() returns construction limits", "[static_chain]")
 
 TEST_CASE("static_chain satisfies chain concept", "[static_chain]")
 {
-    static_assert(liepp::chain<liepp::static_chain<double, liepp::revolute_z, liepp::revolute_y, liepp::revolute_z>>);
+    static_assert(cartan::chain<cartan::static_chain<double, cartan::revolute_z, cartan::revolute_y, cartan::revolute_z>>);
     SUCCEED();
 }
 
@@ -151,7 +151,7 @@ TEST_CASE("static_chain satisfies chain concept", "[static_chain]")
 
 TEST_CASE("static_chain with prismatic joint tag", "[static_chain]")
 {
-    using namespace liepp;
+    using namespace cartan;
 
     auto home = se3<double>::identity();
     auto s0 = screw_axis<double>::revolute({0, 0, 1}, {0, 0, 0});
@@ -171,7 +171,7 @@ TEST_CASE("static_chain with prismatic joint tag", "[static_chain]")
 
 static auto make_3r_screw_axes()
 {
-    using namespace liepp;
+    using namespace cartan;
     auto s0 = screw_axis<double>::revolute({0, 0, 1}, {0, 0, 0});
     auto s1 = screw_axis<double>::revolute({0, 1, 0}, {0, 0, 0.5});
     auto s2 = screw_axis<double>::revolute({0, 0, 1}, {0, 0, 1.0});
@@ -180,13 +180,13 @@ static auto make_3r_screw_axes()
 
 static auto make_3r_home()
 {
-    using namespace liepp;
+    using namespace cartan;
     return se3<double>(so3<double>::identity(), vector3<double>{1.0, 0.0, 1.0});
 }
 
 static auto make_3r_limits()
 {
-    using namespace liepp;
+    using namespace cartan;
     joint_limits<double> lim{-std::numbers::pi, std::numbers::pi};
     return std::array<joint_limits<double>, 3>{lim, lim, lim};
 }
@@ -197,7 +197,7 @@ static auto make_3r_limits()
 
 TEST_CASE("FK on static_chain matches kinematic_chain", "[static_chain][fk]")
 {
-    using namespace liepp;
+    using namespace cartan;
 
     auto axes = make_3r_screw_axes();
     auto home = make_3r_home();
@@ -234,7 +234,7 @@ TEST_CASE("FK on static_chain matches kinematic_chain", "[static_chain][fk]")
 
 TEST_CASE("Space Jacobian on static_chain matches kinematic_chain", "[static_chain][jacobian]")
 {
-    using namespace liepp;
+    using namespace cartan;
 
     auto axes = make_3r_screw_axes();
     auto home = make_3r_home();
@@ -268,7 +268,7 @@ TEST_CASE("Space Jacobian on static_chain matches kinematic_chain", "[static_cha
 
 TEST_CASE("Body Jacobian on static_chain matches kinematic_chain", "[static_chain][jacobian]")
 {
-    using namespace liepp;
+    using namespace cartan;
 
     auto axes = make_3r_screw_axes();
     auto home = make_3r_home();

@@ -1,9 +1,9 @@
-#ifndef HPP_GUARD_LIEPP_LIE_HAT_VEE_H
-#define HPP_GUARD_LIEPP_LIE_HAT_VEE_H
+#ifndef HPP_GUARD_CARTAN_LIE_HAT_VEE_H
+#define HPP_GUARD_CARTAN_LIE_HAT_VEE_H
 
-#include "liepp/types.h"
+#include "cartan/types.h"
 
-namespace liepp
+namespace cartan
 {
 
 /// Constructs a 3x3 skew-symmetric matrix from a 3-vector.
@@ -60,6 +60,6 @@ template <typename Scalar>
     return V;
 }
 
-} // namespace liepp
+}
 
 #endif

@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_SERIAL_CHAIN_STATIC_CHAIN_H
-#define HPP_GUARD_LIEPP_SERIAL_CHAIN_STATIC_CHAIN_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_CHAIN_STATIC_CHAIN_H
+#define HPP_GUARD_CARTAN_SERIAL_CHAIN_STATIC_CHAIN_H
 
 /// @file static_chain.h
 /// @brief Compile-time parameterized serial chain with joint type tags.
@@ -10,18 +10,18 @@
 /// dispatch and specialization in FK/Jacobian/IK while retaining full
 /// runtime flexibility for link geometry.
 
-#include "liepp/serial/chain/joint_tags.h"
-#include "liepp/serial/chain/screw_axis.h"
-#include "liepp/serial/chain/joint_limits.h"
-#include "liepp/serial/chain/chain_concept.h"
+#include "cartan/serial/chain/joint_tags.h"
+#include "cartan/serial/chain/screw_axis.h"
+#include "cartan/serial/chain/joint_limits.h"
+#include "cartan/serial/chain/chain_concept.h"
 
-#include "liepp/lie/se3.h"
+#include "cartan/lie/se3.h"
 
 #include <array>
 #include <cstddef>
 #include <type_traits>
 
-namespace liepp
+namespace cartan
 {
 
 /// Compile-time parameterized serial kinematic chain.

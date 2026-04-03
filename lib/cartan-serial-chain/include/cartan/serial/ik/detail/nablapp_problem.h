@@ -1,25 +1,25 @@
-#ifndef HPP_GUARD_LIEPP_SERIAL_IK_DETAIL_NABLAPP_PROBLEM_H
-#define HPP_GUARD_LIEPP_SERIAL_IK_DETAIL_NABLAPP_PROBLEM_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_NABLAPP_PROBLEM_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_NABLAPP_PROBLEM_H
 
 /// @file detail/nablapp_problem.h
-/// @brief Adapter wrapping liepp IK problem as nablapp problem formulation.
+/// @brief Adapter wrapping cartan IK problem as nablapp problem formulation.
 ///
 /// Satisfies nablapp::objective, nablapp::differentiable, and
 /// nablapp::bound_constrained concepts so that nablapp solvers
-/// (kraft_slsqp_policy, bobyqa_policy) can optimize liepp IK objectives.
+/// (kraft_slsqp_policy, bobyqa_policy) can optimize cartan IK objectives.
 
-#include "liepp/serial/ik/error_weight.h"
-#include "liepp/serial/ik/analytical_gradient.h"
+#include "cartan/serial/ik/error_weight.h"
+#include "cartan/serial/ik/analytical_gradient.h"
 
-#include "liepp/lie/se3.h"
-#include "liepp/serial/chain/chain_concept.h"
+#include "cartan/lie/se3.h"
+#include "cartan/serial/chain/chain_concept.h"
 
 #include <Eigen/Core>
 
-namespace liepp::detail
+namespace cartan::detail
 {
 
-/// Adapts a liepp IK problem (chain + target + weight) to the nablapp
+/// Adapts a cartan IK problem (chain + target + weight) to the nablapp
 /// problem formulation concepts (objective, differentiable, bound_constrained).
 ///
 /// Uses ik_se3_objective for consistent objective and gradient evaluation

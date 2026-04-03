@@ -2,10 +2,10 @@
 /// @brief Single-threaded IK service with CV-based worker dispatch.
 ///
 /// Demonstrates a worker thread that waits on a condition_variable for
-/// IK requests, solves them using liepp's lm_solve_policy, and returns results.
+/// IK requests, solves them using cartan's lm_solve_policy, and returns results.
 /// The main thread submits requests and collects responses.
 
-#include "liepp/serial_chain.h"
+#include "cartan/serial_chain.h"
 
 #include <condition_variable>
 #include <iostream>
@@ -17,22 +17,22 @@
 
 // --- UR3e 6-DOF chain geometry (hardcoded PoE parameters) ---
 
-liepp::kinematic_chain<double, 6> make_ur3e()
+cartan::kinematic_chain<double, 6> make_ur3e()
 {
-    using vec3 = liepp::vector3<double>;
+    using vec3 = cartan::vector3<double>;
 
-    auto s1 = liepp::screw_axis<double>::revolute(vec3(0, 0, 1), vec3(0, 0, 0));
-    auto s2 = liepp::screw_axis<double>::revolute(vec3(0, 1, 0), vec3(0, 0, 0.15185));
-    auto s3 = liepp::screw_axis<double>::revolute(vec3(0, 1, 0), vec3(-0.24355, 0, 0.15185));
-    auto s4 = liepp::screw_axis<double>::revolute(vec3(0, 1, 0), vec3(-0.45675, 0, 0.15185));
-    auto s5 = liepp::screw_axis<double>::revolute(vec3(0, 0, -1), vec3(-0.45675, 0.13105, 0));
-    auto s6 = liepp::screw_axis<double>::revolute(vec3(0, 1, 0), vec3(-0.45675, 0, -0.08535));
+    auto s1 = cartan::screw_axis<double>::revolute(vec3(0, 0, 1), vec3(0, 0, 0));
+    auto s2 = cartan::screw_axis<double>::revolute(vec3(0, 1, 0), vec3(0, 0, 0.15185));
+    auto s3 = cartan::screw_axis<double>::revolute(vec3(0, 1, 0), vec3(-0.24355, 0, 0.15185));
+    auto s4 = cartan::screw_axis<double>::revolute(vec3(0, 1, 0), vec3(-0.45675, 0, 0.15185));
+    auto s5 = cartan::screw_axis<double>::revolute(vec3(0, 0, -1), vec3(-0.45675, 0.13105, 0));
+    auto s6 = cartan::screw_axis<double>::revolute(vec3(0, 1, 0), vec3(-0.45675, 0, -0.08535));
 
     vec3 home_trans(-0.45675, 0.22315, 0.0665);
-    auto home = liepp::se3<double>(liepp::so3<double>::identity(), home_trans);
+    auto home = cartan::se3<double>(cartan::so3<double>::identity(), home_trans);
 
-    liepp::joint_limits<double> lim{-std::numbers::pi, std::numbers::pi};
-    return liepp::kinematic_chain<double, 6>(
+    cartan::joint_limits<double> lim{-std::numbers::pi, std::numbers::pi};
+    return cartan::kinematic_chain<double, 6>(
         home, {s1, s2, s3, s4, s5, s6},
         {lim, lim, lim, lim, lim, lim});
 }
@@ -41,13 +41,13 @@ liepp::kinematic_chain<double, 6> make_ur3e()
 
 struct ik_request
 {
-    liepp::se3<double> target;
+    cartan::se3<double> target;
     Eigen::Vector<double, 6> q0;
 };
 
 struct ik_response
 {
-    std::expected<liepp::ik_result<double, 6>, liepp::ik_error<double, 6>> result;
+    std::expected<cartan::ik_result<double, 6>, cartan::ik_error<double, 6>> result;
 };
 
 // --- Single-threaded IK service ---
@@ -55,7 +55,7 @@ struct ik_response
 class ik_service
 {
 public:
-    explicit ik_service(liepp::kinematic_chain<double, 6> chain)
+    explicit ik_service(cartan::kinematic_chain<double, 6> chain)
         : m_chain(std::move(chain))
         , m_worker([this](std::stop_token stoken) { worker_loop(stoken); })
     {
@@ -88,7 +88,7 @@ public:
 private:
     void worker_loop(std::stop_token stoken)
     {
-        liepp::convergence_criteria<double> criteria{1e-6, 1e-6, 200};
+        cartan::convergence_criteria<double> criteria{1e-6, 1e-6, 200};
 
         while (!stoken.stop_requested())
         {
@@ -105,7 +105,7 @@ private:
             lock.unlock();
 
             // Solve IK using LM solve policy
-            liepp::basic_ik_solver<liepp::lm_solve_policy<liepp::kinematic_chain<double, 6>>> solver;
+            cartan::basic_ik_solver<cartan::lm_solve_policy<cartan::kinematic_chain<double, 6>>> solver;
             solver.setup(m_chain, req.target, req.q0, criteria);
             auto result = solver.solve();
 
@@ -118,7 +118,7 @@ private:
         }
     }
 
-    liepp::kinematic_chain<double, 6> m_chain;
+    cartan::kinematic_chain<double, 6> m_chain;
     std::mutex m_mutex;
     std::condition_variable m_cv;
     std::condition_variable m_response_cv;
@@ -144,7 +144,7 @@ int main()
 
     for (std::size_t i = 0; i < configs.size(); ++i)
     {
-        auto target = liepp::forward_kinematics(chain, configs[i]).end_effector;
+        auto target = cartan::forward_kinematics(chain, configs[i]).end_effector;
         auto response = service.solve({target, q0});
 
         if (response.result.has_value())

@@ -1,9 +1,9 @@
-#ifndef HPP_GUARD_LIEPP_SERIAL_IK_ERROR_WEIGHT_H
-#define HPP_GUARD_LIEPP_SERIAL_IK_ERROR_WEIGHT_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_ERROR_WEIGHT_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_ERROR_WEIGHT_H
 
-#include "liepp/types.h"
+#include "cartan/types.h"
 
-namespace liepp
+namespace cartan
 {
 
 template <typename Scalar = double>

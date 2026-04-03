@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_SERIAL_IK_DEFAULT_SOLVERS_H
-#define HPP_GUARD_LIEPP_SERIAL_IK_DEFAULT_SOLVERS_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_DEFAULT_SOLVERS_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_DEFAULT_SOLVERS_H
 
 /// @file default_solvers.h
 /// @brief Factory functions, builders, and type aliases for common IK solver configurations.
@@ -13,18 +13,18 @@
 /// Reference: Decisions D-07 (solver presets), D-08 (racing default), D-10 (builder pattern),
 ///            D-11 (type aliases), D-12 (factory namespace).
 
-#include "liepp/serial/ik/limits_policy.h"
-#include "liepp/serial/ik/basic_ik_solver.h"
-#include "liepp/serial/ik/ik_solve_policy.h"
-#include "liepp/serial/ik/lbfgsb_solve_policy.h"
-#include "liepp/serial/ik/restart_solve_policy.h"
-#include "liepp/serial/ik/projected_lm_solve_policy.h"
+#include "cartan/serial/ik/limits_policy.h"
+#include "cartan/serial/ik/basic_ik_solver.h"
+#include "cartan/serial/ik/ik_solve_policy.h"
+#include "cartan/serial/ik/lbfgsb_solve_policy.h"
+#include "cartan/serial/ik/restart_solve_policy.h"
+#include "cartan/serial/ik/projected_lm_solve_policy.h"
 
-#include "liepp/serial/chain/chain_concept.h"
+#include "cartan/serial/chain/chain_concept.h"
 
 #include <tuple>
 
-namespace liepp
+namespace cartan
 {
 
 // ---------------------------------------------------------------------------

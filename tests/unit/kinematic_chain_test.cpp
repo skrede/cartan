@@ -1,6 +1,6 @@
-#include <liepp/serial/chain/kinematic_chain.h>
+#include <cartan/serial/chain/kinematic_chain.h>
 
-#include <liepp/serial/chain/joint_state.h>
+#include <cartan/serial/chain/joint_state.h>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -17,7 +17,7 @@ using Catch::Approx;
 
 TEST_CASE("kinematic_chain<double, 3> construction", "[kinematic_chain]")
 {
-    using namespace liepp;
+    using namespace cartan;
 
     double L1 = 1.0, L2 = 1.0, L3 = 1.0;
 
@@ -52,7 +52,7 @@ TEST_CASE("kinematic_chain<double, 3> construction", "[kinematic_chain]")
 
 TEST_CASE("kinematic_chain<double, 3> to_dynamic", "[kinematic_chain]")
 {
-    using namespace liepp;
+    using namespace cartan;
 
     double L = 1.0;
     vector3<double> home_trans;
@@ -87,7 +87,7 @@ TEST_CASE("kinematic_chain<double, 3> to_dynamic", "[kinematic_chain]")
 
 TEST_CASE("kinematic_chain<double, dynamic> construction", "[kinematic_chain]")
 {
-    using namespace liepp;
+    using namespace cartan;
 
     double L = 1.0;
     vector3<double> home_trans;
@@ -114,7 +114,7 @@ TEST_CASE("kinematic_chain<double, dynamic> construction", "[kinematic_chain]")
 
 TEST_CASE("joint_limits contains", "[joint_limits]")
 {
-    liepp::joint_limits<double> lim{-std::numbers::pi, std::numbers::pi};
+    cartan::joint_limits<double> lim{-std::numbers::pi, std::numbers::pi};
 
     REQUIRE(lim.contains(0.0));
     REQUIRE(lim.contains(-std::numbers::pi));
@@ -132,7 +132,7 @@ TEST_CASE("joint_state from_position", "[joint_state]")
     Eigen::Vector3d q;
     q << 0.1, 0.2, 0.3;
 
-    auto js = liepp::joint_state<double, 3>::from_position(q);
+    auto js = cartan::joint_state<double, 3>::from_position(q);
     REQUIRE(js.num_joints() == 3);
     REQUIRE(js.position(0) == Approx(0.1).margin(1e-14));
     REQUIRE(js.position(1) == Approx(0.2).margin(1e-14));
@@ -146,7 +146,7 @@ TEST_CASE("joint_state from_position", "[joint_state]")
 
 TEST_CASE("kinematic_chain with prismatic", "[kinematic_chain]")
 {
-    using namespace liepp;
+    using namespace cartan;
 
     auto home = se3<double>::identity();
 

@@ -1,8 +1,8 @@
 #include "benchmark_utils.h"
 
-#include <liepp/serial/chain/static_chain.h>
-#include <liepp/serial/fk/forward_kinematics.h>
-#include <liepp/serial/fk/detail/axis_specializations.h>
+#include <cartan/serial/chain/static_chain.h>
+#include <cartan/serial/fk/forward_kinematics.h>
+#include <cartan/serial/fk/detail/axis_specializations.h>
 
 #include <kdl/chainfksolverpos_recursive.hpp>
 
@@ -20,88 +20,88 @@ namespace
 template <typename Scalar>
 auto make_3r_planar_static()
 {
-    auto kc = liepp::benchmarks::make_3r_planar_chain<Scalar>();
-    return liepp::static_chain<Scalar, liepp::revolute_z, liepp::revolute_z, liepp::revolute_z>(
+    auto kc = cartan::benchmarks::make_3r_planar_chain<Scalar>();
+    return cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_z, cartan::revolute_z>(
         kc.home(), kc.axes(), kc.limits());
 }
 
 template <typename Scalar>
 auto make_ur3e_static()
 {
-    auto kc = liepp::benchmarks::make_ur3e_chain<Scalar>();
-    return liepp::static_chain<Scalar,
-        liepp::revolute_z, liepp::revolute_y, liepp::revolute_y,
-        liepp::revolute_y, liepp::revolute_z, liepp::revolute_y>(
+    auto kc = cartan::benchmarks::make_ur3e_chain<Scalar>();
+    return cartan::static_chain<Scalar,
+        cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
+        cartan::revolute_y, cartan::revolute_z, cartan::revolute_y>(
         kc.home(), kc.axes(), kc.limits());
 }
 
 template <typename Scalar>
 auto make_lbr_med14_static()
 {
-    auto kc = liepp::benchmarks::make_lbr_med14_chain<Scalar>();
-    return liepp::static_chain<Scalar,
-        liepp::revolute_z, liepp::revolute_y, liepp::revolute_z, liepp::revolute_y,
-        liepp::revolute_z, liepp::revolute_y, liepp::revolute_z>(
+    auto kc = cartan::benchmarks::make_lbr_med14_chain<Scalar>();
+    return cartan::static_chain<Scalar,
+        cartan::revolute_z, cartan::revolute_y, cartan::revolute_z, cartan::revolute_y,
+        cartan::revolute_z, cartan::revolute_y, cartan::revolute_z>(
         kc.home(), kc.axes(), kc.limits());
 }
 
 template <typename Scalar>
 auto make_kr6_sixx_static()
 {
-    auto kc = liepp::benchmarks::make_kr6_sixx_chain<Scalar>();
-    return liepp::static_chain<Scalar,
-        liepp::revolute_z, liepp::revolute_y, liepp::revolute_y,
-        liepp::revolute_x, liepp::revolute_y, liepp::revolute_x>(
+    auto kc = cartan::benchmarks::make_kr6_sixx_chain<Scalar>();
+    return cartan::static_chain<Scalar,
+        cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
+        cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>(
         kc.home(), kc.axes(), kc.limits());
 }
 
 template <typename Scalar>
 auto make_panda_static()
 {
-    auto kc = liepp::benchmarks::make_panda_chain<Scalar>();
-    return liepp::static_chain<Scalar,
-        liepp::revolute_z, liepp::revolute_y, liepp::revolute_z, liepp::revolute_y,
-        liepp::revolute_z, liepp::revolute_y, liepp::revolute_z>(
+    auto kc = cartan::benchmarks::make_panda_chain<Scalar>();
+    return cartan::static_chain<Scalar,
+        cartan::revolute_z, cartan::revolute_y, cartan::revolute_z, cartan::revolute_y,
+        cartan::revolute_z, cartan::revolute_y, cartan::revolute_z>(
         kc.home(), kc.axes(), kc.limits());
 }
 
 template <typename Scalar>
 auto make_abb_irb120_static()
 {
-    auto kc = liepp::benchmarks::make_abb_irb120_chain<Scalar>();
-    return liepp::static_chain<Scalar,
-        liepp::revolute_z, liepp::revolute_y, liepp::revolute_y,
-        liepp::revolute_x, liepp::revolute_y, liepp::revolute_x>(
+    auto kc = cartan::benchmarks::make_abb_irb120_chain<Scalar>();
+    return cartan::static_chain<Scalar,
+        cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
+        cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>(
         kc.home(), kc.axes(), kc.limits());
 }
 
 template <typename Scalar>
 auto make_jaco2_static()
 {
-    auto kc = liepp::benchmarks::make_jaco2_chain<Scalar>();
-    return liepp::static_chain<Scalar,
-        liepp::revolute_z, liepp::revolute_y, liepp::revolute_y,
-        liepp::revolute_x, liepp::revolute_y, liepp::revolute_x>(
+    auto kc = cartan::benchmarks::make_jaco2_chain<Scalar>();
+    return cartan::static_chain<Scalar,
+        cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
+        cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>(
         kc.home(), kc.axes(), kc.limits());
 }
 
 template <typename Scalar>
 auto make_fetch_static()
 {
-    auto kc = liepp::benchmarks::make_fetch_chain<Scalar>();
-    return liepp::static_chain<Scalar,
-        liepp::revolute_z, liepp::revolute_y, liepp::revolute_x, liepp::revolute_y,
-        liepp::revolute_x, liepp::revolute_y, liepp::revolute_x>(
+    auto kc = cartan::benchmarks::make_fetch_chain<Scalar>();
+    return cartan::static_chain<Scalar,
+        cartan::revolute_z, cartan::revolute_y, cartan::revolute_x, cartan::revolute_y,
+        cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>(
         kc.home(), kc.axes(), kc.limits());
 }
 
 template <typename Scalar>
 auto make_baxter_static()
 {
-    auto kc = liepp::benchmarks::make_baxter_chain<Scalar>();
-    return liepp::static_chain<Scalar,
-        liepp::revolute_z, liepp::revolute_y, liepp::revolute_x, liepp::revolute_y,
-        liepp::revolute_x, liepp::revolute_y, liepp::revolute_x>(
+    auto kc = cartan::benchmarks::make_baxter_chain<Scalar>();
+    return cartan::static_chain<Scalar,
+        cartan::revolute_z, cartan::revolute_y, cartan::revolute_x, cartan::revolute_y,
+        cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>(
         kc.home(), kc.axes(), kc.limits());
 }
 
@@ -114,7 +114,7 @@ auto random_config_static(const ChainType& chain, std::mt19937& rng)
 {
     using Scalar = typename ChainType::scalar_type;
     constexpr int N = ChainType::joints;
-    using position_type = typename liepp::joint_state<Scalar, N>::position_type;
+    using position_type = typename cartan::joint_state<Scalar, N>::position_type;
 
     position_type q;
     const auto& limits = chain.limits();
@@ -147,12 +147,12 @@ void fill_kdl_random(KDL::JntArray& q, int n, std::mt19937& rng)
 #define FK_BENCHMARK_KINEMATIC_CHAIN(ROBOT, FACTORY)                     \
 static void bm_fk_##ROBOT##_kinematic_chain(benchmark::State& state)     \
 {                                                                        \
-    auto chain = liepp::benchmarks::FACTORY<double>();                    \
+    auto chain = cartan::benchmarks::FACTORY<double>();                    \
     std::mt19937 rng(42);                                                \
-    auto q = liepp::benchmarks::random_joint_config(chain, rng);         \
+    auto q = cartan::benchmarks::random_joint_config(chain, rng);         \
     for (auto _ : state)                                                 \
     {                                                                    \
-        auto result = liepp::forward_kinematics(chain, q);               \
+        auto result = cartan::forward_kinematics(chain, q);               \
         benchmark::DoNotOptimize(result);                                \
     }                                                                    \
 }                                                                        \
@@ -162,12 +162,12 @@ BENCHMARK(bm_fk_##ROBOT##_kinematic_chain)
 static void bm_fk_##ROBOT##_static_generic(benchmark::State& state)      \
 {                                                                        \
     auto sc = STATIC_FACTORY<double>();                                   \
-    liepp::detail::generic_chain_wrapper wrapped{sc};                     \
+    cartan::detail::generic_chain_wrapper wrapped{sc};                     \
     std::mt19937 rng(42);                                                \
     auto q = random_config_static(sc, rng);                              \
     for (auto _ : state)                                                 \
     {                                                                    \
-        auto result = liepp::forward_kinematics(wrapped, q);             \
+        auto result = cartan::forward_kinematics(wrapped, q);             \
         benchmark::DoNotOptimize(result);                                \
     }                                                                    \
 }                                                                        \
@@ -181,7 +181,7 @@ static void bm_fk_##ROBOT##_static_specialized(benchmark::State& state)  \
     auto q = random_config_static(sc, rng);                              \
     for (auto _ : state)                                                 \
     {                                                                    \
-        auto result = liepp::forward_kinematics(sc, q);                  \
+        auto result = cartan::forward_kinematics(sc, q);                  \
         benchmark::DoNotOptimize(result);                                \
     }                                                                    \
 }                                                                        \
@@ -190,7 +190,7 @@ BENCHMARK(bm_fk_##ROBOT##_static_specialized)
 #define FK_BENCHMARK_KDL(ROBOT, KDL_FACTORY, N_JOINTS)                   \
 static void bm_fk_##ROBOT##_kdl(benchmark::State& state)                 \
 {                                                                        \
-    auto chain = liepp::benchmarks::KDL_FACTORY();                       \
+    auto chain = cartan::benchmarks::KDL_FACTORY();                       \
     KDL::ChainFkSolverPos_recursive fk_solver(chain);                    \
     std::mt19937 rng(42);                                                \
     KDL::JntArray q;                                                     \

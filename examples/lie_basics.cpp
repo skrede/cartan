@@ -3,16 +3,16 @@
 ///
 /// Shows: exp/log maps, group composition, adjoint, inverse, rotation of vectors.
 
-#include "liepp/lie.h"
+#include "cartan/lie.h"
 
 #include <iostream>
 
 int main()
 {
-    using SO3 = liepp::so3<double>;
-    using SE3 = liepp::se3<double>;
-    using vec3 = liepp::vector3<double>;
-    using vec6 = liepp::vector6<double>;
+    using SO3 = cartan::so3<double>;
+    using SE3 = cartan::se3<double>;
+    using vec3 = cartan::vector3<double>;
+    using vec6 = cartan::vector6<double>;
 
     // --- SO(3): 3D rotations ---
     vec3 phi{0.1, 0.2, 0.3};

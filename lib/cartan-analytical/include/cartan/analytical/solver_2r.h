@@ -1,23 +1,23 @@
-#ifndef HPP_GUARD_LIEPP_ANALYTICAL_SOLVER_2R_H
-#define HPP_GUARD_LIEPP_ANALYTICAL_SOLVER_2R_H
+#ifndef HPP_GUARD_CARTAN_ANALYTICAL_SOLVER_2R_H
+#define HPP_GUARD_CARTAN_ANALYTICAL_SOLVER_2R_H
 
-#include "liepp/analytical/analytical_types.h"
-#include "liepp/analytical/analytical_solver.h"
+#include "cartan/analytical/analytical_types.h"
+#include "cartan/analytical/analytical_solver.h"
 
-#include "liepp/analytical/detail/clamped_trig.h"
-#include "liepp/analytical/detail/fk_verification.h"
+#include "cartan/analytical/detail/clamped_trig.h"
+#include "cartan/analytical/detail/fk_verification.h"
 
-#include "liepp/serial/chain/joint_tags.h"
-#include "liepp/serial/chain/static_chain.h"
+#include "cartan/serial/chain/joint_tags.h"
+#include "cartan/serial/chain/static_chain.h"
 
-#include "liepp/lie/se3.h"
+#include "cartan/lie/se3.h"
 
 #include <cmath>
 #include <cstddef>
 #include <expected>
 #include <numbers>
 
-namespace liepp
+namespace cartan
 {
 
 template <typename Scalar, joint_tag... Joints>

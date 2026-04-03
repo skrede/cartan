@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_SERIAL_IK_IK_SOLVE_POLICY_H
-#define HPP_GUARD_LIEPP_SERIAL_IK_IK_SOLVE_POLICY_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_IK_SOLVE_POLICY_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_IK_SOLVE_POLICY_H
 
 /// @file ik_solve_policy.h
 /// @brief Single-parameter concept for IK solve policies.
@@ -9,14 +9,14 @@
 /// S::limits_type for trait access. This enables policies to work with any
 /// chain type satisfying the chain concept.
 
-#include "liepp/serial/ik/ik_types.h"
+#include "cartan/serial/ik/ik_types.h"
 
-#include "liepp/lie/se3.h"
-#include "liepp/serial/chain/joint_state.h"
+#include "cartan/lie/se3.h"
+#include "cartan/serial/chain/joint_state.h"
 
 #include <concepts>
 
-namespace liepp
+namespace cartan
 {
 
 /// Concept for a single-parameter IK solve policy.

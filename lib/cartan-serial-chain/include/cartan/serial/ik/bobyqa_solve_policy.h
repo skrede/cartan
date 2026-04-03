@@ -1,28 +1,28 @@
-#ifndef HPP_GUARD_LIEPP_SERIAL_IK_BOBYQA_SOLVE_POLICY_H
-#define HPP_GUARD_LIEPP_SERIAL_IK_BOBYQA_SOLVE_POLICY_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_BOBYQA_SOLVE_POLICY_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_BOBYQA_SOLVE_POLICY_H
 
 /// @file bobyqa_solve_policy.h
 /// @brief nablapp-backed BOBYQA derivative-free IK solve policy with box constraints.
 ///
 /// Wraps nablapp's bobyqa_policy for constrained IK, using joint limits
 /// as box constraints. Derivative-free -- uses only objective evaluations.
-/// Always available -- nablapp is a required dependency of liepp::kinematics.
+/// Always available -- nablapp is a required dependency of cartan::kinematics.
 ///
 /// Reference: Powell 2009, BOBYQA algorithm for bound constrained optimization.
 
-#include "liepp/serial/ik/ik_types.h"
-#include "liepp/serial/ik/error_weight.h"
-#include "liepp/serial/ik/limits_policy.h"
-#include "liepp/serial/ik/ik_solve_policy.h"
-#include "liepp/serial/ik/detail/convergence.h"
-#include "liepp/serial/ik/detail/nablapp_problem.h"
-#include "liepp/serial/ik/detail/stall_detection.h"
-#include "liepp/serial/ik/detail/limit_enforcement.h"
+#include "cartan/serial/ik/ik_types.h"
+#include "cartan/serial/ik/error_weight.h"
+#include "cartan/serial/ik/limits_policy.h"
+#include "cartan/serial/ik/ik_solve_policy.h"
+#include "cartan/serial/ik/detail/convergence.h"
+#include "cartan/serial/ik/detail/nablapp_problem.h"
+#include "cartan/serial/ik/detail/stall_detection.h"
+#include "cartan/serial/ik/detail/limit_enforcement.h"
 
-#include "liepp/lie/se3.h"
-#include "liepp/serial/chain/joint_state.h"
-#include "liepp/serial/chain/chain_concept.h"
-#include "liepp/serial/fk/forward_kinematics.h"
+#include "cartan/lie/se3.h"
+#include "cartan/serial/chain/joint_state.h"
+#include "cartan/serial/chain/chain_concept.h"
+#include "cartan/serial/fk/forward_kinematics.h"
 
 #include <nablapp/solver/options.h>
 #include <nablapp/solver/basic_solver.h>
@@ -35,7 +35,7 @@
 #include <memory>
 #include <vector>
 
-namespace liepp
+namespace cartan
 {
 
 /// nablapp-backed BOBYQA solve policy for constrained IK with box constraints.
@@ -46,7 +46,7 @@ namespace liepp
 /// iterations for cooperative scheduling in basic_ik_solver.
 ///
 /// This is the default (unprefixed) BOBYQA policy. The NLopt-backed variant
-/// is available as nlopt_bobyqa_solve_policy behind LIEPP_HAS_NLOPT.
+/// is available as nlopt_bobyqa_solve_policy behind CARTAN_HAS_NLOPT.
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 class bobyqa_solve_policy
 {

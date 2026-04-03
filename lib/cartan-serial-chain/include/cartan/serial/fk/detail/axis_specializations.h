@@ -1,18 +1,18 @@
-#ifndef HPP_GUARD_LIEPP_SERIAL_FK_DETAIL_AXIS_SPECIALIZATIONS_H
-#define HPP_GUARD_LIEPP_SERIAL_FK_DETAIL_AXIS_SPECIALIZATIONS_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_FK_DETAIL_AXIS_SPECIALIZATIONS_H
+#define HPP_GUARD_CARTAN_SERIAL_FK_DETAIL_AXIS_SPECIALIZATIONS_H
 
-#include "liepp/types.h"
-#include "liepp/detail/epsilon.h"
-#include "liepp/lie/se3.h"
-#include "liepp/lie/so3.h"
+#include "cartan/types.h"
+#include "cartan/detail/epsilon.h"
+#include "cartan/lie/se3.h"
+#include "cartan/lie/so3.h"
 
-#include "liepp/serial/chain/joint_tags.h"
-#include "liepp/serial/chain/screw_axis.h"
+#include "cartan/serial/chain/joint_tags.h"
+#include "cartan/serial/chain/screw_axis.h"
 
 #include <cmath>
 #include <concepts>
 
-namespace liepp::detail
+namespace cartan::detail
 {
 
 /// Per-joint SE3 exponential exploiting compile-time axis knowledge.

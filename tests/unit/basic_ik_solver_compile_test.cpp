@@ -1,19 +1,19 @@
-#include <liepp/serial/ik/basic_ik_solver.h>
+#include <cartan/serial/ik/basic_ik_solver.h>
 
-#include <liepp/serial/ik/dls_solve_policy.h>
-#include <liepp/serial/ik/limits_policy.h>
+#include <cartan/serial/ik/dls_solve_policy.h>
+#include <cartan/serial/ik/limits_policy.h>
 
-#include <liepp/lie/se3.h>
-#include <liepp/serial/chain/joint_state.h>
-#include <liepp/serial/chain/joint_limits.h>
-#include <liepp/serial/chain/kinematic_chain.h>
+#include <cartan/lie/se3.h>
+#include <cartan/serial/chain/joint_state.h>
+#include <cartan/serial/chain/joint_limits.h>
+#include <cartan/serial/chain/kinematic_chain.h>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
 
-namespace spp = liepp;
+namespace spp = cartan;
 
 TEST_CASE("clamp_limits clamps each q(i) to bounds", "[ik][limits]")
 {

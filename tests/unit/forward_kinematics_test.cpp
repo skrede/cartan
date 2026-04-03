@@ -1,4 +1,4 @@
-#include "liepp/serial_chain.h"
+#include "cartan/serial_chain.h"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -6,7 +6,7 @@
 #include <cmath>
 #include <numbers>
 
-namespace spp = liepp;
+namespace spp = cartan;
 using Catch::Approx;
 
 // ============================================================================

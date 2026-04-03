@@ -1,10 +1,10 @@
-#include <liepp/types.h>
+#include <cartan/types.h>
 
 #include <iostream>
 
 int main()
 {
-    liepp::vector3<double> v = liepp::vector3<double>::UnitX();
-    std::cout << "liepp integration test PASSED (v.norm() = " << v.norm() << ")" << std::endl;
+    cartan::vector3<double> v = cartan::vector3<double>::UnitX();
+    std::cout << "cartan integration test PASSED (v.norm() = " << v.norm() << ")" << std::endl;
     return 0;
 }

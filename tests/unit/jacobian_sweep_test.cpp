@@ -2,11 +2,11 @@
 #include <catch2/catch_template_test_macros.hpp>
 #include "../test_utils.h"
 
-#include <liepp/types.h>
-#include <liepp/lie/se3.h>
-#include <liepp/serial/chain/kinematic_chain.h>
-#include <liepp/serial/fk/forward_kinematics.h>
-#include <liepp/serial/fk/jacobian.h>
+#include <cartan/types.h>
+#include <cartan/lie/se3.h>
+#include <cartan/serial/chain/kinematic_chain.h>
+#include <cartan/serial/fk/forward_kinematics.h>
+#include <cartan/serial/fk/jacobian.h>
 
 #include <numbers>
 #include <type_traits>
@@ -19,14 +19,14 @@
 // ============================================================================
 
 template <int N, typename Scalar>
-liepp::jacobian_matrix<Scalar, N> fd_space_jacobian(
-    const liepp::kinematic_chain<Scalar, N>& chain,
-    const typename liepp::joint_state<Scalar, N>::position_type& q,
+cartan::jacobian_matrix<Scalar, N> fd_space_jacobian(
+    const cartan::kinematic_chain<Scalar, N>& chain,
+    const typename cartan::joint_state<Scalar, N>::position_type& q,
     Scalar h)
 {
     int n = chain.num_joints();
-    liepp::jacobian_matrix<Scalar, N> J;
-    if constexpr (N == liepp::dynamic)
+    cartan::jacobian_matrix<Scalar, N> J;
+    if constexpr (N == cartan::dynamic)
     {
         J.resize(6, n);
     }
@@ -38,8 +38,8 @@ liepp::jacobian_matrix<Scalar, N> fd_space_jacobian(
         q_plus(i) += h;
         q_minus(i) -= h;
 
-        auto fk_plus = liepp::forward_kinematics(chain, q_plus);
-        auto fk_minus = liepp::forward_kinematics(chain, q_minus);
+        auto fk_plus = cartan::forward_kinematics(chain, q_plus);
+        auto fk_minus = cartan::forward_kinematics(chain, q_minus);
 
         // Space-frame: log(T_plus * T_minus^{-1}) / (2h)
         auto delta = (fk_plus.end_effector * fk_minus.end_effector.inverse()).log();
@@ -66,16 +66,16 @@ TEMPLATE_TEST_CASE("Jacobian sweep: DOF 1-7", "[jacobian][sweep]", double, float
     // multiplier scaled by (h/eps)^2 to account for FD error dominance.
     // double: h=1e-6, observed error ~1e-10, multiplier ~1e7 covers with margin
     // float:  h=1e-4, observed error ~1e-3, multiplier ~1e7 covers with margin
-    const Scalar fd_tol = Scalar(1e7) * liepp::test::test_eps<Scalar>;
-    const Scalar dyn_tol = Scalar(10) * liepp::test::test_eps<Scalar>;
+    const Scalar fd_tol = Scalar(1e7) * cartan::test::test_eps<Scalar>;
+    const Scalar dyn_tol = Scalar(10) * cartan::test::test_eps<Scalar>;
     const Scalar h = std::is_same_v<Scalar, float> ? Scalar(1e-4) : Scalar(1e-6);
 
     // Helper lambda: run all checks for a given chain
     auto run_checks = [&](auto& chain, int dof, auto& q_fixed)
     {
-        auto fk = liepp::forward_kinematics(chain, q_fixed);
-        auto Js = liepp::space_jacobian(chain, fk);
-        auto Jb = liepp::body_jacobian(chain, fk);
+        auto fk = cartan::forward_kinematics(chain, q_fixed);
+        auto Js = cartan::space_jacobian(chain, fk);
+        auto Jb = cartan::body_jacobian(chain, fk);
 
         // A. Shape correctness
         REQUIRE(Js.rows() == 6);
@@ -97,7 +97,7 @@ TEMPLATE_TEST_CASE("Jacobian sweep: DOF 1-7", "[jacobian][sweep]", double, float
     // ------------------------------------------------------------------
     SECTION("DOF 1")
     {
-        auto chain = liepp::test::make_1r_chain<Scalar>();
+        auto chain = cartan::test::make_1r_chain<Scalar>();
 
         SECTION("shape and finite-difference")
         {
@@ -110,16 +110,16 @@ TEMPLATE_TEST_CASE("Jacobian sweep: DOF 1-7", "[jacobian][sweep]", double, float
         {
             Eigen::Vector<Scalar, 1> q_fixed;
             q_fixed << Scalar(0.3);
-            auto fk_f = liepp::forward_kinematics(chain, q_fixed);
-            auto Js_f = liepp::space_jacobian(chain, fk_f);
-            auto Jb_f = liepp::body_jacobian(chain, fk_f);
+            auto fk_f = cartan::forward_kinematics(chain, q_fixed);
+            auto Js_f = cartan::space_jacobian(chain, fk_f);
+            auto Jb_f = cartan::body_jacobian(chain, fk_f);
 
             auto dyn_chain = chain.to_dynamic();
             Eigen::VectorX<Scalar> q_dyn(1);
             q_dyn << Scalar(0.3);
-            auto fk_d = liepp::forward_kinematics(dyn_chain, q_dyn);
-            auto Js_d = liepp::space_jacobian(dyn_chain, fk_d);
-            auto Jb_d = liepp::body_jacobian(dyn_chain, fk_d);
+            auto fk_d = cartan::forward_kinematics(dyn_chain, q_dyn);
+            auto Js_d = cartan::space_jacobian(dyn_chain, fk_d);
+            auto Jb_d = cartan::body_jacobian(dyn_chain, fk_d);
 
             REQUIRE((Js_f - Js_d).norm() < dyn_tol);
             REQUIRE((Jb_f - Jb_d).norm() < dyn_tol);
@@ -131,7 +131,7 @@ TEMPLATE_TEST_CASE("Jacobian sweep: DOF 1-7", "[jacobian][sweep]", double, float
     // ------------------------------------------------------------------
     SECTION("DOF 2")
     {
-        auto chain = liepp::test::make_2r_planar_chain<Scalar>();
+        auto chain = cartan::test::make_2r_planar_chain<Scalar>();
 
         SECTION("shape and finite-difference")
         {
@@ -144,16 +144,16 @@ TEMPLATE_TEST_CASE("Jacobian sweep: DOF 1-7", "[jacobian][sweep]", double, float
         {
             Eigen::Vector<Scalar, 2> q_fixed;
             q_fixed << Scalar(0.3), Scalar(-0.2);
-            auto fk_f = liepp::forward_kinematics(chain, q_fixed);
-            auto Js_f = liepp::space_jacobian(chain, fk_f);
-            auto Jb_f = liepp::body_jacobian(chain, fk_f);
+            auto fk_f = cartan::forward_kinematics(chain, q_fixed);
+            auto Js_f = cartan::space_jacobian(chain, fk_f);
+            auto Jb_f = cartan::body_jacobian(chain, fk_f);
 
             auto dyn_chain = chain.to_dynamic();
             Eigen::VectorX<Scalar> q_dyn(2);
             q_dyn << Scalar(0.3), Scalar(-0.2);
-            auto fk_d = liepp::forward_kinematics(dyn_chain, q_dyn);
-            auto Js_d = liepp::space_jacobian(dyn_chain, fk_d);
-            auto Jb_d = liepp::body_jacobian(dyn_chain, fk_d);
+            auto fk_d = cartan::forward_kinematics(dyn_chain, q_dyn);
+            auto Js_d = cartan::space_jacobian(dyn_chain, fk_d);
+            auto Jb_d = cartan::body_jacobian(dyn_chain, fk_d);
 
             REQUIRE((Js_f - Js_d).norm() < dyn_tol);
             REQUIRE((Jb_f - Jb_d).norm() < dyn_tol);
@@ -165,7 +165,7 @@ TEMPLATE_TEST_CASE("Jacobian sweep: DOF 1-7", "[jacobian][sweep]", double, float
     // ------------------------------------------------------------------
     SECTION("DOF 3")
     {
-        auto chain = liepp::test::make_3r_planar_chain<Scalar>();
+        auto chain = cartan::test::make_3r_planar_chain<Scalar>();
 
         SECTION("shape and finite-difference")
         {
@@ -178,16 +178,16 @@ TEMPLATE_TEST_CASE("Jacobian sweep: DOF 1-7", "[jacobian][sweep]", double, float
         {
             Eigen::Vector<Scalar, 3> q_fixed;
             q_fixed << Scalar(0.3), Scalar(-0.2), Scalar(0.5);
-            auto fk_f = liepp::forward_kinematics(chain, q_fixed);
-            auto Js_f = liepp::space_jacobian(chain, fk_f);
-            auto Jb_f = liepp::body_jacobian(chain, fk_f);
+            auto fk_f = cartan::forward_kinematics(chain, q_fixed);
+            auto Js_f = cartan::space_jacobian(chain, fk_f);
+            auto Jb_f = cartan::body_jacobian(chain, fk_f);
 
             auto dyn_chain = chain.to_dynamic();
             Eigen::VectorX<Scalar> q_dyn(3);
             q_dyn << Scalar(0.3), Scalar(-0.2), Scalar(0.5);
-            auto fk_d = liepp::forward_kinematics(dyn_chain, q_dyn);
-            auto Js_d = liepp::space_jacobian(dyn_chain, fk_d);
-            auto Jb_d = liepp::body_jacobian(dyn_chain, fk_d);
+            auto fk_d = cartan::forward_kinematics(dyn_chain, q_dyn);
+            auto Js_d = cartan::space_jacobian(dyn_chain, fk_d);
+            auto Jb_d = cartan::body_jacobian(dyn_chain, fk_d);
 
             REQUIRE((Js_f - Js_d).norm() < dyn_tol);
             REQUIRE((Jb_f - Jb_d).norm() < dyn_tol);
@@ -199,7 +199,7 @@ TEMPLATE_TEST_CASE("Jacobian sweep: DOF 1-7", "[jacobian][sweep]", double, float
     // ------------------------------------------------------------------
     SECTION("DOF 4")
     {
-        auto chain = liepp::test::make_4r_spatial_chain<Scalar>();
+        auto chain = cartan::test::make_4r_spatial_chain<Scalar>();
 
         SECTION("shape and finite-difference")
         {
@@ -212,16 +212,16 @@ TEMPLATE_TEST_CASE("Jacobian sweep: DOF 1-7", "[jacobian][sweep]", double, float
         {
             Eigen::Vector<Scalar, 4> q_fixed;
             q_fixed << Scalar(0.3), Scalar(-0.2), Scalar(0.5), Scalar(-0.1);
-            auto fk_f = liepp::forward_kinematics(chain, q_fixed);
-            auto Js_f = liepp::space_jacobian(chain, fk_f);
-            auto Jb_f = liepp::body_jacobian(chain, fk_f);
+            auto fk_f = cartan::forward_kinematics(chain, q_fixed);
+            auto Js_f = cartan::space_jacobian(chain, fk_f);
+            auto Jb_f = cartan::body_jacobian(chain, fk_f);
 
             auto dyn_chain = chain.to_dynamic();
             Eigen::VectorX<Scalar> q_dyn(4);
             q_dyn << Scalar(0.3), Scalar(-0.2), Scalar(0.5), Scalar(-0.1);
-            auto fk_d = liepp::forward_kinematics(dyn_chain, q_dyn);
-            auto Js_d = liepp::space_jacobian(dyn_chain, fk_d);
-            auto Jb_d = liepp::body_jacobian(dyn_chain, fk_d);
+            auto fk_d = cartan::forward_kinematics(dyn_chain, q_dyn);
+            auto Js_d = cartan::space_jacobian(dyn_chain, fk_d);
+            auto Jb_d = cartan::body_jacobian(dyn_chain, fk_d);
 
             REQUIRE((Js_f - Js_d).norm() < dyn_tol);
             REQUIRE((Jb_f - Jb_d).norm() < dyn_tol);
@@ -233,7 +233,7 @@ TEMPLATE_TEST_CASE("Jacobian sweep: DOF 1-7", "[jacobian][sweep]", double, float
     // ------------------------------------------------------------------
     SECTION("DOF 5")
     {
-        auto chain = liepp::test::make_puma560_5dof_chain<Scalar>();
+        auto chain = cartan::test::make_puma560_5dof_chain<Scalar>();
 
         SECTION("shape and finite-difference")
         {
@@ -246,16 +246,16 @@ TEMPLATE_TEST_CASE("Jacobian sweep: DOF 1-7", "[jacobian][sweep]", double, float
         {
             Eigen::Vector<Scalar, 5> q_fixed;
             q_fixed << Scalar(0.3), Scalar(-0.2), Scalar(0.5), Scalar(-0.1), Scalar(0.4);
-            auto fk_f = liepp::forward_kinematics(chain, q_fixed);
-            auto Js_f = liepp::space_jacobian(chain, fk_f);
-            auto Jb_f = liepp::body_jacobian(chain, fk_f);
+            auto fk_f = cartan::forward_kinematics(chain, q_fixed);
+            auto Js_f = cartan::space_jacobian(chain, fk_f);
+            auto Jb_f = cartan::body_jacobian(chain, fk_f);
 
             auto dyn_chain = chain.to_dynamic();
             Eigen::VectorX<Scalar> q_dyn(5);
             q_dyn << Scalar(0.3), Scalar(-0.2), Scalar(0.5), Scalar(-0.1), Scalar(0.4);
-            auto fk_d = liepp::forward_kinematics(dyn_chain, q_dyn);
-            auto Js_d = liepp::space_jacobian(dyn_chain, fk_d);
-            auto Jb_d = liepp::body_jacobian(dyn_chain, fk_d);
+            auto fk_d = cartan::forward_kinematics(dyn_chain, q_dyn);
+            auto Js_d = cartan::space_jacobian(dyn_chain, fk_d);
+            auto Jb_d = cartan::body_jacobian(dyn_chain, fk_d);
 
             REQUIRE((Js_f - Js_d).norm() < dyn_tol);
             REQUIRE((Jb_f - Jb_d).norm() < dyn_tol);
@@ -267,7 +267,7 @@ TEMPLATE_TEST_CASE("Jacobian sweep: DOF 1-7", "[jacobian][sweep]", double, float
     // ------------------------------------------------------------------
     SECTION("DOF 6 (UR3e)")
     {
-        auto chain = liepp::test::make_ur3e_chain<Scalar>();
+        auto chain = cartan::test::make_ur3e_chain<Scalar>();
 
         SECTION("shape and finite-difference")
         {
@@ -282,17 +282,17 @@ TEMPLATE_TEST_CASE("Jacobian sweep: DOF 1-7", "[jacobian][sweep]", double, float
             Eigen::Vector<Scalar, 6> q_fixed;
             q_fixed << Scalar(0.3), Scalar(-0.2), Scalar(0.5),
                        Scalar(-0.1), Scalar(0.4), Scalar(-0.3);
-            auto fk_f = liepp::forward_kinematics(chain, q_fixed);
-            auto Js_f = liepp::space_jacobian(chain, fk_f);
-            auto Jb_f = liepp::body_jacobian(chain, fk_f);
+            auto fk_f = cartan::forward_kinematics(chain, q_fixed);
+            auto Js_f = cartan::space_jacobian(chain, fk_f);
+            auto Jb_f = cartan::body_jacobian(chain, fk_f);
 
             auto dyn_chain = chain.to_dynamic();
             Eigen::VectorX<Scalar> q_dyn(6);
             q_dyn << Scalar(0.3), Scalar(-0.2), Scalar(0.5),
                      Scalar(-0.1), Scalar(0.4), Scalar(-0.3);
-            auto fk_d = liepp::forward_kinematics(dyn_chain, q_dyn);
-            auto Js_d = liepp::space_jacobian(dyn_chain, fk_d);
-            auto Jb_d = liepp::body_jacobian(dyn_chain, fk_d);
+            auto fk_d = cartan::forward_kinematics(dyn_chain, q_dyn);
+            auto Js_d = cartan::space_jacobian(dyn_chain, fk_d);
+            auto Jb_d = cartan::body_jacobian(dyn_chain, fk_d);
 
             REQUIRE((Js_f - Js_d).norm() < dyn_tol);
             REQUIRE((Jb_f - Jb_d).norm() < dyn_tol);
@@ -304,7 +304,7 @@ TEMPLATE_TEST_CASE("Jacobian sweep: DOF 1-7", "[jacobian][sweep]", double, float
     // ------------------------------------------------------------------
     SECTION("DOF 6 (KR6 SIXX)")
     {
-        auto chain = liepp::test::make_kr6_sixx_chain<Scalar>();
+        auto chain = cartan::test::make_kr6_sixx_chain<Scalar>();
 
         SECTION("shape and finite-difference")
         {
@@ -319,17 +319,17 @@ TEMPLATE_TEST_CASE("Jacobian sweep: DOF 1-7", "[jacobian][sweep]", double, float
             Eigen::Vector<Scalar, 6> q_fixed;
             q_fixed << Scalar(0.3), Scalar(-0.2), Scalar(0.5),
                        Scalar(-0.1), Scalar(0.4), Scalar(-0.3);
-            auto fk_f = liepp::forward_kinematics(chain, q_fixed);
-            auto Js_f = liepp::space_jacobian(chain, fk_f);
-            auto Jb_f = liepp::body_jacobian(chain, fk_f);
+            auto fk_f = cartan::forward_kinematics(chain, q_fixed);
+            auto Js_f = cartan::space_jacobian(chain, fk_f);
+            auto Jb_f = cartan::body_jacobian(chain, fk_f);
 
             auto dyn_chain = chain.to_dynamic();
             Eigen::VectorX<Scalar> q_dyn(6);
             q_dyn << Scalar(0.3), Scalar(-0.2), Scalar(0.5),
                      Scalar(-0.1), Scalar(0.4), Scalar(-0.3);
-            auto fk_d = liepp::forward_kinematics(dyn_chain, q_dyn);
-            auto Js_d = liepp::space_jacobian(dyn_chain, fk_d);
-            auto Jb_d = liepp::body_jacobian(dyn_chain, fk_d);
+            auto fk_d = cartan::forward_kinematics(dyn_chain, q_dyn);
+            auto Js_d = cartan::space_jacobian(dyn_chain, fk_d);
+            auto Jb_d = cartan::body_jacobian(dyn_chain, fk_d);
 
             REQUIRE((Js_f - Js_d).norm() < dyn_tol);
             REQUIRE((Jb_f - Jb_d).norm() < dyn_tol);
@@ -341,7 +341,7 @@ TEMPLATE_TEST_CASE("Jacobian sweep: DOF 1-7", "[jacobian][sweep]", double, float
     // ------------------------------------------------------------------
     SECTION("DOF 7")
     {
-        auto chain = liepp::test::make_lbr_iiwa_chain<Scalar>();
+        auto chain = cartan::test::make_lbr_iiwa_chain<Scalar>();
 
         SECTION("shape and finite-difference")
         {
@@ -356,17 +356,17 @@ TEMPLATE_TEST_CASE("Jacobian sweep: DOF 1-7", "[jacobian][sweep]", double, float
             Eigen::Vector<Scalar, 7> q_fixed;
             q_fixed << Scalar(0.3), Scalar(-0.2), Scalar(0.5), Scalar(-0.1),
                        Scalar(0.4), Scalar(-0.3), Scalar(0.2);
-            auto fk_f = liepp::forward_kinematics(chain, q_fixed);
-            auto Js_f = liepp::space_jacobian(chain, fk_f);
-            auto Jb_f = liepp::body_jacobian(chain, fk_f);
+            auto fk_f = cartan::forward_kinematics(chain, q_fixed);
+            auto Js_f = cartan::space_jacobian(chain, fk_f);
+            auto Jb_f = cartan::body_jacobian(chain, fk_f);
 
             auto dyn_chain = chain.to_dynamic();
             Eigen::VectorX<Scalar> q_dyn(7);
             q_dyn << Scalar(0.3), Scalar(-0.2), Scalar(0.5), Scalar(-0.1),
                      Scalar(0.4), Scalar(-0.3), Scalar(0.2);
-            auto fk_d = liepp::forward_kinematics(dyn_chain, q_dyn);
-            auto Js_d = liepp::space_jacobian(dyn_chain, fk_d);
-            auto Jb_d = liepp::body_jacobian(dyn_chain, fk_d);
+            auto fk_d = cartan::forward_kinematics(dyn_chain, q_dyn);
+            auto Js_d = cartan::space_jacobian(dyn_chain, fk_d);
+            auto Jb_d = cartan::body_jacobian(dyn_chain, fk_d);
 
             REQUIRE((Js_f - Js_d).norm() < dyn_tol);
             REQUIRE((Jb_f - Jb_d).norm() < dyn_tol);

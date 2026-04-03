@@ -1,13 +1,13 @@
-#ifndef HPP_GUARD_LIEPP_FRAMES_TRANSFORM_H
-#define HPP_GUARD_LIEPP_FRAMES_TRANSFORM_H
+#ifndef HPP_GUARD_CARTAN_FRAMES_TRANSFORM_H
+#define HPP_GUARD_CARTAN_FRAMES_TRANSFORM_H
 
-#include "liepp/lie/se3.h"
-#include "liepp/lie/policy.h"
+#include "cartan/lie/se3.h"
+#include "cartan/lie/policy.h"
 
 #include <string>
 #include <expected>
 
-namespace liepp
+namespace cartan
 {
 
 /// Compile-time frame-tagged wrapper over SE(3).
@@ -84,6 +84,6 @@ struct transform
     }
 };
 
-} // namespace liepp
+}
 
 #endif

@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_SERIAL_IK_DETAIL_NABLAPP_LEAST_SQUARES_PROBLEM_H
-#define HPP_GUARD_LIEPP_SERIAL_IK_DETAIL_NABLAPP_LEAST_SQUARES_PROBLEM_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_NABLAPP_LEAST_SQUARES_PROBLEM_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_NABLAPP_LEAST_SQUARES_PROBLEM_H
 
 /// @file detail/nablapp_least_squares_problem.h
 /// @brief Least-squares adapter for nablapp LM solver.
@@ -8,15 +8,15 @@
 /// Exposes the 6-element SE(3) body-frame error as the residual vector
 /// and the body Jacobian as the LM Jacobian.
 
-#include "liepp/serial/fk/jacobian.h"
-#include "liepp/serial/fk/forward_kinematics.h"
+#include "cartan/serial/fk/jacobian.h"
+#include "cartan/serial/fk/forward_kinematics.h"
 
-#include "liepp/lie/se3.h"
-#include "liepp/serial/chain/chain_concept.h"
+#include "cartan/lie/se3.h"
+#include "cartan/serial/chain/chain_concept.h"
 
 #include <Eigen/Core>
 
-namespace liepp::detail
+namespace cartan::detail
 {
 
 /// Least-squares IK problem adapter for nablapp LM solver.

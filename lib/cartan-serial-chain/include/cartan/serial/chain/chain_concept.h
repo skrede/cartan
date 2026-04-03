@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_SERIAL_CHAIN_CHAIN_CONCEPT_H
-#define HPP_GUARD_LIEPP_SERIAL_CHAIN_CHAIN_CONCEPT_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_CHAIN_CHAIN_CONCEPT_H
+#define HPP_GUARD_CARTAN_SERIAL_CHAIN_CHAIN_CONCEPT_H
 
 /// @file chain_concept.h
 /// @brief Concept constraining serial chain types for FK/Jacobian/IK consumers.
@@ -9,20 +9,20 @@
 /// home configuration, per-joint axis access, bulk axes/limits access, joint count,
 /// scalar type, and compile-time joint count constant.
 
-#include "liepp/serial/chain/screw_axis.h"
+#include "cartan/serial/chain/screw_axis.h"
 
-#include "liepp/lie/se3.h"
+#include "cartan/lie/se3.h"
 
 #include <concepts>
 
-namespace liepp
+namespace cartan
 {
 
 /// Concept for a serial kinematic chain.
 ///
 /// Requires the minimal interface consumed by FK, Jacobian, and IK:
 ///   - scalar_type: the floating-point type used throughout
-///   - joints: static constexpr int (liepp::dynamic or compile-time count)
+///   - joints: static constexpr int (cartan::dynamic or compile-time count)
 ///   - home(): the end-effector home configuration (M matrix)
 ///   - num_joints(): runtime joint count
 ///   - axis(i): per-element screw axis access

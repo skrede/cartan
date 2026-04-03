@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_SERIAL_CHAIN_JOINT_LIMITS_H
-#define HPP_GUARD_LIEPP_SERIAL_CHAIN_JOINT_LIMITS_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_CHAIN_JOINT_LIMITS_H
+#define HPP_GUARD_CARTAN_SERIAL_CHAIN_JOINT_LIMITS_H
 
 /// @file joint_limits.h
 /// @brief Joint limits for kinematic chain joints.
@@ -9,7 +9,7 @@
 
 #include <optional>
 
-namespace liepp
+namespace cartan
 {
 
 /// Joint limits with required position bounds and optional dynamic limits.
@@ -31,6 +31,6 @@ struct joint_limits
     }
 };
 
-} // namespace liepp
+}
 
 #endif

@@ -1,13 +1,13 @@
-#ifndef HPP_GUARD_LIEPP_FRAMES_ROTATION_H
-#define HPP_GUARD_LIEPP_FRAMES_ROTATION_H
+#ifndef HPP_GUARD_CARTAN_FRAMES_ROTATION_H
+#define HPP_GUARD_CARTAN_FRAMES_ROTATION_H
 
-#include "liepp/lie/so3.h"
-#include "liepp/lie/policy.h"
+#include "cartan/lie/so3.h"
+#include "cartan/lie/policy.h"
 
 #include <string>
 #include <expected>
 
-namespace liepp
+namespace cartan
 {
 
 /// Compile-time frame-tagged wrapper over SO(3).
@@ -91,6 +91,6 @@ struct rotation
     }
 };
 
-} // namespace liepp
+}
 
 #endif

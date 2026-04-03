@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_LIE_TWIST_H
-#define HPP_GUARD_LIEPP_LIE_TWIST_H
+#ifndef HPP_GUARD_CARTAN_LIE_TWIST_H
+#define HPP_GUARD_CARTAN_LIE_TWIST_H
 
 /// @file twist.h
 /// @brief Twist (spatial velocity) representation and screw motion parameters.
@@ -12,15 +12,15 @@
 /// Reference: Lynch & Park, Modern Robotics, Section 3.3, p. 86-106.
 ///            Barfoot, State Estimation for Robotics, Ch. 8, p. 280-300.
 
-#include "liepp/types.h"
-#include "liepp/detail/epsilon.h"
+#include "cartan/types.h"
+#include "cartan/detail/epsilon.h"
 
-#include "liepp/lie/se3.h"
-#include "liepp/lie/axis_angle.h"
+#include "cartan/lie/se3.h"
+#include "cartan/lie/axis_angle.h"
 
 #include <cmath>
 
-namespace liepp
+namespace cartan
 {
 
 /// Twist (spatial velocity) representation: V = (omega, v).
@@ -222,6 +222,6 @@ template <typename Scalar>
     return tw;
 }
 
-} // namespace liepp
+}
 
 #endif

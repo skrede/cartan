@@ -6,7 +6,7 @@
 ///
 /// All robot geometries expressed as Product of Exponentials screw parameters.
 /// This file is standalone from test infrastructure (D-14).
-/// Chain factories cover ~10 robots in both liepp PoE and KDL representations (D-11, D-12).
+/// Chain factories cover ~10 robots in both cartan PoE and KDL representations (D-11, D-12).
 
 #include "../profiling/chain_factories.h"
 
@@ -16,7 +16,7 @@
 #include <kdl/segment.hpp>
 #include <kdl/jntarray.hpp>
 
-namespace liepp::benchmarks
+namespace cartan::benchmarks
 {
 
 // ===========================================================================
@@ -279,8 +279,8 @@ inline void make_kuka_lwr4_kdl_limits(KDL::JntArray& q_min, KDL::JntArray& q_max
 // KDL frame conversion
 // ===========================================================================
 
-/// Convert liepp SE(3) pose to KDL::Frame.
-inline KDL::Frame se3_to_kdl_frame(const liepp::se3<double>& pose)
+/// Convert cartan SE(3) pose to KDL::Frame.
+inline KDL::Frame se3_to_kdl_frame(const cartan::se3<double>& pose)
 {
     auto R = pose.rotation().matrix();
     auto t = pose.translation();

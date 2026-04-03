@@ -1,15 +1,15 @@
-#include "liepp/serial/ik/detail/nablapp_problem.h"
-#include "liepp/serial/ik/detail/nablapp_unconstrained_problem.h"
-#include "liepp/serial/ik/detail/nablapp_constrained_problem.h"
-#include "liepp/serial/ik/detail/nablapp_least_squares_problem.h"
+#include "cartan/serial/ik/detail/nablapp_problem.h"
+#include "cartan/serial/ik/detail/nablapp_unconstrained_problem.h"
+#include "cartan/serial/ik/detail/nablapp_constrained_problem.h"
+#include "cartan/serial/ik/detail/nablapp_least_squares_problem.h"
 
-#include "liepp/serial/ik/error_weight.h"
+#include "cartan/serial/ik/error_weight.h"
 
-#include "liepp/lie/se3.h"
-#include "liepp/lie/so3.h"
-#include "liepp/serial/chain/screw_axis.h"
-#include "liepp/serial/chain/joint_limits.h"
-#include "liepp/serial/chain/kinematic_chain.h"
+#include "cartan/lie/se3.h"
+#include "cartan/lie/so3.h"
+#include "cartan/serial/chain/screw_axis.h"
+#include "cartan/serial/chain/joint_limits.h"
+#include "cartan/serial/chain/kinematic_chain.h"
 
 #include <nablapp/formulation/concepts.h>
 
@@ -18,7 +18,7 @@
 #include <cmath>
 #include <numbers>
 
-namespace spp = liepp;
+namespace spp = cartan;
 
 static spp::kinematic_chain<double, 6> make_chain()
 {

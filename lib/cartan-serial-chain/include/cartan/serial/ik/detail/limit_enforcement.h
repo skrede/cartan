@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_SERIAL_IK_DETAIL_LIMIT_ENFORCEMENT_H
-#define HPP_GUARD_LIEPP_SERIAL_IK_DETAIL_LIMIT_ENFORCEMENT_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_LIMIT_ENFORCEMENT_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_LIMIT_ENFORCEMENT_H
 
 /// @file detail/limit_enforcement.h
 /// @brief Shared limit enforcement utility for IK solve policies.
@@ -8,18 +8,18 @@
 /// free function template. Policies call this in their step() method
 /// instead of relying on post-hoc enforcement by the solver.
 
-#include "liepp/serial/ik/limits_policy.h"
+#include "cartan/serial/ik/limits_policy.h"
 
-#include "liepp/serial/chain/joint_state.h"
-#include "liepp/serial/fk/jacobian.h"
-#include "liepp/serial/chain/chain_concept.h"
-#include "liepp/serial/fk/forward_kinematics.h"
+#include "cartan/serial/chain/joint_state.h"
+#include "cartan/serial/fk/jacobian.h"
+#include "cartan/serial/chain/chain_concept.h"
+#include "cartan/serial/fk/forward_kinematics.h"
 
 #include <Eigen/SVD>
 
 #include <concepts>
 
-namespace liepp
+namespace cartan
 {
 namespace detail
 {

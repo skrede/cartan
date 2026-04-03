@@ -1,13 +1,13 @@
-#ifndef HPP_GUARD_LIEPP_ANALYTICAL_ANALYTICAL_SOLVER_H
-#define HPP_GUARD_LIEPP_ANALYTICAL_ANALYTICAL_SOLVER_H
+#ifndef HPP_GUARD_CARTAN_ANALYTICAL_ANALYTICAL_SOLVER_H
+#define HPP_GUARD_CARTAN_ANALYTICAL_ANALYTICAL_SOLVER_H
 
-#include "liepp/analytical/analytical_types.h"
+#include "cartan/analytical/analytical_types.h"
 
-#include "liepp/lie/se3.h"
+#include "cartan/lie/se3.h"
 
 #include <concepts>
 
-namespace liepp
+namespace cartan
 {
 
 template <typename S>

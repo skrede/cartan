@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_SERIAL_IK_PROJECTED_LM_SOLVE_POLICY_H
-#define HPP_GUARD_LIEPP_SERIAL_IK_PROJECTED_LM_SOLVE_POLICY_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_PROJECTED_LM_SOLVE_POLICY_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_PROJECTED_LM_SOLVE_POLICY_H
 
 /// @file projected_lm_solve_policy.h
 /// @brief Projected Levenberg-Marquardt IK solve policy with active-set box
@@ -14,21 +14,21 @@
 ///            Nocedal & Wright, Numerical Optimization, Ch. 4 (dogleg).
 ///            Decisions D-01, D-02, D-03, SPEED-01, SPEED-02.
 
-#include "liepp/types.h"
+#include "cartan/types.h"
 
-#include "liepp/serial/ik/ik_types.h"
-#include "liepp/serial/ik/limits_policy.h"
-#include "liepp/serial/ik/error_weight.h"
-#include "liepp/serial/ik/ik_solve_policy.h"
-#include "liepp/serial/ik/detail/convergence.h"
-#include "liepp/serial/ik/detail/stall_detection.h"
-#include "liepp/serial/ik/detail/limit_enforcement.h"
+#include "cartan/serial/ik/ik_types.h"
+#include "cartan/serial/ik/limits_policy.h"
+#include "cartan/serial/ik/error_weight.h"
+#include "cartan/serial/ik/ik_solve_policy.h"
+#include "cartan/serial/ik/detail/convergence.h"
+#include "cartan/serial/ik/detail/stall_detection.h"
+#include "cartan/serial/ik/detail/limit_enforcement.h"
 
-#include "liepp/lie/se3.h"
-#include "liepp/serial/fk/jacobian.h"
-#include "liepp/serial/chain/joint_state.h"
-#include "liepp/serial/chain/chain_concept.h"
-#include "liepp/serial/fk/forward_kinematics.h"
+#include "cartan/lie/se3.h"
+#include "cartan/serial/fk/jacobian.h"
+#include "cartan/serial/chain/joint_state.h"
+#include "cartan/serial/chain/chain_concept.h"
+#include "cartan/serial/fk/forward_kinematics.h"
 
 #include <Eigen/Dense>
 
@@ -36,7 +36,7 @@
 #include <vector>
 #include <algorithm>
 
-namespace liepp
+namespace cartan
 {
 
 /// Projected Levenberg-Marquardt IK solve policy with active-set box projection.

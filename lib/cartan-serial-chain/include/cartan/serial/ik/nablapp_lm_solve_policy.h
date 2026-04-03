@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_SERIAL_IK_NABLAPP_LM_SOLVE_POLICY_H
-#define HPP_GUARD_LIEPP_SERIAL_IK_NABLAPP_LM_SOLVE_POLICY_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_NABLAPP_LM_SOLVE_POLICY_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_NABLAPP_LM_SOLVE_POLICY_H
 
 /// @file nablapp_lm_solve_policy.h
 /// @brief nablapp-backed Levenberg-Marquardt IK solve policy (least-squares).
@@ -11,18 +11,18 @@
 ///
 /// Reference: Nielsen (1999), Levenberg-Marquardt method.
 
-#include "liepp/serial/ik/ik_types.h"
-#include "liepp/serial/ik/limits_policy.h"
-#include "liepp/serial/ik/ik_solve_policy.h"
-#include "liepp/serial/ik/detail/convergence.h"
-#include "liepp/serial/ik/detail/stall_detection.h"
-#include "liepp/serial/ik/detail/limit_enforcement.h"
-#include "liepp/serial/ik/detail/nablapp_least_squares_problem.h"
+#include "cartan/serial/ik/ik_types.h"
+#include "cartan/serial/ik/limits_policy.h"
+#include "cartan/serial/ik/ik_solve_policy.h"
+#include "cartan/serial/ik/detail/convergence.h"
+#include "cartan/serial/ik/detail/stall_detection.h"
+#include "cartan/serial/ik/detail/limit_enforcement.h"
+#include "cartan/serial/ik/detail/nablapp_least_squares_problem.h"
 
-#include "liepp/lie/se3.h"
-#include "liepp/serial/chain/joint_state.h"
-#include "liepp/serial/chain/chain_concept.h"
-#include "liepp/serial/fk/forward_kinematics.h"
+#include "cartan/lie/se3.h"
+#include "cartan/serial/chain/joint_state.h"
+#include "cartan/serial/chain/chain_concept.h"
+#include "cartan/serial/fk/forward_kinematics.h"
 
 #include <nablapp/solver/options.h>
 #include <nablapp/solver/lm_policy.h>
@@ -35,7 +35,7 @@
 #include <optional>
 #include <vector>
 
-namespace liepp
+namespace cartan
 {
 
 /// nablapp-backed Levenberg-Marquardt solve policy for IK.
@@ -45,7 +45,7 @@ namespace liepp
 /// Joint limits are enforced via clamping after each step since LM
 /// is unconstrained.
 ///
-/// This is the nablapp-backed LM. The native liepp implementation
+/// This is the nablapp-backed LM. The native cartan implementation
 /// is available as lm_solve_policy.
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 class nablapp_lm_solve_policy

@@ -1,19 +1,19 @@
-#ifndef HPP_GUARD_LIEPP_SERIAL_CHAIN_JOINT_STATE_H
-#define HPP_GUARD_LIEPP_SERIAL_CHAIN_JOINT_STATE_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_CHAIN_JOINT_STATE_H
+#define HPP_GUARD_CARTAN_SERIAL_CHAIN_JOINT_STATE_H
 
 /// @file joint_state.h
 /// @brief Joint state (position and optional velocity) for kinematic chains.
 ///
-/// Parameterized by joint count N (fixed or liepp::dynamic) and scalar type.
+/// Parameterized by joint count N (fixed or cartan::dynamic) and scalar type.
 
-#include "liepp/serial/chain/storage_trait.h"
+#include "cartan/serial/chain/storage_trait.h"
 
 #include <Eigen/Dense>
 
 #include <optional>
 #include <type_traits>
 
-namespace liepp
+namespace cartan
 {
 
 /// Joint state holding position vector and optional velocity vector.
@@ -51,6 +51,6 @@ struct joint_state
     }
 };
 
-} // namespace liepp
+}
 
 #endif

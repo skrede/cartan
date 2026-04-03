@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_LIE_AXIS_ANGLE_H
-#define HPP_GUARD_LIEPP_LIE_AXIS_ANGLE_H
+#ifndef HPP_GUARD_CARTAN_LIE_AXIS_ANGLE_H
+#define HPP_GUARD_CARTAN_LIE_AXIS_ANGLE_H
 
 /// @file axis_angle.h
 /// @brief Axis-angle representation and screw parameters for SO(3).
@@ -11,15 +11,15 @@
 ///            Lynch & Park, Modern Robotics, Def. 3.24, p. 102 (screw axis).
 ///            Barfoot, State Estimation for Robotics, Ch. 8, p. 280-300.
 
-#include "liepp/types.h"
-#include "liepp/detail/epsilon.h"
+#include "cartan/types.h"
+#include "cartan/detail/epsilon.h"
 
-#include "liepp/lie/so3.h"
+#include "cartan/lie/so3.h"
 
 #include <cmath>
 #include <limits>
 
-namespace liepp
+namespace cartan
 {
 
 /// Axis-angle representation of a 3D rotation.
@@ -119,6 +119,6 @@ template <typename Scalar>
     return screw_params<Scalar>{q, omega_hat, h};
 }
 
-} // namespace liepp
+}
 
 #endif

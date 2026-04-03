@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_SERIAL_IK_DETAIL_NLOPT_COMMON_H
-#define HPP_GUARD_LIEPP_SERIAL_IK_DETAIL_NLOPT_COMMON_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_NLOPT_COMMON_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_NLOPT_COMMON_H
 
 /// @file detail/nlopt_common.h
 /// @brief Shared NLopt wrapper helpers for NLopt-backed IK solve policies.
@@ -8,22 +8,22 @@
 /// convergence checking, perturbation, and limit enforcement utilities shared
 /// between nlopt_slsqp_solve_policy and nlopt_bobyqa_solve_policy.
 ///
-/// All functions live in liepp::detail and are guarded by LIEPP_HAS_NLOPT.
+/// All functions live in cartan::detail and are guarded by CARTAN_HAS_NLOPT.
 ///
 /// Reference: Decision D-17 (extract shared NLopt boilerplate).
 
-#ifdef LIEPP_HAS_NLOPT
+#ifdef CARTAN_HAS_NLOPT
 
-#include "liepp/types.h"
+#include "cartan/types.h"
 
-#include "liepp/serial/ik/ik_types.h"
-#include "liepp/serial/ik/limits_policy.h"
-#include "liepp/serial/ik/detail/limit_enforcement.h"
+#include "cartan/serial/ik/ik_types.h"
+#include "cartan/serial/ik/limits_policy.h"
+#include "cartan/serial/ik/detail/limit_enforcement.h"
 
-#include "liepp/lie/se3.h"
-#include "liepp/serial/chain/joint_state.h"
-#include "liepp/serial/chain/kinematic_chain.h"
-#include "liepp/serial/fk/forward_kinematics.h"
+#include "cartan/lie/se3.h"
+#include "cartan/serial/chain/joint_state.h"
+#include "cartan/serial/chain/kinematic_chain.h"
+#include "cartan/serial/fk/forward_kinematics.h"
 
 #include <nlopt.hpp>
 
@@ -33,7 +33,7 @@
 #include <vector>
 #include <algorithm>
 
-namespace liepp
+namespace cartan
 {
 namespace detail
 {

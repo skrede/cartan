@@ -1,4 +1,4 @@
-#include "liepp/analytical/paden_kahan.h"
+#include "cartan/analytical/paden_kahan.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -6,7 +6,7 @@
 #include <cmath>
 #include <numbers>
 
-using namespace liepp;
+using namespace cartan;
 using Catch::Matchers::WithinAbs;
 
 static constexpr double tolerance = 1e-10;

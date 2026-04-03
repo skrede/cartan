@@ -1,13 +1,13 @@
-#ifndef HPP_GUARD_LIEPP_SERIAL_IK_DETAIL_STALL_DETECTION_H
-#define HPP_GUARD_LIEPP_SERIAL_IK_DETAIL_STALL_DETECTION_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_STALL_DETECTION_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_STALL_DETECTION_H
 
-#include "liepp/serial/ik/ik_types.h"
+#include "cartan/serial/ik/ik_types.h"
 
 #include <cmath>
 #include <vector>
 #include <algorithm>
 
-namespace liepp::detail
+namespace cartan::detail
 {
 
 /// Check for stall or divergence in iterative IK solvers.

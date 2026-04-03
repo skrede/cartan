@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_SERIAL_IK_DETAIL_NABLAPP_CONSTRAINED_PROBLEM_H
-#define HPP_GUARD_LIEPP_SERIAL_IK_DETAIL_NABLAPP_CONSTRAINED_PROBLEM_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_NABLAPP_CONSTRAINED_PROBLEM_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_NABLAPP_CONSTRAINED_PROBLEM_H
 
 /// @file detail/nablapp_constrained_problem.h
 /// @brief Inequality-constrained adapter (formulation B) for nablapp solvers.
@@ -8,17 +8,17 @@
 /// nablapp::constrained. Joint limits are expressed as 2n inequality
 /// constraints: q_i - q_min >= 0 and q_max - q_i >= 0.
 
-#include "liepp/serial/ik/error_weight.h"
-#include "liepp/serial/ik/analytical_gradient.h"
+#include "cartan/serial/ik/error_weight.h"
+#include "cartan/serial/ik/analytical_gradient.h"
 
-#include "liepp/lie/se3.h"
-#include "liepp/serial/chain/chain_concept.h"
+#include "cartan/lie/se3.h"
+#include "cartan/serial/chain/chain_concept.h"
 
 #include <Eigen/Core>
 
 #include <cstddef>
 
-namespace liepp::detail
+namespace cartan::detail
 {
 
 /// Inequality-constrained IK problem adapter for nablapp (formulation B).

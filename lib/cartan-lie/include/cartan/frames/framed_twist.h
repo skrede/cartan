@@ -1,11 +1,11 @@
-#ifndef HPP_GUARD_LIEPP_FRAMES_FRAMED_TWIST_H
-#define HPP_GUARD_LIEPP_FRAMES_FRAMED_TWIST_H
+#ifndef HPP_GUARD_CARTAN_FRAMES_FRAMED_TWIST_H
+#define HPP_GUARD_CARTAN_FRAMES_FRAMED_TWIST_H
 
-#include "liepp/frames/transform.h"
+#include "cartan/frames/transform.h"
 
-#include "liepp/lie/twist.h"
+#include "cartan/lie/twist.h"
 
-namespace liepp
+namespace cartan
 {
 
 /// Compile-time frame-tagged wrapper over twist.
@@ -55,6 +55,6 @@ adjoint_map(const transform<From, To, Scalar, Policy>& T,
     return framed_twist<From, Scalar>::from_vector(result);
 }
 
-} // namespace liepp
+}
 
 #endif

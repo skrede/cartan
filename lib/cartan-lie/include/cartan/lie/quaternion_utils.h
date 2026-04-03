@@ -1,20 +1,20 @@
-#ifndef HPP_GUARD_LIEPP_LIE_QUATERNION_UTILS_H
-#define HPP_GUARD_LIEPP_LIE_QUATERNION_UTILS_H
+#ifndef HPP_GUARD_CARTAN_LIE_QUATERNION_UTILS_H
+#define HPP_GUARD_CARTAN_LIE_QUATERNION_UTILS_H
 
 /// @file quaternion_utils.h
 /// @brief Quaternion utility functions supplementing Eigen's quaternion type.
 ///
 /// These functions delegate to Eigen where possible, following the
-/// "Don't Hand-Roll" principle from the liepp design research (D-12).
+/// "Don't Hand-Roll" principle from the cartan design research (D-12).
 /// Named constructors from_wxyz / from_xyzw / to_wxyz provide explicit
 /// serialization order per ctrlpp convention (w-first external API).
 ///
 /// Reference: Eigen quaternion documentation; Barfoot, State Estimation
 ///            for Robotics, Section 8.1, p. 280-282.
 
-#include "liepp/types.h"
+#include "cartan/types.h"
 
-namespace liepp
+namespace cartan
 {
 
 /// Spherical linear interpolation between two unit quaternions.
@@ -101,6 +101,6 @@ template <typename Scalar>
     return q1 * q2;
 }
 
-} // namespace liepp
+}
 
 #endif

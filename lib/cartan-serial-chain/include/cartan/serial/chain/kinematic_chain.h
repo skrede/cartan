@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_SERIAL_CHAIN_KINEMATIC_CHAIN_H
-#define HPP_GUARD_LIEPP_SERIAL_CHAIN_KINEMATIC_CHAIN_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_CHAIN_KINEMATIC_CHAIN_H
+#define HPP_GUARD_CARTAN_SERIAL_CHAIN_KINEMATIC_CHAIN_H
 
 /// @file kinematic_chain.h
 /// @brief Product of Exponentials (PoE) kinematic chain model.
@@ -13,22 +13,22 @@
 ///
 /// Reference: Lynch & Park, Modern Robotics, Ch. 4, p. 119-158.
 
-#include "liepp/serial/chain/screw_axis.h"
-#include "liepp/serial/chain/joint_limits.h"
-#include "liepp/serial/chain/storage_trait.h"
-#include "liepp/serial/chain/chain_concept.h"
+#include "cartan/serial/chain/screw_axis.h"
+#include "cartan/serial/chain/joint_limits.h"
+#include "cartan/serial/chain/storage_trait.h"
+#include "cartan/serial/chain/chain_concept.h"
 
-#include "liepp/lie/se3.h"
+#include "cartan/lie/se3.h"
 
 #include <vector>
 #include <cassert>
 #include <type_traits>
 
-namespace liepp
+namespace cartan
 {
 
 /// Kinematic chain in Product of Exponentials form.
-/// @tparam N  Number of joints (compile-time), or liepp::dynamic for runtime.
+/// @tparam N  Number of joints (compile-time), or cartan::dynamic for runtime.
 /// @tparam Scalar  Floating-point type.
 ///
 /// Lynch & Park, Modern Robotics, Eq. 4.10, p. 138:

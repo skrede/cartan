@@ -1,18 +1,18 @@
-#ifndef HPP_GUARD_LIEPP_ANALYTICAL_DETAIL_WRIST_CENTER_H
-#define HPP_GUARD_LIEPP_ANALYTICAL_DETAIL_WRIST_CENTER_H
+#ifndef HPP_GUARD_CARTAN_ANALYTICAL_DETAIL_WRIST_CENTER_H
+#define HPP_GUARD_CARTAN_ANALYTICAL_DETAIL_WRIST_CENTER_H
 
-#include "liepp/analytical/analytical_types.h"
+#include "cartan/analytical/analytical_types.h"
 
-#include "liepp/serial/chain/screw_axis.h"
+#include "cartan/serial/chain/screw_axis.h"
 
-#include "liepp/lie/se3.h"
-#include "liepp/detail/epsilon.h"
-#include "liepp/types.h"
+#include "cartan/lie/se3.h"
+#include "cartan/detail/epsilon.h"
+#include "cartan/types.h"
 
 #include <cmath>
 #include <expected>
 
-namespace liepp::detail
+namespace cartan::detail
 {
 
 /// Compute wrist center position from target pose and tool offset.

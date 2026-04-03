@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_SERIAL_IK_LIMITS_POLICY_H
-#define HPP_GUARD_LIEPP_SERIAL_IK_LIMITS_POLICY_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_LIMITS_POLICY_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_LIMITS_POLICY_H
 
 /// @file limits_policy.h
 /// @brief Joint limit enforcement policies for IK solvers.
@@ -10,16 +10,16 @@
 ///
 /// Reference: Lynch & Park, Modern Robotics, Ch. 6.3 (null-space).
 
-#include "liepp/serial/chain/joint_state.h"
-#include "liepp/serial/fk/jacobian.h"
-#include "liepp/serial/chain/chain_concept.h"
+#include "cartan/serial/chain/joint_state.h"
+#include "cartan/serial/fk/jacobian.h"
+#include "cartan/serial/chain/chain_concept.h"
 
 #include <Eigen/SVD>
 
 #include <concepts>
 #include <algorithm>
 
-namespace liepp
+namespace cartan
 {
 
 /// Concept detecting whether a limits policy has an extended enforce signature

@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_SERIAL_FK_FORWARD_KINEMATICS_H
-#define HPP_GUARD_LIEPP_SERIAL_FK_FORWARD_KINEMATICS_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_FK_FORWARD_KINEMATICS_H
+#define HPP_GUARD_CARTAN_SERIAL_FK_FORWARD_KINEMATICS_H
 
 /// @file forward_kinematics.h
 /// @brief Forward kinematics via Product of Exponentials (PoE).
@@ -14,18 +14,18 @@
 ///
 /// Reference: Lynch & Park, Modern Robotics, Ch. 4, p. 119-158.
 
-#include "liepp/serial/fk/fk_result.h"
-#include "liepp/serial/fk/detail/axis_specializations.h"
+#include "cartan/serial/fk/fk_result.h"
+#include "cartan/serial/fk/detail/axis_specializations.h"
 
-#include "liepp/serial/chain/joint_state.h"
-#include "liepp/serial/chain/chain_concept.h"
-#include "liepp/serial/chain/static_chain.h"
-#include "liepp/serial/chain/kinematic_chain.h"
+#include "cartan/serial/chain/joint_state.h"
+#include "cartan/serial/chain/chain_concept.h"
+#include "cartan/serial/chain/static_chain.h"
+#include "cartan/serial/chain/kinematic_chain.h"
 
 #include <tuple>
 #include <utility>
 
-namespace liepp
+namespace cartan
 {
 
 namespace detail
@@ -109,7 +109,7 @@ fk_result<Scalar, N> fk_unrolled(
 /// Lynch & Park, Modern Robotics, Eq. 4.10, p. 138:
 ///   T(q) = exp([S1]q1) * ... * exp([Sn]qn) * M
 ///
-/// @tparam N      Number of joints (compile-time), or liepp::dynamic.
+/// @tparam N      Number of joints (compile-time), or cartan::dynamic.
 /// @tparam Scalar Floating-point type.
 /// @param chain   Kinematic chain with screw axes and home configuration.
 /// @param q       Joint position vector.

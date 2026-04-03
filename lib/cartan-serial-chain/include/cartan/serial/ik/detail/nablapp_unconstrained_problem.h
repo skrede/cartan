@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_SERIAL_IK_DETAIL_NABLAPP_UNCONSTRAINED_PROBLEM_H
-#define HPP_GUARD_LIEPP_SERIAL_IK_DETAIL_NABLAPP_UNCONSTRAINED_PROBLEM_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_NABLAPP_UNCONSTRAINED_PROBLEM_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_NABLAPP_UNCONSTRAINED_PROBLEM_H
 
 /// @file detail/nablapp_unconstrained_problem.h
 /// @brief Unconstrained adapter (formulation A) for nablapp solvers.
@@ -8,15 +8,15 @@
 /// bounds. Joint limits are enforced externally by the solve policy
 /// via clamping after each step.
 
-#include "liepp/serial/ik/error_weight.h"
-#include "liepp/serial/ik/analytical_gradient.h"
+#include "cartan/serial/ik/error_weight.h"
+#include "cartan/serial/ik/analytical_gradient.h"
 
-#include "liepp/lie/se3.h"
-#include "liepp/serial/chain/chain_concept.h"
+#include "cartan/lie/se3.h"
+#include "cartan/serial/chain/chain_concept.h"
 
 #include <Eigen/Core>
 
-namespace liepp::detail
+namespace cartan::detail
 {
 
 /// Unconstrained IK problem adapter for nablapp (formulation A).

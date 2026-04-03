@@ -4,9 +4,9 @@
 /// Reports custom counters: success_rate, avg_iterations,
 /// avg_position_error, avg_orientation_error per D-08.
 
-#include <liepp/serial/ik/basic_ik_solver.h>
-#include <liepp/serial/ik/nlopt_bobyqa_solve_policy.h>
-#include <liepp/serial/ik/ik_types.h>
+#include <cartan/serial/ik/basic_ik_solver.h>
+#include <cartan/serial/ik/nlopt_bobyqa_solve_policy.h>
+#include <cartan/serial/ik/ik_types.h>
 
 #include "benchmark_utils.h"
 
@@ -17,8 +17,8 @@
 
 static void bm_ik_sqp_3r_planar(benchmark::State& state)
 {
-    auto chain = liepp::benchmarks::make_3r_planar_chain<double>();
-    liepp::convergence_criteria<double> criteria{1e-5, 1e-5, 100};
+    auto chain = cartan::benchmarks::make_3r_planar_chain<double>();
+    cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 100};
     std::mt19937 rng(42);
 
     int total_solves = 0;
@@ -29,10 +29,10 @@ static void bm_ik_sqp_3r_planar(benchmark::State& state)
 
     for (auto _ : state)
     {
-        auto target = liepp::benchmarks::random_reachable_target(chain, rng);
-        auto q_seed = liepp::benchmarks::random_joint_config(chain, rng);
+        auto target = cartan::benchmarks::random_reachable_target(chain, rng);
+        auto q_seed = cartan::benchmarks::random_joint_config(chain, rng);
 
-        liepp::basic_ik_solver<liepp::nlopt_bobyqa_solve_policy<liepp::kinematic_chain<double, 3>>> solver;
+        cartan::basic_ik_solver<cartan::nlopt_bobyqa_solve_policy<cartan::kinematic_chain<double, 3>>> solver;
         solver.setup(chain, target, q_seed, criteria);
         auto result = solver.solve();
 
@@ -41,7 +41,7 @@ static void bm_ik_sqp_3r_planar(benchmark::State& state)
         {
             ++successes;
             total_iterations += result->iterations;
-            auto [pos_err, ori_err] = liepp::benchmarks::compute_pose_errors(
+            auto [pos_err, ori_err] = cartan::benchmarks::compute_pose_errors(
                 chain, result->solution.position, target);
             total_pos_error += pos_err;
             total_ori_error += ori_err;
@@ -66,8 +66,8 @@ BENCHMARK(bm_ik_sqp_3r_planar)->Iterations(10000)->Unit(benchmark::kMicrosecond)
 
 static void bm_ik_sqp_ur3e(benchmark::State& state)
 {
-    auto chain = liepp::benchmarks::make_ur3e_chain<double>();
-    liepp::convergence_criteria<double> criteria{1e-5, 1e-5, 100};
+    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 100};
     std::mt19937 rng(42);
 
     int total_solves = 0;
@@ -78,10 +78,10 @@ static void bm_ik_sqp_ur3e(benchmark::State& state)
 
     for (auto _ : state)
     {
-        auto target = liepp::benchmarks::random_reachable_target(chain, rng);
-        auto q_seed = liepp::benchmarks::random_joint_config(chain, rng);
+        auto target = cartan::benchmarks::random_reachable_target(chain, rng);
+        auto q_seed = cartan::benchmarks::random_joint_config(chain, rng);
 
-        liepp::basic_ik_solver<liepp::nlopt_bobyqa_solve_policy<liepp::kinematic_chain<double, 6>>> solver;
+        cartan::basic_ik_solver<cartan::nlopt_bobyqa_solve_policy<cartan::kinematic_chain<double, 6>>> solver;
         solver.setup(chain, target, q_seed, criteria);
         auto result = solver.solve();
 
@@ -90,7 +90,7 @@ static void bm_ik_sqp_ur3e(benchmark::State& state)
         {
             ++successes;
             total_iterations += result->iterations;
-            auto [pos_err, ori_err] = liepp::benchmarks::compute_pose_errors(
+            auto [pos_err, ori_err] = cartan::benchmarks::compute_pose_errors(
                 chain, result->solution.position, target);
             total_pos_error += pos_err;
             total_ori_error += ori_err;
@@ -115,8 +115,8 @@ BENCHMARK(bm_ik_sqp_ur3e)->Iterations(10000)->Unit(benchmark::kMicrosecond);
 
 static void bm_ik_sqp_lbr_med14(benchmark::State& state)
 {
-    auto chain = liepp::benchmarks::make_lbr_med14_chain<double>();
-    liepp::convergence_criteria<double> criteria{1e-5, 1e-5, 100};
+    auto chain = cartan::benchmarks::make_lbr_med14_chain<double>();
+    cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 100};
     std::mt19937 rng(42);
 
     int total_solves = 0;
@@ -127,10 +127,10 @@ static void bm_ik_sqp_lbr_med14(benchmark::State& state)
 
     for (auto _ : state)
     {
-        auto target = liepp::benchmarks::random_reachable_target(chain, rng);
-        auto q_seed = liepp::benchmarks::random_joint_config(chain, rng);
+        auto target = cartan::benchmarks::random_reachable_target(chain, rng);
+        auto q_seed = cartan::benchmarks::random_joint_config(chain, rng);
 
-        liepp::basic_ik_solver<liepp::nlopt_bobyqa_solve_policy<liepp::kinematic_chain<double, 7>>> solver;
+        cartan::basic_ik_solver<cartan::nlopt_bobyqa_solve_policy<cartan::kinematic_chain<double, 7>>> solver;
         solver.setup(chain, target, q_seed, criteria);
         auto result = solver.solve();
 
@@ -139,7 +139,7 @@ static void bm_ik_sqp_lbr_med14(benchmark::State& state)
         {
             ++successes;
             total_iterations += result->iterations;
-            auto [pos_err, ori_err] = liepp::benchmarks::compute_pose_errors(
+            auto [pos_err, ori_err] = cartan::benchmarks::compute_pose_errors(
                 chain, result->solution.position, target);
             total_pos_error += pos_err;
             total_ori_error += ori_err;

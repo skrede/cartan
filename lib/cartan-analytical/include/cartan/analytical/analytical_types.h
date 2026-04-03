@@ -1,12 +1,12 @@
-#ifndef HPP_GUARD_LIEPP_ANALYTICAL_ANALYTICAL_TYPES_H
-#define HPP_GUARD_LIEPP_ANALYTICAL_ANALYTICAL_TYPES_H
+#ifndef HPP_GUARD_CARTAN_ANALYTICAL_ANALYTICAL_TYPES_H
+#define HPP_GUARD_CARTAN_ANALYTICAL_ANALYTICAL_TYPES_H
 
-#include "liepp/serial/chain/joint_state.h"
+#include "cartan/serial/chain/joint_state.h"
 
 #include <array>
 #include <expected>
 
-namespace liepp
+namespace cartan
 {
 
 enum class analytical_failure

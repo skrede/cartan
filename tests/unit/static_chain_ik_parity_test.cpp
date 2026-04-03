@@ -4,19 +4,19 @@
 
 #include "../../profiling/chain_factories.h"
 
-#include <liepp/serial/ik/default_solvers.h>
+#include <cartan/serial/ik/default_solvers.h>
 
-#include <liepp/lie/se3.h>
-#include <liepp/serial/fk/jacobian.h>
-#include <liepp/serial/chain/static_chain.h>
-#include <liepp/serial/fk/forward_kinematics.h>
+#include <cartan/lie/se3.h>
+#include <cartan/serial/fk/jacobian.h>
+#include <cartan/serial/chain/static_chain.h>
+#include <cartan/serial/fk/forward_kinematics.h>
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
 #include <numbers>
 
-namespace spp = liepp;
+namespace spp = cartan;
 
 // ============================================================================
 // Static chain factory helpers

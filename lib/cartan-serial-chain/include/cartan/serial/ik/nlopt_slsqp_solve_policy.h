@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_SERIAL_IK_NLOPT_SLSQP_SOLVE_POLICY_H
-#define HPP_GUARD_LIEPP_SERIAL_IK_NLOPT_SLSQP_SOLVE_POLICY_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_NLOPT_SLSQP_SOLVE_POLICY_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_NLOPT_SLSQP_SOLVE_POLICY_H
 
 /// @file nlopt_slsqp_solve_policy.h
 /// @brief NLopt SLSQP gradient-based IK solve policy with box constraints.
@@ -11,22 +11,22 @@
 /// This is the same algorithm TRAC-IK uses for its nonlinear
 /// optimization path.
 ///
-/// Guarded by LIEPP_HAS_NLOPT: only available when NLopt is linked.
+/// Guarded by CARTAN_HAS_NLOPT: only available when NLopt is linked.
 ///
 /// Reference: Decisions D-04, D-08, D-11.
 
-#ifdef LIEPP_HAS_NLOPT
+#ifdef CARTAN_HAS_NLOPT
 
-#include "liepp/serial/ik/ik_types.h"
-#include "liepp/serial/ik/limits_policy.h"
-#include "liepp/serial/ik/ik_solve_policy.h"
-#include "liepp/serial/ik/analytical_gradient.h"
-#include "liepp/serial/ik/detail/nlopt_common.h"
+#include "cartan/serial/ik/ik_types.h"
+#include "cartan/serial/ik/limits_policy.h"
+#include "cartan/serial/ik/ik_solve_policy.h"
+#include "cartan/serial/ik/analytical_gradient.h"
+#include "cartan/serial/ik/detail/nlopt_common.h"
 
-#include "liepp/lie/se3.h"
-#include "liepp/serial/chain/joint_state.h"
-#include "liepp/serial/chain/chain_concept.h"
-#include "liepp/serial/chain/kinematic_chain.h"
+#include "cartan/lie/se3.h"
+#include "cartan/serial/chain/joint_state.h"
+#include "cartan/serial/chain/chain_concept.h"
+#include "cartan/serial/chain/kinematic_chain.h"
 
 #include <nlopt.hpp>
 
@@ -35,7 +35,7 @@
 #include <random>
 #include <vector>
 
-namespace liepp
+namespace cartan
 {
 
 /// NLopt SLSQP solve policy for constrained IK with box constraints.

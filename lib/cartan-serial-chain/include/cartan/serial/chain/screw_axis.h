@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_SERIAL_CHAIN_SCREW_AXIS_H
-#define HPP_GUARD_LIEPP_SERIAL_CHAIN_SCREW_AXIS_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_CHAIN_SCREW_AXIS_H
+#define HPP_GUARD_CARTAN_SERIAL_CHAIN_SCREW_AXIS_H
 
 /// @file screw_axis.h
 /// @brief Screw axis representation for kinematic chain joints.
@@ -10,14 +10,14 @@
 ///
 /// Reference: Lynch & Park, Modern Robotics, Def. 3.24, p. 102.
 
-#include "liepp/types.h"
-#include "liepp/detail/epsilon.h"
+#include "cartan/types.h"
+#include "cartan/detail/epsilon.h"
 
 #include <cmath>
 #include <string>
 #include <expected>
 
-namespace liepp
+namespace cartan
 {
 
 /// Screw axis for a kinematic joint in PoE form.
@@ -119,6 +119,6 @@ private:
     vector3<Scalar> m_v;      ///< Linear component
 };
 
-} // namespace liepp
+}
 
 #endif

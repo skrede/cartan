@@ -5,17 +5,17 @@
 
 #include "../../profiling/chain_factories.h"
 
-#include <liepp/serial/fk/forward_kinematics.h>
-#include <liepp/serial/fk/jacobian.h>
-#include <liepp/serial/fk/detail/axis_specializations.h>
-#include <liepp/serial/chain/static_chain.h>
+#include <cartan/serial/fk/forward_kinematics.h>
+#include <cartan/serial/fk/jacobian.h>
+#include <cartan/serial/fk/detail/axis_specializations.h>
+#include <cartan/serial/chain/static_chain.h>
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
 #include <random>
 
-namespace spp = liepp;
+namespace spp = cartan;
 
 // ============================================================================
 // Static chain factory helpers (mirrors chain_factories.h runtime geometry)

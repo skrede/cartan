@@ -1,11 +1,11 @@
-#ifndef HPP_GUARD_LIEPP_LIE_SO3_H
-#define HPP_GUARD_LIEPP_LIE_SO3_H
+#ifndef HPP_GUARD_CARTAN_LIE_SO3_H
+#define HPP_GUARD_CARTAN_LIE_SO3_H
 
-#include "liepp/types.h"
-#include "liepp/detail/epsilon.h"
+#include "cartan/types.h"
+#include "cartan/detail/epsilon.h"
 
-#include "liepp/lie/policy.h"
-#include "liepp/lie/hat_vee.h"
+#include "cartan/lie/policy.h"
+#include "cartan/lie/hat_vee.h"
 
 #include <cmath>
 #include <string>
@@ -13,7 +13,7 @@
 #include <utility>
 #include <expected>
 
-namespace liepp
+namespace cartan
 {
 
 namespace detail
@@ -350,6 +350,6 @@ exp_with_left_jacobian(const vector3<Scalar>& phi)
 
 }
 
-} // namespace liepp
+}
 
 #endif

@@ -2,45 +2,45 @@
 /// @brief Demonstrates nablapp-backed SLSQP and BOBYQA solve policies.
 ///
 /// Shows: slsqp_solve_policy, bobyqa_solve_policy, restart wrapping,
-/// and racing a nablapp solver against a native liepp solver.
+/// and racing a nablapp solver against a native cartan solver.
 
-#include "liepp/serial_chain.h"
+#include "cartan/serial_chain.h"
 
 #include <iostream>
 #include <numbers>
 
 int main()
 {
-    using vec3 = liepp::vector3<double>;
+    using vec3 = cartan::vector3<double>;
 
     // UR3e 6-DOF chain: PoE screw axes in space frame
-    auto s1 = liepp::screw_axis<double>::revolute(vec3(0, 0, 1), vec3(0, 0, 0));
-    auto s2 = liepp::screw_axis<double>::revolute(vec3(0, 1, 0), vec3(0, 0, 0.15185));
-    auto s3 = liepp::screw_axis<double>::revolute(vec3(0, 1, 0), vec3(-0.24355, 0, 0.15185));
-    auto s4 = liepp::screw_axis<double>::revolute(vec3(0, 1, 0), vec3(-0.45675, 0, 0.15185));
-    auto s5 = liepp::screw_axis<double>::revolute(vec3(0, 0, -1), vec3(-0.45675, 0.13105, 0));
-    auto s6 = liepp::screw_axis<double>::revolute(vec3(0, 1, 0), vec3(-0.45675, 0, -0.08535));
+    auto s1 = cartan::screw_axis<double>::revolute(vec3(0, 0, 1), vec3(0, 0, 0));
+    auto s2 = cartan::screw_axis<double>::revolute(vec3(0, 1, 0), vec3(0, 0, 0.15185));
+    auto s3 = cartan::screw_axis<double>::revolute(vec3(0, 1, 0), vec3(-0.24355, 0, 0.15185));
+    auto s4 = cartan::screw_axis<double>::revolute(vec3(0, 1, 0), vec3(-0.45675, 0, 0.15185));
+    auto s5 = cartan::screw_axis<double>::revolute(vec3(0, 0, -1), vec3(-0.45675, 0.13105, 0));
+    auto s6 = cartan::screw_axis<double>::revolute(vec3(0, 1, 0), vec3(-0.45675, 0, -0.08535));
 
     vec3 home_trans(-0.45675, 0.22315, 0.0665);
-    auto home = liepp::se3<double>(liepp::so3<double>::identity(), home_trans);
+    auto home = cartan::se3<double>(cartan::so3<double>::identity(), home_trans);
 
-    liepp::joint_limits<double> lim{-std::numbers::pi, std::numbers::pi};
-    liepp::kinematic_chain<double, 6> chain(
+    cartan::joint_limits<double> lim{-std::numbers::pi, std::numbers::pi};
+    cartan::kinematic_chain<double, 6> chain(
         home, {s1, s2, s3, s4, s5, s6},
         {lim, lim, lim, lim, lim, lim});
 
     // Compute a target by FK at a known configuration
     Eigen::Vector<double, 6> q_known{0.3, -0.5, 0.2, -0.4, 0.1, 0.3};
-    auto target = liepp::forward_kinematics(chain, q_known).end_effector;
+    auto target = cartan::forward_kinematics(chain, q_known).end_effector;
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
-    liepp::convergence_criteria<double> criteria{1e-5, 1e-5, 500};
+    cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 500};
 
     // --- Section 1: nablapp SLSQP with restart wrapping ---
 
-    liepp::basic_ik_solver slsqp_solver{
-        liepp::restart_solve_policy{
-            liepp::slsqp_solve_policy<liepp::kinematic_chain<double, 6>>{}}};
+    cartan::basic_ik_solver slsqp_solver{
+        cartan::restart_solve_policy{
+            cartan::slsqp_solve_policy<cartan::kinematic_chain<double, 6>>{}}};
 
     slsqp_solver.setup(chain, target, q0, criteria);
     auto slsqp_result = slsqp_solver.solve();
@@ -59,9 +59,9 @@ int main()
 
     // --- Section 2: nablapp BOBYQA with restart wrapping ---
 
-    liepp::basic_ik_solver bobyqa_solver{
-        liepp::restart_solve_policy{
-            liepp::bobyqa_solve_policy<liepp::kinematic_chain<double, 6>>{}}};
+    cartan::basic_ik_solver bobyqa_solver{
+        cartan::restart_solve_policy{
+            cartan::bobyqa_solve_policy<cartan::kinematic_chain<double, 6>>{}}};
 
     bobyqa_solver.setup(chain, target, q0, criteria);
     auto bobyqa_result = bobyqa_solver.solve();
@@ -80,9 +80,9 @@ int main()
 
     // --- Section 3: Racing nablapp SLSQP against native projected LM ---
 
-    liepp::basic_ik_solver racing_solver{
-        liepp::restart_solve_policy{liepp::slsqp_solve_policy<liepp::kinematic_chain<double, 6>>{}},
-        liepp::restart_solve_policy{liepp::projected_lm_solve_policy<liepp::kinematic_chain<double, 6>>{}}};
+    cartan::basic_ik_solver racing_solver{
+        cartan::restart_solve_policy{cartan::slsqp_solve_policy<cartan::kinematic_chain<double, 6>>{}},
+        cartan::restart_solve_policy{cartan::projected_lm_solve_policy<cartan::kinematic_chain<double, 6>>{}}};
 
     racing_solver.setup(chain, target, q0, criteria);
     auto racing_result = racing_solver.solve();

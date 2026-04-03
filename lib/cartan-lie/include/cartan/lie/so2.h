@@ -1,17 +1,17 @@
-#ifndef HPP_GUARD_LIEPP_LIE_SO2_H
-#define HPP_GUARD_LIEPP_LIE_SO2_H
+#ifndef HPP_GUARD_CARTAN_LIE_SO2_H
+#define HPP_GUARD_CARTAN_LIE_SO2_H
 
-#include "liepp/types.h"
-#include "liepp/detail/epsilon.h"
+#include "cartan/types.h"
+#include "cartan/detail/epsilon.h"
 
-#include "liepp/lie/policy.h"
+#include "cartan/lie/policy.h"
 
 #include <cmath>
 #include <string>
 #include <cassert>
 #include <expected>
 
-namespace liepp
+namespace cartan
 {
 
 /// 2D rotation group SO(2), parameterized by scalar type and policy.
@@ -137,6 +137,6 @@ private:
     Scalar m_sin;
 };
 
-} // namespace liepp
+}
 
 #endif

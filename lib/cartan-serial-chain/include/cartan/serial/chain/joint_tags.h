@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_SERIAL_CHAIN_JOINT_TAGS_H
-#define HPP_GUARD_LIEPP_SERIAL_CHAIN_JOINT_TAGS_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_CHAIN_JOINT_TAGS_H
+#define HPP_GUARD_CARTAN_SERIAL_CHAIN_JOINT_TAGS_H
 
 /// @file joint_tags.h
 /// @brief Joint type tags for compile-time chain descriptions.
@@ -8,11 +8,11 @@
 /// Used as template parameter packs in static_chain to enable compile-time
 /// axis knowledge and if-constexpr dispatch on joint type.
 
-#include "liepp/types.h"
+#include "cartan/types.h"
 
 #include <concepts>
 
-namespace liepp
+namespace cartan
 {
 
 /// Tag for a revolute joint about the X axis.

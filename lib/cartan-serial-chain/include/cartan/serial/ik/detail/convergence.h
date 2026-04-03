@@ -1,12 +1,12 @@
-#ifndef HPP_GUARD_LIEPP_SERIAL_IK_DETAIL_CONVERGENCE_H
-#define HPP_GUARD_LIEPP_SERIAL_IK_DETAIL_CONVERGENCE_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_CONVERGENCE_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_CONVERGENCE_H
 
-#include "liepp/serial/ik/ik_types.h"
-#include "liepp/serial/ik/error_weight.h"
+#include "cartan/serial/ik/ik_types.h"
+#include "cartan/serial/ik/error_weight.h"
 
 #include <Eigen/Core>
 
-namespace liepp::detail
+namespace cartan::detail
 {
 
 /// Weighted convergence check for IK policies using error_weight.

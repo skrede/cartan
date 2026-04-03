@@ -1,4 +1,4 @@
-#include <liepp/lie/so2.h>
+#include <cartan/lie/so2.h>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -20,43 +20,43 @@ TEMPLATE_TEST_CASE("so2: exp/log roundtrip", "[so2]", double, float)
 
     SECTION("theta = 0")
     {
-        auto r = liepp::so2<S>::exp(S(0));
+        auto r = cartan::so2<S>::exp(S(0));
         REQUIRE(r.log() == Approx(S(0)).margin(S(1e-12)));
     }
 
     SECTION("theta = pi/4")
     {
-        auto r = liepp::so2<S>::exp(pi / S(4));
+        auto r = cartan::so2<S>::exp(pi / S(4));
         REQUIRE(r.log() == Approx(pi / S(4)).margin(S(1e-6)));
     }
 
     SECTION("theta = pi/2")
     {
-        auto r = liepp::so2<S>::exp(pi / S(2));
+        auto r = cartan::so2<S>::exp(pi / S(2));
         REQUIRE(r.log() == Approx(pi / S(2)).margin(S(1e-6)));
     }
 
     SECTION("theta = pi")
     {
-        auto r = liepp::so2<S>::exp(pi);
+        auto r = cartan::so2<S>::exp(pi);
         REQUIRE(std::abs(r.log()) == Approx(pi).margin(S(1e-6)));
     }
 
     SECTION("theta = -pi/2")
     {
-        auto r = liepp::so2<S>::exp(-pi / S(2));
+        auto r = cartan::so2<S>::exp(-pi / S(2));
         REQUIRE(r.log() == Approx(-pi / S(2)).margin(S(1e-6)));
     }
 
     SECTION("theta = -pi")
     {
-        auto r = liepp::so2<S>::exp(-pi);
+        auto r = cartan::so2<S>::exp(-pi);
         REQUIRE(std::abs(r.log()) == Approx(pi).margin(S(1e-6)));
     }
 
     SECTION("theta = 2*pi wraps to 0")
     {
-        auto r = liepp::so2<S>::exp(S(2) * pi);
+        auto r = cartan::so2<S>::exp(S(2) * pi);
         REQUIRE(r.log() == Approx(S(0)).margin(S(1e-5)));
     }
 }
@@ -67,8 +67,8 @@ TEMPLATE_TEST_CASE("so2: exp/log roundtrip", "[so2]", double, float)
 
 TEST_CASE("so2: identity properties", "[so2]")
 {
-    auto id = liepp::so2<double>::identity();
-    auto x = liepp::so2<double>::exp(0.7);
+    auto id = cartan::so2<double>::identity();
+    auto x = cartan::so2<double>::exp(0.7);
 
     SECTION("identity * x == x")
     {
@@ -98,7 +98,7 @@ TEST_CASE("so2: identity properties", "[so2]")
 
 TEST_CASE("so2: inverse cancels rotation", "[so2]")
 {
-    auto x = liepp::so2<double>::exp(1.23);
+    auto x = cartan::so2<double>::exp(1.23);
     auto result = x * x.inverse();
     REQUIRE(result.log() == Approx(0.0).margin(1e-14));
 }
@@ -111,8 +111,8 @@ TEST_CASE("so2: compose is angle addition", "[so2]")
 {
     double a = 0.3;
     double b = 0.5;
-    auto ra = liepp::so2<double>::exp(a);
-    auto rb = liepp::so2<double>::exp(b);
+    auto ra = cartan::so2<double>::exp(a);
+    auto rb = cartan::so2<double>::exp(b);
 
     auto composed = ra * rb;
     REQUIRE(composed.log() == Approx(a + b).margin(1e-14));
@@ -125,7 +125,7 @@ TEST_CASE("so2: compose is angle addition", "[so2]")
 TEST_CASE("so2: matrix returns correct 2x2 rotation", "[so2]")
 {
     double theta = 0.7;
-    auto r = liepp::so2<double>::exp(theta);
+    auto r = cartan::so2<double>::exp(theta);
     auto m = r.matrix();
 
     REQUIRE(m(0, 0) == Approx(std::cos(theta)).margin(1e-14));
@@ -141,32 +141,32 @@ TEST_CASE("so2: matrix returns correct 2x2 rotation", "[so2]")
 TEST_CASE("so2: from_matrix with valid rotation", "[so2]")
 {
     double theta = 0.5;
-    liepp::matrix2<double> R;
+    cartan::matrix2<double> R;
     R << std::cos(theta), -std::sin(theta),
          std::sin(theta),  std::cos(theta);
 
-    auto result = liepp::so2<double>::from_matrix(R);
+    auto result = cartan::so2<double>::from_matrix(R);
     REQUIRE(result.has_value());
     REQUIRE(result.value().log() == Approx(theta).margin(1e-14));
 }
 
 TEST_CASE("so2: from_matrix rejects non-orthogonal matrix", "[so2]")
 {
-    liepp::matrix2<double> bad;
+    cartan::matrix2<double> bad;
     bad << 1.0, 1.0,
            0.0, 1.0;
 
-    auto result = liepp::so2<double>::from_matrix(bad);
+    auto result = cartan::so2<double>::from_matrix(bad);
     REQUIRE_FALSE(result.has_value());
 }
 
 TEST_CASE("so2: from_matrix rejects negative determinant", "[so2]")
 {
-    liepp::matrix2<double> reflection;
+    cartan::matrix2<double> reflection;
     reflection << -1.0,  0.0,
                    0.0,  1.0;
 
-    auto result = liepp::so2<double>::from_matrix(reflection);
+    auto result = cartan::so2<double>::from_matrix(reflection);
     REQUIRE_FALSE(result.has_value());
 }
 
@@ -177,14 +177,14 @@ TEST_CASE("so2: from_matrix rejects negative determinant", "[so2]")
 TEST_CASE("so2: strict policy normalizes on construction", "[so2][policy]")
 {
     // Non-unit cos/sin pair: (3, 4) has magnitude 5
-    liepp::so2<double, liepp::strict_policy> r(3.0, 4.0);
+    cartan::so2<double, cartan::strict_policy> r(3.0, 4.0);
     REQUIRE(r.cos_angle() == Approx(3.0 / 5.0).margin(1e-14));
     REQUIRE(r.sin_angle() == Approx(4.0 / 5.0).margin(1e-14));
 }
 
 TEST_CASE("so2: fast policy does NOT normalize on construction", "[so2][policy]")
 {
-    liepp::so2<double, liepp::fast_policy> r(3.0, 4.0);
+    cartan::so2<double, cartan::fast_policy> r(3.0, 4.0);
     REQUIRE(r.cos_angle() == Approx(3.0).margin(1e-14));
     REQUIRE(r.sin_angle() == Approx(4.0).margin(1e-14));
 }
@@ -195,15 +195,15 @@ TEST_CASE("so2: fast policy does NOT normalize on construction", "[so2][policy]"
 
 TEST_CASE("so2: mixed-policy compose returns strict result", "[so2][policy]")
 {
-    auto strict_r = liepp::so2<double, liepp::strict_policy>::exp(0.3);
-    auto fast_r = liepp::so2<double, liepp::fast_policy>::exp(0.5);
+    auto strict_r = cartan::so2<double, cartan::strict_policy>::exp(0.3);
+    auto fast_r = cartan::so2<double, cartan::fast_policy>::exp(0.5);
 
     auto result = strict_r * fast_r;
 
     // Result type should be strict_policy (stricter of the two)
     static_assert(std::is_same_v<
         decltype(result),
-        liepp::so2<double, liepp::strict_policy>>);
+        cartan::so2<double, cartan::strict_policy>>);
 
     REQUIRE(result.log() == Approx(0.8).margin(1e-14));
 }
@@ -215,8 +215,8 @@ TEST_CASE("so2: mixed-policy compose returns strict result", "[so2][policy]")
 TEST_CASE("so2: act rotates 2D vector", "[so2]")
 {
     constexpr double pi = std::numbers::pi;
-    auto r = liepp::so2<double>::exp(pi / 2.0);
-    liepp::vector2<double> v;
+    auto r = cartan::so2<double>::exp(pi / 2.0);
+    cartan::vector2<double> v;
     v << 1.0, 0.0;
 
     auto rotated = r.act(v);
@@ -231,7 +231,7 @@ TEST_CASE("so2: act rotates 2D vector", "[so2]")
 TEST_CASE("so2: float scalar operations", "[so2][float]")
 {
     constexpr float pi = std::numbers::pi_v<float>;
-    auto r = liepp::so2<float>::exp(pi / 4.0f);
+    auto r = cartan::so2<float>::exp(pi / 4.0f);
 
     REQUIRE(r.log() == Approx(pi / 4.0f).margin(1e-6f));
     REQUIRE(r.cos_angle() == Approx(std::cos(pi / 4.0f)).margin(1e-6f));

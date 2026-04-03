@@ -1,17 +1,17 @@
-#ifndef HPP_GUARD_LIEPP_ANALYTICAL_PADEN_KAHAN_H
-#define HPP_GUARD_LIEPP_ANALYTICAL_PADEN_KAHAN_H
+#ifndef HPP_GUARD_CARTAN_ANALYTICAL_PADEN_KAHAN_H
+#define HPP_GUARD_CARTAN_ANALYTICAL_PADEN_KAHAN_H
 
-#include "liepp/analytical/analytical_types.h"
-#include "liepp/analytical/detail/clamped_trig.h"
+#include "cartan/analytical/analytical_types.h"
+#include "cartan/analytical/detail/clamped_trig.h"
 
-#include "liepp/detail/epsilon.h"
-#include "liepp/types.h"
+#include "cartan/detail/epsilon.h"
+#include "cartan/types.h"
 
 #include <cmath>
 #include <expected>
 #include <numbers>
 
-namespace liepp
+namespace cartan
 {
 
 /// Paden-Kahan subproblem 1: rotation about a single axis.

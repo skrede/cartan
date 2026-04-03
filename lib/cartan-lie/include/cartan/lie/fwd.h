@@ -1,10 +1,10 @@
-#ifndef HPP_GUARD_LIEPP_LIE_FWD_H
-#define HPP_GUARD_LIEPP_LIE_FWD_H
+#ifndef HPP_GUARD_CARTAN_LIE_FWD_H
+#define HPP_GUARD_CARTAN_LIE_FWD_H
 
 #include <cstddef>
 #include <type_traits>
 
-namespace liepp
+namespace cartan
 {
 
 // Policy tags (defined in policy.h)
@@ -24,6 +24,6 @@ class so3;
 template <typename Scalar, typename Policy = strict_policy>
 class se3;
 
-} // namespace liepp
+}
 
 #endif

@@ -1,11 +1,11 @@
-#include <liepp/serial/ik/analytical_gradient.h>
+#include <cartan/serial/ik/analytical_gradient.h>
 
-#include <liepp/lie/se3.h>
-#include <liepp/lie/so3.h>
-#include <liepp/serial/chain/screw_axis.h>
-#include <liepp/serial/chain/joint_limits.h>
-#include <liepp/serial/chain/kinematic_chain.h>
-#include <liepp/serial/fk/forward_kinematics.h>
+#include <cartan/lie/se3.h>
+#include <cartan/lie/so3.h>
+#include <cartan/serial/chain/screw_axis.h>
+#include <cartan/serial/chain/joint_limits.h>
+#include <cartan/serial/chain/kinematic_chain.h>
+#include <cartan/serial/fk/forward_kinematics.h>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -13,7 +13,7 @@
 #include <cmath>
 #include <numbers>
 
-namespace spp = liepp;
+namespace spp = cartan;
 using Catch::Approx;
 
 // ============================================================================

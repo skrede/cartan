@@ -4,36 +4,36 @@
 /// Shows: kinematic_chain construction, basic_ik_solver with lm_solve_policy,
 /// std::expected result handling, FK verification of the IK solution.
 
-#include "liepp/serial_chain.h"
+#include "cartan/serial_chain.h"
 
 #include <iostream>
 #include <numbers>
 
 int main()
 {
-    using vec3 = liepp::vector3<double>;
+    using vec3 = cartan::vector3<double>;
 
     // 3-DOF planar arm: three revolute joints about z, unit link lengths
-    auto s1 = liepp::screw_axis<double>::revolute(vec3(0, 0, 1), vec3(0, 0, 0));
-    auto s2 = liepp::screw_axis<double>::revolute(vec3(0, 0, 1), vec3(1, 0, 0));
-    auto s3 = liepp::screw_axis<double>::revolute(vec3(0, 0, 1), vec3(2, 0, 0));
+    auto s1 = cartan::screw_axis<double>::revolute(vec3(0, 0, 1), vec3(0, 0, 0));
+    auto s2 = cartan::screw_axis<double>::revolute(vec3(0, 0, 1), vec3(1, 0, 0));
+    auto s3 = cartan::screw_axis<double>::revolute(vec3(0, 0, 1), vec3(2, 0, 0));
 
     vec3 home_trans(3, 0, 0);
-    auto home = liepp::se3<double>(liepp::so3<double>::identity(), home_trans);
+    auto home = cartan::se3<double>(cartan::so3<double>::identity(), home_trans);
 
-    liepp::joint_limits<double> lim{-std::numbers::pi, std::numbers::pi};
-    liepp::kinematic_chain<double, 3> chain(home, {s1, s2, s3}, {lim, lim, lim});
+    cartan::joint_limits<double> lim{-std::numbers::pi, std::numbers::pi};
+    cartan::kinematic_chain<double, 3> chain(home, {s1, s2, s3}, {lim, lim, lim});
 
     // Compute a target by FK at a known configuration
     Eigen::Vector3d q_known{0.3, -0.5, 0.2};
-    auto fk_target = liepp::forward_kinematics(chain, q_known);
+    auto fk_target = cartan::forward_kinematics(chain, q_known);
     auto target = fk_target.end_effector;
 
     // Solve IK from a different initial guess
     Eigen::Vector3d q0{0.0, 0.0, 0.0};
-    liepp::convergence_criteria<double> criteria{1e-6, 1e-6, 200};
+    cartan::convergence_criteria<double> criteria{1e-6, 1e-6, 200};
 
-    liepp::basic_ik_solver<liepp::lm_solve_policy<liepp::kinematic_chain<double, 3>>> solver;
+    cartan::basic_ik_solver<cartan::lm_solve_policy<cartan::kinematic_chain<double, 3>>> solver;
     solver.setup(chain, target, q0, criteria);
     auto result = solver.solve();
 
@@ -45,7 +45,7 @@ int main()
         std::cout << "Error:    " << sol.final_error_norm << "\n";
 
         // Verify: FK of solution should match target
-        auto fk_verify = liepp::forward_kinematics(chain, sol.solution.position);
+        auto fk_verify = cartan::forward_kinematics(chain, sol.solution.position);
         auto err = (fk_verify.end_effector.inverse() * target).log();
         std::cout << "FK verification error: " << err.norm() << "\n";
     }

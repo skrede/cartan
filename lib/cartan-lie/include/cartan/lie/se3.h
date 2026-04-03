@@ -1,18 +1,18 @@
-#ifndef HPP_GUARD_LIEPP_LIE_SE3_H
-#define HPP_GUARD_LIEPP_LIE_SE3_H
+#ifndef HPP_GUARD_CARTAN_LIE_SE3_H
+#define HPP_GUARD_CARTAN_LIE_SE3_H
 
-#include "liepp/types.h"
-#include "liepp/detail/epsilon.h"
+#include "cartan/types.h"
+#include "cartan/detail/epsilon.h"
 
-#include "liepp/lie/so3.h"
-#include "liepp/lie/policy.h"
-#include "liepp/lie/hat_vee.h"
+#include "cartan/lie/so3.h"
+#include "cartan/lie/policy.h"
+#include "cartan/lie/hat_vee.h"
 
 #include <cmath>
 #include <string>
 #include <expected>
 
-namespace liepp
+namespace cartan
 {
 
 /// 3D rigid body transformation group SE(3), parameterized by scalar type and policy.
@@ -172,6 +172,6 @@ private:
     vector3<Scalar> m_translation;
 };
 
-} // namespace liepp
+}
 
 #endif

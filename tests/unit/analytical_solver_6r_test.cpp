@@ -1,5 +1,5 @@
-#include "liepp/analytical.h"
-#include "liepp/serial_chain.h"
+#include "cartan/analytical.h"
+#include "cartan/serial_chain.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -7,7 +7,7 @@
 #include <cmath>
 #include <numbers>
 
-using namespace liepp;
+using namespace cartan;
 using Catch::Matchers::WithinAbs;
 
 static constexpr double tolerance = 1e-6;

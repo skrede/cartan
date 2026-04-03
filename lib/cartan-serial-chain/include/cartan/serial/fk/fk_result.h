@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_SERIAL_FK_FK_RESULT_H
-#define HPP_GUARD_LIEPP_SERIAL_FK_FK_RESULT_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_FK_FK_RESULT_H
+#define HPP_GUARD_CARTAN_SERIAL_FK_FK_RESULT_H
 
 /// @file fk_result.h
 /// @brief Forward kinematics result with intermediate product caching.
@@ -13,13 +13,13 @@
 ///
 /// Intermediate product T_i = exp([S1]q1) * ... * exp([Si]qi).
 
-#include "liepp/lie/se3.h"
-#include "liepp/serial/chain/storage_trait.h"
+#include "cartan/lie/se3.h"
+#include "cartan/serial/chain/storage_trait.h"
 
 #include <utility>
 #include <type_traits>
 
-namespace liepp
+namespace cartan
 {
 
 namespace detail
@@ -48,7 +48,7 @@ auto make_intermediate_storage()
 } // namespace detail
 
 /// Result of forward kinematics via Product of Exponentials.
-/// @tparam N      Number of joints (compile-time), or liepp::dynamic.
+/// @tparam N      Number of joints (compile-time), or cartan::dynamic.
 /// @tparam Scalar Floating-point type.
 ///
 /// intermediates[i] holds the partial product exp([S1]q1) * ... * exp([S_{i+1}]q_{i+1}).
@@ -71,6 +71,6 @@ struct fk_result
     }
 };
 
-} // namespace liepp
+}
 
 #endif

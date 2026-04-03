@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_SERIAL_FK_JACOBIAN_H
-#define HPP_GUARD_LIEPP_SERIAL_FK_JACOBIAN_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_FK_JACOBIAN_H
+#define HPP_GUARD_CARTAN_SERIAL_FK_JACOBIAN_H
 
 /// @file jacobian.h
 /// @brief Space and body Jacobian computation for kinematic chains.
@@ -11,20 +11,20 @@
 ///
 /// Reference: Lynch & Park, Modern Robotics, Ch. 5, p. 174-190.
 
-#include "liepp/types.h"
+#include "cartan/types.h"
 
-#include "liepp/serial/fk/fk_result.h"
-#include "liepp/serial/fk/detail/axis_specializations.h"
+#include "cartan/serial/fk/fk_result.h"
+#include "cartan/serial/fk/detail/axis_specializations.h"
 
-#include "liepp/serial/chain/chain_concept.h"
-#include "liepp/serial/chain/static_chain.h"
-#include "liepp/serial/chain/kinematic_chain.h"
+#include "cartan/serial/chain/chain_concept.h"
+#include "cartan/serial/chain/static_chain.h"
+#include "cartan/serial/chain/kinematic_chain.h"
 
 #include <tuple>
 #include <utility>
 #include <type_traits>
 
-namespace liepp
+namespace cartan
 {
 
 /// Jacobian matrix type: 6xN fixed for compile-time N, 6xDynamic otherwise.
@@ -110,7 +110,7 @@ jacobian_matrix<Scalar, N> space_jacobian_unrolled(
 ///
 /// Reference: Lynch & Park, Modern Robotics, Eq. 5.11, p. 178.
 ///
-/// @tparam N      Number of joints (compile-time), or liepp::dynamic.
+/// @tparam N      Number of joints (compile-time), or cartan::dynamic.
 /// @tparam Scalar Floating-point type.
 /// @param chain   Kinematic chain with screw axes.
 /// @param fk      Forward kinematics result with cached intermediates.
@@ -136,7 +136,7 @@ jacobian_matrix<Scalar, N> space_jacobian(
 ///
 /// Reference: Lynch & Park, Modern Robotics, Eq. 5.22, p. 185.
 ///
-/// @tparam N      Number of joints (compile-time), or liepp::dynamic.
+/// @tparam N      Number of joints (compile-time), or cartan::dynamic.
 /// @tparam Scalar Floating-point type.
 /// @param chain   Kinematic chain with screw axes.
 /// @param fk      Forward kinematics result with cached intermediates.

@@ -1,12 +1,12 @@
-#ifndef HPP_GUARD_LIEPP_TYPES_H
-#define HPP_GUARD_LIEPP_TYPES_H
+#ifndef HPP_GUARD_CARTAN_TYPES_H
+#define HPP_GUARD_CARTAN_TYPES_H
 
 #include <Eigen/Dense>
 
 #include <cstddef>
 #include <numbers>
 
-namespace liepp
+namespace cartan
 {
 
 template <typename Scalar, std::size_t Rows, std::size_t Cols>

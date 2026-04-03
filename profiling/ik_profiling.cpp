@@ -4,20 +4,20 @@
 
 #include "chain_factories.h"
 
-#include <liepp/serial/ik/ik_types.h>
-#include <liepp/serial/ik/lm_solve_policy.h>
-#include <liepp/serial/ik/limits_policy.h>
-#include <liepp/serial/ik/basic_ik_solver.h>
-#include <liepp/serial/ik/default_solvers.h>
-#include <liepp/serial/ik/dls_solve_policy.h>
-#include <liepp/serial/ik/slsqp_solve_policy.h>
-#include <liepp/serial/ik/lbfgsb_solve_policy.h>
-#include <liepp/serial/ik/restart_solve_policy.h>
-#include <liepp/serial/ik/projected_lm_solve_policy.h>
-#include <liepp/serial/ik/newton_raphson_solve_policy.h>
+#include <cartan/serial/ik/ik_types.h>
+#include <cartan/serial/ik/lm_solve_policy.h>
+#include <cartan/serial/ik/limits_policy.h>
+#include <cartan/serial/ik/basic_ik_solver.h>
+#include <cartan/serial/ik/default_solvers.h>
+#include <cartan/serial/ik/dls_solve_policy.h>
+#include <cartan/serial/ik/slsqp_solve_policy.h>
+#include <cartan/serial/ik/lbfgsb_solve_policy.h>
+#include <cartan/serial/ik/restart_solve_policy.h>
+#include <cartan/serial/ik/projected_lm_solve_policy.h>
+#include <cartan/serial/ik/newton_raphson_solve_policy.h>
 
-#ifdef LIEPP_HAS_NLOPT
-#include <liepp/serial/ik/nlopt_slsqp_solve_policy.h>
+#ifdef CARTAN_HAS_NLOPT
+#include <cartan/serial/ik/nlopt_slsqp_solve_policy.h>
 #endif
 
 #include <benchmark/benchmark.h>
@@ -38,20 +38,20 @@ constexpr int num_targets = 1000;
 template <typename Scalar, int N>
 struct target_set
 {
-    using position_type = typename liepp::joint_state<Scalar, N>::position_type;
+    using position_type = typename cartan::joint_state<Scalar, N>::position_type;
 
-    std::vector<liepp::se3<Scalar>> targets;
+    std::vector<cartan::se3<Scalar>> targets;
     std::vector<position_type> seeds;
 
-    target_set(const liepp::kinematic_chain<Scalar, N>& chain, int count, unsigned seed = 42)
+    target_set(const cartan::kinematic_chain<Scalar, N>& chain, int count, unsigned seed = 42)
     {
         std::mt19937 rng(seed);
         targets.reserve(static_cast<std::size_t>(count));
         seeds.reserve(static_cast<std::size_t>(count));
         for (int i = 0; i < count; ++i)
         {
-            targets.push_back(liepp::benchmarks::random_reachable_target(chain, rng));
-            seeds.push_back(liepp::benchmarks::random_joint_config(chain, rng));
+            targets.push_back(cartan::benchmarks::random_reachable_target(chain, rng));
+            seeds.push_back(cartan::benchmarks::random_joint_config(chain, rng));
         }
     }
 };
@@ -63,9 +63,9 @@ struct target_set
 template <int N, typename Solver>
 void bm_native_solver(
     benchmark::State& state,
-    const liepp::kinematic_chain<double, N>& chain,
+    const cartan::kinematic_chain<double, N>& chain,
     const target_set<double, N>& ts,
-    const liepp::convergence_criteria<double>& criteria)
+    const cartan::convergence_criteria<double>& criteria)
 {
     std::size_t idx = 0;
     int successes = 0;
@@ -87,7 +87,7 @@ void bm_native_solver(
         {
             ++successes;
             total_iterations += result->iterations;
-            auto [position_error, orientation_error] = liepp::benchmarks::compute_pose_errors(
+            auto [position_error, orientation_error] = cartan::benchmarks::compute_pose_errors(
                 chain, result->solution.position, target);
             total_position_error += position_error;
             total_orientation_error += orientation_error;
@@ -116,49 +116,49 @@ void bm_native_solver(
 
 // Chain type shorthand
 template <int N>
-using chain_t = liepp::kinematic_chain<double, N>;
+using chain_t = cartan::kinematic_chain<double, N>;
 
 // Native family
 template <int N>
-using speed_ik_solver = liepp::basic_ik_solver<liepp::speed_solver<chain_t<N>>>;
+using speed_ik_solver = cartan::basic_ik_solver<cartan::speed_solver<chain_t<N>>>;
 
 template <int N>
-using convergence_ik_solver = liepp::basic_ik_solver<liepp::convergence_solver<chain_t<N>>>;
+using convergence_ik_solver = cartan::basic_ik_solver<cartan::convergence_solver<chain_t<N>>>;
 
 template <int N>
-using restart_lm = liepp::restart_solve_policy<chain_t<N>, liepp::lm_solve_policy<chain_t<N>, liepp::no_limits>>;
+using restart_lm = cartan::restart_solve_policy<chain_t<N>, cartan::lm_solve_policy<chain_t<N>, cartan::no_limits>>;
 
 template <int N>
-using restart_lm_ik_solver = liepp::basic_ik_solver<restart_lm<N>>;
+using restart_lm_ik_solver = cartan::basic_ik_solver<restart_lm<N>>;
 
 template <int N>
-using racing_solver = liepp::default_solver<chain_t<N>>;
+using racing_solver = cartan::default_solver<chain_t<N>>;
 
 // nablapp family (always available)
 template <int N>
-using nablapp_slsqp_restart = liepp::restart_solve_policy<chain_t<N>, liepp::slsqp_solve_policy<chain_t<N>>>;
+using nablapp_slsqp_restart = cartan::restart_solve_policy<chain_t<N>, cartan::slsqp_solve_policy<chain_t<N>>>;
 
 template <int N>
-using nablapp_slsqp_solver = liepp::basic_ik_solver<nablapp_slsqp_restart<N>>;
+using nablapp_slsqp_solver = cartan::basic_ik_solver<nablapp_slsqp_restart<N>>;
 
-// NLopt family (behind LIEPP_HAS_NLOPT)
-#ifdef LIEPP_HAS_NLOPT
+// NLopt family (behind CARTAN_HAS_NLOPT)
+#ifdef CARTAN_HAS_NLOPT
 template <int N>
-using nlopt_slsqp_restart = liepp::restart_solve_policy<chain_t<N>, liepp::nlopt_slsqp_solve_policy<chain_t<N>>>;
+using nlopt_slsqp_restart = cartan::restart_solve_policy<chain_t<N>, cartan::nlopt_slsqp_solve_policy<chain_t<N>>>;
 
 template <int N>
-using nlopt_slsqp_solver = liepp::basic_ik_solver<nlopt_slsqp_restart<N>>;
+using nlopt_slsqp_solver = cartan::basic_ik_solver<nlopt_slsqp_restart<N>>;
 #endif
 
 // ============================================================================
 // Convergence criteria per solver family
 // ============================================================================
 
-inline liepp::convergence_criteria<double> speed_criteria()                { return {1e-5, 1e-5, 200}; }
-inline liepp::convergence_criteria<double> convergence_criteria_tuned()    { return {1e-5, 1e-5, 500}; }
-inline liepp::convergence_criteria<double> restart_lm_criteria()           { return {1e-5, 1e-5, 200}; }
-inline liepp::convergence_criteria<double> nablapp_criteria()              { return {1e-5, 1e-5, 500}; }
-inline liepp::convergence_criteria<double> nlopt_criteria()                { return {1e-5, 1e-5, 500}; }
+inline cartan::convergence_criteria<double> speed_criteria()                { return {1e-5, 1e-5, 200}; }
+inline cartan::convergence_criteria<double> convergence_criteria_tuned()    { return {1e-5, 1e-5, 500}; }
+inline cartan::convergence_criteria<double> restart_lm_criteria()           { return {1e-5, 1e-5, 200}; }
+inline cartan::convergence_criteria<double> nablapp_criteria()              { return {1e-5, 1e-5, 500}; }
+inline cartan::convergence_criteria<double> nlopt_criteria()                { return {1e-5, 1e-5, 500}; }
 
 // ============================================================================
 // Macro-based benchmark registration
@@ -169,7 +169,7 @@ inline liepp::convergence_criteria<double> nlopt_criteria()                { ret
                                                                                                        \
 static void bm_profiling_##ROBOT##_speed(benchmark::State& state)                                      \
 {                                                                                                      \
-    auto chain = liepp::benchmarks::CHAIN_FN<double>();                                                \
+    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                                \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                     \
     bm_native_solver<6, speed_ik_solver<6>>(state, chain, ts, speed_criteria());                       \
 }                                                                                                      \
@@ -177,7 +177,7 @@ BENCHMARK(bm_profiling_##ROBOT##_speed)->Iterations(1000)->Unit(benchmark::kMicr
                                                                                                        \
 static void bm_profiling_##ROBOT##_convergence(benchmark::State& state)                                \
 {                                                                                                      \
-    auto chain = liepp::benchmarks::CHAIN_FN<double>();                                                \
+    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                                \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                     \
     bm_native_solver<6, convergence_ik_solver<6>>(state, chain, ts, convergence_criteria_tuned());     \
 }                                                                                                      \
@@ -185,7 +185,7 @@ BENCHMARK(bm_profiling_##ROBOT##_convergence)->Iterations(1000)->Unit(benchmark:
                                                                                                        \
 static void bm_profiling_##ROBOT##_restart_lm(benchmark::State& state)                                 \
 {                                                                                                      \
-    auto chain = liepp::benchmarks::CHAIN_FN<double>();                                                \
+    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                                \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                     \
     bm_native_solver<6, restart_lm_ik_solver<6>>(state, chain, ts, restart_lm_criteria());             \
 }                                                                                                      \
@@ -193,7 +193,7 @@ BENCHMARK(bm_profiling_##ROBOT##_restart_lm)->Iterations(1000)->Unit(benchmark::
                                                                                                        \
 static void bm_profiling_##ROBOT##_racing(benchmark::State& state)                                     \
 {                                                                                                      \
-    auto chain = liepp::benchmarks::CHAIN_FN<double>();                                                \
+    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                                \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                     \
     bm_native_solver<6, racing_solver<6>>(state, chain, ts, convergence_criteria_tuned());             \
 }                                                                                                      \
@@ -201,19 +201,19 @@ BENCHMARK(bm_profiling_##ROBOT##_racing)->Iterations(1000)->Unit(benchmark::kMic
                                                                                                        \
 static void bm_profiling_##ROBOT##_nablapp_slsqp(benchmark::State& state)                              \
 {                                                                                                      \
-    auto chain = liepp::benchmarks::CHAIN_FN<double>();                                                \
+    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                                \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                     \
     bm_native_solver<6, nablapp_slsqp_solver<6>>(state, chain, ts, nablapp_criteria());                \
 }                                                                                                      \
 BENCHMARK(bm_profiling_##ROBOT##_nablapp_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 // Register NLopt solver benchmarks for a 6-DOF robot.
-#ifdef LIEPP_HAS_NLOPT
+#ifdef CARTAN_HAS_NLOPT
 #define REGISTER_6DOF_NLOPT_PROFILING(ROBOT, CHAIN_FN)                                                 \
                                                                                                        \
 static void bm_profiling_##ROBOT##_nlopt_slsqp(benchmark::State& state)                                \
 {                                                                                                      \
-    auto chain = liepp::benchmarks::CHAIN_FN<double>();                                                \
+    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                                \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                     \
     bm_native_solver<6, nlopt_slsqp_solver<6>>(state, chain, ts, nlopt_criteria());                    \
 }                                                                                                      \
@@ -227,7 +227,7 @@ BENCHMARK(bm_profiling_##ROBOT##_nlopt_slsqp)->Iterations(1000)->Unit(benchmark:
                                                                                                        \
 static void bm_profiling_##ROBOT##_speed(benchmark::State& state)                                      \
 {                                                                                                      \
-    auto chain = liepp::benchmarks::CHAIN_FN<double>();                                                \
+    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                                \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                     \
     bm_native_solver<7, speed_ik_solver<7>>(state, chain, ts, speed_criteria());                       \
 }                                                                                                      \
@@ -235,7 +235,7 @@ BENCHMARK(bm_profiling_##ROBOT##_speed)->Iterations(1000)->Unit(benchmark::kMicr
                                                                                                        \
 static void bm_profiling_##ROBOT##_convergence(benchmark::State& state)                                \
 {                                                                                                      \
-    auto chain = liepp::benchmarks::CHAIN_FN<double>();                                                \
+    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                                \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                     \
     bm_native_solver<7, convergence_ik_solver<7>>(state, chain, ts, convergence_criteria_tuned());     \
 }                                                                                                      \
@@ -243,7 +243,7 @@ BENCHMARK(bm_profiling_##ROBOT##_convergence)->Iterations(1000)->Unit(benchmark:
                                                                                                        \
 static void bm_profiling_##ROBOT##_restart_lm(benchmark::State& state)                                 \
 {                                                                                                      \
-    auto chain = liepp::benchmarks::CHAIN_FN<double>();                                                \
+    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                                \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                     \
     bm_native_solver<7, restart_lm_ik_solver<7>>(state, chain, ts, restart_lm_criteria());             \
 }                                                                                                      \
@@ -251,7 +251,7 @@ BENCHMARK(bm_profiling_##ROBOT##_restart_lm)->Iterations(1000)->Unit(benchmark::
                                                                                                        \
 static void bm_profiling_##ROBOT##_racing(benchmark::State& state)                                     \
 {                                                                                                      \
-    auto chain = liepp::benchmarks::CHAIN_FN<double>();                                                \
+    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                                \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                     \
     bm_native_solver<7, racing_solver<7>>(state, chain, ts, convergence_criteria_tuned());             \
 }                                                                                                      \
@@ -259,19 +259,19 @@ BENCHMARK(bm_profiling_##ROBOT##_racing)->Iterations(1000)->Unit(benchmark::kMic
                                                                                                        \
 static void bm_profiling_##ROBOT##_nablapp_slsqp(benchmark::State& state)                              \
 {                                                                                                      \
-    auto chain = liepp::benchmarks::CHAIN_FN<double>();                                                \
+    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                                \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                     \
     bm_native_solver<7, nablapp_slsqp_solver<7>>(state, chain, ts, nablapp_criteria());                \
 }                                                                                                      \
 BENCHMARK(bm_profiling_##ROBOT##_nablapp_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 // Register NLopt solver benchmarks for a 7-DOF robot.
-#ifdef LIEPP_HAS_NLOPT
+#ifdef CARTAN_HAS_NLOPT
 #define REGISTER_7DOF_NLOPT_PROFILING(ROBOT, CHAIN_FN)                                                 \
                                                                                                        \
 static void bm_profiling_##ROBOT##_nlopt_slsqp(benchmark::State& state)                                \
 {                                                                                                      \
-    auto chain = liepp::benchmarks::CHAIN_FN<double>();                                                \
+    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                                \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                     \
     bm_native_solver<7, nlopt_slsqp_solver<7>>(state, chain, ts, nlopt_criteria());                    \
 }                                                                                                      \

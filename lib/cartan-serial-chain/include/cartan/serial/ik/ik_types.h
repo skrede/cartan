@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_SERIAL_IK_IK_TYPES_H
-#define HPP_GUARD_LIEPP_SERIAL_IK_IK_TYPES_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_IK_TYPES_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_IK_TYPES_H
 
 /// @file ik_types.h
 /// @brief Foundation types for inverse kinematics: status, objective,
@@ -7,12 +7,12 @@
 ///
 /// Reference: Lynch & Park, Modern Robotics, Ch. 6.2, p. 227-233.
 
-#include "liepp/serial/chain/joint_state.h"
-#include "liepp/serial/chain/storage_trait.h"
+#include "cartan/serial/chain/joint_state.h"
+#include "cartan/serial/chain/storage_trait.h"
 
 #include <type_traits>
 
-namespace liepp
+namespace cartan
 {
 
 /// Status returned by each IK stepper step() call.

@@ -1,10 +1,10 @@
-#ifndef HPP_GUARD_LIEPP_LIE_POLICY_H
-#define HPP_GUARD_LIEPP_LIE_POLICY_H
+#ifndef HPP_GUARD_CARTAN_LIE_POLICY_H
+#define HPP_GUARD_CARTAN_LIE_POLICY_H
 
 #include <concepts>
 #include <type_traits>
 
-namespace liepp
+namespace cartan
 {
 
 /// Policy that normalizes group elements on construction and asserts validity.
@@ -39,6 +39,6 @@ concept lie_group_policy = requires
     { P::assert_valid } -> std::convertible_to<bool>;
 };
 
-} // namespace liepp
+}
 
 #endif

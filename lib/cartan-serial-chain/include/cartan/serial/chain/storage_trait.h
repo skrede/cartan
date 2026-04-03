@@ -1,19 +1,19 @@
-#ifndef HPP_GUARD_LIEPP_SERIAL_CHAIN_STORAGE_TRAIT_H
-#define HPP_GUARD_LIEPP_SERIAL_CHAIN_STORAGE_TRAIT_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_CHAIN_STORAGE_TRAIT_H
+#define HPP_GUARD_CARTAN_SERIAL_CHAIN_STORAGE_TRAIT_H
 
 /// @file storage_trait.h
 /// @brief Fixed/dynamic storage selector for kinematic chain containers.
 ///
 /// Provides a compile-time selector between std::array (fixed N) and
-/// std::vector (dynamic) storage, controlled by the liepp::dynamic sentinel.
+/// std::vector (dynamic) storage, controlled by the cartan::dynamic sentinel.
 
-#include "liepp/types.h"
+#include "cartan/types.h"
 
 #include <array>
 #include <vector>
 #include <cstddef>
 
-namespace liepp
+namespace cartan
 {
 
 namespace detail
@@ -40,6 +40,6 @@ template <int N, typename T>
 using storage_t = typename storage_selector<N, T>::type;
 
 } // namespace detail
-} // namespace liepp
+}
 
 #endif

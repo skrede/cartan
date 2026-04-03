@@ -1,16 +1,16 @@
-#ifndef HPP_GUARD_LIEPP_SERIAL_IK_ANALYTICAL_GRADIENT_H
-#define HPP_GUARD_LIEPP_SERIAL_IK_ANALYTICAL_GRADIENT_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_ANALYTICAL_GRADIENT_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_ANALYTICAL_GRADIENT_H
 
-#include "liepp/types.h"
+#include "cartan/types.h"
 
-#include "liepp/lie/se3.h"
-#include "liepp/serial/ik/error_weight.h"
-#include "liepp/lie/se3_left_jacobian.h"
-#include "liepp/serial/chain/chain_concept.h"
-#include "liepp/serial/fk/jacobian.h"
-#include "liepp/serial/fk/forward_kinematics.h"
+#include "cartan/lie/se3.h"
+#include "cartan/serial/ik/error_weight.h"
+#include "cartan/lie/se3_left_jacobian.h"
+#include "cartan/serial/chain/chain_concept.h"
+#include "cartan/serial/fk/jacobian.h"
+#include "cartan/serial/fk/forward_kinematics.h"
 
-namespace liepp
+namespace cartan
 {
 
 /// Result of IK objective evaluation: scalar objective, body-frame error,

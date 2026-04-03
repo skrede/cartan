@@ -1,9 +1,9 @@
-#ifndef HPP_GUARD_LIEPP_FRAMES_FRAMED_WRENCH_H
-#define HPP_GUARD_LIEPP_FRAMES_FRAMED_WRENCH_H
+#ifndef HPP_GUARD_CARTAN_FRAMES_FRAMED_WRENCH_H
+#define HPP_GUARD_CARTAN_FRAMES_FRAMED_WRENCH_H
 
-#include "liepp/frames/transform.h"
+#include "cartan/frames/transform.h"
 
-namespace liepp
+namespace cartan
 {
 
 /// Compile-time frame-tagged wrapper over wrench (6-vector).
@@ -51,6 +51,6 @@ coadjoint_map(const transform<From, To, Scalar, Policy>& T,
     return framed_wrench<From, Scalar>{result};
 }
 
-} // namespace liepp
+}
 
 #endif

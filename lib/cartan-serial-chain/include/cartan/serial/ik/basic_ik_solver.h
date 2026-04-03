@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_LIEPP_SERIAL_IK_BASIC_IK_SOLVER_H
-#define HPP_GUARD_LIEPP_SERIAL_IK_BASIC_IK_SOLVER_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_BASIC_IK_SOLVER_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_BASIC_IK_SOLVER_H
 
 /// @file basic_ik_solver.h
 /// @brief Variadic policy-based IK solver with cooperative interleaved racing.
@@ -15,15 +15,15 @@
 /// Reference: Lynch & Park, Modern Robotics, Ch. 6.2, p. 227-233.
 ///            Phase 13 decisions D-01 through D-09.
 
-#include "liepp/serial/ik/ik_types.h"
-#include "liepp/serial/ik/ik_solve_policy.h"
-#include "liepp/serial/ik/halton_seed_generator.h"
+#include "cartan/serial/ik/ik_types.h"
+#include "cartan/serial/ik/ik_solve_policy.h"
+#include "cartan/serial/ik/halton_seed_generator.h"
 
-#include "liepp/lie/se3.h"
-#include "liepp/serial/fk/jacobian.h"
-#include "liepp/serial/chain/joint_state.h"
-#include "liepp/serial/chain/chain_concept.h"
-#include "liepp/serial/fk/forward_kinematics.h"
+#include "cartan/lie/se3.h"
+#include "cartan/serial/fk/jacobian.h"
+#include "cartan/serial/chain/joint_state.h"
+#include "cartan/serial/chain/chain_concept.h"
+#include "cartan/serial/fk/forward_kinematics.h"
 
 #include <Eigen/SVD>
 
@@ -36,7 +36,7 @@
 #include <concepts>
 #include <type_traits>
 
-namespace liepp
+namespace cartan
 {
 
 /// Check that all policies in a variadic pack agree on chain_type, scalar_type, and joints.

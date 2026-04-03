@@ -1,19 +1,19 @@
-#ifndef HPP_GUARD_LIEPP_ANALYTICAL_SOLVER_6R_H
-#define HPP_GUARD_LIEPP_ANALYTICAL_SOLVER_6R_H
+#ifndef HPP_GUARD_CARTAN_ANALYTICAL_SOLVER_6R_H
+#define HPP_GUARD_CARTAN_ANALYTICAL_SOLVER_6R_H
 
-#include "liepp/analytical/analytical_types.h"
-#include "liepp/analytical/analytical_solver.h"
-#include "liepp/analytical/paden_kahan.h"
-#include "liepp/analytical/detail/clamped_trig.h"
-#include "liepp/analytical/detail/fk_verification.h"
-#include "liepp/analytical/detail/wrist_center.h"
+#include "cartan/analytical/analytical_types.h"
+#include "cartan/analytical/analytical_solver.h"
+#include "cartan/analytical/paden_kahan.h"
+#include "cartan/analytical/detail/clamped_trig.h"
+#include "cartan/analytical/detail/fk_verification.h"
+#include "cartan/analytical/detail/wrist_center.h"
 
-#include "liepp/serial/chain/static_chain.h"
-#include "liepp/serial/chain/joint_tags.h"
+#include "cartan/serial/chain/static_chain.h"
+#include "cartan/serial/chain/joint_tags.h"
 
-#include "liepp/lie/se3.h"
-#include "liepp/lie/so3.h"
-#include "liepp/detail/epsilon.h"
+#include "cartan/lie/se3.h"
+#include "cartan/lie/so3.h"
+#include "cartan/detail/epsilon.h"
 
 #include <array>
 #include <cmath>
@@ -21,7 +21,7 @@
 #include <numbers>
 #include <tuple>
 
-namespace liepp
+namespace cartan
 {
 
 /// Closed-form IK solver for 6R mechanisms with Pieper geometry

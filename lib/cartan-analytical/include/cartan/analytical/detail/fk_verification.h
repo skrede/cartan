@@ -1,13 +1,13 @@
-#ifndef HPP_GUARD_LIEPP_ANALYTICAL_DETAIL_FK_VERIFICATION_H
-#define HPP_GUARD_LIEPP_ANALYTICAL_DETAIL_FK_VERIFICATION_H
+#ifndef HPP_GUARD_CARTAN_ANALYTICAL_DETAIL_FK_VERIFICATION_H
+#define HPP_GUARD_CARTAN_ANALYTICAL_DETAIL_FK_VERIFICATION_H
 
-#include "liepp/serial/chain/static_chain.h"
-#include "liepp/serial/chain/joint_tags.h"
-#include "liepp/serial/fk/forward_kinematics.h"
+#include "cartan/serial/chain/static_chain.h"
+#include "cartan/serial/chain/joint_tags.h"
+#include "cartan/serial/fk/forward_kinematics.h"
 
-#include "liepp/lie/se3.h"
+#include "cartan/lie/se3.h"
 
-namespace liepp::detail
+namespace cartan::detail
 {
 
 template <typename Scalar, joint_tag... Joints>
