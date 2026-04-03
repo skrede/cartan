@@ -1,6 +1,8 @@
 #ifndef HPP_GUARD_LIEPP_DETAIL_EPSILON_H
 #define HPP_GUARD_LIEPP_DETAIL_EPSILON_H
 
+#include <liepp/detail/compat.h>
+
 #include <cmath>
 #include <limits>
 #include <type_traits>
@@ -14,6 +16,9 @@ struct epsilon_traits
     static_assert(std::is_floating_point_v<Scalar>);
 
     static constexpr Scalar value = std::numeric_limits<Scalar>::epsilon();
+#if LIEPP_HAS_CONSTEXPR_CMATH
+    static constexpr Scalar sqrt_value = std::sqrt(std::numeric_limits<Scalar>::epsilon());
+#else
     static constexpr Scalar sqrt_value = []
     {
         if consteval
@@ -28,6 +33,7 @@ struct epsilon_traits
             return std::sqrt(std::numeric_limits<Scalar>::epsilon());
         }
     }();
+#endif
 };
 
 template <typename Scalar>
