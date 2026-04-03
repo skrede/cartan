@@ -1,6 +1,6 @@
 # IK Solver Composition Guide
 
-This guide shows how to assemble inverse kinematics solvers from liepp's composable solve policies. The `basic_ik_solver<Policies...>` template accepts one or more policies: a single policy gives direct solve, multiple policies give cooperative interleaved racing.
+This guide shows how to assemble inverse kinematics solvers from Cartan's composable solve policies. The `basic_ik_solver<Policies...>` template accepts one or more policies: a single policy gives direct solve, multiple policies give cooperative interleaved racing.
 
 **Prerequisites:** Familiarity with forward kinematics ([PoE Walkthrough](poe-walkthrough.md)) and basic IK concepts.
 
@@ -9,13 +9,13 @@ This guide shows how to assemble inverse kinematics solvers from liepp's composa
 The simplest case: one solve policy, direct solve.
 
 ```cpp
-#include <liepp/ik/basic_ik_solver.h>
-#include <liepp/ik/lm_solve_policy.h>
+#include <cartan/ik/basic_ik_solver.h>
+#include <cartan/ik/lm_solve_policy.h>
 
-liepp::basic_ik_solver solver{liepp::lm_solve_policy<double, 6>{}};
+cartan::basic_ik_solver solver{cartan::lm_solve_policy<double, 6>{}};
 
-auto target = liepp::se3<double>( /* desired pose */ );
-liepp::convergence_criteria<double> criteria{1e-6, 1e-6, 200};
+auto target = cartan::se3<double>( /* desired pose */ );
+cartan::convergence_criteria<double> criteria{1e-6, 1e-6, 200};
 Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
 
 solver.setup(chain, target, q0, criteria);
@@ -41,13 +41,13 @@ The `solve()` method returns `std::expected<ik_result, ik_error>`, giving struct
 The `restart_solve_policy` wraps any inner policy with multi-start capability. When the inner policy stalls, diverges, or hits its iteration limit, the wrapper re-seeds from a Halton sequence and retries with warm-start lambda preservation.
 
 ```cpp
-#include <liepp/ik/basic_ik_solver.h>
-#include <liepp/ik/restart_solve_policy.h>
-#include <liepp/ik/lm_solve_policy.h>
+#include <cartan/ik/basic_ik_solver.h>
+#include <cartan/ik/restart_solve_policy.h>
+#include <cartan/ik/lm_solve_policy.h>
 
 // restart_solve_policy wraps lm_solve_policy
-liepp::basic_ik_solver solver{
-    liepp::restart_solve_policy{liepp::lm_solve_policy<double, 6>{}}
+cartan::basic_ik_solver solver{
+    cartan::restart_solve_policy{cartan::lm_solve_policy<double, 6>{}}
 };
 
 solver.setup(chain, target, q0, criteria);
@@ -61,15 +61,15 @@ This is the recommended pattern for production use. Restart+LM achieves 99.9% su
 Pass two or more policies to `basic_ik_solver` for cooperative interleaved racing. Each `step()` performs one round-robin across all active policies, parking converged ones and selecting the best result based on the configured objective.
 
 ```cpp
-#include <liepp/ik/basic_ik_solver.h>
-#include <liepp/ik/restart_solve_policy.h>
-#include <liepp/ik/projected_lm_solve_policy.h>
-#include <liepp/ik/lbfgsb_solve_policy.h>
+#include <cartan/ik/basic_ik_solver.h>
+#include <cartan/ik/restart_solve_policy.h>
+#include <cartan/ik/projected_lm_solve_policy.h>
+#include <cartan/ik/lbfgsb_solve_policy.h>
 
 // Two restart-wrapped policies racing cooperatively
-liepp::basic_ik_solver solver{
-    liepp::restart_solve_policy{liepp::projected_lm_solve_policy<double, 7>{}},
-    liepp::restart_solve_policy{liepp::lbfgsb_solve_policy<double, 7>{}}
+cartan::basic_ik_solver solver{
+    cartan::restart_solve_policy{cartan::projected_lm_solve_policy<double, 7>{}},
+    cartan::restart_solve_policy{cartan::lbfgsb_solve_policy<double, 7>{}}
 };
 
 solver.setup(chain, target, q0, criteria);
@@ -91,12 +91,12 @@ Class template argument deduction allows constructing `basic_ik_solver` without 
 
 ```cpp
 // Scalar=double, N=6 deduced from lm_solve_policy<double, 6>
-liepp::basic_ik_solver solver{liepp::lm_solve_policy<double, 6>{}};
+cartan::basic_ik_solver solver{cartan::lm_solve_policy<double, 6>{}};
 
 // Scalar=double, N=7 deduced from the policies (all must agree)
-liepp::basic_ik_solver solver{
-    liepp::restart_solve_policy{liepp::projected_lm_solve_policy<double, 7>{}},
-    liepp::restart_solve_policy{liepp::lbfgsb_solve_policy<double, 7>{}}
+cartan::basic_ik_solver solver{
+    cartan::restart_solve_policy{cartan::projected_lm_solve_policy<double, 7>{}},
+    cartan::restart_solve_policy{cartan::lbfgsb_solve_policy<double, 7>{}}
 };
 ```
 
@@ -113,10 +113,10 @@ Three type aliases provide ready-to-use solver configurations:
 | `default_solver<double, 7>` | `basic_ik_solver<speed_solver, convergence_solver>` | Races both, first convergence wins |
 
 ```cpp
-#include <liepp/ik/default_solvers.h>
+#include <cartan/ik/default_solvers.h>
 
 // Use the default racing solver directly
-liepp::default_solver<double, 7> solver;
+cartan::default_solver<double, 7> solver;
 solver.setup(chain, target, q0, criteria);
 auto result = solver.solve();
 ```
@@ -128,11 +128,11 @@ Factory functions return builders requiring `.build()` as the materialization po
 ### Preset Builders
 
 ```cpp
-#include <liepp/ik/default_solvers.h>
+#include <cartan/ik/default_solvers.h>
 
-auto solver = liepp::make_speed_solver<double, 7>().build();
-auto solver = liepp::make_convergence_solver<double, 7>().build();
-auto solver = liepp::make_default_solver<double, 7>().build();
+auto solver = cartan::make_speed_solver<double, 7>().build();
+auto solver = cartan::make_convergence_solver<double, 7>().build();
+auto solver = cartan::make_default_solver<double, 7>().build();
 ```
 
 ### Composable Builder
@@ -140,21 +140,21 @@ auto solver = liepp::make_default_solver<double, 7>().build();
 Chain `.policy()` calls to accumulate policies, finish with `.build()`:
 
 ```cpp
-auto solver = liepp::make_solver<double, 7>()
-    .policy(liepp::restart_solve_policy{liepp::lm_solve_policy<double, 7>{}})
-    .policy(liepp::dls_solve_policy<double, 7>{})
+auto solver = cartan::make_solver<double, 7>()
+    .policy(cartan::restart_solve_policy{cartan::lm_solve_policy<double, 7>{}})
+    .policy(cartan::dls_solve_policy<double, 7>{})
     .build();
 ```
 
 ## nablapp Solvers
 
-The nablapp-backed policies (`slsqp_solve_policy`, `bobyqa_solve_policy`) are always available as nablapp is a required dependency of `liepp::kinematics`. They provide constrained optimization with joint limits as box bounds.
+The nablapp-backed policies (`slsqp_solve_policy`, `bobyqa_solve_policy`) are always available as nablapp is a required dependency of `cartan::kinematics`. They provide constrained optimization with joint limits as box bounds.
 
 ```cpp
-#include <liepp/ik/basic_ik_solver.h>
-#include <liepp/ik/slsqp_solve_policy.h>
+#include <cartan/ik/basic_ik_solver.h>
+#include <cartan/ik/slsqp_solve_policy.h>
 
-liepp::basic_ik_solver solver{liepp::slsqp_solve_policy<double, 7>{}};
+cartan::basic_ik_solver solver{cartan::slsqp_solve_policy<double, 7>{}};
 solver.setup(chain, target, q0, criteria);
 auto result = solver.solve();
 ```
@@ -162,10 +162,10 @@ auto result = solver.solve();
 BOBYQA is derivative-free, useful when the gradient is expensive or unreliable:
 
 ```cpp
-#include <liepp/ik/basic_ik_solver.h>
-#include <liepp/ik/bobyqa_solve_policy.h>
+#include <cartan/ik/basic_ik_solver.h>
+#include <cartan/ik/bobyqa_solve_policy.h>
 
-liepp::basic_ik_solver solver{liepp::bobyqa_solve_policy<double, 7>{}};
+cartan::basic_ik_solver solver{cartan::bobyqa_solve_policy<double, 7>{}};
 ```
 
 ## Mixing Families
@@ -173,15 +173,15 @@ liepp::basic_ik_solver solver{liepp::bobyqa_solve_policy<double, 7>{}};
 Any combination of native, nablapp, and NLopt policies can race together in a single `basic_ik_solver`:
 
 ```cpp
-#include <liepp/ik/basic_ik_solver.h>
-#include <liepp/ik/restart_solve_policy.h>
-#include <liepp/ik/projected_lm_solve_policy.h>
-#include <liepp/ik/slsqp_solve_policy.h>
+#include <cartan/ik/basic_ik_solver.h>
+#include <cartan/ik/restart_solve_policy.h>
+#include <cartan/ik/projected_lm_solve_policy.h>
+#include <cartan/ik/slsqp_solve_policy.h>
 
 // Race a native restart+projected-LM against nablapp SLSQP
-liepp::basic_ik_solver solver{
-    liepp::restart_solve_policy{liepp::projected_lm_solve_policy<double, 7>{}},
-    liepp::slsqp_solve_policy<double, 7>{}
+cartan::basic_ik_solver solver{
+    cartan::restart_solve_policy{cartan::projected_lm_solve_policy<double, 7>{}},
+    cartan::slsqp_solve_policy<double, 7>{}
 };
 
 solver.setup(chain, target, q0, criteria);

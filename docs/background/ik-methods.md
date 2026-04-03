@@ -11,7 +11,7 @@ Unlike forward kinematics (which has a unique closed-form solution), inverse
 kinematics may have zero, one, or infinitely many solutions, and generally
 requires iterative numerical methods.
 
-liepp provides three IK steppers: Damped Least Squares (DLS),
+Cartan provides three IK steppers: Damped Least Squares (DLS),
 Levenberg-Marquardt (LM), and Sequential Quadratic Programming (SQP). All
 operate on the body-frame error twist and expose a cooperative `step()`
 interface.
@@ -69,7 +69,7 @@ $\theta \leftarrow \theta + \Delta\theta$.
 **Properties:**
 - **Quadratic convergence** near the solution (when the Jacobian is well-conditioned)
 - **No damping:** Diverges or produces huge joint velocities near singularities
-- **Not used directly in liepp:** Both DLS and LM add damping to handle singularities
+- **Not used directly in Cartan:** Both DLS and LM add damping to handle singularities
 
 ## Damped Least Squares (DLS)
 
@@ -105,7 +105,7 @@ and robustness near singularities:
 
 ### SVD-Based Adaptive Damping (Nakamura)
 
-liepp's `dls_stepper` uses Nakamura's adaptive damping scheme. The body
+Cartan's `dls_stepper` uses Nakamura's adaptive damping scheme. The body
 Jacobian is decomposed via SVD: $J_b = U \Sigma V^\top$. The damping factor
 adapts based on the smallest singular value $\sigma_{\min}$:
 
@@ -126,7 +126,7 @@ $$
 This smoothly increases damping as the robot approaches a singularity, avoiding
 discontinuities in joint velocities.
 
-### liepp Implementation
+### Cartan Implementation
 
 ```
 dls_stepper<N, Scalar>
@@ -177,7 +177,7 @@ The lambda update rule:
 This trust-region strategy automatically adapts the damping: good steps reduce
 $\lambda$ (more aggressive), poor steps increase $\lambda$ (more conservative).
 
-### liepp Implementation
+### Cartan Implementation
 
 ```
 lm_stepper<N, Scalar>
@@ -207,13 +207,13 @@ $$
 where $H \approx J_b^\top J_b$ (Gauss-Newton Hessian approximation) and
 $g = -J_b^\top \xi_b$ (negative gradient).
 
-### liepp Implementation
+### Cartan Implementation
 
 ```
-sqp_stepper<N, Scalar>   // requires LIEPP_HAS_NLOPT
+sqp_stepper<N, Scalar>   // requires CARTAN_HAS_NLOPT
 ```
 
-liepp wraps NLopt's SLSQP algorithm. Joint limits from the `kinematic_chain`
+Cartan wraps NLopt's SLSQP algorithm. Joint limits from the `kinematic_chain`
 are passed as box constraints. The stepper runs a configurable budget of NLopt
 evaluations per `step()` call, enabling cooperative scheduling with other
 solvers.
@@ -230,7 +230,7 @@ $$
 \lVert \xi_\omega \rVert < \epsilon_\omega \qquad \text{and} \qquad \lVert \xi_v \rVert < \epsilon_v
 $$
 
-liepp uses the `convergence_criteria<Scalar>` struct:
+Cartan uses the `convergence_criteria<Scalar>` struct:
 
 | Parameter | Meaning | Default |
 |-----------|---------|---------|
@@ -243,7 +243,7 @@ different physical units (radians vs meters) and different magnitudes in
 practice. A combined norm $\lVert \xi_b \rVert < \epsilon$ conflates the two,
 making it difficult to set appropriate tolerances.
 
-liepp's `epsilon_v<Scalar>` trait provides scalar-appropriate default
+Cartan's `epsilon_v<Scalar>` trait provides scalar-appropriate default
 tolerances: `double` uses $10^{-6}$, `float` uses $10^{-4}$, reflecting
 the difference in machine precision.
 
@@ -259,9 +259,9 @@ All three steppers report status via `ik_status`:
 | `diverged` | Error exceeds divergence factor times initial error |
 | `joint_limit_hit` | Joint limit violated (SQP box constraint) |
 
-## liepp's Tick-Based Architecture
+## Cartan's Tick-Based Architecture
 
-liepp's IK architecture is designed around **cooperative scheduling**. Each
+Cartan's IK architecture is designed around **cooperative scheduling**. Each
 stepper is a passive object with a `step()` method that performs exactly one
 iteration. The scheduler (not the stepper) controls iteration allocation.
 
@@ -294,7 +294,7 @@ The `racing_scheduler` runs multiple steppers cooperatively:
    - `time_boxed_tick`: step until time budget exhausted
 
 This architecture replaces TRAC-IK's thread-per-solver model. Instead of
-spawning $O(N)$ threads, liepp schedules $N$ steppers cooperatively on a
+spawning $O(N)$ threads, Cartan schedules $N$ steppers cooperatively on a
 single thread. Multiple IK queries can run concurrently on separate threads
 without internal thread proliferation.
 

@@ -8,7 +8,7 @@ to a spatial twist -- a 6-vector combining angular and linear velocity in a
 single reference frame [1, Ch. 5, pp. 169--194].
 
 This page derives the space and body Jacobians column-by-column, discusses
-singularities and manipulability, and maps the theory to liepp's implementation.
+singularities and manipulability, and maps the theory to Cartan's implementation.
 
 ## Space Jacobian
 
@@ -166,9 +166,9 @@ When $\mu = 0$, the configuration is singular. The manipulability ellipsoid,
 defined by the singular values of $J$, visualizes the set of achievable
 end-effector velocities for a unit-norm joint velocity vector.
 
-## Numerical Computation in liepp
+## Numerical Computation in Cartan
 
-liepp computes the space Jacobian column-by-column using the cached
+Cartan computes the space Jacobian column-by-column using the cached
 intermediate products from `fk_result`. This avoids redundant matrix
 exponential computations:
 
@@ -189,9 +189,9 @@ For fixed-size chains ($N = 1$--$7$), the column loop is unrolled at compile
 time via fold expressions. For dynamic or larger chains, a runtime loop is
 used. Both paths produce identical results.
 
-## liepp Mapping
+## Cartan Mapping
 
-| Concept | liepp API |
+| Concept | Cartan API |
 |---------|-----------|
 | Space Jacobian $J_s(\theta)$ | `space_jacobian(chain, fk)` |
 | Body Jacobian $J_b(\theta)$ | `body_jacobian(chain, fk)` |

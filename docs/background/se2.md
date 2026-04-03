@@ -65,7 +65,7 @@ $v = (v_x, v_y) \in \mathbb{R}^2$ is the linear velocity component.
 ### Twist Representation
 
 The Lie algebra element is compactly represented as a 3-vector called a
-**twist**. liepp uses **omega-first** ordering following Lynch and Park
+**twist**. Cartan uses **omega-first** ordering following Lynch and Park
 [1, Ch. 3]:
 
 $$
@@ -76,7 +76,7 @@ The **hat map** (wedge operator) $[\cdot]^\wedge$ sends the 3-vector to the
 $3 \times 3$ matrix, and the **vee operator** $(\cdot)^\vee$ recovers the
 vector.
 
-> **Convention note:** liepp uses omega-first twist ordering
+> **Convention note:** Cartan uses omega-first twist ordering
 > $\xi = (\omega, v_x, v_y)$, consistent with Lynch and Park's convention
 > where the angular component precedes the linear component.
 
@@ -128,7 +128,7 @@ $$
 G(0) = I, \qquad p = v
 $$
 
-This is the pure translation case. liepp handles this branch explicitly to
+This is the pure translation case. Cartan handles this branch explicitly to
 avoid division by zero.
 
 ### Summary
@@ -214,11 +214,11 @@ planar motions. The bottom $2 \times 2$ block is the rotation $R$, and the
 $p_y, -p_x$ terms couple the angular velocity into a linear velocity shift
 (the "lever arm" effect).
 
-## liepp Mapping
+## Cartan Mapping
 
-| Math | liepp C++ | Notes |
+| Math | Cartan C++ | Notes |
 |------|-----------|-------|
-| $T \in \text{SE}(2)$ | `liepp::se2<Scalar>` | Internal: `so2` + `vector2` |
+| $T \in \text{SE}(2)$ | `cartan::se2<Scalar>` | Internal: `so2` + `vector2` |
 | $3 \times 3$ matrix | `se2<Scalar>::matrix()` | Returns `Eigen::Matrix<Scalar,3,3>` |
 | $\exp(\xi)$ | `se2<Scalar>::exp(v)` | `vector3<Scalar>` $(\omega, v_x, v_y)$ |
 | $\log(T)$ | `se2<Scalar>::log()` | Returns `vector3<Scalar>` |

@@ -1,6 +1,6 @@
-# liepp
+# Cartan
 
-![CI](https://github.com/skrede/liepp/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/skrede/cartan/actions/workflows/ci.yml/badge.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![C++23](https://img.shields.io/badge/C%2B%2B-23-blue.svg)
 
@@ -22,22 +22,22 @@ C++ Lie group and kinematics library for robotics.
 ```cmake
 include(FetchContent)
 FetchContent_Declare(
-    liepp
-    GIT_REPOSITORY https://github.com/skrede/liepp.git
+    cartan
+    GIT_REPOSITORY https://github.com/skrede/cartan.git
     GIT_TAG        main
 )
-FetchContent_MakeAvailable(liepp)
+FetchContent_MakeAvailable(cartan)
 
-target_link_libraries(my_app PRIVATE liepp::liepp)
+target_link_libraries(my_app PRIVATE cartan::cartan)
 ```
 
-This pulls liepp and its Eigen dependency automatically. No manual installation required.
+This pulls Cartan and its Eigen dependency automatically. No manual installation required.
 
 ### find_package
 
 ```cmake
-find_package(liepp CONFIG REQUIRED)
-target_link_libraries(my_app PRIVATE liepp::liepp)
+find_package(cartan CONFIG REQUIRED)
+target_link_libraries(my_app PRIVATE cartan::cartan)
 ```
 
 ## Requirements

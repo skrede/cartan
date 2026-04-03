@@ -1,6 +1,6 @@
 # Using Frame Tags for Type-Safe Transforms
 
-This guide shows how to use liepp's compile-time frame safety system. Frame tags prevent accidental composition of transforms between incompatible coordinate frames -- errors that are notoriously hard to catch at runtime but trivial to prevent at compile time.
+This guide shows how to use Cartan's compile-time frame safety system. Frame tags prevent accidental composition of transforms between incompatible coordinate frames -- errors that are notoriously hard to catch at runtime but trivial to prevent at compile time.
 
 **Prerequisites:** Familiarity with SE(3) rigid body transforms. See the [Lie Basics example](../../examples/lie_basics.cpp) for SE(3) fundamentals.
 
@@ -22,24 +22,24 @@ These tags carry no data. They serve purely as compile-time identifiers for coor
 A `transform<From, To>` wraps an `se3` value with frame annotations:
 
 ```cpp
-#include <liepp/frames/transform.h>
+#include <cartan/frames/transform.h>
 
 // Transform from World frame to Camera frame
-liepp::transform<World, Camera> T_wc{
-    liepp::se3<double>(
-        liepp::so3<double>::identity(),
-        liepp::vector3<double>(0, 0, 1.5))
+cartan::transform<World, Camera> T_wc{
+    cartan::se3<double>(
+        cartan::so3<double>::identity(),
+        cartan::vector3<double>(0, 0, 1.5))
 };
 
 // Identity transform
-auto T_id = liepp::transform<World, World>::identity();
+auto T_id = cartan::transform<World, World>::identity();
 
 // From a 4x4 matrix (with validation)
 Eigen::Matrix4d mat = Eigen::Matrix4d::Identity();
-auto T_result = liepp::transform<World, Camera>::from_matrix(mat);
+auto T_result = cartan::transform<World, Camera>::from_matrix(mat);
 if (T_result.has_value())
 {
-    liepp::transform<World, Camera> T = T_result.value();
+    cartan::transform<World, Camera> T = T_result.value();
 }
 ```
 
@@ -50,8 +50,8 @@ The template parameters read as "transforms **from** the first frame **to** the 
 Transforms compose with `operator*`, but **only when frames match**:
 
 ```cpp
-liepp::transform<World, Camera> T_wc{ /* ... */ };
-liepp::transform<Camera, Tool>  T_ct{ /* ... */ };
+cartan::transform<World, Camera> T_wc{ /* ... */ };
+cartan::transform<Camera, Tool>  T_ct{ /* ... */ };
 
 // Valid: World <- Camera <- Tool => World <- Tool
 auto T_wt = T_wc * T_ct;   // transform<World, Tool>
@@ -65,9 +65,9 @@ The compiler enforces that the `To` frame of the left operand matches the `From`
 Multi-step composition works naturally:
 
 ```cpp
-liepp::transform<World, Base>   T_wb{ /* ... */ };
-liepp::transform<Base, Camera>  T_bc{ /* ... */ };
-liepp::transform<Camera, Tool>  T_ct{ /* ... */ };
+cartan::transform<World, Base>   T_wb{ /* ... */ };
+cartan::transform<Base, Camera>  T_bc{ /* ... */ };
+cartan::transform<Camera, Tool>  T_ct{ /* ... */ };
 
 // Chains correctly: World <- Base <- Camera <- Tool
 auto T_wt = T_wb * T_bc * T_ct;  // transform<World, Tool>
@@ -78,7 +78,7 @@ auto T_wt = T_wb * T_bc * T_ct;  // transform<World, Tool>
 Inverting a transform flips the frame tags:
 
 ```cpp
-liepp::transform<World, Camera> T_wc{ /* ... */ };
+cartan::transform<World, Camera> T_wc{ /* ... */ };
 
 // Inverse: Camera <- World
 auto T_cw = T_wc.inverse();  // transform<Camera, World>
@@ -94,10 +94,10 @@ This is mathematically correct: if T maps Camera -> World, then T^{-1} maps Worl
 When you need the raw `se3` value for math operations or interop with untagged code, use `.m_value`:
 
 ```cpp
-liepp::transform<World, Camera> T_wc{ /* ... */ };
+cartan::transform<World, Camera> T_wc{ /* ... */ };
 
 // Access the underlying se3
-liepp::se3<double> raw = T_wc.m_value;
+cartan::se3<double> raw = T_wc.m_value;
 
 // Use se3 methods through the wrapper
 Eigen::Matrix4d mat = T_wc.matrix();
@@ -106,7 +106,7 @@ auto rot = T_wc.rotation();
 auto twist = T_wc.log();
 
 // Transform a point
-liepp::vector3<double> p_camera(0.1, 0.2, 0.3);
+cartan::vector3<double> p_camera(0.1, 0.2, 0.3);
 auto p_world = T_wc.act(p_camera);
 ```
 
@@ -117,21 +117,21 @@ The `m_value` member is public (aggregate struct), so bridging between framed an
 The same pattern applies to pure rotations with `rotation<From, To>`:
 
 ```cpp
-#include <liepp/frames/rotation.h>
+#include <cartan/frames/rotation.h>
 
 struct Imu {};
 struct Body {};
 
 // Rotation from IMU frame to Body frame
-liepp::rotation<Imu, Body> R_ib{liepp::so3<double>::exp(
-    liepp::vector3<double>(0.01, -0.02, 0.0))};
+cartan::rotation<Imu, Body> R_ib{cartan::so3<double>::exp(
+    cartan::vector3<double>(0.01, -0.02, 0.0))};
 
 // Composition, inverse -- same rules as transform
 auto R_bi = R_ib.inverse();            // rotation<Body, Imu>
 auto R_id = R_ib * R_bi;               // rotation<Imu, Imu>
 
 // Access underlying so3
-liepp::so3<double> raw = R_ib.m_value;
+cartan::so3<double> raw = R_ib.m_value;
 auto axis_angle = R_ib.log();
 auto R_mat = R_ib.matrix();
 ```
@@ -141,30 +141,30 @@ auto R_mat = R_ib.matrix();
 Velocity twists and force wrenches are tagged with a **single** frame (the frame in which they are expressed):
 
 ```cpp
-#include <liepp/frames/framed_twist.h>
-#include <liepp/frames/framed_wrench.h>
+#include <cartan/frames/framed_twist.h>
+#include <cartan/frames/framed_wrench.h>
 
 // Spatial twist expressed in the World frame
-liepp::framed_twist<World> V_world = liepp::framed_twist<World>::from_vector(
-    liepp::vector6<double>{{0, 0, 0.1, 0.5, 0, 0}});
+cartan::framed_twist<World> V_world = cartan::framed_twist<World>::from_vector(
+    cartan::vector6<double>{{0, 0, 0.1, 0.5, 0, 0}});
 
 // Access components
 auto omega = V_world.omega();  // angular velocity
 auto v = V_world.v();          // linear velocity
 
 // Transform twist between frames using the adjoint map
-liepp::transform<World, Camera> T_wc{ /* ... */ };
-auto V_camera = liepp::adjoint_map(T_wc.inverse(), V_world);
+cartan::transform<World, Camera> T_wc{ /* ... */ };
+auto V_camera = cartan::adjoint_map(T_wc.inverse(), V_world);
 // V_camera is framed_twist<Camera>
 
 // Wrench expressed in the Tool frame
-auto W_tool = liepp::framed_wrench<Tool>::from_moment_force(
-    liepp::vector3<double>(0, 0, 0.5),   // moment
-    liepp::vector3<double>(0, 0, -9.81)); // force
+auto W_tool = cartan::framed_wrench<Tool>::from_moment_force(
+    cartan::vector3<double>(0, 0, 0.5),   // moment
+    cartan::vector3<double>(0, 0, -9.81)); // force
 
 // Transform wrench using coadjoint map
-liepp::transform<World, Tool> T_wt{ /* ... */ };
-auto W_world = liepp::coadjoint_map(T_wt, W_tool);
+cartan::transform<World, Tool> T_wt{ /* ... */ };
+auto W_world = cartan::coadjoint_map(T_wt, W_tool);
 // W_world is framed_wrench<World>
 ```
 
@@ -187,13 +187,13 @@ auto W_world = liepp::coadjoint_map(T_wt, W_tool);
 
 ```cpp
 // Application layer: framed
-liepp::transform<World, Tool> T_wt = /* ... */;
+cartan::transform<World, Tool> T_wt = /* ... */;
 
 // Pass to library function expecting raw se3
 auto fk = some_library_function(T_wt.m_value);
 
 // Wrap result back into framed transform
-liepp::transform<World, Tool> result{fk};
+cartan::transform<World, Tool> result{fk};
 ```
 
 ## Further Reading

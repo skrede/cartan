@@ -1,28 +1,28 @@
 # Notation Conventions
 
-liepp follows the notation and conventions of Lynch and Park's *Modern
+Cartan follows the notation and conventions of Lynch and Park's *Modern
 Robotics* [1] as its primary reference. Siciliano et al.'s *Foundations of
 Robotics* [3] serves as a secondary reference for classical robotics concepts,
 and Barfoot's *State Estimation for Robotics* [2] as a tertiary reference for
 Lie group operations and uncertainty.
 
-This page maps the notation used in all three textbooks to liepp's C++ API,
+This page maps the notation used in all three textbooks to Cartan's C++ API,
 and documents the key convention choices that affect formula translation between
 references.
 
 ## Notation Table
 
 The following table maps mathematical concepts across the three reference
-textbooks and to their liepp C++ implementations.
+textbooks and to their Cartan C++ implementations.
 
 ### Lie Groups and Basic Operations
 
-| Concept | Lynch & Park [1] | Siciliano et al. [3] | Barfoot [2] | liepp C++ |
+| Concept | Lynch & Park [1] | Siciliano et al. [3] | Barfoot [2] | Cartan C++ |
 |---------|-----------------|---------------------|-------------|-----------|
-| 2D rotation group | $\text{SO}(2)$ | $\text{SO}(2)$ | $\text{SO}(2)$ | `liepp::so2<Scalar>` |
-| 3D rotation group | $\text{SO}(3)$ | $\text{SO}(3)$ | $\text{SO}(3)$ | `liepp::so3<Scalar>` |
-| 2D rigid motion group | $\text{SE}(2)$ | $\text{SE}(2)$ | $\text{SE}(2)$ | `liepp::se2<Scalar>` |
-| 3D rigid motion group | $\text{SE}(3)$ | $\text{SE}(3)$ | $\text{SE}(3)$ | `liepp::se3<Scalar>` |
+| 2D rotation group | $\text{SO}(2)$ | $\text{SO}(2)$ | $\text{SO}(2)$ | `cartan::so2<Scalar>` |
+| 3D rotation group | $\text{SO}(3)$ | $\text{SO}(3)$ | $\text{SO}(3)$ | `cartan::so3<Scalar>` |
+| 2D rigid motion group | $\text{SE}(2)$ | $\text{SE}(2)$ | $\text{SE}(2)$ | `cartan::se2<Scalar>` |
+| 3D rigid motion group | $\text{SE}(3)$ | $\text{SE}(3)$ | $\text{SE}(3)$ | `cartan::se3<Scalar>` |
 | Rotation matrix | $R$ | $R$ | $\mathbf{C}$ | `so3<Scalar>::matrix()` |
 | Homogeneous transform | $T$ | $T$ | $\mathbf{T}$ | `se3<Scalar>::matrix()` |
 | Identity element | $I$ | $I$ | $\mathbf{1}$ | `::identity()` |
@@ -31,7 +31,7 @@ textbooks and to their liepp C++ implementations.
 
 ### Rotation Representations
 
-| Concept | Lynch & Park [1] | Siciliano et al. [3] | Barfoot [2] | liepp C++ |
+| Concept | Lynch & Park [1] | Siciliano et al. [3] | Barfoot [2] | Cartan C++ |
 |---------|-----------------|---------------------|-------------|-----------|
 | Rotation vector | $\hat{\omega}\theta$ | $\phi$ (angle-axis) | $\boldsymbol{\phi}$ | `vector3<Scalar>` (to `exp`) |
 | Rotation angle | $\theta$ | $\theta$ | $\phi = \|\boldsymbol{\phi}\|$ | `axis_angle<Scalar>::angle` |
@@ -40,11 +40,11 @@ textbooks and to their liepp C++ implementations.
 
 ### Lie Algebra and Maps
 
-| Concept | Lynch & Park [1] | Siciliano et al. [3] | Barfoot [2] | liepp C++ |
+| Concept | Lynch & Park [1] | Siciliano et al. [3] | Barfoot [2] | Cartan C++ |
 |---------|-----------------|---------------------|-------------|-----------|
 | so(3) element | $[\omega]_\times \in \mathfrak{so}(3)$ | $S(\omega)$ (skew) | $\boldsymbol{\phi}^\wedge$ | `hat(omega)` |
-| Hat (wedge) operator | $[\cdot]$ or $[\cdot]_\times$ | $S(\cdot)$ | $(\cdot)^\wedge$ | `liepp::hat()` |
-| Vee operator | $[\cdot]^\vee$ | -- | $(\cdot)^\vee$ | `liepp::vee()` |
+| Hat (wedge) operator | $[\cdot]$ or $[\cdot]_\times$ | $S(\cdot)$ | $(\cdot)^\wedge$ | `cartan::hat()` |
+| Vee operator | $[\cdot]^\vee$ | -- | $(\cdot)^\vee$ | `cartan::vee()` |
 | Exponential map (SO3) | $e^{[\hat{\omega}]\theta}$ | $e^{S(\omega)\theta}$ | $\exp(\boldsymbol{\phi}^\wedge)$ | `so3<Scalar>::exp(phi)` |
 | Logarithmic map (SO3) | $\log R$ | -- | $\ln(\mathbf{C})^\vee$ | `so3<Scalar>::log()` |
 | Exponential map (SE3) | $e^{[\mathcal{S}]\theta}$ | -- | $\exp(\boldsymbol{\xi}^\wedge)$ | `se3<Scalar>::exp(V)` |
@@ -52,7 +52,7 @@ textbooks and to their liepp C++ implementations.
 
 ### Twists, Screws, and Velocities
 
-| Concept | Lynch & Park [1] | Siciliano et al. [3] | Barfoot [2] | liepp C++ |
+| Concept | Lynch & Park [1] | Siciliano et al. [3] | Barfoot [2] | Cartan C++ |
 |---------|-----------------|---------------------|-------------|-----------|
 | Spatial twist | $\mathcal{V} = (\omega, v)$ | -- | $\boldsymbol{\varpi}^s$ | `vector6<Scalar>` omega-first |
 | Body twist | $\mathcal{V}_b = (\omega_b, v_b)$ | -- | $\boldsymbol{\varpi}^b$ | `vector6<Scalar>` omega-first |
@@ -63,7 +63,7 @@ textbooks and to their liepp C++ implementations.
 
 ### Kinematics
 
-| Concept | Lynch & Park [1] | Siciliano et al. [3] | Barfoot [2] | liepp C++ |
+| Concept | Lynch & Park [1] | Siciliano et al. [3] | Barfoot [2] | Cartan C++ |
 |---------|-----------------|---------------------|-------------|-----------|
 | Forward kinematics | $T(\theta) = e^{[\mathcal{S}_1]\theta_1} \cdots e^{[\mathcal{S}_n]\theta_n} M$ | $T(q)$ | $\mathbf{T}(q)$ | `forward_kinematics(chain, q)` |
 | Home configuration | $M$ | -- | -- | `chain<...>::home_transform()` |
@@ -76,7 +76,7 @@ textbooks and to their liepp C++ implementations.
 
 ### Inverse Kinematics
 
-| Concept | Lynch & Park [1] | Siciliano et al. [3] | Barfoot [2] | liepp C++ |
+| Concept | Lynch & Park [1] | Siciliano et al. [3] | Barfoot [2] | Cartan C++ |
 |---------|-----------------|---------------------|-------------|-----------|
 | IK error twist | $\mathcal{V}_b = \log(T_{sd}^{-1} T_{sb})$ | $e = x_d - x$ | -- | Body-frame log error |
 | Damped least squares | -- | DLS / Levenberg | -- | `dls_stepper<DOF, Scalar>` |
@@ -85,7 +85,7 @@ textbooks and to their liepp C++ implementations.
 
 ## Twist Ordering Convention
 
-liepp uses **omega-first** twist ordering following Lynch and Park [1]:
+Cartan uses **omega-first** twist ordering following Lynch and Park [1]:
 
 $$
 \xi = \begin{pmatrix} \omega \\ v \end{pmatrix} \in \mathbb{R}^6
@@ -103,7 +103,7 @@ $$
 where $\boldsymbol{\rho}$ (translational) comes first and
 $\boldsymbol{\phi}$ (rotational) comes second.
 
-**When adapting formulas from Barfoot to liepp:** swap the top-3 and bottom-3
+**When adapting formulas from Barfoot to Cartan:** swap the top-3 and bottom-3
 components of any 6-vector, and correspondingly rearrange the rows and columns
 of any $6 \times 6$ matrix (adjoint, Jacobians, covariance).
 
@@ -113,10 +113,10 @@ $$
 \text{Ad}_T^{\text{Barfoot}} = \begin{bmatrix} \mathbf{C} & [\mathbf{r}]_\times \mathbf{C} \\ \mathbf{0} & \mathbf{C} \end{bmatrix}
 $$
 
-then liepp's adjoint (omega-first) is:
+then Cartan's adjoint (omega-first) is:
 
 $$
-[\text{Ad}_T]^{\text{liepp}} = \begin{bmatrix} R & 0 \\ [p]_\times R & R \end{bmatrix}
+[\text{Ad}_T]^{\text{Cartan}} = \begin{bmatrix} R & 0 \\ [p]_\times R & R \end{bmatrix}
 $$
 
 where $R = \mathbf{C}$ and $p = \mathbf{r}$, with rows and columns permuted
@@ -124,7 +124,7 @@ to place the angular block in the top-left.
 
 ## Frame Conventions
 
-liepp uses the **space-frame Product of Exponentials (PoE)** formulation from
+Cartan uses the **space-frame Product of Exponentials (PoE)** formulation from
 Lynch and Park [1, Ch. 4]:
 
 $$
@@ -137,7 +137,7 @@ where:
 - Exponentials multiply from left to right in joint order
 
 **Siciliano et al.** [3] use the geometric Jacobian $J$ which relates joint
-velocities to the end-effector twist. Their Jacobian corresponds to liepp's
+velocities to the end-effector twist. Their Jacobian corresponds to Cartan's
 **space Jacobian** $J_s$ when both are expressed in the same frame, but the
 frame attachment conventions may differ. Siciliano defines the Jacobian columns
 from DH parameters rather than PoE screw axes, so numerical values may need
@@ -168,7 +168,7 @@ $$
 
 where $\theta = \|\boldsymbol{\phi}\|$ and $\boldsymbol{\phi}$ is **not**
 necessarily unit length. This form uses sinc-type coefficients and is the form
-implemented in liepp (it handles arbitrary-magnitude rotation vectors directly).
+implemented in Cartan (it handles arbitrary-magnitude rotation vectors directly).
 
 ## Bibliography
 
