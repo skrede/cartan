@@ -356,4 +356,4 @@ auto make_1r_chain() -> cartan::kinematic_chain<Scalar, 1>
         {lim});
 }
 
-}::test
+}
