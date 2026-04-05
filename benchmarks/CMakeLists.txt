@@ -54,6 +54,9 @@ if (CARTAN_BUILD_TRAC_IK)
         SYSTEM
     )
     set(TRAC_IK_WITH_URDF OFF CACHE BOOL "" FORCE)
+    find_package(Eigen3 CONFIG REQUIRED)
+    set(EIGEN3_FOUND TRUE) # To satisfy orocos-kdl and their wrong capitalization requirement of Eigen3
+    set(EIGEN3_INCLUDE_DIR "${EIGEN3_INCLUDE_DIR}")
     FetchContent_MakeAvailable(trac_ik_lib)
 
     cartan_add_benchmark(ik_comparison_benchmarks ik_comparison_benchmarks.cpp)
