@@ -105,7 +105,7 @@ private:
             lock.unlock();
 
             // Solve IK using LM solve policy
-            cartan::basic_ik_solver<cartan::lm_solve_policy<cartan::kinematic_chain<double, 6>>> solver;
+            cartan::basic_ik_solver<cartan::restart_solve_policy<cartan::kinematic_chain<double, 6>>> solver;
             solver.setup(m_chain, req.target, req.q0, criteria);
             auto result = solver.solve();
 

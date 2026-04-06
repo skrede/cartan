@@ -103,6 +103,7 @@ public:
         nab_opts.max_iterations = m_options.budget_per_step;
         nab_opts.set_gradient_threshold(0.0);
         nab_opts.set_objective_threshold(1e-16);
+        nab_opts.set_stationarity_threshold(std::numeric_limits<double>::infinity());
         nab_opts.set_step_threshold(1e-16);
 
         typename nablapp::cmaes_policy<joints>::options_type policy_opts;
@@ -176,7 +177,8 @@ public:
     void abort() { m_status = ik_status::stalled; }
 
 private:
-    using nablapp_solver = nablapp::basic_solver<nablapp::cmaes_policy<joints>, joints>;
+    using nablapp_solver = nablapp::basic_solver<
+        nablapp::cmaes_policy<joints>, joints, detail::nablapp_ik_problem<Chain>>;
 
     void sync_solution_from_solver()
     {

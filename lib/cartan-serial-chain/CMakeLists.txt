@@ -5,7 +5,7 @@ if (CARTAN_BUILD_NABLAPP)
         FetchContent_Declare(
             nablapp
             GIT_REPOSITORY git@github.com:skrede/nablapp.git
-            GIT_TAG milestone/v0.2.0-11-intervention
+            GIT_TAG milestone/v0.2.0-11-opt
             EXCLUDE_FROM_ALL
             SYSTEM
         )

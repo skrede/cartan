@@ -176,7 +176,8 @@ public:
     void abort() { m_status = ik_status::stalled; }
 
 private:
-    using nablapp_solver = nablapp::basic_solver<nablapp::kraft_slsqp_policy<joints>, joints>;
+    using nablapp_solver = nablapp::basic_solver<
+        nablapp::kraft_slsqp_policy<joints>, joints, detail::nablapp_ik_problem<Chain>>;
 
     void sync_solution_from_solver()
     {

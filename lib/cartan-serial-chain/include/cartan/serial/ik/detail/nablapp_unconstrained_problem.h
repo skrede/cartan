@@ -48,21 +48,22 @@ public:
         return m_chain->num_joints();
     }
 
-    double value(const Eigen::VectorXd& x) const
+    template <typename Derived>
+    double value(const Eigen::MatrixBase<Derived>& x) const
     {
         auto q = to_position(x);
         auto result = ik_se3_objective<Chain>::evaluate(*m_chain, m_target, q, m_weight);
         return static_cast<double>(result.objective);
     }
 
-    void gradient(const Eigen::VectorXd& x, Eigen::VectorXd& g) const
+    template <typename DerivedIn, typename DerivedOut>
+    void gradient(const Eigen::MatrixBase<DerivedIn>& x, Eigen::MatrixBase<DerivedOut>& g) const
     {
         auto q = to_position(x);
         auto result = ik_se3_objective<Chain>::evaluate_with_gradient(
             *m_chain, m_target, q, m_weight);
 
         int n = m_chain->num_joints();
-        g.resize(n);
         for (int i = 0; i < n; ++i)
         {
             g[i] = static_cast<double>(result.gradient(i));
@@ -70,7 +71,8 @@ public:
     }
 
 private:
-    position_type to_position(const Eigen::VectorXd& x) const
+    template <typename Derived>
+    position_type to_position(const Eigen::MatrixBase<Derived>& x) const
     {
         int n = m_chain->num_joints();
         if constexpr (N == dynamic)

@@ -105,6 +105,7 @@ public:
         nab_opts.max_iterations = m_options.budget_per_step;
         nab_opts.set_gradient_threshold(0.0);
         nab_opts.set_objective_threshold(1e-14);
+        nab_opts.set_stationarity_threshold(std::numeric_limits<double>::infinity());
         nab_opts.set_step_threshold(1e-14);
 
         m_solver.emplace(*m_problem, x0, nab_opts);
@@ -175,7 +176,8 @@ public:
     void abort() { m_status = ik_status::stalled; }
 
 private:
-    using nablapp_solver = nablapp::basic_solver<nablapp::bobyqa_policy<>>;
+    using nablapp_solver = nablapp::basic_solver<
+        nablapp::bobyqa_policy<joints>, joints, detail::nablapp_ik_problem<Chain>>;
 
     void sync_solution_from_solver()
     {
