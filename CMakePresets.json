@@ -10,6 +10,7 @@
                 "CMAKE_BUILD_TYPE": "Debug",
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
                 "CARTAN_BUILD_TESTS": "ON",
+                "CARTAN_BUILD_ARGMIN": "ON",
                 "CARTAN_CMAKE_FETCH_DEPS": "ON"
             }
         },
@@ -25,6 +26,7 @@
                 "CARTAN_BUILD_EXAMPLES": "ON",
                 "CARTAN_BUILD_FUZZ_TESTS": "ON",
                 "CARTAN_BUILD_PROPERTY_TESTS": "ON",
+                "CARTAN_BUILD_ARGMIN": "ON",
                 "CARTAN_CMAKE_FETCH_DEPS": "ON"
             }
         },
@@ -35,6 +37,7 @@
             "binaryDir": "${sourceDir}/build/release",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
+                "CARTAN_BUILD_ARGMIN": "ON",
                 "CARTAN_CMAKE_FETCH_DEPS": "ON"
             }
         },
@@ -47,6 +50,7 @@
                 "CMAKE_BUILD_TYPE": "Debug",
                 "CMAKE_CXX_FLAGS": "--coverage -fprofile-arcs -ftest-coverage",
                 "CARTAN_BUILD_TESTS": "ON",
+                "CARTAN_BUILD_ARGMIN": "ON",
                 "CARTAN_CMAKE_FETCH_DEPS": "ON"
             }
         },
@@ -60,6 +64,7 @@
                 "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer",
                 "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined",
                 "CARTAN_BUILD_TESTS": "ON",
+                "CARTAN_BUILD_ARGMIN": "ON",
                 "CARTAN_CMAKE_FETCH_DEPS": "ON"
             }
         },
@@ -71,6 +76,7 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
                 "CARTAN_BUILD_BENCHMARKS": "ON",
+                "CARTAN_BUILD_ARGMIN": "ON",
                 "CARTAN_CMAKE_FETCH_DEPS": "ON"
             }
         },
@@ -82,6 +88,7 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
                 "CARTAN_BUILD_FUZZ_TESTS": "ON",
+                "CARTAN_BUILD_ARGMIN": "ON",
                 "CARTAN_CMAKE_FETCH_DEPS": "ON"
             }
         }
