@@ -1,20 +1,19 @@
-#ifndef HPP_GUARD_CARTAN_SERIAL_IK_SLSQP_SOLVE_POLICY_H
-#define HPP_GUARD_CARTAN_SERIAL_IK_SLSQP_SOLVE_POLICY_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_ARGMIN_LBFGSB_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_ARGMIN_LBFGSB_H
 
-/// @file slsqp_solve_policy.h
-/// @brief nablapp-backed SLSQP gradient-based IK solve policy with box constraints.
+/// @file argmin_lbfgsb.h
+/// @brief nablapp-backed L-BFGS-B IK solve policy with box constraints.
 ///
-/// Wraps nablapp's kraft_slsqp_policy for constrained IK, using joint
-/// limits as box constraints and the analytical gradient from
-/// ik_se3_objective (SE(3) log Jacobian). Always available -- nablapp
-/// is a required dependency of cartan::kinematics.
+/// Wraps nablapp's lbfgsb_policy for bound-constrained IK using
+/// analytical gradient via the SE(3) log Jacobian. Distinct from the
+/// native lbfgsb_solve_policy which implements L-BFGS-B directly.
 ///
-/// Reference: Kraft 1988, N&W Ch. 18 (SQP methods).
+/// Reference: Byrd, Lu, Nocedal, Zhu (1995), L-BFGS-B algorithm.
 
-#include "cartan/serial/ik/ik_types.h"
-#include "cartan/serial/ik/error_weight.h"
-#include "cartan/serial/ik/limits_policy.h"
-#include "cartan/serial/ik/ik_solve_policy.h"
+#include "cartan/serial/ik/ik_status.h"
+#include "cartan/serial/ik/policy/error_weight.h"
+#include "cartan/serial/ik/policy/limits_policy.h"
+#include "cartan/serial/ik/concepts/solve_concept.h"
 #include "cartan/serial/ik/detail/convergence.h"
 #include "cartan/serial/ik/detail/nablapp_problem.h"
 #include "cartan/serial/ik/detail/stall_detection.h"
@@ -27,29 +26,29 @@
 
 #include <nablapp/solver/options.h>
 #include <nablapp/solver/basic_solver.h>
-#include <nablapp/solver/kraft_slsqp_policy.h>
+#include <nablapp/solver/lbfgsb_policy.h>
 
 #include <Eigen/Core>
 
 #include <cmath>
 #include <limits>
-#include <memory>
+#include <optional>
 #include <vector>
 
-namespace cartan
+namespace cartan::ik
 {
 
-/// nablapp-backed SLSQP solve policy for constrained IK with box constraints.
+/// nablapp-backed L-BFGS-B solve policy for bound-constrained IK.
 ///
-/// Uses Kraft's Sequential Least Squares Programming algorithm via nablapp,
-/// with analytical gradient through the SE(3) log Jacobian. Each step()
-/// call runs a budget of nablapp iterations, allowing cooperative scheduling
-/// with other policies in basic_ik_solver.
+/// Uses the Limited-memory BFGS for Bound-constrained optimization via
+/// nablapp, with analytical gradient through the SE(3) log Jacobian.
+/// Each step() call runs a budget of nablapp iterations for cooperative
+/// scheduling in basic_ik_solver.
 ///
-/// This is the default (unprefixed) SLSQP policy. The NLopt-backed variant
-/// is available as nlopt_slsqp_solve_policy behind CARTAN_HAS_NLOPT.
+/// This is the nablapp-backed L-BFGS-B. The native cartan implementation
+/// is available as lbfgsb_solve_policy.
 template <chain Chain, typename LimitsPolicy = clamp_limits>
-class slsqp_solve_policy
+class argmin_lbfgsb
 {
 public:
     using chain_type = Chain;
@@ -59,7 +58,7 @@ public:
 
     using position_type = typename joint_state<scalar_type, joints>::position_type;
 
-    static_assert(std::is_floating_point_v<scalar_type>, "slsqp_solve_policy requires a floating-point Scalar type");
+    static_assert(std::is_floating_point_v<scalar_type>, "argmin_lbfgsb requires a floating-point Scalar type");
 
     struct options
     {
@@ -69,9 +68,9 @@ public:
         int stall_window{5};
     };
 
-    slsqp_solve_policy() = default;
+    nablapp_lbfgsb_solve_policy() = default;
 
-    explicit slsqp_solve_policy(const options& opts)
+    explicit nablapp_lbfgsb_solve_policy(const options& opts)
         : m_options{opts}
     {}
 
@@ -104,9 +103,9 @@ public:
 
         nablapp::solver_options<> nab_opts;
         nab_opts.max_iterations = m_options.budget_per_step;
-        nab_opts.set_gradient_threshold(1e-12);
-        nab_opts.set_objective_threshold(1e-14);
-        nab_opts.set_step_threshold(1e-14);
+        nab_opts.set_gradient_threshold(1e-14);
+        nab_opts.set_objective_threshold(1e-16);
+        nab_opts.set_step_threshold(1e-16);
 
         m_solver.emplace(*m_problem, x0, nab_opts);
     }
@@ -177,7 +176,7 @@ public:
 
 private:
     using nablapp_solver = nablapp::basic_solver<
-        nablapp::kraft_slsqp_policy<joints>, joints, detail::nablapp_ik_problem<Chain>>;
+        nablapp::lbfgsb_policy<joints>, joints, detail::nablapp_ik_problem<Chain>>;
 
     void sync_solution_from_solver()
     {

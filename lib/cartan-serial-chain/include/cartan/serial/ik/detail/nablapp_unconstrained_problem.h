@@ -8,8 +8,8 @@
 /// bounds. Joint limits are enforced externally by the solve policy
 /// via clamping after each step.
 
-#include "cartan/serial/ik/error_weight.h"
-#include "cartan/serial/ik/analytical_gradient.h"
+#include "cartan/serial/ik/policy/error_weight.h"
+#include "cartan/serial/ik/solver/detail/analytical_gradient.h"
 
 #include "cartan/lie/se3.h"
 #include "cartan/serial/chain/chain_concept.h"

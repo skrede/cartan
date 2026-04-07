@@ -8,8 +8,8 @@
 /// nablapp::constrained. Joint limits are expressed as 2n inequality
 /// constraints: q_i - q_min >= 0 and q_max - q_i >= 0.
 
-#include "cartan/serial/ik/error_weight.h"
-#include "cartan/serial/ik/analytical_gradient.h"
+#include "cartan/serial/ik/policy/error_weight.h"
+#include "cartan/serial/ik/solver/detail/analytical_gradient.h"
 
 #include "cartan/lie/se3.h"
 #include "cartan/serial/chain/chain_concept.h"

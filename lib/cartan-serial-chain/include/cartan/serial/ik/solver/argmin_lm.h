@@ -1,23 +1,23 @@
-#ifndef HPP_GUARD_CARTAN_SERIAL_IK_NABLAPP_LBFGSB_SOLVE_POLICY_H
-#define HPP_GUARD_CARTAN_SERIAL_IK_NABLAPP_LBFGSB_SOLVE_POLICY_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_ARGMIN_LM_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_ARGMIN_LM_H
 
-/// @file nablapp_lbfgsb_solve_policy.h
-/// @brief nablapp-backed L-BFGS-B IK solve policy with box constraints.
+/// @file argmin_lm.h
+/// @brief nablapp-backed Levenberg-Marquardt IK solve policy (least-squares).
 ///
-/// Wraps nablapp's lbfgsb_policy for bound-constrained IK using
-/// analytical gradient via the SE(3) log Jacobian. Distinct from the
-/// native lbfgsb_solve_policy which implements L-BFGS-B directly.
+/// Wraps nablapp's lm_policy using the least-squares problem adapter.
+/// The residual is the 6-element SE(3) body-frame error, and the Jacobian
+/// is the body Jacobian. LM is unconstrained; joint limits are enforced
+/// by clamping after each step (formulation A).
 ///
-/// Reference: Byrd, Lu, Nocedal, Zhu (1995), L-BFGS-B algorithm.
+/// Reference: Nielsen (1999), Levenberg-Marquardt method.
 
-#include "cartan/serial/ik/ik_types.h"
-#include "cartan/serial/ik/error_weight.h"
-#include "cartan/serial/ik/limits_policy.h"
-#include "cartan/serial/ik/ik_solve_policy.h"
+#include "cartan/serial/ik/ik_status.h"
+#include "cartan/serial/ik/policy/limits_policy.h"
+#include "cartan/serial/ik/concepts/solve_concept.h"
 #include "cartan/serial/ik/detail/convergence.h"
-#include "cartan/serial/ik/detail/nablapp_problem.h"
 #include "cartan/serial/ik/detail/stall_detection.h"
 #include "cartan/serial/ik/detail/limit_enforcement.h"
+#include "cartan/serial/ik/detail/nablapp_least_squares_problem.h"
 
 #include "cartan/lie/se3.h"
 #include "cartan/serial/chain/joint_state.h"
@@ -25,8 +25,8 @@
 #include "cartan/serial/fk/forward_kinematics.h"
 
 #include <nablapp/solver/options.h>
+#include <nablapp/solver/lm_policy.h>
 #include <nablapp/solver/basic_solver.h>
-#include <nablapp/solver/lbfgsb_policy.h>
 
 #include <Eigen/Core>
 
@@ -35,20 +35,20 @@
 #include <optional>
 #include <vector>
 
-namespace cartan
+namespace cartan::ik
 {
 
-/// nablapp-backed L-BFGS-B solve policy for bound-constrained IK.
+/// nablapp-backed Levenberg-Marquardt solve policy for IK.
 ///
-/// Uses the Limited-memory BFGS for Bound-constrained optimization via
-/// nablapp, with analytical gradient through the SE(3) log Jacobian.
-/// Each step() call runs a budget of nablapp iterations for cooperative
-/// scheduling in basic_ik_solver.
+/// Uses nablapp's LM solver with the least-squares adapter exposing
+/// the 6-element body-frame error as residuals and the body Jacobian.
+/// Joint limits are enforced via clamping after each step since LM
+/// is unconstrained.
 ///
-/// This is the nablapp-backed L-BFGS-B. The native cartan implementation
-/// is available as lbfgsb_solve_policy.
+/// This is the nablapp-backed LM. The native cartan implementation
+/// is available as lm_solve_policy.
 template <chain Chain, typename LimitsPolicy = clamp_limits>
-class nablapp_lbfgsb_solve_policy
+class argmin_lm
 {
 public:
     using chain_type = Chain;
@@ -58,7 +58,7 @@ public:
 
     using position_type = typename joint_state<scalar_type, joints>::position_type;
 
-    static_assert(std::is_floating_point_v<scalar_type>, "nablapp_lbfgsb_solve_policy requires a floating-point Scalar type");
+    static_assert(std::is_floating_point_v<scalar_type>, "argmin_lm requires a floating-point Scalar type");
 
     struct options
     {
@@ -68,9 +68,9 @@ public:
         int stall_window{5};
     };
 
-    nablapp_lbfgsb_solve_policy() = default;
+    nablapp_lm_solve_policy() = default;
 
-    explicit nablapp_lbfgsb_solve_policy(const options& opts)
+    explicit nablapp_lm_solve_policy(const options& opts)
         : m_options{opts}
     {}
 
@@ -92,7 +92,7 @@ public:
         auto V_b = (target.inverse() * fk.end_effector).log();
         m_initial_error = V_b.norm();
 
-        m_problem.emplace(chain, target, m_weight);
+        m_problem.emplace(chain, target);
 
         int n = chain.num_joints();
         Eigen::VectorXd x0(n);
@@ -130,6 +130,8 @@ public:
 
         sync_solution_from_solver();
 
+        detail::enforce_limits<LimitsPolicy>(m_q, chain);
+
         auto fk = forward_kinematics(chain, m_q);
         auto V_b = (m_target.inverse() * fk.end_effector).log();
         m_error_norm = V_b.norm();
@@ -162,8 +164,6 @@ public:
             return m_status;
         }
 
-        detail::enforce_limits<LimitsPolicy>(m_q, chain);
-
         return m_status;
     }
 
@@ -176,7 +176,7 @@ public:
 
 private:
     using nablapp_solver = nablapp::basic_solver<
-        nablapp::lbfgsb_policy<joints>, joints, detail::nablapp_ik_problem<Chain>>;
+        nablapp::lm_policy<joints>, joints, detail::nablapp_ik_least_squares_problem<Chain>>;
 
     void sync_solution_from_solver()
     {
@@ -195,7 +195,6 @@ private:
     const Chain* m_chain{nullptr};
     se3<scalar_type> m_target{se3<scalar_type>::identity()};
     convergence_criteria<scalar_type> m_criteria{};
-    error_weight<scalar_type> m_weight{};
     options m_options{};
     position_type m_q{};
     std::vector<scalar_type> m_error_history;
@@ -203,7 +202,7 @@ private:
     scalar_type m_error_norm{std::numeric_limits<scalar_type>::max()};
     int m_iterations{};
     ik_status m_status{ik_status::running};
-    std::optional<detail::nablapp_ik_problem<Chain>> m_problem;
+    std::optional<detail::nablapp_ik_least_squares_problem<Chain>> m_problem;
     std::optional<nablapp_solver> m_solver;
 };
 

@@ -1,7 +1,7 @@
-#ifndef HPP_GUARD_CARTAN_SERIAL_IK_PROJECTED_LM_SOLVE_POLICY_H
-#define HPP_GUARD_CARTAN_SERIAL_IK_PROJECTED_LM_SOLVE_POLICY_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_PROJECTED_LM_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_PROJECTED_LM_H
 
-/// @file projected_lm_solve_policy.h
+/// @file projected_lm.h
 /// @brief Projected Levenberg-Marquardt IK solve policy with active-set box
 ///        projection and optional dogleg trust-region step.
 ///
@@ -12,14 +12,13 @@
 /// Reference: Lynch & Park, Modern Robotics, Ch. 6.2, p. 227-233.
 ///            Nielsen, H.B., Damping Parameter in Marquardt's Method, 1999.
 ///            Nocedal & Wright, Numerical Optimization, Ch. 4 (dogleg).
-///            Decisions D-01, D-02, D-03, SPEED-01, SPEED-02.
 
 #include "cartan/types.h"
 
-#include "cartan/serial/ik/ik_types.h"
-#include "cartan/serial/ik/limits_policy.h"
-#include "cartan/serial/ik/error_weight.h"
-#include "cartan/serial/ik/ik_solve_policy.h"
+#include "cartan/serial/ik/ik_status.h"
+#include "cartan/serial/ik/policy/limits_policy.h"
+#include "cartan/serial/ik/policy/error_weight.h"
+#include "cartan/serial/ik/concepts/solve_concept.h"
 #include "cartan/serial/ik/detail/convergence.h"
 #include "cartan/serial/ik/detail/stall_detection.h"
 #include "cartan/serial/ik/detail/limit_enforcement.h"
@@ -36,22 +35,12 @@
 #include <vector>
 #include <algorithm>
 
-namespace cartan
+namespace cartan::ik
 {
 
 /// Projected Levenberg-Marquardt IK solve policy with active-set box projection.
-///
-/// Each step() call: compute FK, body-frame error, Jacobian, identify
-/// active-set (joints at limits with gradient pushing outward), solve
-/// reduced (H + lambda*I) dq = g for free variables only, clamp trial step.
-///
-/// When use_dogleg is enabled, the step interpolates between the Cauchy
-/// point and Gauss-Newton step within a trust region.
-///
-/// Reference: Lynch & Park, Modern Robotics, Ch. 6.2.
-///            Nielsen, Damping Parameter in Marquardt's Method, 1999.
 template <chain Chain, typename LimitsPolicy = no_limits>
-class projected_lm_solve_policy
+class projected_lm
 {
 public:
     using chain_type = Chain;
@@ -61,9 +50,8 @@ public:
 
     using position_type = typename joint_state<scalar_type, joints>::position_type;
 
-    static_assert(std::is_floating_point_v<scalar_type>, "projected_lm_solve_policy requires a floating-point Scalar type");
+    static_assert(std::is_floating_point_v<scalar_type>, "projected_lm requires a floating-point Scalar type");
 
-    /// Tunable parameters for the projected LM solve policy.
     struct options
     {
         scalar_type initial_lambda_factor{scalar_type(1e-3)};
@@ -74,14 +62,13 @@ public:
         scalar_type trust_region_radius{scalar_type(1.0)};
     };
 
-    projected_lm_solve_policy() = default;
+    projected_lm() = default;
 
-    explicit projected_lm_solve_policy(const options& opts)
+    explicit projected_lm(const options& opts)
         : m_options(opts)
     {
     }
 
-    /// Initialize the solve policy (satisfies ik_solve_policy concept).
     void setup(
         const Chain& chain,
         const se3<scalar_type>& target,
@@ -91,7 +78,6 @@ public:
         setup(chain, target, q0, criteria, error_weight<scalar_type>{});
     }
 
-    /// Initialize with error weighting for position/orientation emphasis.
     void setup(
         const Chain& chain,
         const se3<scalar_type>& target,
@@ -109,7 +95,6 @@ public:
         m_delta = m_options.trust_region_radius;
         m_error_history.clear();
 
-        // Read joint limits from chain
         int n = chain.num_joints();
         if constexpr (joints == dynamic)
         {
@@ -122,7 +107,6 @@ public:
             m_q_max(i) = chain.limits()[static_cast<std::size_t>(i)].position_max;
         }
 
-        // Clamp initial seed to limits
         m_q = m_q.cwiseMax(m_q_min).cwiseMin(m_q_max);
 
         auto fk = forward_kinematics(chain, m_q);
@@ -130,7 +114,6 @@ public:
         m_error_norm = m_V_b.norm();
         m_initial_error = m_error_norm;
 
-        // Initial lambda from max diagonal of J^T J (Nielsen initialization)
         auto J_b = body_jacobian(chain, fk);
         auto JtJ = (J_b.transpose() * J_b).eval();
         scalar_type max_diag{0};
@@ -145,7 +128,6 @@ public:
         }
     }
 
-    /// Execute one projected Levenberg-Marquardt iteration.
     ik_status step(const Chain& chain)
     {
         if (m_status != ik_status::running)
@@ -153,7 +135,6 @@ public:
             return m_status;
         }
 
-        // (a) Forward kinematics, body-frame error, and convergence check
         auto fk = forward_kinematics(chain, m_q);
         m_V_b = (fk.end_effector.inverse() * m_target).log();
 
@@ -162,23 +143,18 @@ public:
             return s;
         }
 
-        // (b) Body Jacobian and Gauss-Newton approximation
         auto J_b = body_jacobian(chain, fk);
         int n = static_cast<int>(J_b.cols());
         auto H = (J_b.transpose() * J_b).eval();
         auto g = (J_b.transpose() * m_V_b).eval();
 
-        // (c) Active-set projection and reduced system solve
         auto free_indices = identify_active_set(g, n);
         position_type dq = solve_projected_system(J_b, H, g, free_indices, n);
 
-        // (d) Evaluate trial step and compute gain ratio
         auto [q_trial, V_b_trial, rho] = evaluate_trial_step(chain, dq, H, g);
 
-        // (e) Accept/reject step and update damping parameters
         update_damping(rho, dq, q_trial, V_b_trial);
 
-        // (f) Error norm update and stall/divergence detection
         m_error_norm = m_V_b.norm();
         auto stall_result = detail::check_stall_divergence(
             m_error_history, m_error_norm, m_initial_error,
@@ -204,7 +180,6 @@ public:
     [[nodiscard]] ik_status status() const { return m_status; }
 
 private:
-    /// Check convergence and iteration limit; return non-running status if done.
     ik_status check_convergence_and_limits()
     {
         if (detail::is_converged(m_V_b, m_weight, m_criteria))
@@ -225,7 +200,6 @@ private:
         return ik_status::running;
     }
 
-    /// Identify the active set: joints at bounds with gradient pushing outward.
     std::vector<int> identify_active_set(const auto& g, int n)
     {
         std::vector<int> free_indices;
@@ -244,7 +218,6 @@ private:
         return free_indices;
     }
 
-    /// Solve the reduced system on free variables (standard LM or dogleg).
     template <typename JacobianType, typename HessianType, typename GradientType>
     position_type solve_projected_system(
         const JacobianType& J_b,
@@ -269,7 +242,6 @@ private:
             return dq;
         }
 
-        // Extract reduced system for free variables
         Eigen::MatrixX<scalar_type> H_free(n_free, n_free);
         Eigen::VectorX<scalar_type> g_free(n_free);
         for (int i = 0; i < n_free; ++i)
@@ -304,7 +276,6 @@ private:
         return dq;
     }
 
-    /// Evaluate trial step: compute trial FK, error, and gain ratio.
     template <typename HessianType, typename GradientType>
     struct trial_result
     {
@@ -347,7 +318,6 @@ private:
         return {q_trial, V_b_trial, rho};
     }
 
-    /// Accept/reject step and update damping (lambda or trust-region radius).
     void update_damping(
         scalar_type rho,
         const position_type& dq,
@@ -391,7 +361,6 @@ private:
         }
     }
 
-    /// Dogleg step computation on the free (unconstrained) subspace.
     template <int JRows>
     Eigen::VectorX<scalar_type> dogleg_step(
         const Eigen::Matrix<scalar_type, 6, JRows>& J_b,
@@ -400,17 +369,14 @@ private:
         const std::vector<int>& free_indices,
         int n_free)
     {
-        // Steepest descent direction (g = J^T V_b points toward solution)
         Eigen::VectorX<scalar_type> delta_sd = g_free;
 
-        // Extract J_b columns for free indices
         Eigen::Matrix<scalar_type, 6, Eigen::Dynamic> J_b_free(6, n_free);
         for (int i = 0; i < n_free; ++i)
         {
             J_b_free.col(i) = J_b.col(free_indices[static_cast<std::size_t>(i)]);
         }
 
-        // Optimal steepest descent step size
         scalar_type g_sq = g_free.squaredNorm();
         auto Jg = (J_b_free * g_free).eval();
         scalar_type Jg_sq = Jg.squaredNorm();
@@ -418,7 +384,6 @@ private:
             ? g_sq / Jg_sq
             : scalar_type(1);
 
-        // Gauss-Newton step (with small regularization)
         Eigen::MatrixX<scalar_type> H_reg = H_free;
         for (int i = 0; i < n_free; ++i)
         {
@@ -429,19 +394,16 @@ private:
         scalar_type delta_gn_norm = delta_gn.norm();
         scalar_type sd_scaled_norm = t * delta_sd.norm();
 
-        // Case 1: GN step within trust region
         if (delta_gn_norm <= m_delta)
         {
             return delta_gn;
         }
 
-        // Case 2: Scaled steepest descent exceeds trust region
         if (sd_scaled_norm >= m_delta)
         {
             return (m_delta / delta_sd.norm()) * delta_sd;
         }
 
-        // Case 3: Dogleg interpolation
         Eigen::VectorX<scalar_type> a = t * delta_sd;
         Eigen::VectorX<scalar_type> b = delta_gn;
         Eigen::VectorX<scalar_type> d = b - a;
@@ -451,7 +413,6 @@ private:
         scalar_type a_dot_d = a.dot(d);
         scalar_type delta_sq = m_delta * m_delta;
 
-        // Solve ||a + beta * d||^2 = Delta^2 for beta in [0, 1]
         scalar_type discriminant = a_dot_d * a_dot_d - d_sq * (a_sq - delta_sq);
         scalar_type beta = (-a_dot_d + std::sqrt(std::max(scalar_type(0), discriminant))) / d_sq;
         beta = std::clamp(beta, scalar_type(0), scalar_type(1));

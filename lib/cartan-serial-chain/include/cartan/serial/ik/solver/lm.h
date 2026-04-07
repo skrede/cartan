@@ -1,7 +1,7 @@
-#ifndef HPP_GUARD_CARTAN_SERIAL_IK_LM_SOLVE_POLICY_H
-#define HPP_GUARD_CARTAN_SERIAL_IK_LM_SOLVE_POLICY_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_LM_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_LM_H
 
-/// @file lm_solve_policy.h
+/// @file lm.h
 /// @brief Levenberg-Marquardt IK solve policy with Nielsen-style lambda update.
 ///
 /// Body-frame Newton-Raphson with trust-region damping. The gain ratio
@@ -11,13 +11,12 @@
 ///
 /// Reference: Lynch & Park, Modern Robotics, Ch. 6.2, p. 227-233.
 ///            Nielsen, H.B., Damping Parameter in Marquardt's Method, 1999.
-///            Decisions IK-03, D-04.
 
 #include "cartan/types.h"
 
-#include "cartan/serial/ik/ik_types.h"
-#include "cartan/serial/ik/limits_policy.h"
-#include "cartan/serial/ik/ik_solve_policy.h"
+#include "cartan/serial/ik/ik_status.h"
+#include "cartan/serial/ik/policy/limits_policy.h"
+#include "cartan/serial/ik/concepts/solve_concept.h"
 #include "cartan/serial/ik/detail/convergence.h"
 #include "cartan/serial/ik/detail/stall_detection.h"
 #include "cartan/serial/ik/detail/limit_enforcement.h"
@@ -34,7 +33,7 @@
 #include <vector>
 #include <algorithm>
 
-namespace cartan
+namespace cartan::ik
 {
 
 /// Levenberg-Marquardt IK solve policy with Nielsen lambda update strategy.
@@ -46,7 +45,7 @@ namespace cartan
 /// Reference: Lynch & Park, Modern Robotics, Ch. 6.2.
 ///            Nielsen, Damping Parameter in Marquardt's Method, 1999.
 template <chain Chain, typename LimitsPolicy = clamp_limits>
-class lm_solve_policy
+class builtin_lm
 {
 public:
     using chain_type = Chain;
@@ -56,9 +55,8 @@ public:
 
     using position_type = typename joint_state<scalar_type, joints>::position_type;
 
-    static_assert(std::is_floating_point_v<scalar_type>, "lm_solve_policy requires a floating-point Scalar type");
+    static_assert(std::is_floating_point_v<scalar_type>, "builtin_lm requires a floating-point Scalar type");
 
-    /// Tunable parameters for the LM solve policy.
     struct options
     {
         scalar_type initial_lambda_factor{scalar_type(1e-3)};
@@ -67,15 +65,13 @@ public:
         int stall_window{5};
     };
 
-    lm_solve_policy() = default;
+    builtin_lm() = default;
 
-    explicit lm_solve_policy(const options& opts)
+    explicit builtin_lm(const options& opts)
         : m_options(opts)
     {
     }
 
-    /// Initialize the solve policy with chain, target pose, seed configuration,
-    /// and convergence criteria.
     void setup(
         const Chain& chain,
         const se3<scalar_type>& target,
@@ -95,7 +91,6 @@ public:
         m_error_norm = m_V_b.norm();
         m_initial_error = m_error_norm;
 
-        // Initial lambda from max diagonal of J^T J (Nielsen initialization)
         auto J_b = body_jacobian(chain, fk);
         int n = static_cast<int>(J_b.cols());
         auto JtJ = (J_b.transpose() * J_b).eval();
@@ -111,9 +106,6 @@ public:
         }
     }
 
-    /// Execute one Levenberg-Marquardt iteration.
-    ///
-    /// Lynch & Park, Modern Robotics, Ch. 6.2, with Nielsen lambda update.
     ik_status step(const Chain& chain)
     {
         if (m_status != ik_status::running)
@@ -121,11 +113,9 @@ public:
             return m_status;
         }
 
-        // (a) Forward kinematics and body-frame error
         auto fk = forward_kinematics(chain, m_q);
         m_V_b = (fk.end_effector.inverse() * m_target).log();
 
-        // (b) Convergence check: separate angular and linear
         if (detail::is_converged_unweighted(m_V_b, m_criteria))
         {
             m_error_norm = m_V_b.norm();
@@ -133,7 +123,6 @@ public:
             return m_status;
         }
 
-        // (c) Iteration limit check
         ++m_iterations;
         if (m_iterations >= m_criteria.max_iterations)
         {
@@ -142,15 +131,12 @@ public:
             return m_status;
         }
 
-        // (d) Body Jacobian
         auto J_b = body_jacobian(chain, fk);
         int n = static_cast<int>(J_b.cols());
 
-        // (e) Gauss-Newton approximation: H = J^T J, g = J^T V_b
         auto H = (J_b.transpose() * J_b).eval();
         auto g = (J_b.transpose() * m_V_b).eval();
 
-        // (f) Solve (H + lambda * I) dq = g
         using dq_matrix = std::conditional_t<
             joints == dynamic,
             Eigen::MatrixX<scalar_type>,
@@ -164,16 +150,13 @@ public:
 
         position_type dq = A.ldlt().solve(g);
 
-        // (g) Evaluate trial step and update damping
         position_type q_trial = m_q + dq;
         auto fk_trial = forward_kinematics(chain, q_trial);
         auto V_b_trial = (fk_trial.end_effector.inverse() * m_target).log();
         evaluate_gain_and_update_damping(dq, g, q_trial, V_b_trial);
 
-        // Update error norm
         m_error_norm = m_V_b.norm();
 
-        // (k) Stall and divergence detection
         auto stall_result = detail::check_stall_divergence(
             m_error_history, m_error_norm, m_initial_error,
             m_options.stall_window, m_options.stall_threshold,
@@ -184,35 +167,20 @@ public:
             return m_status;
         }
 
-        // Enforce joint limits via LimitsPolicy
         detail::enforce_limits<LimitsPolicy>(m_q, chain);
 
         return m_status;
     }
 
-    /// Whether the solve policy has converged.
     [[nodiscard]] bool converged() const { return m_status == ik_status::converged; }
-
-    /// Current joint configuration (the candidate solution).
     [[nodiscard]] const position_type& solution() const { return m_q; }
-
-    /// Current error norm (body-frame twist magnitude).
     [[nodiscard]] scalar_type error_norm() const { return m_error_norm; }
-
-    /// Number of iterations executed so far.
     [[nodiscard]] int iterations() const { return m_iterations; }
-
-    /// Abort the solver (no-op for LM per D-05).
     void abort() {}
-
-    /// Current damping parameter lambda.
     [[nodiscard]] scalar_type lambda() const { return m_lambda; }
-
-    /// Current solve policy status.
     [[nodiscard]] ik_status status() const { return m_status; }
 
 private:
-    /// Compute gain ratio and accept/reject step with Nielsen lambda update.
     void evaluate_gain_and_update_damping(
         const position_type& dq,
         const auto& g,
@@ -256,6 +224,15 @@ private:
     int m_iterations{};
     ik_status m_status{ik_status::running};
 };
+
+#ifdef CARTAN_BUILD_ARGMIN
+#include "cartan/serial/ik/solver/argmin_lm.h"
+template <chain Chain, typename LimitsPolicy = clamp_limits>
+using lm = argmin_lm<Chain, LimitsPolicy>;
+#else
+template <chain Chain, typename LimitsPolicy = clamp_limits>
+using lm = builtin_lm<Chain, LimitsPolicy>;
+#endif
 
 }
 

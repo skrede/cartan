@@ -1,10 +1,10 @@
-#ifndef HPP_GUARD_CARTAN_SERIAL_IK_BASIC_IK_SOLVER_H
-#define HPP_GUARD_CARTAN_SERIAL_IK_BASIC_IK_SOLVER_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_BASIC_IK_RUNNER_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_BASIC_IK_RUNNER_H
 
-/// @file basic_ik_solver.h
+/// @file basic_ik_runner.h
 /// @brief Variadic policy-based IK solver with cooperative interleaved racing.
 ///
-/// basic_ik_solver<Policies...> provides direct solve for a single policy and
+/// basic_ik_runner<Policies...> provides direct solve for a single policy and
 /// cooperative round-robin racing for two or more policies. The single-policy
 /// path produces identical code to a non-variadic solver (zero overhead).
 /// The multi-policy path absorbs the round-robin tick logic formerly in
@@ -13,11 +13,11 @@
 /// the configured objective.
 ///
 /// Reference: Lynch & Park, Modern Robotics, Ch. 6.2, p. 227-233.
-///            Phase 13 decisions D-01 through D-09.
 
-#include "cartan/serial/ik/ik_types.h"
-#include "cartan/serial/ik/ik_solve_policy.h"
-#include "cartan/serial/ik/halton_seed_generator.h"
+#include "cartan/serial/ik/ik_result.h"
+#include "cartan/serial/ik/ik_status.h"
+#include "cartan/serial/ik/concepts/solve_concept.h"
+#include "cartan/serial/ik/solver/detail/halton_seed_generator.h"
 
 #include "cartan/lie/se3.h"
 #include "cartan/serial/fk/jacobian.h"
@@ -62,15 +62,15 @@ consteval bool all_policies_agree()
 /// on the same const chain. A single solver instance must not be
 /// used from multiple threads without synchronization.
 ///
-/// @tparam Policies  One or more IK solve policies satisfying ik_solve_policy.
+/// @tparam Policies  One or more IK solve policies satisfying ik::solve_policy.
 template <typename... Policies>
-    requires (sizeof...(Policies) >= 1) && (ik_solve_policy<Policies> && ...)
-class basic_ik_solver
+    requires (sizeof...(Policies) >= 1) && (ik::solve_policy<Policies> && ...)
+class basic_ik_runner
 {
     using first_policy = std::tuple_element_t<0, std::tuple<Policies...>>;
 
     static_assert(std::is_floating_point_v<typename first_policy::scalar_type>,
-        "basic_ik_solver requires a floating-point Scalar type");
+        "basic_ik_runner requires a floating-point Scalar type");
     static_assert(all_policies_agree<Policies...>(),
         "All policies must agree on chain_type, scalar_type, and joints");
 
@@ -81,17 +81,13 @@ public:
 
     using position_type = typename joint_state<scalar_type, joints>::position_type;
 
-    basic_ik_solver() = default;
+    basic_ik_runner() = default;
 
-    explicit basic_ik_solver(Policies... policies)
+    explicit basic_ik_runner(Policies... policies)
         : m_policies(std::move(policies)...)
     {
     }
 
-    /// Initialize the solver with chain, target, seed, criteria, and options.
-    ///
-    /// The first policy receives the user's q0. Remaining policies (if any)
-    /// receive deterministic Halton seeds within joint limits.
     void setup(
         const chain_type& chain,
         const se3<scalar_type>& target,
@@ -125,19 +121,13 @@ public:
 
             m_seed_gen.emplace(chain);
 
-            // First policy gets user's q0
             std::get<0>(m_policies).setup(chain, target, q0, criteria);
 
-            // Remaining policies get Halton seeds
             setup_remaining_policies(chain, target, criteria, options.halton_seed,
                 std::make_index_sequence<sizeof...(Policies) - 1>{});
         }
     }
 
-    /// Execute one solver step.
-    ///
-    /// For single-policy: delegates directly to the policy's step().
-    /// For multi-policy: one round-robin across all active (non-parked) policies.
     ik_status step()
     {
         if (m_status != ik_status::running)
@@ -155,7 +145,6 @@ public:
         }
     }
 
-    /// Execute n round-robin rounds, stopping early on terminal status.
     ik_status step_n(int n)
     {
         for (int i = 0; i < n; ++i)
@@ -169,7 +158,6 @@ public:
         return m_status;
     }
 
-    /// Run to completion. Returns the best result or an error.
     std::expected<ik_result<scalar_type, joints>, ik_error<scalar_type, joints>> solve()
     {
         if constexpr (sizeof...(Policies) == 1)
@@ -189,10 +177,8 @@ public:
         return build_result();
     }
 
-    /// Whether the solver has converged.
     [[nodiscard]] bool converged() const { return m_status == ik_status::converged; }
 
-    /// Current best error norm.
     [[nodiscard]] scalar_type error_norm() const
     {
         if constexpr (sizeof...(Policies) == 1)
@@ -211,24 +197,17 @@ public:
         }
     }
 
-    /// Number of iterations executed (total across all policies).
     [[nodiscard]] int iterations() const { return m_total_iterations; }
-
-    /// Current best joint configuration.
     [[nodiscard]] const position_type& current_q() const { return m_best_q; }
-
-    /// Current solver status.
     [[nodiscard]] ik_status status() const { return m_status; }
 
-    /// Abort all policies.
     void abort()
     {
         abort_all(std::index_sequence_for<Policies...>{});
-        m_status = ik_status::running; // allow status query after abort
+        m_status = ik_status::running;
     }
 
 private:
-    /// Result saved when a policy is parked (converged or terminal failure).
     struct parked_result
     {
         position_type q;
@@ -236,8 +215,6 @@ private:
         int iterations;
         bool converged;
     };
-
-    // -- Single-policy fast path --
 
     ik_status step_single()
     {
@@ -278,8 +255,6 @@ private:
 
         return ik_status::running;
     }
-
-    // -- Multi-policy racing path --
 
     ik_status step_multi()
         requires (sizeof...(Policies) > 1)
@@ -368,8 +343,6 @@ private:
         m_parked.fill(true);
     }
 
-    // -- Setup helpers --
-
     template <std::size_t... Is>
     void setup_remaining_policies(
         const chain_type& chain,
@@ -392,8 +365,6 @@ private:
         auto seed = (*m_seed_gen)(static_cast<int>(policy_index + halton_seed_offset));
         std::get<I>(m_policies).setup(chain, target, seed, criteria);
     }
-
-    // -- Objective tracking (single-policy) --
 
     void update_best(const position_type& q)
     {
@@ -459,8 +430,6 @@ private:
         }
     }
 
-    // -- Result construction --
-
     std::expected<ik_result<scalar_type, joints>, ik_error<scalar_type, joints>> build_result()
     {
         if (m_status == ik_status::converged)
@@ -488,13 +457,11 @@ private:
     select_best_result(std::index_sequence<Is...>)
         requires (sizeof...(Policies) > 1)
     {
-        // For speed objective, m_best_solver_index is already set
         if (m_objective == ik_objective::speed && m_best_solver_index >= 0)
         {
             return make_result_from_parked(m_best_solver_index);
         }
 
-        // For other objectives, find best among converged results
         int best_index = -1;
         scalar_type best_metric = std::numeric_limits<scalar_type>::max();
 
@@ -513,8 +480,6 @@ private:
                 }
                 else
                 {
-                    // For max_manipulability / max_isotropy, we'd need to
-                    // compute SVD-based metrics. Use error_norm as tiebreaker.
                     if (best_index < 0 || metric < best_metric)
                     {
                         best_metric = metric;
@@ -559,7 +524,6 @@ private:
         }
         else
         {
-            // Find the policy with lowest error norm
             scalar_type min_err = std::numeric_limits<scalar_type>::max();
             int best_fail = 0;
             for (std::size_t i = 0; i < sizeof...(Policies); ++i)
@@ -604,8 +568,6 @@ private:
         return std::unexpected(err);
     }
 
-    // -- Accessor helpers --
-
     template <std::size_t... Is>
     void find_best_error(scalar_type& best, std::index_sequence<Is...>) const
         requires (sizeof...(Policies) > 1)
@@ -642,8 +604,6 @@ private:
         (std::get<Is>(m_policies).abort(), ...);
     }
 
-    // -- Data members --
-
     std::tuple<Policies...> m_policies{};
     const chain_type* m_chain{nullptr};
     se3<scalar_type> m_target{se3<scalar_type>::identity()};
@@ -657,8 +617,6 @@ private:
     int m_total_iterations{};
     bool m_found_convergence{false};
 
-    // Multi-policy members (only used when sizeof...(Policies) > 1, but
-    // declared unconditionally for simplicity; if constexpr gates all usage).
     std::array<bool, sizeof...(Policies)> m_parked{};
     std::array<std::optional<parked_result>, sizeof...(Policies)> m_results{};
     std::optional<halton_seed_generator<chain_type>> m_seed_gen{};
@@ -669,7 +627,7 @@ private:
 
 // CTAD deduction guide: deduce Policies... from constructor arguments
 template <typename... Policies>
-basic_ik_solver(Policies...) -> basic_ik_solver<Policies...>;
+basic_ik_runner(Policies...) -> basic_ik_runner<Policies...>;
 
 }
 
