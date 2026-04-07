@@ -124,7 +124,7 @@ public:
         auto& grad = result.gradient;
         auto& body_error = result.info.body_error;
 
-        if (detail::is_converged(body_error, m_weight, m_criteria))
+        if (cartan::detail::is_converged(body_error, m_weight, m_criteria))
         {
             m_error_norm = body_error.norm();
             m_status = ik_status::converged;
@@ -181,7 +181,7 @@ public:
                 .body_error.norm();
         }
 
-        auto stall_result = detail::check_stall_divergence(
+        auto stall_result = cartan::detail::check_stall_divergence(
             m_error_history, m_error_norm, m_initial_error,
             m_options.stall_window, m_options.stall_threshold,
             m_options.divergence_factor);
@@ -191,7 +191,7 @@ public:
             return m_status;
         }
 
-        detail::enforce_limits<LimitsPolicy>(m_q, chain);
+        cartan::detail::enforce_limits<LimitsPolicy>(m_q, chain);
 
         return m_status;
     }

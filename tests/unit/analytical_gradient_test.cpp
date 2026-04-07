@@ -1,4 +1,4 @@
-#include <cartan/serial/ik/analytical_gradient.h>
+#include <cartan/serial/ik/solver/detail/analytical_gradient.h>
 
 #include <cartan/lie/se3.h>
 #include <cartan/lie/so3.h>

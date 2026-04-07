@@ -14,26 +14,26 @@
 
 #include "benchmark_utils.h"
 
-#include <cartan/serial/ik/ik_types.h>
-#include <cartan/serial/ik/basic_ik_solver.h>
-#include <cartan/serial/ik/dls_solve_policy.h>
-#include <cartan/serial/ik/lm_solve_policy.h>
-#include <cartan/serial/ik/limits_policy.h>
-#include <cartan/serial/ik/restart_solve_policy.h>
-#include <cartan/serial/ik/lbfgsb_solve_policy.h>
-#include <cartan/serial/ik/projected_lm_solve_policy.h>
-#include <cartan/serial/ik/newton_raphson_solve_policy.h>
-#include <cartan/serial/ik/default_solvers.h>
+#include <cartan/serial/ik/ik_status.h>
+#include <cartan/serial/ik/basic_ik_runner.h>
+#include <cartan/serial/ik/solver/dls.h>
+#include <cartan/serial/ik/solver/lm.h>
+#include <cartan/serial/ik/policy/limits_policy.h>
+#include <cartan/serial/ik/wrapper/restart_wrapper.h>
+#include <cartan/serial/ik/solver/lbfgsb.h>
+#include <cartan/serial/ik/solver/projected_lm.h>
+#include <cartan/serial/ik/solver/newton_raphson.h>
+#include <cartan/serial/ik/solvers.h>
 
-#include <cartan/serial/ik/slsqp_solve_policy.h>
-#include <cartan/serial/ik/nw_sqp_solve_policy.h>
-#include <cartan/serial/ik/nablapp_lm_solve_policy.h>
-#include <cartan/serial/ik/nablapp_lbfgsb_solve_policy.h>
-#include <cartan/serial/ik/augmented_lagrangian_solve_policy.h>
+#include <cartan/serial/ik/solver/argmin_slsqp.h>
+#include <cartan/serial/ik/solver/nw_sqp.h>
+#include <cartan/serial/ik/solver/argmin_lm.h>
+#include <cartan/serial/ik/solver/argmin_lbfgsb.h>
+#include <cartan/serial/ik/solver/augmented_lagrangian.h>
 
 #ifdef CARTAN_HAS_NLOPT
-#include <cartan/serial/ik/nlopt_bobyqa_solve_policy.h>
-#include <cartan/serial/ik/nlopt_slsqp_solve_policy.h>
+#include <cartan/serial/ik/solver/nlopt_bobyqa.h>
+#include <cartan/serial/ik/solver/nlopt_slsqp.h>
 #endif
 
 #include <trac_ik/trac_ik.hpp>
@@ -80,11 +80,11 @@ struct target_set
 };
 
 // ============================================================================
-// Generic benchmark for basic_ik_solver-wrapped steppers
+// Generic benchmark for basic_ik_runner-wrapped steppers
 // ============================================================================
 
 template <int N, typename Solver>
-void bm_native_solver(
+void bm_full_solver(
     benchmark::State& state,
     const cartan::kinematic_chain<double, N>& chain,
     const target_set<double, N>& ts,
@@ -362,11 +362,11 @@ void bm_lbfgsb_aggressive(
     const target_set<double, N>& ts)
 {
     using chain_t = cartan::kinematic_chain<double, N>;
-    typename cartan::lbfgsb_solve_policy<chain_t>::options lbfgsb_opts{
+    typename cartan::ik::builtin_lbfgsb<chain_t>::options lbfgsb_opts{
         .history_depth = 10,
         .stall_window = 20
     };
-    typename cartan::restart_solve_policy<chain_t, cartan::lbfgsb_solve_policy<chain_t>>::options restart_opts{
+    typename cartan::ik::restart_wrapper<chain_t, cartan::ik::builtin_lbfgsb<chain_t>>::options restart_opts{
         .max_restarts = 5
     };
     cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 1000};
@@ -385,10 +385,10 @@ void bm_lbfgsb_aggressive(
         auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
         ++idx;
 
-        cartan::lbfgsb_solve_policy<chain_t> inner(lbfgsb_opts);
-        cartan::restart_solve_policy<chain_t, cartan::lbfgsb_solve_policy<chain_t>> stepper(
+        cartan::ik::builtin_lbfgsb<chain_t> inner(lbfgsb_opts);
+        cartan::ik::restart_wrapper<chain_t, cartan::ik::builtin_lbfgsb<chain_t>> stepper(
             restart_opts, std::move(inner));
-        cartan::basic_ik_solver solver(std::move(stepper));
+        cartan::basic_ik_runner solver(std::move(stepper));
         solver.setup(chain, target, q_seed, criteria);
         auto result = solver.solve();
 
@@ -447,10 +447,10 @@ void bm_gauss_newton(
     const target_set<double, N>& ts)
 {
     using chain_t = cartan::kinematic_chain<double, N>;
-    typename cartan::projected_lm_solve_policy<chain_t>::options plm_opts{
+    typename cartan::ik::projected_lm<chain_t>::options plm_opts{
         .initial_lambda_factor = 0.0
     };
-    typename cartan::restart_solve_policy<chain_t, cartan::projected_lm_solve_policy<chain_t>>::options restart_opts{
+    typename cartan::ik::restart_wrapper<chain_t, cartan::ik::projected_lm<chain_t>>::options restart_opts{
         .max_restarts = 20
     };
     cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 200};
@@ -469,10 +469,10 @@ void bm_gauss_newton(
         auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
         ++idx;
 
-        cartan::projected_lm_solve_policy<chain_t> inner(plm_opts);
-        cartan::restart_solve_policy<chain_t, cartan::projected_lm_solve_policy<chain_t>> stepper(
+        cartan::ik::projected_lm<chain_t> inner(plm_opts);
+        cartan::ik::restart_wrapper<chain_t, cartan::ik::projected_lm<chain_t>> stepper(
             restart_opts, std::move(inner));
-        cartan::basic_ik_solver solver(std::move(stepper));
+        cartan::basic_ik_runner solver(std::move(stepper));
         solver.setup(chain, target, q_seed, criteria);
         auto result = solver.solve();
 
@@ -533,88 +533,88 @@ using chain_t = cartan::kinematic_chain<double, N>;
 
 // Individual policies (no restart wrapper)
 template <int N>
-using dls_ik_solver = cartan::basic_ik_solver<cartan::dls_solve_policy<chain_t<N>>>;
+using dls_ik_solver = cartan::basic_ik_runner<cartan::ik::dls<chain_t<N>>>;
 
 template <int N>
-using lm_ik_solver = cartan::basic_ik_solver<cartan::lm_solve_policy<chain_t<N>>>;
+using lm_ik_solver = cartan::basic_ik_runner<cartan::ik::lm<chain_t<N>>>;
 
 template <int N>
-using projected_lm_ik_solver = cartan::basic_ik_solver<cartan::projected_lm_solve_policy<chain_t<N>>>;
+using projected_lm_ik_solver = cartan::basic_ik_runner<cartan::ik::projected_lm<chain_t<N>>>;
 
 template <int N>
-using lbfgsb_ik_solver = cartan::basic_ik_solver<cartan::lbfgsb_solve_policy<chain_t<N>>>;
+using lbfgsb_ik_solver = cartan::basic_ik_runner<cartan::ik::builtin_lbfgsb<chain_t<N>>>;
 
 // Restart-wrapped variants
 template <int N>
-using speed_ik_solver = cartan::basic_ik_solver<cartan::speed_solver<chain_t<N>>>;
+using speed_ik_solver = cartan::basic_ik_runner<cartan::speed_ik_runner<chain_t<N>>>;
 
 template <int N>
-using tuned_lbfgsb = cartan::restart_solve_policy<chain_t<N>, cartan::lbfgsb_solve_policy<chain_t<N>>>;
+using tuned_lbfgsb = cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::builtin_lbfgsb<chain_t<N>>>;
 
 template <int N>
-using convergence_ik_solver = cartan::basic_ik_solver<tuned_lbfgsb<N>>;
+using convergence_ik_solver = cartan::basic_ik_runner<tuned_lbfgsb<N>>;
 
 template <int N>
-using restart_lm = cartan::restart_solve_policy<chain_t<N>, cartan::lm_solve_policy<chain_t<N>, cartan::no_limits>>;
+using restart_lm = cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::lm<chain_t<N>, cartan::no_limits>>;
 
 template <int N>
-using restart_lm_ik_solver = cartan::basic_ik_solver<restart_lm<N>>;
+using restart_lm_ik_solver = cartan::basic_ik_runner<restart_lm<N>>;
 
 template <int N>
-using nr_restart = cartan::restart_solve_policy<chain_t<N>, cartan::newton_raphson_solve_policy<chain_t<N>, cartan::no_limits>>;
+using nr_restart = cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::newton_raphson<chain_t<N>, cartan::no_limits>>;
 
 template <int N>
-using nr_ik_solver = cartan::basic_ik_solver<nr_restart<N>>;
+using nr_ik_solver = cartan::basic_ik_runner<nr_restart<N>>;
 
 // NLopt solvers
 #ifdef CARTAN_HAS_NLOPT
 template <int N>
-using bobyqa_restart = cartan::restart_solve_policy<chain_t<N>, cartan::nlopt_bobyqa_solve_policy<chain_t<N>>>;
+using bobyqa_restart = cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::nlopt_bobyqa<chain_t<N>>>;
 
 template <int N>
-using bobyqa_ik_solver = cartan::basic_ik_solver<bobyqa_restart<N>>;
+using bobyqa_ik_solver = cartan::basic_ik_runner<bobyqa_restart<N>>;
 
 template <int N>
-using slsqp_restart = cartan::restart_solve_policy<chain_t<N>, cartan::nlopt_slsqp_solve_policy<chain_t<N>>>;
+using slsqp_restart = cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::nlopt_slsqp<chain_t<N>>>;
 
 template <int N>
-using slsqp_ik_solver = cartan::basic_ik_solver<slsqp_restart<N>>;
+using slsqp_ik_solver = cartan::basic_ik_runner<slsqp_restart<N>>;
 #endif
 
 // nablapp solvers (always available)
 template <int N>
-using nablapp_slsqp_restart = cartan::restart_solve_policy<chain_t<N>, cartan::slsqp_solve_policy<chain_t<N>>>;
+using nablapp_slsqp_restart = cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::argmin_slsqp<chain_t<N>>>;
 
 template <int N>
-using nablapp_slsqp_ik_solver = cartan::basic_ik_solver<nablapp_slsqp_restart<N>>;
+using nablapp_slsqp_ik_solver = cartan::basic_ik_runner<nablapp_slsqp_restart<N>>;
 
 // nablapp L-BFGS-B (distinct from native lbfgsb)
 template <int N>
-using nablapp_lbfgsb_restart = cartan::restart_solve_policy<chain_t<N>, cartan::nablapp_lbfgsb_solve_policy<chain_t<N>>>;
+using nablapp_lbfgsb_restart = cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::argmin_lbfgsb<chain_t<N>>>;
 template <int N>
-using nablapp_lbfgsb_ik_solver = cartan::basic_ik_solver<nablapp_lbfgsb_restart<N>>;
+using nablapp_lbfgsb_ik_solver = cartan::basic_ik_runner<nablapp_lbfgsb_restart<N>>;
 
 // nablapp NW-SQP (inequality-constrained)
 template <int N>
-using nw_sqp_restart = cartan::restart_solve_policy<chain_t<N>, cartan::nw_sqp_solve_policy<chain_t<N>>>;
+using nw_sqp_restart = cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::nw_sqp<chain_t<N>>>;
 template <int N>
-using nw_sqp_ik_solver = cartan::basic_ik_solver<nw_sqp_restart<N>>;
+using nw_sqp_ik_solver = cartan::basic_ik_runner<nw_sqp_restart<N>>;
 
 // nablapp LM (via least-squares adapter)
 template <int N>
-using nablapp_lm_restart = cartan::restart_solve_policy<chain_t<N>, cartan::nablapp_lm_solve_policy<chain_t<N>, cartan::no_limits>>;
+using nablapp_lm_restart = cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::argmin_lm<chain_t<N>, cartan::no_limits>>;
 template <int N>
-using nablapp_lm_ik_solver = cartan::basic_ik_solver<nablapp_lm_restart<N>>;
+using nablapp_lm_ik_solver = cartan::basic_ik_runner<nablapp_lm_restart<N>>;
 
 // nablapp Augmented Lagrangian (inequality-constrained outer, L-BFGS-B inner)
 template <int N>
-using auglag_restart = cartan::restart_solve_policy<chain_t<N>, cartan::augmented_lagrangian_solve_policy<chain_t<N>>>;
+using auglag_restart = cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::augmented_lagrangian<chain_t<N>>>;
 template <int N>
-using auglag_ik_solver = cartan::basic_ik_solver<auglag_restart<N>>;
+using auglag_ik_solver = cartan::basic_ik_runner<auglag_restart<N>>;
 
 // Racing: variadic solver (speed + convergence policies)
 template <int N>
-using racing_solver = cartan::default_solver<chain_t<N>>;
+using racing_solver = cartan::dual_ik_runner<chain_t<N>>;
 
 // ============================================================================
 // Convergence criteria per solver type
@@ -645,99 +645,99 @@ inline cartan::convergence_criteria<double> auglag_criteria()         { return {
 // CHAIN_FN: factory function name (e.g., make_ur3e_chain)
 #define REGISTER_6DOF_BENCHMARKS(ROBOT, CHAIN_FN)                                                   \
                                                                                                      \
-static void bm_native_##ROBOT##_dls(benchmark::State& state)                                        \
+static void bm_full_##ROBOT##_dls(benchmark::State& state)                                        \
 {                                                                                                    \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                   \
-    bm_native_solver<6, dls_ik_solver<6>>(state, chain, ts, dls_criteria());                         \
+    bm_full_solver<6, dls_ik_solver<6>>(state, chain, ts, dls_criteria());                         \
 }                                                                                                    \
-BENCHMARK(bm_native_##ROBOT##_dls)->Iterations(1000)->Unit(benchmark::kMicrosecond);                 \
+BENCHMARK(bm_full_##ROBOT##_dls)->Iterations(1000)->Unit(benchmark::kMicrosecond);                 \
                                                                                                      \
-static void bm_native_##ROBOT##_lm(benchmark::State& state)                                         \
+static void bm_full_##ROBOT##_lm(benchmark::State& state)                                         \
 {                                                                                                    \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                   \
-    bm_native_solver<6, lm_ik_solver<6>>(state, chain, ts, lm_criteria());                           \
+    bm_full_solver<6, lm_ik_solver<6>>(state, chain, ts, lm_criteria());                           \
 }                                                                                                    \
-BENCHMARK(bm_native_##ROBOT##_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);                  \
+BENCHMARK(bm_full_##ROBOT##_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);                  \
                                                                                                      \
-static void bm_native_##ROBOT##_projected_lm(benchmark::State& state)                               \
+static void bm_full_##ROBOT##_projected_lm(benchmark::State& state)                               \
 {                                                                                                    \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                   \
-    bm_native_solver<6, projected_lm_ik_solver<6>>(state, chain, ts, plm_criteria());                \
+    bm_full_solver<6, projected_lm_ik_solver<6>>(state, chain, ts, plm_criteria());                \
 }                                                                                                    \
-BENCHMARK(bm_native_##ROBOT##_projected_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);        \
+BENCHMARK(bm_full_##ROBOT##_projected_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);        \
                                                                                                      \
-static void bm_native_##ROBOT##_lbfgsb(benchmark::State& state)                                     \
+static void bm_full_##ROBOT##_lbfgsb(benchmark::State& state)                                     \
 {                                                                                                    \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                   \
-    bm_native_solver<6, lbfgsb_ik_solver<6>>(state, chain, ts, lbfgsb_criteria());                   \
+    bm_full_solver<6, lbfgsb_ik_solver<6>>(state, chain, ts, lbfgsb_criteria());                   \
 }                                                                                                    \
-BENCHMARK(bm_native_##ROBOT##_lbfgsb)->Iterations(1000)->Unit(benchmark::kMicrosecond);              \
+BENCHMARK(bm_full_##ROBOT##_lbfgsb)->Iterations(1000)->Unit(benchmark::kMicrosecond);              \
                                                                                                      \
-static void bm_native_##ROBOT##_speed(benchmark::State& state)                                      \
+static void bm_full_##ROBOT##_speed(benchmark::State& state)                                      \
 {                                                                                                    \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                   \
-    bm_native_solver<6, speed_ik_solver<6>>(state, chain, ts, speed_criteria());                     \
+    bm_full_solver<6, speed_ik_solver<6>>(state, chain, ts, speed_criteria());                     \
 }                                                                                                    \
-BENCHMARK(bm_native_##ROBOT##_speed)->Iterations(1000)->Unit(benchmark::kMicrosecond);               \
+BENCHMARK(bm_full_##ROBOT##_speed)->Iterations(1000)->Unit(benchmark::kMicrosecond);               \
                                                                                                      \
-static void bm_native_##ROBOT##_convergence(benchmark::State& state)                                \
+static void bm_full_##ROBOT##_convergence(benchmark::State& state)                                \
 {                                                                                                    \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                   \
-    bm_native_solver<6, convergence_ik_solver<6>>(state, chain, ts, convergence_criteria_tuned());   \
+    bm_full_solver<6, convergence_ik_solver<6>>(state, chain, ts, convergence_criteria_tuned());   \
 }                                                                                                    \
-BENCHMARK(bm_native_##ROBOT##_convergence)->Iterations(1000)->Unit(benchmark::kMicrosecond);         \
+BENCHMARK(bm_full_##ROBOT##_convergence)->Iterations(1000)->Unit(benchmark::kMicrosecond);         \
                                                                                                      \
-static void bm_native_##ROBOT##_restart_lm(benchmark::State& state)                                 \
+static void bm_full_##ROBOT##_restart_lm(benchmark::State& state)                                 \
 {                                                                                                    \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                   \
-    bm_native_solver<6, restart_lm_ik_solver<6>>(state, chain, ts, restart_lm_criteria());           \
+    bm_full_solver<6, restart_lm_ik_solver<6>>(state, chain, ts, restart_lm_criteria());           \
 }                                                                                                    \
-BENCHMARK(bm_native_##ROBOT##_restart_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);          \
+BENCHMARK(bm_full_##ROBOT##_restart_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);          \
                                                                                                      \
-static void bm_native_##ROBOT##_newton_raphson(benchmark::State& state)                              \
+static void bm_full_##ROBOT##_newton_raphson(benchmark::State& state)                              \
 {                                                                                                    \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                   \
-    bm_native_solver<6, nr_ik_solver<6>>(state, chain, ts, nr_criteria());                           \
+    bm_full_solver<6, nr_ik_solver<6>>(state, chain, ts, nr_criteria());                           \
 }                                                                                                    \
-BENCHMARK(bm_native_##ROBOT##_newton_raphson)->Iterations(1000)->Unit(benchmark::kMicrosecond);      \
+BENCHMARK(bm_full_##ROBOT##_newton_raphson)->Iterations(1000)->Unit(benchmark::kMicrosecond);      \
                                                                                                      \
-static void bm_native_##ROBOT##_gauss_newton(benchmark::State& state)                               \
+static void bm_full_##ROBOT##_gauss_newton(benchmark::State& state)                               \
 {                                                                                                    \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                   \
     bm_gauss_newton<6>(state, chain, ts);                                                            \
 }                                                                                                    \
-BENCHMARK(bm_native_##ROBOT##_gauss_newton)->Iterations(1000)->Unit(benchmark::kMicrosecond);        \
+BENCHMARK(bm_full_##ROBOT##_gauss_newton)->Iterations(1000)->Unit(benchmark::kMicrosecond);        \
                                                                                                      \
-static void bm_native_##ROBOT##_lbfgsb_aggressive(benchmark::State& state)                          \
+static void bm_full_##ROBOT##_lbfgsb_aggressive(benchmark::State& state)                          \
 {                                                                                                    \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                   \
     bm_lbfgsb_aggressive<6>(state, chain, ts);                                                       \
 }                                                                                                    \
-BENCHMARK(bm_native_##ROBOT##_lbfgsb_aggressive)->Iterations(1000)->Unit(benchmark::kMicrosecond);   \
+BENCHMARK(bm_full_##ROBOT##_lbfgsb_aggressive)->Iterations(1000)->Unit(benchmark::kMicrosecond);   \
                                                                                                      \
-static void bm_native_##ROBOT##_racing(benchmark::State& state)                                     \
+static void bm_full_##ROBOT##_racing(benchmark::State& state)                                     \
 {                                                                                                    \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                   \
     bm_racing_solver<6, racing_solver<6>>(state, chain, ts, 1000);                                \
 }                                                                                                    \
-BENCHMARK(bm_native_##ROBOT##_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_full_##ROBOT##_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 // Register TRAC-IK baseline for a 6-DOF robot.
 // ROBOT: lowercase name, KDL_FN: KDL chain factory, LIMITS_FN: KDL limits factory
 #define REGISTER_6DOF_TRAC_IK(ROBOT, CHAIN_FN, KDL_FN, LIMITS_FN)                                   \
                                                                                                      \
-static void bm_native_##ROBOT##_trac_ik(benchmark::State& state)                                    \
+static void bm_full_##ROBOT##_trac_ik(benchmark::State& state)                                    \
 {                                                                                                    \
     auto cartan_chain = cartan::benchmarks::CHAIN_FN<double>();                                        \
     auto kdl_chain = cartan::benchmarks::KDL_FN();                                                    \
@@ -746,27 +746,27 @@ static void bm_native_##ROBOT##_trac_ik(benchmark::State& state)                
     static const target_set<double, 6> ts(cartan_chain, num_targets, 42);                             \
     bm_trac_ik_baseline<6>(state, cartan_chain, kdl_chain, q_min, q_max, ts);                         \
 }                                                                                                    \
-BENCHMARK(bm_native_##ROBOT##_trac_ik)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_full_##ROBOT##_trac_ik)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 // Register NLopt solver benchmarks for a 6-DOF robot.
 #ifdef CARTAN_HAS_NLOPT
 #define REGISTER_6DOF_NLOPT(ROBOT, CHAIN_FN)                                                         \
                                                                                                      \
-static void bm_native_##ROBOT##_bobyqa(benchmark::State& state)                                     \
+static void bm_full_##ROBOT##_bobyqa(benchmark::State& state)                                     \
 {                                                                                                    \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                   \
-    bm_native_solver<6, bobyqa_ik_solver<6>>(state, chain, ts, bobyqa_criteria());                   \
+    bm_full_solver<6, bobyqa_ik_solver<6>>(state, chain, ts, bobyqa_criteria());                   \
 }                                                                                                    \
-BENCHMARK(bm_native_##ROBOT##_bobyqa)->Iterations(1000)->Unit(benchmark::kMicrosecond);              \
+BENCHMARK(bm_full_##ROBOT##_bobyqa)->Iterations(1000)->Unit(benchmark::kMicrosecond);              \
                                                                                                      \
-static void bm_native_##ROBOT##_slsqp(benchmark::State& state)                                      \
+static void bm_full_##ROBOT##_slsqp(benchmark::State& state)                                      \
 {                                                                                                    \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                   \
-    bm_native_solver<6, slsqp_ik_solver<6>>(state, chain, ts, slsqp_criteria());                     \
+    bm_full_solver<6, slsqp_ik_solver<6>>(state, chain, ts, slsqp_criteria());                     \
 }                                                                                                    \
-BENCHMARK(bm_native_##ROBOT##_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_full_##ROBOT##_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 #else
 #define REGISTER_6DOF_NLOPT(ROBOT, CHAIN_FN)
 #endif
@@ -774,141 +774,141 @@ BENCHMARK(bm_native_##ROBOT##_slsqp)->Iterations(1000)->Unit(benchmark::kMicrose
 // Register nablapp solver benchmarks for a 6-DOF robot (always available).
 #define REGISTER_6DOF_NABLAPP(ROBOT, CHAIN_FN)                                                        \
                                                                                                       \
-static void bm_native_##ROBOT##_nablapp_slsqp(benchmark::State& state)                               \
+static void bm_full_##ROBOT##_nablapp_slsqp(benchmark::State& state)                               \
 {                                                                                                     \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
-    bm_native_solver<6, nablapp_slsqp_ik_solver<6>>(state, chain, ts, nablapp_slsqp_criteria());     \
+    bm_full_solver<6, nablapp_slsqp_ik_solver<6>>(state, chain, ts, nablapp_slsqp_criteria());     \
 }                                                                                                     \
-BENCHMARK(bm_native_##ROBOT##_nablapp_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);        \
+BENCHMARK(bm_full_##ROBOT##_nablapp_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);        \
                                                                                                       \
-static void bm_native_##ROBOT##_nablapp_lbfgsb(benchmark::State& state)                              \
+static void bm_full_##ROBOT##_nablapp_lbfgsb(benchmark::State& state)                              \
 {                                                                                                     \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
-    bm_native_solver<6, nablapp_lbfgsb_ik_solver<6>>(state, chain, ts, nablapp_lbfgsb_criteria());   \
+    bm_full_solver<6, nablapp_lbfgsb_ik_solver<6>>(state, chain, ts, nablapp_lbfgsb_criteria());   \
 }                                                                                                     \
-BENCHMARK(bm_native_##ROBOT##_nablapp_lbfgsb)->Iterations(1000)->Unit(benchmark::kMicrosecond);       \
+BENCHMARK(bm_full_##ROBOT##_nablapp_lbfgsb)->Iterations(1000)->Unit(benchmark::kMicrosecond);       \
                                                                                                       \
-static void bm_native_##ROBOT##_nw_sqp(benchmark::State& state)                                      \
+static void bm_full_##ROBOT##_nw_sqp(benchmark::State& state)                                      \
 {                                                                                                     \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
-    bm_native_solver<6, nw_sqp_ik_solver<6>>(state, chain, ts, nw_sqp_criteria());                   \
+    bm_full_solver<6, nw_sqp_ik_solver<6>>(state, chain, ts, nw_sqp_criteria());                   \
 }                                                                                                     \
-BENCHMARK(bm_native_##ROBOT##_nw_sqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);               \
+BENCHMARK(bm_full_##ROBOT##_nw_sqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);               \
                                                                                                       \
-static void bm_native_##ROBOT##_nablapp_lm(benchmark::State& state)                                  \
+static void bm_full_##ROBOT##_nablapp_lm(benchmark::State& state)                                  \
 {                                                                                                     \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
-    bm_native_solver<6, nablapp_lm_ik_solver<6>>(state, chain, ts, nablapp_lm_criteria());           \
+    bm_full_solver<6, nablapp_lm_ik_solver<6>>(state, chain, ts, nablapp_lm_criteria());           \
 }                                                                                                     \
-BENCHMARK(bm_native_##ROBOT##_nablapp_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);           \
+BENCHMARK(bm_full_##ROBOT##_nablapp_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);           \
                                                                                                       \
-static void bm_native_##ROBOT##_auglag(benchmark::State& state)                                      \
+static void bm_full_##ROBOT##_auglag(benchmark::State& state)                                      \
 {                                                                                                     \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
-    bm_native_solver<6, auglag_ik_solver<6>>(state, chain, ts, auglag_criteria());                   \
+    bm_full_solver<6, auglag_ik_solver<6>>(state, chain, ts, auglag_criteria());                   \
 }                                                                                                     \
-BENCHMARK(bm_native_##ROBOT##_auglag)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_full_##ROBOT##_auglag)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 // Register all native solver benchmarks for a 7-DOF robot.
 #define REGISTER_7DOF_BENCHMARKS(ROBOT, CHAIN_FN)                                                   \
                                                                                                      \
-static void bm_native_##ROBOT##_dls(benchmark::State& state)                                        \
+static void bm_full_##ROBOT##_dls(benchmark::State& state)                                        \
 {                                                                                                    \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                   \
-    bm_native_solver<7, dls_ik_solver<7>>(state, chain, ts, dls_criteria());                         \
+    bm_full_solver<7, dls_ik_solver<7>>(state, chain, ts, dls_criteria());                         \
 }                                                                                                    \
-BENCHMARK(bm_native_##ROBOT##_dls)->Iterations(1000)->Unit(benchmark::kMicrosecond);                 \
+BENCHMARK(bm_full_##ROBOT##_dls)->Iterations(1000)->Unit(benchmark::kMicrosecond);                 \
                                                                                                      \
-static void bm_native_##ROBOT##_lm(benchmark::State& state)                                         \
+static void bm_full_##ROBOT##_lm(benchmark::State& state)                                         \
 {                                                                                                    \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                   \
-    bm_native_solver<7, lm_ik_solver<7>>(state, chain, ts, lm_criteria());                           \
+    bm_full_solver<7, lm_ik_solver<7>>(state, chain, ts, lm_criteria());                           \
 }                                                                                                    \
-BENCHMARK(bm_native_##ROBOT##_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);                  \
+BENCHMARK(bm_full_##ROBOT##_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);                  \
                                                                                                      \
-static void bm_native_##ROBOT##_projected_lm(benchmark::State& state)                               \
+static void bm_full_##ROBOT##_projected_lm(benchmark::State& state)                               \
 {                                                                                                    \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                   \
-    bm_native_solver<7, projected_lm_ik_solver<7>>(state, chain, ts, plm_criteria());                \
+    bm_full_solver<7, projected_lm_ik_solver<7>>(state, chain, ts, plm_criteria());                \
 }                                                                                                    \
-BENCHMARK(bm_native_##ROBOT##_projected_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);        \
+BENCHMARK(bm_full_##ROBOT##_projected_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);        \
                                                                                                      \
-static void bm_native_##ROBOT##_lbfgsb(benchmark::State& state)                                     \
+static void bm_full_##ROBOT##_lbfgsb(benchmark::State& state)                                     \
 {                                                                                                    \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                   \
-    bm_native_solver<7, lbfgsb_ik_solver<7>>(state, chain, ts, lbfgsb_criteria());                   \
+    bm_full_solver<7, lbfgsb_ik_solver<7>>(state, chain, ts, lbfgsb_criteria());                   \
 }                                                                                                    \
-BENCHMARK(bm_native_##ROBOT##_lbfgsb)->Iterations(1000)->Unit(benchmark::kMicrosecond);              \
+BENCHMARK(bm_full_##ROBOT##_lbfgsb)->Iterations(1000)->Unit(benchmark::kMicrosecond);              \
                                                                                                      \
-static void bm_native_##ROBOT##_speed(benchmark::State& state)                                      \
+static void bm_full_##ROBOT##_speed(benchmark::State& state)                                      \
 {                                                                                                    \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                   \
-    bm_native_solver<7, speed_ik_solver<7>>(state, chain, ts, speed_criteria());                     \
+    bm_full_solver<7, speed_ik_solver<7>>(state, chain, ts, speed_criteria());                     \
 }                                                                                                    \
-BENCHMARK(bm_native_##ROBOT##_speed)->Iterations(1000)->Unit(benchmark::kMicrosecond);               \
+BENCHMARK(bm_full_##ROBOT##_speed)->Iterations(1000)->Unit(benchmark::kMicrosecond);               \
                                                                                                      \
-static void bm_native_##ROBOT##_convergence(benchmark::State& state)                                \
+static void bm_full_##ROBOT##_convergence(benchmark::State& state)                                \
 {                                                                                                    \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                   \
-    bm_native_solver<7, convergence_ik_solver<7>>(state, chain, ts, convergence_criteria_tuned());   \
+    bm_full_solver<7, convergence_ik_solver<7>>(state, chain, ts, convergence_criteria_tuned());   \
 }                                                                                                    \
-BENCHMARK(bm_native_##ROBOT##_convergence)->Iterations(1000)->Unit(benchmark::kMicrosecond);         \
+BENCHMARK(bm_full_##ROBOT##_convergence)->Iterations(1000)->Unit(benchmark::kMicrosecond);         \
                                                                                                      \
-static void bm_native_##ROBOT##_restart_lm(benchmark::State& state)                                 \
+static void bm_full_##ROBOT##_restart_lm(benchmark::State& state)                                 \
 {                                                                                                    \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                   \
-    bm_native_solver<7, restart_lm_ik_solver<7>>(state, chain, ts, restart_lm_criteria());           \
+    bm_full_solver<7, restart_lm_ik_solver<7>>(state, chain, ts, restart_lm_criteria());           \
 }                                                                                                    \
-BENCHMARK(bm_native_##ROBOT##_restart_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);          \
+BENCHMARK(bm_full_##ROBOT##_restart_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);          \
                                                                                                      \
-static void bm_native_##ROBOT##_newton_raphson(benchmark::State& state)                              \
+static void bm_full_##ROBOT##_newton_raphson(benchmark::State& state)                              \
 {                                                                                                    \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                   \
-    bm_native_solver<7, nr_ik_solver<7>>(state, chain, ts, nr_criteria());                           \
+    bm_full_solver<7, nr_ik_solver<7>>(state, chain, ts, nr_criteria());                           \
 }                                                                                                    \
-BENCHMARK(bm_native_##ROBOT##_newton_raphson)->Iterations(1000)->Unit(benchmark::kMicrosecond);      \
+BENCHMARK(bm_full_##ROBOT##_newton_raphson)->Iterations(1000)->Unit(benchmark::kMicrosecond);      \
                                                                                                      \
-static void bm_native_##ROBOT##_gauss_newton(benchmark::State& state)                               \
+static void bm_full_##ROBOT##_gauss_newton(benchmark::State& state)                               \
 {                                                                                                    \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                   \
     bm_gauss_newton<7>(state, chain, ts);                                                            \
 }                                                                                                    \
-BENCHMARK(bm_native_##ROBOT##_gauss_newton)->Iterations(1000)->Unit(benchmark::kMicrosecond);        \
+BENCHMARK(bm_full_##ROBOT##_gauss_newton)->Iterations(1000)->Unit(benchmark::kMicrosecond);        \
                                                                                                      \
-static void bm_native_##ROBOT##_lbfgsb_aggressive(benchmark::State& state)                          \
+static void bm_full_##ROBOT##_lbfgsb_aggressive(benchmark::State& state)                          \
 {                                                                                                    \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                   \
     bm_lbfgsb_aggressive<7>(state, chain, ts);                                                       \
 }                                                                                                    \
-BENCHMARK(bm_native_##ROBOT##_lbfgsb_aggressive)->Iterations(1000)->Unit(benchmark::kMicrosecond);   \
+BENCHMARK(bm_full_##ROBOT##_lbfgsb_aggressive)->Iterations(1000)->Unit(benchmark::kMicrosecond);   \
                                                                                                      \
-static void bm_native_##ROBOT##_racing(benchmark::State& state)                                     \
+static void bm_full_##ROBOT##_racing(benchmark::State& state)                                     \
 {                                                                                                    \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                   \
     bm_racing_solver<7, racing_solver<7>>(state, chain, ts, 1000);                                \
 }                                                                                                    \
-BENCHMARK(bm_native_##ROBOT##_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_full_##ROBOT##_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 // Register TRAC-IK baseline for a 7-DOF robot.
 #define REGISTER_7DOF_TRAC_IK(ROBOT, CHAIN_FN, KDL_FN, LIMITS_FN)                                   \
                                                                                                      \
-static void bm_native_##ROBOT##_trac_ik(benchmark::State& state)                                    \
+static void bm_full_##ROBOT##_trac_ik(benchmark::State& state)                                    \
 {                                                                                                    \
     auto cartan_chain = cartan::benchmarks::CHAIN_FN<double>();                                        \
     auto kdl_chain = cartan::benchmarks::KDL_FN();                                                    \
@@ -917,27 +917,27 @@ static void bm_native_##ROBOT##_trac_ik(benchmark::State& state)                
     static const target_set<double, 7> ts(cartan_chain, num_targets, 42);                             \
     bm_trac_ik_baseline<7>(state, cartan_chain, kdl_chain, q_min, q_max, ts);                         \
 }                                                                                                    \
-BENCHMARK(bm_native_##ROBOT##_trac_ik)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_full_##ROBOT##_trac_ik)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 // Register NLopt solver benchmarks for a 7-DOF robot.
 #ifdef CARTAN_HAS_NLOPT
 #define REGISTER_7DOF_NLOPT(ROBOT, CHAIN_FN)                                                         \
                                                                                                      \
-static void bm_native_##ROBOT##_bobyqa(benchmark::State& state)                                     \
+static void bm_full_##ROBOT##_bobyqa(benchmark::State& state)                                     \
 {                                                                                                    \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                   \
-    bm_native_solver<7, bobyqa_ik_solver<7>>(state, chain, ts, bobyqa_criteria());                   \
+    bm_full_solver<7, bobyqa_ik_solver<7>>(state, chain, ts, bobyqa_criteria());                   \
 }                                                                                                    \
-BENCHMARK(bm_native_##ROBOT##_bobyqa)->Iterations(1000)->Unit(benchmark::kMicrosecond);              \
+BENCHMARK(bm_full_##ROBOT##_bobyqa)->Iterations(1000)->Unit(benchmark::kMicrosecond);              \
                                                                                                      \
-static void bm_native_##ROBOT##_slsqp(benchmark::State& state)                                      \
+static void bm_full_##ROBOT##_slsqp(benchmark::State& state)                                      \
 {                                                                                                    \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                   \
-    bm_native_solver<7, slsqp_ik_solver<7>>(state, chain, ts, slsqp_criteria());                     \
+    bm_full_solver<7, slsqp_ik_solver<7>>(state, chain, ts, slsqp_criteria());                     \
 }                                                                                                    \
-BENCHMARK(bm_native_##ROBOT##_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_full_##ROBOT##_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 #else
 #define REGISTER_7DOF_NLOPT(ROBOT, CHAIN_FN)
 #endif
@@ -945,45 +945,45 @@ BENCHMARK(bm_native_##ROBOT##_slsqp)->Iterations(1000)->Unit(benchmark::kMicrose
 // Register nablapp solver benchmarks for a 7-DOF robot (always available).
 #define REGISTER_7DOF_NABLAPP(ROBOT, CHAIN_FN)                                                        \
                                                                                                       \
-static void bm_native_##ROBOT##_nablapp_slsqp(benchmark::State& state)                               \
+static void bm_full_##ROBOT##_nablapp_slsqp(benchmark::State& state)                               \
 {                                                                                                     \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
-    bm_native_solver<7, nablapp_slsqp_ik_solver<7>>(state, chain, ts, nablapp_slsqp_criteria());     \
+    bm_full_solver<7, nablapp_slsqp_ik_solver<7>>(state, chain, ts, nablapp_slsqp_criteria());     \
 }                                                                                                     \
-BENCHMARK(bm_native_##ROBOT##_nablapp_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);        \
+BENCHMARK(bm_full_##ROBOT##_nablapp_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);        \
                                                                                                       \
-static void bm_native_##ROBOT##_nablapp_lbfgsb(benchmark::State& state)                              \
+static void bm_full_##ROBOT##_nablapp_lbfgsb(benchmark::State& state)                              \
 {                                                                                                     \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
-    bm_native_solver<7, nablapp_lbfgsb_ik_solver<7>>(state, chain, ts, nablapp_lbfgsb_criteria());   \
+    bm_full_solver<7, nablapp_lbfgsb_ik_solver<7>>(state, chain, ts, nablapp_lbfgsb_criteria());   \
 }                                                                                                     \
-BENCHMARK(bm_native_##ROBOT##_nablapp_lbfgsb)->Iterations(1000)->Unit(benchmark::kMicrosecond);       \
+BENCHMARK(bm_full_##ROBOT##_nablapp_lbfgsb)->Iterations(1000)->Unit(benchmark::kMicrosecond);       \
                                                                                                       \
-static void bm_native_##ROBOT##_nw_sqp(benchmark::State& state)                                      \
+static void bm_full_##ROBOT##_nw_sqp(benchmark::State& state)                                      \
 {                                                                                                     \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
-    bm_native_solver<7, nw_sqp_ik_solver<7>>(state, chain, ts, nw_sqp_criteria());                   \
+    bm_full_solver<7, nw_sqp_ik_solver<7>>(state, chain, ts, nw_sqp_criteria());                   \
 }                                                                                                     \
-BENCHMARK(bm_native_##ROBOT##_nw_sqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);               \
+BENCHMARK(bm_full_##ROBOT##_nw_sqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);               \
                                                                                                       \
-static void bm_native_##ROBOT##_nablapp_lm(benchmark::State& state)                                  \
+static void bm_full_##ROBOT##_nablapp_lm(benchmark::State& state)                                  \
 {                                                                                                     \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
-    bm_native_solver<7, nablapp_lm_ik_solver<7>>(state, chain, ts, nablapp_lm_criteria());           \
+    bm_full_solver<7, nablapp_lm_ik_solver<7>>(state, chain, ts, nablapp_lm_criteria());           \
 }                                                                                                     \
-BENCHMARK(bm_native_##ROBOT##_nablapp_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);           \
+BENCHMARK(bm_full_##ROBOT##_nablapp_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);           \
                                                                                                       \
-static void bm_native_##ROBOT##_auglag(benchmark::State& state)                                      \
+static void bm_full_##ROBOT##_auglag(benchmark::State& state)                                      \
 {                                                                                                     \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
-    bm_native_solver<7, auglag_ik_solver<7>>(state, chain, ts, auglag_criteria());                   \
+    bm_full_solver<7, auglag_ik_solver<7>>(state, chain, ts, auglag_criteria());                   \
 }                                                                                                     \
-BENCHMARK(bm_native_##ROBOT##_auglag)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_full_##ROBOT##_auglag)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 // ============================================================================
 // 6-DOF robots: UR3e, KR6 SIXX, ABB IRB120, Jaco2
@@ -1048,26 +1048,26 @@ REGISTER_7DOF_NABLAPP(kuka_lwr4,    make_kuka_lwr4_chain)
 
 using dynamic_chain = cartan::kinematic_chain<double, cartan::dynamic>;
 
-using nablapp_slsqp_dynamic_restart = cartan::restart_solve_policy<dynamic_chain, cartan::slsqp_solve_policy<dynamic_chain>>;
-using nablapp_slsqp_dynamic_solver = cartan::basic_ik_solver<nablapp_slsqp_dynamic_restart>;
+using nablapp_slsqp_dynamic_restart = cartan::ik::restart_wrapper<dynamic_chain, cartan::ik::argmin_slsqp<dynamic_chain>>;
+using nablapp_slsqp_dynamic_solver = cartan::basic_ik_runner<nablapp_slsqp_dynamic_restart>;
 
-// Fixed-size UR3e nablapp SLSQP (reference: same as bm_native_ur3e_nablapp_slsqp above)
-static void bm_native_ur3e_nablapp_slsqp_fixed(benchmark::State& state)
+// Fixed-size UR3e nablapp SLSQP (reference: same as bm_full_ur3e_nablapp_slsqp above)
+static void bm_full_ur3e_nablapp_slsqp_fixed(benchmark::State& state)
 {
     auto chain = cartan::benchmarks::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
-    bm_native_solver<6, nablapp_slsqp_ik_solver<6>>(state, chain, ts, nablapp_slsqp_criteria());
+    bm_full_solver<6, nablapp_slsqp_ik_solver<6>>(state, chain, ts, nablapp_slsqp_criteria());
 }
-BENCHMARK(bm_native_ur3e_nablapp_slsqp_fixed)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_full_ur3e_nablapp_slsqp_fixed)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 // Dynamic-size UR3e nablapp SLSQP
-static void bm_native_ur3e_nablapp_slsqp_dynamic(benchmark::State& state)
+static void bm_full_ur3e_nablapp_slsqp_dynamic(benchmark::State& state)
 {
     auto fixed_chain = cartan::benchmarks::make_ur3e_chain<double>();
     auto chain = fixed_chain.to_dynamic();
     static const target_set<double, cartan::dynamic> ts(chain, num_targets, 42);
-    bm_native_solver<cartan::dynamic, nablapp_slsqp_dynamic_solver>(state, chain, ts, nablapp_slsqp_criteria());
+    bm_full_solver<cartan::dynamic, nablapp_slsqp_dynamic_solver>(state, chain, ts, nablapp_slsqp_criteria());
 }
-BENCHMARK(bm_native_ur3e_nablapp_slsqp_dynamic)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_full_ur3e_nablapp_slsqp_dynamic)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 }

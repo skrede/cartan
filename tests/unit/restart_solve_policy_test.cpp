@@ -1,6 +1,6 @@
-#include <cartan/serial/ik/basic_ik_solver.h>
-#include <cartan/serial/ik/restart_solve_policy.h>
-#include <cartan/serial/ik/projected_lm_solve_policy.h>
+#include <cartan/serial/ik/basic_ik_runner.h>
+#include <cartan/serial/ik/wrapper/restart_wrapper.h>
+#include <cartan/serial/ik/solver/projected_lm.h>
 
 #include <cartan/types.h>
 
@@ -67,8 +67,8 @@ spp::ik_status run_stepper(
 
 TEST_CASE("restart_solve_policy concept satisfaction", "[ik][restart]")
 {
-    static_assert(spp::ik_solve_policy<
-        spp::restart_solve_policy<spp::kinematic_chain<double, 6>, spp::projected_lm_solve_policy<spp::kinematic_chain<double, 6>>>>);
+    static_assert(spp::ik::solve_policy<
+        spp::ik::restart_wrapper<spp::kinematic_chain<double, 6>, spp::ik::projected_lm<spp::kinematic_chain<double, 6>>>>);
 }
 
 // ============================================================================
@@ -85,7 +85,7 @@ TEST_CASE("restart_solve_policy trivial convergence", "[ik][restart]")
     auto fk_target = spp::forward_kinematics(chain, q_known);
     auto target = fk_target.end_effector;
 
-    spp::restart_solve_policy<spp::kinematic_chain<double, 6>, spp::projected_lm_solve_policy<spp::kinematic_chain<double, 6>>> stepper;
+    spp::ik::restart_wrapper<spp::kinematic_chain<double, 6>, spp::ik::projected_lm<spp::kinematic_chain<double, 6>>> stepper;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations = 200;
@@ -118,15 +118,15 @@ TEST_CASE("restart_solve_policy re-seeds after stall", "[ik][restart]")
     auto target = fk_target.end_effector;
 
     // Use inner stepper options that make first attempt likely to stall
-    spp::projected_lm_solve_policy<spp::kinematic_chain<double, 6>>::options inner_opts;
+    spp::ik::projected_lm<spp::kinematic_chain<double, 6>>::options inner_opts;
     inner_opts.stall_window = 3;
     inner_opts.stall_threshold = 1e-4;
 
-    spp::restart_solve_policy<spp::kinematic_chain<double, 6>, spp::projected_lm_solve_policy<spp::kinematic_chain<double, 6>>>::options opts;
+    spp::ik::restart_wrapper<spp::kinematic_chain<double, 6>, spp::ik::projected_lm<spp::kinematic_chain<double, 6>>>::options opts;
     opts.max_restarts = 20;
 
-    spp::restart_solve_policy<spp::kinematic_chain<double, 6>, spp::projected_lm_solve_policy<spp::kinematic_chain<double, 6>>> stepper(
-        opts, spp::projected_lm_solve_policy<spp::kinematic_chain<double, 6>>(inner_opts));
+    spp::ik::restart_wrapper<spp::kinematic_chain<double, 6>, spp::ik::projected_lm<spp::kinematic_chain<double, 6>>> stepper(
+        opts, spp::ik::projected_lm<spp::kinematic_chain<double, 6>>(inner_opts));
 
     // Seed far from solution with tight iteration limit to force stalls
     Eigen::Vector<double, 6> q0;
@@ -166,10 +166,10 @@ TEST_CASE("restart_solve_policy warm-start lambda", "[ik][restart]")
     auto target = fk_target.end_effector;
 
     // Run with warm-start (the default)
-    spp::restart_solve_policy<spp::kinematic_chain<double, 6>, spp::projected_lm_solve_policy<spp::kinematic_chain<double, 6>>>::options opts;
+    spp::ik::restart_wrapper<spp::kinematic_chain<double, 6>, spp::ik::projected_lm<spp::kinematic_chain<double, 6>>>::options opts;
     opts.max_restarts = 30;
 
-    spp::restart_solve_policy<spp::kinematic_chain<double, 6>, spp::projected_lm_solve_policy<spp::kinematic_chain<double, 6>>> stepper(opts);
+    spp::ik::restart_wrapper<spp::kinematic_chain<double, 6>, spp::ik::projected_lm<spp::kinematic_chain<double, 6>>> stepper(opts);
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
@@ -196,10 +196,10 @@ TEST_CASE("restart_solve_policy max_restarts exhaustion", "[ik][restart]")
     far_trans << 100.0, 100.0, 100.0;
     auto target = spp::se3<double>(spp::so3<double>::identity(), far_trans);
 
-    spp::restart_solve_policy<spp::kinematic_chain<double, 6>, spp::projected_lm_solve_policy<spp::kinematic_chain<double, 6>>>::options opts;
+    spp::ik::restart_wrapper<spp::kinematic_chain<double, 6>, spp::ik::projected_lm<spp::kinematic_chain<double, 6>>>::options opts;
     opts.max_restarts = 0;  // no restarts allowed
 
-    spp::restart_solve_policy<spp::kinematic_chain<double, 6>, spp::projected_lm_solve_policy<spp::kinematic_chain<double, 6>>> stepper(opts);
+    spp::ik::restart_wrapper<spp::kinematic_chain<double, 6>, spp::ik::projected_lm<spp::kinematic_chain<double, 6>>> stepper(opts);
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
@@ -229,15 +229,15 @@ TEST_CASE("restart_solve_policy iterations is cumulative", "[ik][restart]")
     auto fk_target = spp::forward_kinematics(chain, q_known);
     auto target = fk_target.end_effector;
 
-    spp::projected_lm_solve_policy<spp::kinematic_chain<double, 6>>::options inner_opts;
+    spp::ik::projected_lm<spp::kinematic_chain<double, 6>>::options inner_opts;
     inner_opts.stall_window = 3;
     inner_opts.stall_threshold = 1e-4;
 
-    spp::restart_solve_policy<spp::kinematic_chain<double, 6>, spp::projected_lm_solve_policy<spp::kinematic_chain<double, 6>>>::options opts;
+    spp::ik::restart_wrapper<spp::kinematic_chain<double, 6>, spp::ik::projected_lm<spp::kinematic_chain<double, 6>>>::options opts;
     opts.max_restarts = 10;
 
-    spp::restart_solve_policy<spp::kinematic_chain<double, 6>, spp::projected_lm_solve_policy<spp::kinematic_chain<double, 6>>> stepper(
-        opts, spp::projected_lm_solve_policy<spp::kinematic_chain<double, 6>>(inner_opts));
+    spp::ik::restart_wrapper<spp::kinematic_chain<double, 6>, spp::ik::projected_lm<spp::kinematic_chain<double, 6>>> stepper(
+        opts, spp::ik::projected_lm<spp::kinematic_chain<double, 6>>(inner_opts));
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
@@ -265,7 +265,7 @@ TEST_CASE("restart_solve_policy abort propagates", "[ik][restart]")
     auto fk_target = spp::forward_kinematics(chain, q_known);
     auto target = fk_target.end_effector;
 
-    spp::restart_solve_policy<spp::kinematic_chain<double, 6>, spp::projected_lm_solve_policy<spp::kinematic_chain<double, 6>>> stepper;
+    spp::ik::restart_wrapper<spp::kinematic_chain<double, 6>, spp::ik::projected_lm<spp::kinematic_chain<double, 6>>> stepper;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
 
@@ -284,11 +284,11 @@ TEST_CASE("restart_solve_policy composes with racing_scheduler", "[ik][restart]"
     // This is a compile-time check: racing_scheduler accepts restart_solve_policy
     // via its Solver template parameter. racing_scheduler uses basic_ik_solver<..., Stepper>
     // so we check that basic_ik_solver accepts restart_solve_policy.
-    using restart_type = spp::restart_solve_policy<spp::kinematic_chain<double, 6>, spp::projected_lm_solve_policy<spp::kinematic_chain<double, 6>>>;
-    static_assert(spp::ik_solve_policy<restart_type>);
+    using restart_type = spp::ik::restart_wrapper<spp::kinematic_chain<double, 6>, spp::ik::projected_lm<spp::kinematic_chain<double, 6>>>;
+    static_assert(spp::ik::solve_policy<restart_type>);
 
     // Instantiation check: just create the type alias to verify it compiles
-    using solver_type = spp::basic_ik_solver<restart_type>;
+    using solver_type = spp::basic_ik_runner<restart_type>;
     solver_type solver;
     (void)solver;
 }

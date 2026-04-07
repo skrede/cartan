@@ -4,7 +4,7 @@
 
 #include "../../profiling/chain_factories.h"
 
-#include <cartan/serial/ik/default_solvers.h>
+#include <cartan/serial/ik/solvers.h>
 
 #include <cartan/lie/se3.h>
 #include <cartan/serial/fk/jacobian.h>
@@ -169,12 +169,12 @@ void verify_ik_parity(
     Eigen::Vector<double, N> q0 = Eigen::Vector<double, N>::Zero();
     spp::convergence_criteria<double> criteria{1e-6, 1e-6, 200};
 
-    spp::basic_ik_solver kc_solver{spp::speed_solver<KChain>{}};
+    spp::basic_ik_runner kc_solver{spp::speed_ik_runner<KChain>{}};
     kc_solver.setup(kc, target, q0, criteria);
     auto kc_result = kc_solver.solve();
     REQUIRE(kc_result.has_value());
 
-    spp::basic_ik_solver sc_solver{spp::speed_solver<SChain>{}};
+    spp::basic_ik_runner sc_solver{spp::speed_ik_runner<SChain>{}};
     sc_solver.setup(sc, target, q0, criteria);
     auto sc_result = sc_solver.solve();
     REQUIRE(sc_result.has_value());

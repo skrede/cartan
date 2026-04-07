@@ -66,7 +66,7 @@ TEST_CASE("Reachable target: DLS converges within tolerance", "[ik][integration]
         auto fk_target = spp::forward_kinematics(chain, q_known);
         auto target = fk_target.end_effector;
 
-        spp::basic_ik_solver<spp::dls_solve_policy<spp::kinematic_chain<double, 6>>> solver;
+        spp::basic_ik_runner<spp::ik::dls<spp::kinematic_chain<double, 6>>> solver;
         Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
         spp::convergence_criteria<double> criteria;
         criteria.max_iterations = 300;
@@ -108,7 +108,7 @@ TEST_CASE("Reachable target: DLS converges within tolerance", "[ik][integration]
         Eigen::Vector<double, 6> q0;
         q0 << 0.1, 0.1, 0.1, 0.1, 0.1, 0.1;
 
-        spp::basic_ik_solver<spp::dls_solve_policy<spp::kinematic_chain<double, 6>>> solver;
+        spp::basic_ik_runner<spp::ik::dls<spp::kinematic_chain<double, 6>>> solver;
         spp::convergence_criteria<double> criteria;
         criteria.max_iterations = 300;
 
@@ -137,7 +137,7 @@ TEST_CASE("Reachable target: LM converges within tolerance", "[ik][integration]"
         auto fk_target = spp::forward_kinematics(chain, q_known);
         auto target = fk_target.end_effector;
 
-        spp::basic_ik_solver<spp::lm_solve_policy<spp::kinematic_chain<double, 6>>> solver;
+        spp::basic_ik_runner<spp::ik::lm<spp::kinematic_chain<double, 6>>> solver;
         Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
         spp::convergence_criteria<double> criteria;
         criteria.max_iterations = 300;
@@ -183,7 +183,7 @@ TEST_CASE("Boundary target: near workspace limit", "[ik][integration]")
     auto fk_target = spp::forward_kinematics(chain, q_ext);
     auto target = fk_target.end_effector;
 
-    spp::basic_ik_solver<spp::dls_solve_policy<spp::kinematic_chain<double, 6>>> solver;
+    spp::basic_ik_runner<spp::ik::dls<spp::kinematic_chain<double, 6>>> solver;
     Eigen::Vector<double, 6> q0;
     q0 << 0.1, 0.1, 0.1, 0.1, 0.1, 0.1;
     spp::convergence_criteria<double> criteria;
@@ -218,7 +218,7 @@ TEST_CASE("Singular configuration: elbow singularity does not diverge", "[ik][in
     auto fk_target = spp::forward_kinematics(chain, q_sing);
     auto target = fk_target.end_effector;
 
-    spp::basic_ik_solver<spp::dls_solve_policy<spp::kinematic_chain<double, 6>>> solver;
+    spp::basic_ik_runner<spp::ik::dls<spp::kinematic_chain<double, 6>>> solver;
     Eigen::Vector<double, 6> q0;
     q0 << 0.1, 0.2, 0.1, 0.1, 0.1, 0.1;
     spp::convergence_criteria<double> criteria;
@@ -246,7 +246,7 @@ TEST_CASE("Unreachable target: far outside workspace", "[ik][integration]")
     far_trans << 10, 10, 10;
     auto target = spp::se3<double>(spp::so3<double>::identity(), far_trans);
 
-    spp::basic_ik_solver<spp::dls_solve_policy<spp::kinematic_chain<double, 6>>> solver;
+    spp::basic_ik_runner<spp::ik::dls<spp::kinematic_chain<double, 6>>> solver;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations = 100;
@@ -275,7 +275,7 @@ TEST_CASE("Unreachable target: inside workspace but impossible orientation", "[i
     auto rot = spp::so3<double>::exp(Eigen::Vector3d(3.0, 3.0, 3.0));
     auto target = spp::se3<double>(rot, pos);
 
-    spp::basic_ik_solver<spp::dls_solve_policy<spp::kinematic_chain<double, 6>>> solver;
+    spp::basic_ik_runner<spp::ik::dls<spp::kinematic_chain<double, 6>>> solver;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations = 100;
@@ -302,7 +302,7 @@ TEST_CASE("3R planar reachable", "[ik][integration]")
     auto fk_target = spp::forward_kinematics(chain, q_known);
     auto target = fk_target.end_effector;
 
-    spp::basic_ik_solver<spp::dls_solve_policy<spp::kinematic_chain<double, 3>>> solver;
+    spp::basic_ik_runner<spp::ik::dls<spp::kinematic_chain<double, 3>>> solver;
     Eigen::Vector3d q0 = Eigen::Vector3d::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations = 200;
@@ -331,7 +331,7 @@ TEST_CASE("3R planar unreachable", "[ik][integration]")
     far_trans << 5, 0, 0;
     auto target = spp::se3<double>(spp::so3<double>::identity(), far_trans);
 
-    spp::basic_ik_solver<spp::dls_solve_policy<spp::kinematic_chain<double, 3>>> solver;
+    spp::basic_ik_runner<spp::ik::dls<spp::kinematic_chain<double, 3>>> solver;
     Eigen::Vector3d q0 = Eigen::Vector3d::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations = 100;
@@ -365,7 +365,7 @@ TEST_CASE("Float scalar type compiles and converges", "[ik][integration]")
     auto fk_target = spp::forward_kinematics(chain, q_known);
     auto target = fk_target.end_effector;
 
-    spp::basic_ik_solver<spp::dls_solve_policy<spp::kinematic_chain<float, 3>>> solver;
+    spp::basic_ik_runner<spp::ik::dls<spp::kinematic_chain<float, 3>>> solver;
     Eigen::Vector3f q0 = Eigen::Vector3f::Zero();
     spp::convergence_criteria<float> criteria;
     criteria.position_tol = 1e-4f;
@@ -395,7 +395,7 @@ TEST_CASE("Dynamic chain IK converges", "[ik][integration]")
     auto fk_target = spp::forward_kinematics(chain, q_known);
     auto target = fk_target.end_effector;
 
-    spp::basic_ik_solver<spp::dls_solve_policy<spp::kinematic_chain<double, spp::dynamic>>> solver;
+    spp::basic_ik_runner<spp::ik::dls<spp::kinematic_chain<double, spp::dynamic>>> solver;
     Eigen::VectorXd q0 = Eigen::VectorXd::Zero(6);
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations = 300;

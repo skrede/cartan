@@ -1,5 +1,5 @@
-#include <cartan/serial/ik/lm_solve_policy.h>
-#include <cartan/serial/ik/dls_solve_policy.h>
+#include <cartan/serial/ik/solver/lm.h>
+#include <cartan/serial/ik/solver/dls.h>
 
 #include <catch2/catch_test_macros.hpp>
 

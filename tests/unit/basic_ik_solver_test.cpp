@@ -1,11 +1,11 @@
-#include <cartan/serial/ik/ik_types.h>
-#include <cartan/serial/ik/basic_ik_solver.h>
+#include <cartan/serial/ik/ik_status.h>
+#include <cartan/serial/ik/basic_ik_runner.h>
 
 #include <cartan/types.h>
 
-#include <cartan/serial/ik/lm_solve_policy.h>
-#include <cartan/serial/ik/dls_solve_policy.h>
-#include <cartan/serial/ik/limits_policy.h>
+#include <cartan/serial/ik/solver/lm.h>
+#include <cartan/serial/ik/solver/dls.h>
+#include <cartan/serial/ik/policy/limits_policy.h>
 
 #include <cartan/lie/se3.h>
 #include <cartan/lie/so3.h>
@@ -106,7 +106,7 @@ TEST_CASE("IkSolver with DLS converges via solve()", "[ik][solver]")
     auto fk_target = spp::forward_kinematics(chain, q_known);
     auto target = fk_target.end_effector;
 
-    spp::basic_ik_solver<spp::dls_solve_policy<spp::kinematic_chain<double, 6>>> solver;
+    spp::basic_ik_runner<spp::ik::dls<spp::kinematic_chain<double, 6>>> solver;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations = 200;
@@ -137,7 +137,7 @@ TEST_CASE("IkSolver with LM converges via solve()", "[ik][solver]")
     auto fk_target = spp::forward_kinematics(chain, q_known);
     auto target = fk_target.end_effector;
 
-    spp::basic_ik_solver<spp::lm_solve_policy<spp::kinematic_chain<double, 6>>> solver;
+    spp::basic_ik_runner<spp::ik::lm<spp::kinematic_chain<double, 6>>> solver;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations = 200;
@@ -166,7 +166,7 @@ TEST_CASE("IkSolver step-by-step matches solve()", "[ik][solver]")
     auto fk_target = spp::forward_kinematics(chain, q_known);
     auto target = fk_target.end_effector;
 
-    spp::basic_ik_solver<spp::dls_solve_policy<spp::kinematic_chain<double, 6>>> solver;
+    spp::basic_ik_runner<spp::ik::dls<spp::kinematic_chain<double, 6>>> solver;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations = 200;
@@ -197,7 +197,7 @@ TEST_CASE("IkSolver with clamp_limits enforces bounds", "[ik][solver][limits]")
     auto fk_target = spp::forward_kinematics(chain, q_known);
     auto target = fk_target.end_effector;
 
-    spp::basic_ik_solver<spp::dls_solve_policy<spp::kinematic_chain<double, 6>>> solver;
+    spp::basic_ik_runner<spp::ik::dls<spp::kinematic_chain<double, 6>>> solver;
     // Seed outside limits
     Eigen::Vector<double, 6> q0;
     q0 << 1.0, -1.0, 1.5, -1.5, 2.0, -2.0;
@@ -243,7 +243,7 @@ TEST_CASE("IkSolver returns ik_error on unreachable target", "[ik][solver]")
     far_trans << 100, 100, 100;
     auto target = spp::se3<double>(spp::so3<double>::identity(), far_trans);
 
-    spp::basic_ik_solver<spp::dls_solve_policy<spp::kinematic_chain<double, 6>>> solver;
+    spp::basic_ik_runner<spp::ik::dls<spp::kinematic_chain<double, 6>>> solver;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations = 50;
@@ -271,7 +271,7 @@ TEST_CASE("IkSolver min_distance objective continues past first convergence", "[
     auto fk_target = spp::forward_kinematics(chain, q_known);
     auto target = fk_target.end_effector;
 
-    spp::basic_ik_solver<spp::dls_solve_policy<spp::kinematic_chain<double, 6>>> solver;
+    spp::basic_ik_runner<spp::ik::dls<spp::kinematic_chain<double, 6>>> solver;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations = 200;
@@ -296,7 +296,7 @@ TEST_CASE("IkSolver ik_result contains correct fields", "[ik][solver]")
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
     auto fk_target = spp::forward_kinematics(chain, q_known);
 
-    spp::basic_ik_solver<spp::dls_solve_policy<spp::kinematic_chain<double, 6>>> solver;
+    spp::basic_ik_runner<spp::ik::dls<spp::kinematic_chain<double, 6>>> solver;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations = 200;
@@ -324,7 +324,7 @@ TEST_CASE("IkSolver with LM and null_space_limits on 7-DOF chain", "[ik][solver]
     auto target = fk_target.end_effector;
 
     // Solve with null_space_limits
-    spp::basic_ik_solver<spp::lm_solve_policy<spp::kinematic_chain<double, 7>, spp::null_space_limits>> solver;
+    spp::basic_ik_runner<spp::ik::lm<spp::kinematic_chain<double, 7>, spp::null_space_limits>> solver;
     Eigen::Vector<double, 7> q0 = Eigen::Vector<double, 7>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations = 300;
