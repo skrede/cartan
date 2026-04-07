@@ -10,20 +10,20 @@ set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CARTAN_WARNING_FLAGS
     $<$<CXX_COMPILER_ID:MSVC>:/W4 /permissive- /utf-8>
     $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:
-        -fPIC
-        -Wall
-        -Wextra
-        -Wpedantic
-        -Wshadow
-        -Wconversion
-        -Wsign-conversion
-        -Wold-style-cast
-        -Wcast-align
-        -Woverloaded-virtual
-        -Wnon-virtual-dtor
-        -Wdouble-promotion
-        -Wimplicit-fallthrough
-        -Wformat=2
+    -fPIC
+    -Wall
+    -Wextra
+    -Wpedantic
+    -Wshadow
+    -Wconversion
+    -Wsign-conversion
+    -Wold-style-cast
+    -Wcast-align
+    -Woverloaded-virtual
+    -Wnon-virtual-dtor
+    -Wdouble-promotion
+    -Wimplicit-fallthrough
+    -Wformat=2
     >
 )
 
@@ -31,11 +31,14 @@ option(CARTAN_BUILD_TESTS "Build unit and compile tests" OFF)
 option(CARTAN_BUILD_EXAMPLES "Build examples" OFF)
 option(CARTAN_BUILD_FUZZ_TESTS "Build fuzz test targets" OFF)
 option(CARTAN_BUILD_PROPERTY_TESTS "Build property-based test targets (requires RapidCheck)" OFF)
+option(CARTAN_BUILD_ARGMIN "Build with Argmin NLP solver backend" OFF)
 option(CARTAN_BUILD_NLOPT "Build NLopt solver backend for IK" OFF)
 option(CARTAN_BUILD_BENCHMARKS "Build benchmarks (requires Google Benchmark)" OFF)
 option(CARTAN_BUILD_TRAC_IK "Build TRAC-IK comparison benchmarks (requires orocos-kdl, NLopt)" OFF)
 option(CARTAN_BUILD_PROFILING "Build profiling benchmarks (no external robot library dependencies)" OFF)
 option(CARTAN_CMAKE_FETCH_DEPS "Use CMake FetchContent to download and install dependencies" OFF)
+
+set(CARTAN_ARGMIN_SOURCE_DIR "" CACHE PATH "Path to local Argmin (nablapp) source checkout")
 
 include(FetchContent)
 include(GNUInstallDirs)
