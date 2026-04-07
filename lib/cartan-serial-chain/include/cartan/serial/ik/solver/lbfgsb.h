@@ -137,7 +137,7 @@ public:
             return m_status;
         }
 
-        if (detail::is_converged(m_body_error, m_weight, m_criteria))
+        if (cartan::detail::is_converged(m_body_error, m_weight, m_criteria))
         {
             m_status = ik_status::converged;
             return m_status;
@@ -173,7 +173,7 @@ public:
         update_lbfgs_history(q_old, g_old);
 
         update_stall_detection();
-        detail::enforce_limits<LimitsPolicy>(m_q, chain);
+        cartan::detail::enforce_limits<LimitsPolicy>(m_q, chain);
 
         return m_status;
     }
@@ -356,7 +356,7 @@ private:
 
     void update_stall_detection()
     {
-        auto stall_result = detail::check_stall_divergence(
+        auto stall_result = cartan::detail::check_stall_divergence(
             m_error_history, m_error_norm, m_initial_error,
             m_options.stall_window, m_options.stall_threshold,
             m_options.divergence_factor);

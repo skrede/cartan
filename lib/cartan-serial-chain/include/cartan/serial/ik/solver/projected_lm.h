@@ -156,7 +156,7 @@ public:
         update_damping(rho, dq, q_trial, V_b_trial);
 
         m_error_norm = m_V_b.norm();
-        auto stall_result = detail::check_stall_divergence(
+        auto stall_result = cartan::detail::check_stall_divergence(
             m_error_history, m_error_norm, m_initial_error,
             m_options.stall_window, m_options.stall_threshold,
             m_options.divergence_factor);
@@ -166,7 +166,7 @@ public:
             return m_status;
         }
 
-        detail::enforce_limits<LimitsPolicy>(m_q, chain);
+        cartan::detail::enforce_limits<LimitsPolicy>(m_q, chain);
         return m_status;
     }
 
@@ -182,7 +182,7 @@ public:
 private:
     ik_status check_convergence_and_limits()
     {
-        if (detail::is_converged(m_V_b, m_weight, m_criteria))
+        if (cartan::detail::is_converged(m_V_b, m_weight, m_criteria))
         {
             m_error_norm = m_V_b.norm();
             m_status = ik_status::converged;

@@ -4,9 +4,9 @@
 /// Reports custom counters: success_rate, avg_iterations,
 /// avg_position_error, avg_orientation_error per D-08.
 
-#include <cartan/serial/ik/basic_ik_solver.h>
-#include <cartan/serial/ik/lm_solve_policy.h>
-#include <cartan/serial/ik/ik_types.h>
+#include <cartan/serial/ik/basic_ik_runner.h>
+#include <cartan/serial/ik/solver/lm.h>
+#include <cartan/serial/ik/ik_status.h>
 
 #include "benchmark_utils.h"
 
@@ -32,7 +32,7 @@ static void bm_ik_lm_3r_planar(benchmark::State& state)
         auto target = cartan::benchmarks::random_reachable_target(chain, rng);
         auto q_seed = cartan::benchmarks::random_joint_config(chain, rng);
 
-        cartan::basic_ik_solver<cartan::lm_solve_policy<cartan::kinematic_chain<double, 3>>> solver;
+        cartan::basic_ik_runner<cartan::ik::lm<cartan::kinematic_chain<double, 3>>> solver;
         solver.setup(chain, target, q_seed, criteria);
         auto result = solver.solve();
 
@@ -81,7 +81,7 @@ static void bm_ik_lm_ur3e(benchmark::State& state)
         auto target = cartan::benchmarks::random_reachable_target(chain, rng);
         auto q_seed = cartan::benchmarks::random_joint_config(chain, rng);
 
-        cartan::basic_ik_solver<cartan::lm_solve_policy<cartan::kinematic_chain<double, 6>>> solver;
+        cartan::basic_ik_runner<cartan::ik::lm<cartan::kinematic_chain<double, 6>>> solver;
         solver.setup(chain, target, q_seed, criteria);
         auto result = solver.solve();
 
@@ -130,7 +130,7 @@ static void bm_ik_lm_lbr_med14(benchmark::State& state)
         auto target = cartan::benchmarks::random_reachable_target(chain, rng);
         auto q_seed = cartan::benchmarks::random_joint_config(chain, rng);
 
-        cartan::basic_ik_solver<cartan::lm_solve_policy<cartan::kinematic_chain<double, 7>>> solver;
+        cartan::basic_ik_runner<cartan::ik::lm<cartan::kinematic_chain<double, 7>>> solver;
         solver.setup(chain, target, q_seed, criteria);
         auto result = solver.solve();
 

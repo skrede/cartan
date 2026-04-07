@@ -1,7 +1,7 @@
 /// @file basic_ik.cpp
 /// @brief Single IK solve with Levenberg-Marquardt solver on a 3-DOF planar arm.
 ///
-/// Shows: kinematic_chain construction, basic_ik_solver with lm_solve_policy,
+/// Shows: kinematic_chain construction, basic_ik_runner with ik::lm,
 /// std::expected result handling, FK verification of the IK solution.
 
 #include "cartan/serial_chain.h"
@@ -33,7 +33,7 @@ int main()
     Eigen::Vector3d q0{0.0, 0.0, 0.0};
     cartan::convergence_criteria<double> criteria{1e-6, 1e-6, 200};
 
-    cartan::basic_ik_solver<cartan::lm_solve_policy<cartan::kinematic_chain<double, 3>>> solver;
+    cartan::basic_ik_runner<cartan::ik::lm<cartan::kinematic_chain<double, 3>>> solver;
     solver.setup(chain, target, q0, criteria);
     auto result = solver.solve();
 

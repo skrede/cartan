@@ -1,5 +1,5 @@
 #include <cartan/lie/se3_left_jacobian.h>
-#include <cartan/serial/ik/error_weight.h>
+#include <cartan/serial/ik/policy/error_weight.h>
 #include <cartan/lie/se3.h>
 
 #include <catch2/catch_approx.hpp>

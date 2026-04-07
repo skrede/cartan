@@ -1,7 +1,7 @@
-#include <cartan/serial/ik/basic_ik_solver.h>
+#include <cartan/serial/ik/basic_ik_runner.h>
 
-#include <cartan/serial/ik/dls_solve_policy.h>
-#include <cartan/serial/ik/limits_policy.h>
+#include <cartan/serial/ik/solver/dls.h>
+#include <cartan/serial/ik/policy/limits_policy.h>
 
 #include <cartan/lie/se3.h>
 #include <cartan/serial/chain/joint_state.h>
@@ -50,7 +50,7 @@ TEST_CASE("no_limits returns q unchanged", "[ik][limits]")
 
 TEST_CASE("basic_ik_solver with dls_solve_policy and clamp_limits compiles", "[ik][solver]")
 {
-    using solver_type = spp::basic_ik_solver<spp::dls_solve_policy<spp::kinematic_chain<double, 6>>>;
+    using solver_type = spp::basic_ik_runner<spp::ik::dls<spp::kinematic_chain<double, 6>>>;
     solver_type solver;
     static_assert(std::is_default_constructible_v<solver_type>);
 }

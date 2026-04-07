@@ -1,11 +1,11 @@
 #include <cartan/serial/ik/ik.h>
-#include <cartan/serial/ik/basic_ik_solver.h>
-#include <cartan/serial/ik/ik_solve_policy.h>
-#include <cartan/serial/ik/nw_sqp_solve_policy.h>
-#include <cartan/serial/ik/cmaes_solve_policy.h>
-#include <cartan/serial/ik/nablapp_lm_solve_policy.h>
-#include <cartan/serial/ik/nablapp_lbfgsb_solve_policy.h>
-#include <cartan/serial/ik/augmented_lagrangian_solve_policy.h>
+#include <cartan/serial/ik/basic_ik_runner.h>
+#include <cartan/serial/ik/concepts/solve_concept.h>
+#include <cartan/serial/ik/solver/nw_sqp.h>
+#include <cartan/serial/ik/solver/cmaes.h>
+#include <cartan/serial/ik/solver/argmin_lm.h>
+#include <cartan/serial/ik/solver/argmin_lbfgsb.h>
+#include <cartan/serial/ik/solver/augmented_lagrangian.h>
 
 #include <cartan/lie/se3.h>
 #include <cartan/lie/so3.h>
@@ -22,11 +22,11 @@
 
 using chain_t = cartan::kinematic_chain<double, 6>;
 
-static_assert(cartan::ik_solve_policy<cartan::nablapp_lbfgsb_solve_policy<chain_t>>);
-static_assert(cartan::ik_solve_policy<cartan::nw_sqp_solve_policy<chain_t>>);
-static_assert(cartan::ik_solve_policy<cartan::nablapp_lm_solve_policy<chain_t>>);
-static_assert(cartan::ik_solve_policy<cartan::cmaes_solve_policy<chain_t>>);
-static_assert(cartan::ik_solve_policy<cartan::augmented_lagrangian_solve_policy<chain_t>>);
+static_assert(cartan::ik::solve_policy<cartan::ik::argmin_lbfgsb<chain_t>>);
+static_assert(cartan::ik::solve_policy<cartan::ik::nw_sqp<chain_t>>);
+static_assert(cartan::ik::solve_policy<cartan::ik::argmin_lm<chain_t>>);
+static_assert(cartan::ik::solve_policy<cartan::ik::cmaes<chain_t>>);
+static_assert(cartan::ik::solve_policy<cartan::ik::augmented_lagrangian<chain_t>>);
 
 static chain_t make_ur5_like_chain()
 {
@@ -60,7 +60,7 @@ TEST_CASE("nablapp_lbfgsb_solve_policy converges on UR5-like chain", "[ik][nabla
     Eigen::Vector<double, 6> q_seed = Eigen::Vector<double, 6>::Zero();
     cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 500};
 
-    cartan::basic_ik_solver<cartan::nablapp_lbfgsb_solve_policy<chain_t>> solver;
+    cartan::basic_ik_runner<cartan::ik::argmin_lbfgsb<chain_t>> solver;
     solver.setup(chain, target, q_seed, criteria);
     auto result = solver.solve();
 
@@ -76,7 +76,7 @@ TEST_CASE("nw_sqp_solve_policy converges on UR5-like chain", "[ik][nablapp][nw-s
     Eigen::Vector<double, 6> q_seed = Eigen::Vector<double, 6>::Zero();
     cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 500};
 
-    cartan::basic_ik_solver<cartan::nw_sqp_solve_policy<chain_t>> solver;
+    cartan::basic_ik_runner<cartan::ik::nw_sqp<chain_t>> solver;
     solver.setup(chain, target, q_seed, criteria);
     auto result = solver.solve();
 
@@ -92,7 +92,7 @@ TEST_CASE("nablapp_lm_solve_policy converges on UR5-like chain", "[ik][nablapp][
     Eigen::Vector<double, 6> q_seed = Eigen::Vector<double, 6>::Zero();
     cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 500};
 
-    cartan::basic_ik_solver<cartan::nablapp_lm_solve_policy<chain_t>> solver;
+    cartan::basic_ik_runner<cartan::ik::argmin_lm<chain_t>> solver;
     solver.setup(chain, target, q_seed, criteria);
     auto result = solver.solve();
 
@@ -110,14 +110,14 @@ TEST_CASE("cmaes_solve_policy converges on UR5-like chain", "[ik][nablapp][cmaes
     q_seed << 0.25, -0.45, 0.75, -0.25, 0.55, -0.15;
     cartan::convergence_criteria<double> criteria{1e-2, 1e-2, 10000};
 
-    cartan::cmaes_solve_policy<chain_t>::options opts;
+    cartan::ik::cmaes<chain_t>::options opts;
     opts.budget_per_step = 500;
     opts.initial_sigma = 0.05;
     opts.stall_window = 200;
     opts.stall_threshold = 1e-14;
 
-    cartan::basic_ik_solver<cartan::cmaes_solve_policy<chain_t>> solver{
-        cartan::cmaes_solve_policy<chain_t>{opts}};
+    cartan::basic_ik_runner<cartan::ik::cmaes<chain_t>> solver{
+        cartan::ik::cmaes<chain_t>{opts}};
     solver.setup(chain, target, q_seed, criteria);
     auto result = solver.solve();
 
@@ -142,7 +142,7 @@ TEST_CASE("augmented_lagrangian_solve_policy converges on UR5-like chain", "[ik]
     Eigen::Vector<double, 6> q_seed = Eigen::Vector<double, 6>::Zero();
     cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 500};
 
-    cartan::basic_ik_solver<cartan::augmented_lagrangian_solve_policy<chain_t>> solver;
+    cartan::basic_ik_runner<cartan::ik::augmented_lagrangian<chain_t>> solver;
     solver.setup(chain, target, q_seed, criteria);
     auto result = solver.solve();
 

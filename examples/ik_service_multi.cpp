@@ -2,12 +2,12 @@
 /// @brief Multi-threaded IK service with cooperative multi-policy solving.
 ///
 /// Demonstrates M worker threads processing IK requests from a shared queue.
-/// Each request is solved using a variadic basic_ik_solver with two policies
+/// Each request is solved using a variadic basic_ik_runner with two policies
 /// (speed + convergence) that race cooperatively. The worker thread calls
 /// solve() which internally uses step() to interleave both policies.
 ///
 /// Unlike TRAC-IK which spawns a thread per solver strategy, cartan's
-/// multi-policy basic_ik_solver runs all strategies cooperatively via step().
+/// multi-policy basic_ik_runner runs all strategies cooperatively via step().
 /// M worker threads can service many requests without thread proliferation.
 
 #include "cartan/serial_chain.h"
@@ -63,7 +63,7 @@ struct ik_response
 //
 // Architecture:
 //   - M worker jthreads pull requests from a shared queue
-//   - Each request is solved by a multi-policy basic_ik_solver (speed + convergence)
+//   - Each request is solved by a multi-policy basic_ik_runner (speed + convergence)
 //   - solve() internally calls step() which round-robins across both policies
 //   - No thread-per-solver: a single worker thread drives both policies cooperatively
 //
@@ -138,7 +138,7 @@ private:
             // Multi-policy solver: two policies race cooperatively.
             // step() advances each active policy once per call (round-robin).
             // No additional threads -- cooperative scheduling in this worker thread.
-            auto solver = cartan::make_default_solver<cartan::kinematic_chain<double, 7>>().build();
+            auto solver = cartan::make_dual_ik_runner<cartan::kinematic_chain<double, 7>>().build();
 
             // Generate random initial configuration
             Eigen::Vector<double, 7> q0;

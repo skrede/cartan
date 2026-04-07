@@ -66,9 +66,9 @@ public:
         scalar_type initial_sigma{scalar_type(0.3)};
     };
 
-    cmaes_solve_policy() = default;
+    cmaes() = default;
 
-    explicit cmaes_solve_policy(const options& opts)
+    explicit cmaes(const options& opts)
         : m_options{opts}
     {}
 
@@ -136,13 +136,13 @@ public:
         auto V_b = (m_target.inverse() * fk.end_effector).log();
         m_error_norm = V_b.norm();
 
-        if (detail::is_converged_unweighted(V_b, m_criteria))
+        if (cartan::detail::is_converged_unweighted(V_b, m_criteria))
         {
             m_status = ik_status::converged;
             return m_status;
         }
 
-        auto stall_result = detail::check_stall_divergence(
+        auto stall_result = cartan::detail::check_stall_divergence(
             m_error_history, m_error_norm, m_initial_error,
             m_options.stall_window, m_options.stall_threshold,
             m_options.divergence_factor);
@@ -164,7 +164,7 @@ public:
             return m_status;
         }
 
-        detail::enforce_limits<LimitsPolicy>(m_q, chain);
+        cartan::detail::enforce_limits<LimitsPolicy>(m_q, chain);
 
         return m_status;
     }
@@ -178,7 +178,7 @@ public:
 
 private:
     using nablapp_solver = nablapp::basic_solver<
-        nablapp::cmaes_policy<joints>, joints, detail::nablapp_ik_problem<Chain>>;
+        nablapp::cmaes_policy<joints>, joints, cartan::detail::nablapp_ik_problem<Chain>>;
 
     void sync_solution_from_solver()
     {
@@ -205,7 +205,7 @@ private:
     scalar_type m_error_norm{std::numeric_limits<scalar_type>::max()};
     int m_iterations{};
     ik_status m_status{ik_status::running};
-    std::optional<detail::nablapp_ik_problem<Chain>> m_problem;
+    std::optional<cartan::detail::nablapp_ik_problem<Chain>> m_problem;
     std::optional<nablapp_solver> m_solver;
 };
 

@@ -12,20 +12,20 @@
 
 #include "benchmark_utils.h"
 
-#include <cartan/serial/ik/ik_types.h>
-#include <cartan/serial/ik/limits_policy.h>
-#include <cartan/serial/ik/default_solvers.h>
-#include <cartan/serial/ik/basic_ik_solver.h>
-#include <cartan/serial/ik/lm_solve_policy.h>
-#include <cartan/serial/ik/slsqp_solve_policy.h>
-#include <cartan/serial/ik/bobyqa_solve_policy.h>
-#include <cartan/serial/ik/nw_sqp_solve_policy.h>
-#include <cartan/serial/ik/restart_solve_policy.h>
-#include <cartan/serial/ik/nablapp_lbfgsb_solve_policy.h>
+#include <cartan/serial/ik/ik_status.h>
+#include <cartan/serial/ik/policy/limits_policy.h>
+#include <cartan/serial/ik/solvers.h>
+#include <cartan/serial/ik/basic_ik_runner.h>
+#include <cartan/serial/ik/solver/lm.h>
+#include <cartan/serial/ik/solver/argmin_slsqp.h>
+#include <cartan/serial/ik/solver/argmin_bobyqa.h>
+#include <cartan/serial/ik/solver/nw_sqp.h>
+#include <cartan/serial/ik/wrapper/restart_wrapper.h>
+#include <cartan/serial/ik/solver/argmin_lbfgsb.h>
 
 #ifdef CARTAN_HAS_NLOPT
-#include <cartan/serial/ik/nlopt_bobyqa_solve_policy.h>
-#include <cartan/serial/ik/nlopt_slsqp_solve_policy.h>
+#include <cartan/serial/ik/solver/nlopt_bobyqa.h>
+#include <cartan/serial/ik/solver/nlopt_slsqp.h>
 #endif
 
 #include <trac_ik/trac_ik.hpp>
@@ -92,7 +92,7 @@ void bm_cartan_comparison(
         auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
         ++idx;
 
-        cartan::basic_ik_solver<cartan::lm_solve_policy<cartan::kinematic_chain<double, N>>> solver;
+        cartan::basic_ik_runner<cartan::ik::lm<cartan::kinematic_chain<double, N>>> solver;
         solver.setup(chain, target, q_seed, criteria);
         auto result = solver.solve();
 
@@ -131,8 +131,8 @@ void bm_cartan_restart_lm_comparison(
     const target_set<double, N>& ts)
 {
     using chain_t = cartan::kinematic_chain<double, N>;
-    using restart_lm = cartan::restart_solve_policy<
-        chain_t, cartan::lm_solve_policy<chain_t, LimitsPolicy>>;
+    using restart_lm = cartan::ik::restart_wrapper<
+        chain_t, cartan::ik::lm<chain_t, LimitsPolicy>>;
 
     cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 200};
 
@@ -148,7 +148,7 @@ void bm_cartan_restart_lm_comparison(
         auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
         ++idx;
 
-        cartan::basic_ik_solver<restart_lm> solver;
+        cartan::basic_ik_runner<restart_lm> solver;
         solver.setup(chain, target, q_seed, criteria);
         auto result = solver.solve();
 
@@ -202,7 +202,7 @@ void bm_cartan_speed_comparison(
         auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
         ++idx;
 
-        cartan::basic_ik_solver<cartan::speed_solver<chain_t>> solver;
+        cartan::basic_ik_runner<cartan::speed_ik_runner<chain_t>> solver;
         solver.setup(chain, target, q_seed, criteria);
         auto result = solver.solve();
 
@@ -256,7 +256,7 @@ void bm_cartan_racing_comparison(
         auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
         ++idx;
 
-        cartan::default_solver<chain_t> solver;
+        cartan::dual_ik_runner<chain_t> solver;
         solver.setup(chain, target, q_seed, criteria);
         auto result = solver.solve();
 
@@ -893,26 +893,26 @@ using chain_t = cartan::kinematic_chain<double, N>;
 
 // nablapp solver type aliases for comparison benchmarks
 template <int N>
-using nablapp_slsqp_solver = cartan::basic_ik_solver<
-    cartan::restart_solve_policy<chain_t<N>, cartan::slsqp_solve_policy<chain_t<N>>>>;
+using nablapp_slsqp_solver = cartan::basic_ik_runner<
+    cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::argmin_slsqp<chain_t<N>>>>;
 
 template <int N>
-using nablapp_lbfgsb_solver = cartan::basic_ik_solver<
-    cartan::restart_solve_policy<chain_t<N>, cartan::nablapp_lbfgsb_solve_policy<chain_t<N>>>>;
+using nablapp_lbfgsb_solver = cartan::basic_ik_runner<
+    cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::argmin_lbfgsb<chain_t<N>>>>;
 
 template <int N>
-using nablapp_nw_sqp_solver = cartan::basic_ik_solver<
-    cartan::restart_solve_policy<chain_t<N>, cartan::nw_sqp_solve_policy<chain_t<N>>>>;
+using nablapp_nw_sqp_solver = cartan::basic_ik_runner<
+    cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::nw_sqp<chain_t<N>>>>;
 
 // NLopt solver type aliases (gated behind CARTAN_HAS_NLOPT)
 #ifdef CARTAN_HAS_NLOPT
 template <int N>
-using nlopt_slsqp_solver = cartan::basic_ik_solver<
-    cartan::restart_solve_policy<chain_t<N>, cartan::nlopt_slsqp_solve_policy<chain_t<N>>>>;
+using nlopt_slsqp_solver = cartan::basic_ik_runner<
+    cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::nlopt_slsqp<chain_t<N>>>>;
 
 template <int N>
-using nlopt_bobyqa_solver = cartan::basic_ik_solver<
-    cartan::restart_solve_policy<chain_t<N>, cartan::nlopt_bobyqa_solve_policy<chain_t<N>>>>;
+using nlopt_bobyqa_solver = cartan::basic_ik_runner<
+    cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::nlopt_bobyqa<chain_t<N>>>>;
 #endif
 
 // Convergence criteria shared across comparison benchmarks

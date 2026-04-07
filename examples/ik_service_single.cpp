@@ -2,7 +2,7 @@
 /// @brief Single-threaded IK service with CV-based worker dispatch.
 ///
 /// Demonstrates a worker thread that waits on a condition_variable for
-/// IK requests, solves them using cartan's lm_solve_policy, and returns results.
+/// IK requests, solves them using cartan's restart_wrapper, and returns results.
 /// The main thread submits requests and collects responses.
 
 #include "cartan/serial_chain.h"
@@ -105,7 +105,7 @@ private:
             lock.unlock();
 
             // Solve IK using LM solve policy
-            cartan::basic_ik_solver<cartan::restart_solve_policy<cartan::kinematic_chain<double, 6>>> solver;
+            cartan::basic_ik_runner<cartan::ik::restart_wrapper<cartan::kinematic_chain<double, 6>>> solver;
             solver.setup(m_chain, req.target, req.q0, criteria);
             auto result = solver.solve();
 

@@ -1,4 +1,4 @@
-#include <cartan/serial/ik/halton_seed_generator.h>
+#include <cartan/serial/ik/solver/detail/halton_seed_generator.h>
 
 #include <cartan/lie/se3.h>
 #include <cartan/lie/so3.h>

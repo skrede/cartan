@@ -69,9 +69,9 @@ public:
         scalar_type restart_scale{scalar_type(0.5)};
     };
 
-    nlopt_slsqp_solve_policy() = default;
+    nlopt_slsqp() = default;
 
-    explicit nlopt_slsqp_solve_policy(const options& opts)
+    explicit nlopt_slsqp(const options& opts)
         : m_options(opts)
     {
     }
@@ -91,10 +91,10 @@ public:
         m_error_norm = std::numeric_limits<scalar_type>::max();
         m_status = ik_status::running;
 
-        m_q_vec = detail::eigen_to_stdvec<scalar_type, joints>(q0);
+        m_q_vec = cartan::detail::eigen_to_stdvec<scalar_type, joints>(q0);
 
         m_opt = nlopt::opt(nlopt::LD_SLSQP, static_cast<unsigned>(chain.num_joints()));
-        detail::set_nlopt_bounds<scalar_type, joints>(m_opt, chain);
+        cartan::detail::set_nlopt_bounds<scalar_type, joints>(m_opt, chain);
         m_opt.set_min_objective(objective_func, this);
         m_opt.set_xtol_rel(static_cast<double>(m_options.xtol_rel));
         m_opt.set_ftol_rel(static_cast<double>(m_options.ftol_rel));
@@ -116,7 +116,7 @@ public:
         m_opt.set_maxeval(m_eval_count);
 
         double min_val = 0.0;
-        nlopt::result result = detail::run_nlopt_optimize(m_opt, m_q_vec, min_val);
+        nlopt::result result = cartan::detail::run_nlopt_optimize(m_opt, m_q_vec, min_val);
 
         // Handle exception-sourced results immediately
         if (result == nlopt::FAILURE)
@@ -126,8 +126,8 @@ public:
         }
         if (result == nlopt::ROUNDOFF_LIMITED)
         {
-            m_error_norm = detail::compute_body_error_norm<scalar_type, joints>(*m_chain, m_target, m_q_vec);
-            bool conv = detail::check_nlopt_convergence<scalar_type, joints>(*m_chain, m_target, m_criteria, m_q_vec);
+            m_error_norm = cartan::detail::compute_body_error_norm<scalar_type, joints>(*m_chain, m_target, m_q_vec);
+            bool conv = cartan::detail::check_nlopt_convergence<scalar_type, joints>(*m_chain, m_target, m_criteria, m_q_vec);
             m_status = conv ? ik_status::converged : ik_status::stalled;
             return m_status;
         }
@@ -135,31 +135,31 @@ public:
         ++m_iterations;
 
         m_prev_error = m_error_norm;
-        m_error_norm = detail::compute_body_error_norm<scalar_type, joints>(*m_chain, m_target, m_q_vec);
+        m_error_norm = cartan::detail::compute_body_error_norm<scalar_type, joints>(*m_chain, m_target, m_q_vec);
 
-        bool conv = detail::check_nlopt_convergence<scalar_type, joints>(*m_chain, m_target, m_criteria, m_q_vec);
+        bool conv = cartan::detail::check_nlopt_convergence<scalar_type, joints>(*m_chain, m_target, m_criteria, m_q_vec);
         bool error_stalled = std::abs(m_error_norm - m_prev_error) <
             scalar_type(1e-10) * (scalar_type(1) + m_error_norm);
         bool can_restart = m_restart_count < m_options.max_restarts;
 
-        if (detail::needs_restart(result, conv, error_stalled))
+        if (cartan::detail::needs_restart(result, conv, error_stalled))
         {
             ++m_restart_count;
             can_restart = m_restart_count < m_options.max_restarts;
         }
 
-        m_status = detail::map_nlopt_result(result, conv, error_stalled, can_restart);
+        m_status = cartan::detail::map_nlopt_result(result, conv, error_stalled, can_restart);
 
-        if (m_status == ik_status::running && detail::needs_restart(result, conv, error_stalled))
+        if (m_status == ik_status::running && cartan::detail::needs_restart(result, conv, error_stalled))
         {
-            detail::perturb_nlopt_solution<scalar_type, joints>(m_q_vec, *m_chain, m_options.restart_scale, m_rng);
-            detail::reset_nlopt_optimizer<scalar_type, joints>(
+            cartan::detail::perturb_nlopt_solution<scalar_type, joints>(m_q_vec, *m_chain, m_options.restart_scale, m_rng);
+            cartan::detail::reset_nlopt_optimizer<scalar_type, joints>(
                 m_opt, nlopt::LD_SLSQP, *m_chain, objective_func, this,
                 static_cast<double>(m_options.xtol_rel), m_options.budget_per_step, m_eval_count);
             m_opt.set_ftol_rel(static_cast<double>(m_options.ftol_rel));
         }
 
-        detail::enforce_and_sync_limits<LimitsPolicy, scalar_type, joints>(m_q_vec, chain);
+        cartan::detail::enforce_and_sync_limits<LimitsPolicy, scalar_type, joints>(m_q_vec, chain);
 
         return m_status;
     }
@@ -168,7 +168,7 @@ public:
 
     [[nodiscard]] position_type solution() const
     {
-        return detail::stdvec_to_eigen<scalar_type, joints>(m_q_vec);
+        return cartan::detail::stdvec_to_eigen<scalar_type, joints>(m_q_vec);
     }
 
     [[nodiscard]] scalar_type error_norm() const { return m_error_norm; }
@@ -192,7 +192,7 @@ private:
     {
         auto* self = static_cast<nlopt_slsqp*>(data);
         int n = static_cast<int>(x.size());
-        auto q = detail::stdvec_to_eigen<scalar_type, joints>(x);
+        auto q = cartan::detail::stdvec_to_eigen<scalar_type, joints>(x);
 
         if (!grad.empty())
         {

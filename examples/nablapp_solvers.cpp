@@ -1,8 +1,8 @@
 /// @file nablapp_solvers.cpp
 /// @brief Demonstrates nablapp-backed SLSQP and BOBYQA solve policies.
 ///
-/// Shows: slsqp_solve_policy, bobyqa_solve_policy, restart wrapping,
-/// and racing a nablapp solver against a native cartan solver.
+/// Shows: ik::argmin_slsqp, ik::argmin_bobyqa, restart wrapping,
+/// and racing a argmin solver against a native cartan solver.
 
 #include "cartan/serial_chain.h"
 
@@ -38,9 +38,9 @@ int main()
 
     // --- Section 1: nablapp SLSQP with restart wrapping ---
 
-    cartan::basic_ik_solver slsqp_solver{
-        cartan::restart_solve_policy{
-            cartan::slsqp_solve_policy<cartan::kinematic_chain<double, 6>>{}}};
+    cartan::basic_ik_runner slsqp_solver{
+        cartan::ik::restart_wrapper{
+            cartan::ik::argmin_slsqp<cartan::kinematic_chain<double, 6>>{}}};
 
     slsqp_solver.setup(chain, target, q0, criteria);
     auto slsqp_result = slsqp_solver.solve();
@@ -59,9 +59,9 @@ int main()
 
     // --- Section 2: nablapp BOBYQA with restart wrapping ---
 
-    cartan::basic_ik_solver bobyqa_solver{
-        cartan::restart_solve_policy{
-            cartan::bobyqa_solve_policy<cartan::kinematic_chain<double, 6>>{}}};
+    cartan::basic_ik_runner bobyqa_solver{
+        cartan::ik::restart_wrapper{
+            cartan::ik::argmin_bobyqa<cartan::kinematic_chain<double, 6>>{}}};
 
     bobyqa_solver.setup(chain, target, q0, criteria);
     auto bobyqa_result = bobyqa_solver.solve();
@@ -80,9 +80,9 @@ int main()
 
     // --- Section 3: Racing nablapp SLSQP against native projected LM ---
 
-    cartan::basic_ik_solver racing_solver{
-        cartan::restart_solve_policy{cartan::slsqp_solve_policy<cartan::kinematic_chain<double, 6>>{}},
-        cartan::restart_solve_policy{cartan::projected_lm_solve_policy<cartan::kinematic_chain<double, 6>>{}}};
+    cartan::basic_ik_runner racing_solver{
+        cartan::ik::restart_wrapper{cartan::ik::argmin_slsqp<cartan::kinematic_chain<double, 6>>{}},
+        cartan::ik::restart_wrapper{cartan::ik::projected_lm<cartan::kinematic_chain<double, 6>>{}}};
 
     racing_solver.setup(chain, target, q0, criteria);
     auto racing_result = racing_solver.solve();

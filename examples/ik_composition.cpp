@@ -1,7 +1,7 @@
 /// @file ik_composition.cpp
 /// @brief Solver composition: multi-policy racing and factory functions.
 ///
-/// Shows: variadic basic_ik_solver with two policies (cooperative racing),
+/// Shows: variadic basic_ik_runner with two policies (cooperative racing),
 /// preset factory functions with .build(), and the composable solver builder.
 
 #include "cartan/serial_chain.h"
@@ -39,9 +39,9 @@ int main()
 
     // --- Multi-policy solver: races speed + convergence ---
     {
-        auto solver = cartan::basic_ik_solver{
-            cartan::speed_solver<cartan::kinematic_chain<double, 7>>{},
-            cartan::convergence_solver<cartan::kinematic_chain<double, 7>>{}
+        auto solver = cartan::basic_ik_runner{
+            cartan::speed_ik_runner<cartan::kinematic_chain<double, 7>>{},
+            cartan::robust_ik_runner<cartan::kinematic_chain<double, 7>>{}
         };
         solver.setup(chain, target, q0, criteria);
         auto result = solver.solve();
@@ -58,9 +58,9 @@ int main()
         }
     }
 
-    // --- Factory function: make_default_solver().build() ---
+    // --- Factory function: make_dual_ik_runner().build() ---
     {
-        auto solver = cartan::make_default_solver<cartan::kinematic_chain<double, 7>>().build();
+        auto solver = cartan::make_dual_ik_runner<cartan::kinematic_chain<double, 7>>().build();
         solver.setup(chain, target, q0, criteria);
         auto result = solver.solve();
         if (result.has_value())
@@ -71,7 +71,7 @@ int main()
 
     // --- Single-policy presets with .build() ---
     {
-        auto solver = cartan::make_speed_solver<cartan::kinematic_chain<double, 7>>().build();
+        auto solver = cartan::make_speed_ik_runner<cartan::kinematic_chain<double, 7>>().build();
         solver.setup(chain, target, q0, criteria);
         auto result = solver.solve();
         if (result.has_value())
@@ -80,7 +80,7 @@ int main()
         }
     }
     {
-        auto solver = cartan::make_convergence_solver<cartan::kinematic_chain<double, 7>>().build();
+        auto solver = cartan::make_robust_ik_runner<cartan::kinematic_chain<double, 7>>().build();
         solver.setup(chain, target, q0, criteria);
         auto result = solver.solve();
         if (result.has_value())
@@ -92,8 +92,8 @@ int main()
     // --- Composable builder: make_solver ---
     {
         auto solver = cartan::make_solver<cartan::kinematic_chain<double, 7>>()
-            .policy(cartan::speed_solver<cartan::kinematic_chain<double, 7>>{})
-            .policy(cartan::convergence_solver<cartan::kinematic_chain<double, 7>>{})
+            .policy(cartan::speed_ik_runner<cartan::kinematic_chain<double, 7>>{})
+            .policy(cartan::robust_ik_runner<cartan::kinematic_chain<double, 7>>{})
             .build();
         solver.setup(chain, target, q0, criteria);
         auto result = solver.solve();

@@ -3,7 +3,7 @@
 #include "cartan/serial/ik/detail/nablapp_constrained_problem.h"
 #include "cartan/serial/ik/detail/nablapp_least_squares_problem.h"
 
-#include "cartan/serial/ik/error_weight.h"
+#include "cartan/serial/ik/policy/error_weight.h"
 
 #include "cartan/lie/se3.h"
 #include "cartan/lie/so3.h"
