@@ -26,8 +26,6 @@
 #include <cartan/serial/ik/default_solvers.h>
 
 #include <cartan/serial/ik/slsqp_solve_policy.h>
-#include <cartan/serial/ik/bobyqa_solve_policy.h>
-#include <cartan/serial/ik/cmaes_solve_policy.h>
 #include <cartan/serial/ik/nw_sqp_solve_policy.h>
 #include <cartan/serial/ik/nablapp_lm_solve_policy.h>
 #include <cartan/serial/ik/nablapp_lbfgsb_solve_policy.h>
@@ -48,6 +46,7 @@
 
 #include <vector>
 #include <random>
+#include <numbers>
 #include <algorithm>
 
 namespace
@@ -93,6 +92,8 @@ void bm_native_solver(
 {
     std::size_t idx = 0;
     int successes = 0;
+    int fk_valid = 0;
+    int nearest_minima = 0;
     int total_iterations = 0;
     double total_position_error = 0.0;
     double total_orientation_error = 0.0;
@@ -115,13 +116,33 @@ void bm_native_solver(
                 chain, result->solution.position, target);
             total_position_error += position_error;
             total_orientation_error += orientation_error;
+
+            if (position_error <= criteria.position_tol && orientation_error <= criteria.orientation_tol)
+                ++fk_valid;
+
+            bool is_nearest = true;
+            for (Eigen::Index j = 0; j < q_seed.size(); ++j)
+            {
+                if (std::abs(result->solution.position[j] - q_seed[j]) > std::numbers::pi)
+                {
+                    is_nearest = false;
+                    break;
+                }
+            }
+            if (is_nearest) ++nearest_minima;
         }
         benchmark::DoNotOptimize(result);
     }
 
     auto total = static_cast<int>(idx);
-    state.counters["success_rate"] = benchmark::Counter(
+    state.counters["Success_rate"] = benchmark::Counter(
         100.0 * static_cast<double>(successes) / std::max(total, 1),
+        benchmark::Counter::kAvgThreads);
+    state.counters["Valid_fk_rate"] = benchmark::Counter(
+        100.0 * static_cast<double>(fk_valid) / std::max(total, 1),
+        benchmark::Counter::kAvgThreads);
+    state.counters["Wrap_free_rate"] = benchmark::Counter(
+        100.0 * static_cast<double>(nearest_minima) / std::max(successes, 1),
         benchmark::Counter::kAvgThreads);
     state.counters["avg_iterations"] = benchmark::Counter(
         static_cast<double>(total_iterations) / std::max(successes, 1),
@@ -150,6 +171,8 @@ void bm_racing_solver(
 
     std::size_t idx = 0;
     int successes = 0;
+    int fk_valid = 0;
+    int nearest_minima = 0;
     int total_iterations = 0;
     double total_position_error = 0.0;
     double total_orientation_error = 0.0;
@@ -188,13 +211,33 @@ void bm_racing_solver(
                 chain, result->solution.position, target);
             total_position_error += position_error;
             total_orientation_error += orientation_error;
+
+            if (position_error <= criteria.position_tol && orientation_error <= criteria.orientation_tol)
+                ++fk_valid;
+
+            bool is_nearest = true;
+            for (Eigen::Index j = 0; j < q0.size(); ++j)
+            {
+                if (std::abs(result->solution.position[j] - q0[j]) > std::numbers::pi)
+                {
+                    is_nearest = false;
+                    break;
+                }
+            }
+            if (is_nearest) ++nearest_minima;
         }
         benchmark::DoNotOptimize(result);
     }
 
     auto total = static_cast<int>(idx);
-    state.counters["success_rate"] = benchmark::Counter(
+    state.counters["Success_rate"] = benchmark::Counter(
         100.0 * static_cast<double>(successes) / std::max(total, 1),
+        benchmark::Counter::kAvgThreads);
+    state.counters["Valid_fk_rate"] = benchmark::Counter(
+        100.0 * static_cast<double>(fk_valid) / std::max(total, 1),
+        benchmark::Counter::kAvgThreads);
+    state.counters["Wrap_free_rate"] = benchmark::Counter(
+        100.0 * static_cast<double>(nearest_minima) / std::max(successes, 1),
         benchmark::Counter::kAvgThreads);
     state.counters["avg_iterations"] = benchmark::Counter(
         static_cast<double>(total_iterations) / std::max(successes, 1),
@@ -240,8 +283,12 @@ void bm_trac_ik_baseline(
     TRAC_IK::TRAC_IK solver(kdl_chain, q_min, q_max,
                              /*maxtime=*/0.005, /*eps=*/1e-5, TRAC_IK::Speed);
 
+    constexpr double trac_ik_tol = 1e-5;
+
     std::size_t idx = 0;
     int successes = 0;
+    int fk_valid = 0;
+    int nearest_minima = 0;
     double total_position_error = 0.0;
     double total_orientation_error = 0.0;
 
@@ -266,13 +313,33 @@ void bm_trac_ik_baseline(
                 chain, q_solution, ts.targets[idx - 1]);
             total_position_error += position_error;
             total_orientation_error += orientation_error;
+
+            if (position_error <= trac_ik_tol && orientation_error <= trac_ik_tol)
+                ++fk_valid;
+
+            bool is_nearest = true;
+            for (unsigned int j = 0; j < static_cast<unsigned int>(N); ++j)
+            {
+                if (std::abs(q_out(j) - q_init(j)) > std::numbers::pi)
+                {
+                    is_nearest = false;
+                    break;
+                }
+            }
+            if (is_nearest) ++nearest_minima;
         }
         benchmark::DoNotOptimize(q_out);
     }
 
     auto total = static_cast<int>(idx);
-    state.counters["success_rate"] = benchmark::Counter(
+    state.counters["Success_rate"] = benchmark::Counter(
         100.0 * static_cast<double>(successes) / std::max(total, 1),
+        benchmark::Counter::kAvgThreads);
+    state.counters["Valid_fk_rate"] = benchmark::Counter(
+        100.0 * static_cast<double>(fk_valid) / std::max(total, 1),
+        benchmark::Counter::kAvgThreads);
+    state.counters["Wrap_free_rate"] = benchmark::Counter(
+        100.0 * static_cast<double>(nearest_minima) / std::max(successes, 1),
         benchmark::Counter::kAvgThreads);
     state.counters["avg_position_error"] = benchmark::Counter(
         total_position_error / std::max(successes, 1),
@@ -306,6 +373,8 @@ void bm_lbfgsb_aggressive(
 
     std::size_t idx = 0;
     int successes = 0;
+    int fk_valid = 0;
+    int nearest_minima = 0;
     int total_iterations = 0;
     double total_position_error = 0.0;
     double total_orientation_error = 0.0;
@@ -331,13 +400,33 @@ void bm_lbfgsb_aggressive(
                 chain, result->solution.position, target);
             total_position_error += position_error;
             total_orientation_error += orientation_error;
+
+            if (position_error <= criteria.position_tol && orientation_error <= criteria.orientation_tol)
+                ++fk_valid;
+
+            bool is_nearest = true;
+            for (Eigen::Index j = 0; j < q_seed.size(); ++j)
+            {
+                if (std::abs(result->solution.position[j] - q_seed[j]) > std::numbers::pi)
+                {
+                    is_nearest = false;
+                    break;
+                }
+            }
+            if (is_nearest) ++nearest_minima;
         }
         benchmark::DoNotOptimize(result);
     }
 
     auto total = static_cast<int>(idx);
-    state.counters["success_rate"] = benchmark::Counter(
+    state.counters["Success_rate"] = benchmark::Counter(
         100.0 * static_cast<double>(successes) / std::max(total, 1),
+        benchmark::Counter::kAvgThreads);
+    state.counters["Valid_fk_rate"] = benchmark::Counter(
+        100.0 * static_cast<double>(fk_valid) / std::max(total, 1),
+        benchmark::Counter::kAvgThreads);
+    state.counters["Wrap_free_rate"] = benchmark::Counter(
+        100.0 * static_cast<double>(nearest_minima) / std::max(successes, 1),
         benchmark::Counter::kAvgThreads);
     state.counters["avg_iterations"] = benchmark::Counter(
         static_cast<double>(total_iterations) / std::max(successes, 1),
@@ -368,6 +457,8 @@ void bm_gauss_newton(
 
     std::size_t idx = 0;
     int successes = 0;
+    int fk_valid = 0;
+    int nearest_minima = 0;
     int total_iterations = 0;
     double total_position_error = 0.0;
     double total_orientation_error = 0.0;
@@ -393,13 +484,33 @@ void bm_gauss_newton(
                 chain, result->solution.position, target);
             total_position_error += position_error;
             total_orientation_error += orientation_error;
+
+            if (position_error <= criteria.position_tol && orientation_error <= criteria.orientation_tol)
+                ++fk_valid;
+
+            bool is_nearest = true;
+            for (Eigen::Index j = 0; j < q_seed.size(); ++j)
+            {
+                if (std::abs(result->solution.position[j] - q_seed[j]) > std::numbers::pi)
+                {
+                    is_nearest = false;
+                    break;
+                }
+            }
+            if (is_nearest) ++nearest_minima;
         }
         benchmark::DoNotOptimize(result);
     }
 
     auto total = static_cast<int>(idx);
-    state.counters["success_rate"] = benchmark::Counter(
+    state.counters["Success_rate"] = benchmark::Counter(
         100.0 * static_cast<double>(successes) / std::max(total, 1),
+        benchmark::Counter::kAvgThreads);
+    state.counters["Valid_fk_rate"] = benchmark::Counter(
+        100.0 * static_cast<double>(fk_valid) / std::max(total, 1),
+        benchmark::Counter::kAvgThreads);
+    state.counters["Wrap_free_rate"] = benchmark::Counter(
+        100.0 * static_cast<double>(nearest_minima) / std::max(successes, 1),
         benchmark::Counter::kAvgThreads);
     state.counters["avg_iterations"] = benchmark::Counter(
         static_cast<double>(total_iterations) / std::max(successes, 1),
@@ -472,12 +583,6 @@ using slsqp_ik_solver = cartan::basic_ik_solver<slsqp_restart<N>>;
 
 // nablapp solvers (always available)
 template <int N>
-using nablapp_bobyqa_restart = cartan::restart_solve_policy<chain_t<N>, cartan::bobyqa_solve_policy<chain_t<N>>>;
-
-template <int N>
-using nablapp_bobyqa_ik_solver = cartan::basic_ik_solver<nablapp_bobyqa_restart<N>>;
-
-template <int N>
 using nablapp_slsqp_restart = cartan::restart_solve_policy<chain_t<N>, cartan::slsqp_solve_policy<chain_t<N>>>;
 
 template <int N>
@@ -500,12 +605,6 @@ template <int N>
 using nablapp_lm_restart = cartan::restart_solve_policy<chain_t<N>, cartan::nablapp_lm_solve_policy<chain_t<N>, cartan::no_limits>>;
 template <int N>
 using nablapp_lm_ik_solver = cartan::basic_ik_solver<nablapp_lm_restart<N>>;
-
-// nablapp CMA-ES (population-based, derivative-free)
-template <int N>
-using cmaes_restart = cartan::restart_solve_policy<chain_t<N>, cartan::cmaes_solve_policy<chain_t<N>>>;
-template <int N>
-using cmaes_ik_solver = cartan::basic_ik_solver<cmaes_restart<N>>;
 
 // nablapp Augmented Lagrangian (inequality-constrained outer, L-BFGS-B inner)
 template <int N>
@@ -531,12 +630,10 @@ inline cartan::convergence_criteria<double> restart_lm_criteria() { return {1e-5
 inline cartan::convergence_criteria<double> nr_criteria()       { return {1e-5, 1e-5, 200}; }
 inline cartan::convergence_criteria<double> bobyqa_criteria()   { return {1e-5, 1e-5, 500}; }
 inline cartan::convergence_criteria<double> slsqp_criteria()    { return {1e-5, 1e-5, 500}; }
-inline cartan::convergence_criteria<double> nablapp_bobyqa_criteria()  { return {1e-5, 1e-5, 500}; }
 inline cartan::convergence_criteria<double> nablapp_slsqp_criteria()  { return {1e-5, 1e-5, 500}; }
 inline cartan::convergence_criteria<double> nablapp_lbfgsb_criteria() { return {1e-5, 1e-5, 500}; }
 inline cartan::convergence_criteria<double> nw_sqp_criteria()         { return {1e-5, 1e-5, 500}; }
 inline cartan::convergence_criteria<double> nablapp_lm_criteria()     { return {1e-5, 1e-5, 200}; }
-inline cartan::convergence_criteria<double> cmaes_criteria()          { return {1e-5, 1e-5, 2000}; }
 inline cartan::convergence_criteria<double> auglag_criteria()         { return {1e-5, 1e-5, 500}; }
 
 // ============================================================================
@@ -677,14 +774,6 @@ BENCHMARK(bm_native_##ROBOT##_slsqp)->Iterations(1000)->Unit(benchmark::kMicrose
 // Register nablapp solver benchmarks for a 6-DOF robot (always available).
 #define REGISTER_6DOF_NABLAPP(ROBOT, CHAIN_FN)                                                        \
                                                                                                       \
-static void bm_native_##ROBOT##_nablapp_bobyqa(benchmark::State& state)                               \
-{                                                                                                     \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
-    static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
-    bm_native_solver<6, nablapp_bobyqa_ik_solver<6>>(state, chain, ts, nablapp_bobyqa_criteria());    \
-}                                                                                                     \
-BENCHMARK(bm_native_##ROBOT##_nablapp_bobyqa)->Iterations(1000)->Unit(benchmark::kMicrosecond);       \
-                                                                                                      \
 static void bm_native_##ROBOT##_nablapp_slsqp(benchmark::State& state)                               \
 {                                                                                                     \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
@@ -716,14 +805,6 @@ static void bm_native_##ROBOT##_nablapp_lm(benchmark::State& state)             
     bm_native_solver<6, nablapp_lm_ik_solver<6>>(state, chain, ts, nablapp_lm_criteria());           \
 }                                                                                                     \
 BENCHMARK(bm_native_##ROBOT##_nablapp_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);           \
-                                                                                                      \
-static void bm_native_##ROBOT##_cmaes(benchmark::State& state)                                       \
-{                                                                                                     \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
-    static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
-    bm_native_solver<6, cmaes_ik_solver<6>>(state, chain, ts, cmaes_criteria());                     \
-}                                                                                                     \
-BENCHMARK(bm_native_##ROBOT##_cmaes)->Iterations(1000)->Unit(benchmark::kMicrosecond);                \
                                                                                                       \
 static void bm_native_##ROBOT##_auglag(benchmark::State& state)                                      \
 {                                                                                                     \
@@ -864,14 +945,6 @@ BENCHMARK(bm_native_##ROBOT##_slsqp)->Iterations(1000)->Unit(benchmark::kMicrose
 // Register nablapp solver benchmarks for a 7-DOF robot (always available).
 #define REGISTER_7DOF_NABLAPP(ROBOT, CHAIN_FN)                                                        \
                                                                                                       \
-static void bm_native_##ROBOT##_nablapp_bobyqa(benchmark::State& state)                               \
-{                                                                                                     \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
-    static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
-    bm_native_solver<7, nablapp_bobyqa_ik_solver<7>>(state, chain, ts, nablapp_bobyqa_criteria());    \
-}                                                                                                     \
-BENCHMARK(bm_native_##ROBOT##_nablapp_bobyqa)->Iterations(1000)->Unit(benchmark::kMicrosecond);       \
-                                                                                                      \
 static void bm_native_##ROBOT##_nablapp_slsqp(benchmark::State& state)                               \
 {                                                                                                     \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
@@ -903,14 +976,6 @@ static void bm_native_##ROBOT##_nablapp_lm(benchmark::State& state)             
     bm_native_solver<7, nablapp_lm_ik_solver<7>>(state, chain, ts, nablapp_lm_criteria());           \
 }                                                                                                     \
 BENCHMARK(bm_native_##ROBOT##_nablapp_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);           \
-                                                                                                      \
-static void bm_native_##ROBOT##_cmaes(benchmark::State& state)                                       \
-{                                                                                                     \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
-    static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
-    bm_native_solver<7, cmaes_ik_solver<7>>(state, chain, ts, cmaes_criteria());                     \
-}                                                                                                     \
-BENCHMARK(bm_native_##ROBOT##_cmaes)->Iterations(1000)->Unit(benchmark::kMicrosecond);                \
                                                                                                       \
 static void bm_native_##ROBOT##_auglag(benchmark::State& state)                                      \
 {                                                                                                     \
@@ -983,30 +1048,8 @@ REGISTER_7DOF_NABLAPP(kuka_lwr4,    make_kuka_lwr4_chain)
 
 using dynamic_chain = cartan::kinematic_chain<double, cartan::dynamic>;
 
-using nablapp_bobyqa_dynamic_restart = cartan::restart_solve_policy<dynamic_chain, cartan::bobyqa_solve_policy<dynamic_chain>>;
-using nablapp_bobyqa_dynamic_solver = cartan::basic_ik_solver<nablapp_bobyqa_dynamic_restart>;
-
 using nablapp_slsqp_dynamic_restart = cartan::restart_solve_policy<dynamic_chain, cartan::slsqp_solve_policy<dynamic_chain>>;
 using nablapp_slsqp_dynamic_solver = cartan::basic_ik_solver<nablapp_slsqp_dynamic_restart>;
-
-// Fixed-size UR3e nablapp BOBYQA (reference: same as bm_native_ur3e_nablapp_bobyqa above)
-static void bm_native_ur3e_nablapp_bobyqa_fixed(benchmark::State& state)
-{
-    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
-    static const target_set<double, 6> ts(chain, num_targets, 42);
-    bm_native_solver<6, nablapp_bobyqa_ik_solver<6>>(state, chain, ts, nablapp_bobyqa_criteria());
-}
-BENCHMARK(bm_native_ur3e_nablapp_bobyqa_fixed)->Iterations(1000)->Unit(benchmark::kMicrosecond);
-
-// Dynamic-size UR3e nablapp BOBYQA
-static void bm_native_ur3e_nablapp_bobyqa_dynamic(benchmark::State& state)
-{
-    auto fixed_chain = cartan::benchmarks::make_ur3e_chain<double>();
-    auto chain = fixed_chain.to_dynamic();
-    static const target_set<double, cartan::dynamic> ts(chain, num_targets, 42);
-    bm_native_solver<cartan::dynamic, nablapp_bobyqa_dynamic_solver>(state, chain, ts, nablapp_bobyqa_criteria());
-}
-BENCHMARK(bm_native_ur3e_nablapp_bobyqa_dynamic)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 // Fixed-size UR3e nablapp SLSQP (reference: same as bm_native_ur3e_nablapp_slsqp above)
 static void bm_native_ur3e_nablapp_slsqp_fixed(benchmark::State& state)

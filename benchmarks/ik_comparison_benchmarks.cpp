@@ -897,10 +897,6 @@ using nablapp_slsqp_solver = cartan::basic_ik_solver<
     cartan::restart_solve_policy<chain_t<N>, cartan::slsqp_solve_policy<chain_t<N>>>>;
 
 template <int N>
-using nablapp_bobyqa_solver = cartan::basic_ik_solver<
-    cartan::restart_solve_policy<chain_t<N>, cartan::bobyqa_solve_policy<chain_t<N>>>>;
-
-template <int N>
 using nablapp_lbfgsb_solver = cartan::basic_ik_solver<
     cartan::restart_solve_policy<chain_t<N>, cartan::nablapp_lbfgsb_solve_policy<chain_t<N>>>>;
 
@@ -954,14 +950,6 @@ static void bm_comparison_ur3e_nablapp_slsqp(benchmark::State& state)
     bm_nablapp_comparison<6, nablapp_slsqp_solver<6>>(state, chain, ts, nablapp_comparison_criteria());
 }
 BENCHMARK(bm_comparison_ur3e_nablapp_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);
-
-static void bm_comparison_ur3e_nablapp_bobyqa(benchmark::State& state)
-{
-    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
-    static const target_set<double, 6> ts(chain, num_targets, 42);
-    bm_nablapp_comparison<6, nablapp_bobyqa_solver<6>>(state, chain, ts, nablapp_comparison_criteria());
-}
-BENCHMARK(bm_comparison_ur3e_nablapp_bobyqa)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 #ifdef CARTAN_HAS_NLOPT
 static void bm_comparison_ur3e_nlopt_slsqp(benchmark::State& state)
