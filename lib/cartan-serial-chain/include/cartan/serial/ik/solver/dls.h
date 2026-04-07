@@ -1,7 +1,7 @@
-#ifndef HPP_GUARD_CARTAN_SERIAL_IK_DLS_SOLVE_POLICY_H
-#define HPP_GUARD_CARTAN_SERIAL_IK_DLS_SOLVE_POLICY_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_DLS_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_DLS_H
 
-/// @file dls_solve_policy.h
+/// @file dls.h
 /// @brief Damped least squares IK solve policy with SVD-based adaptive damping.
 ///
 /// Body-frame Newton-Raphson iteration with Nakamura's adaptive damping
@@ -11,13 +11,12 @@
 ///
 /// Reference: Lynch & Park, Modern Robotics, Ch. 6.2, p. 227-233.
 ///            Nakamura, Y., Advanced Robotics: Redundancy and Optimization, 1991.
-///            Decisions IK-02, D-04.
 
 #include "cartan/types.h"
 
-#include "cartan/serial/ik/ik_types.h"
-#include "cartan/serial/ik/limits_policy.h"
-#include "cartan/serial/ik/ik_solve_policy.h"
+#include "cartan/serial/ik/ik_status.h"
+#include "cartan/serial/ik/policy/limits_policy.h"
+#include "cartan/serial/ik/concepts/solve_concept.h"
 #include "cartan/serial/ik/detail/convergence.h"
 #include "cartan/serial/ik/detail/stall_detection.h"
 #include "cartan/serial/ik/detail/limit_enforcement.h"
@@ -35,7 +34,7 @@
 #include <vector>
 #include <algorithm>
 
-namespace cartan
+namespace cartan::ik
 {
 
 /// Damped least squares IK solve policy with SVD-based adaptive damping (Nakamura).
@@ -46,7 +45,7 @@ namespace cartan
 /// Reference: Lynch & Park, Modern Robotics, Ch. 6.2, Eq. 6.8-6.10.
 ///            Nakamura, Advanced Robotics, Ch. 11 (adaptive DLS).
 template <chain Chain, typename LimitsPolicy = clamp_limits>
-class dls_solve_policy
+class dls
 {
 public:
     using chain_type = Chain;
@@ -56,7 +55,7 @@ public:
 
     using position_type = typename joint_state<scalar_type, joints>::position_type;
 
-    static_assert(std::is_floating_point_v<scalar_type>, "dls_solve_policy requires a floating-point Scalar type");
+    static_assert(std::is_floating_point_v<scalar_type>, "dls requires a floating-point Scalar type");
 
     /// Tunable parameters for the DLS solve policy.
     struct options
@@ -68,15 +67,13 @@ public:
         int stall_window{5};
     };
 
-    dls_solve_policy() = default;
+    dls() = default;
 
-    explicit dls_solve_policy(const options& opts)
+    explicit dls(const options& opts)
         : m_options(opts)
     {
     }
 
-    /// Initialize the solve policy with chain, target pose, seed configuration,
-    /// and convergence criteria.
     void setup(
         const Chain& chain,
         const se3<scalar_type>& target,
@@ -98,9 +95,6 @@ public:
         m_initial_error = m_error_norm;
     }
 
-    /// Execute one Newton-Raphson iteration with adaptive DLS damping.
-    ///
-    /// Lynch & Park, Modern Robotics, Ch. 6.2, Algorithm 6.2, p. 233.
     ik_status step(const Chain& chain)
     {
         if (m_status != ik_status::running)
@@ -108,13 +102,9 @@ public:
             return m_status;
         }
 
-        // (a) Forward kinematics
         auto fk = forward_kinematics(chain, m_q);
-
-        // (b) Body-frame error twist: V_b = log(T_current^{-1} * T_target)
         auto V_b = (fk.end_effector.inverse() * m_target).log();
 
-        // (c) Convergence check: separate angular and linear per Lynch & Park
         if (detail::is_converged_unweighted(V_b, m_criteria))
         {
             m_error_norm = V_b.norm();
@@ -122,7 +112,6 @@ public:
             return m_status;
         }
 
-        // (d) Iteration limit check
         ++m_iterations;
         if (m_iterations >= m_criteria.max_iterations)
         {
@@ -131,12 +120,8 @@ public:
             return m_status;
         }
 
-        // (e) Body Jacobian
         auto J_b = body_jacobian(chain, fk);
 
-        // (f) SVD of the body Jacobian
-        // Use ComputeFullU/V for fixed-size matrices (Eigen requirement),
-        // ComputeThinU/V for dynamic matrices (more efficient).
         constexpr unsigned int svd_options = (joints == dynamic)
             ? (Eigen::ComputeThinU | Eigen::ComputeThinV)
             : (Eigen::ComputeFullU | Eigen::ComputeFullV);
@@ -145,7 +130,6 @@ public:
         auto sigma = svd.singularValues();
         int rank = static_cast<int>(sigma.size());
 
-        // (g) Adaptive damping (Nakamura): lambda depends on sigma_min
         scalar_type sigma_min = sigma(rank - 1);
         scalar_type sigma_max = sigma(0);
         scalar_type lambda_sq{0};
@@ -157,8 +141,6 @@ public:
             lambda_sq = m_options.lambda_max * m_options.lambda_max * ratio;
         }
 
-        // (h) Damped pseudoinverse step: dq = V_r * diag(sigma_i/(sigma_i^2 + lambda^2)) * U_r^T * V_b
-        //     where U_r and V_r are the first `rank` columns (thin SVD equivalent).
         Eigen::VectorX<scalar_type> damped(rank);
         for (int i = 0; i < rank; ++i)
         {
@@ -169,13 +151,9 @@ public:
         auto V_r = svd.matrixV().leftCols(rank);
         position_type dq = V_r * damped.asDiagonal() * U_r.transpose() * V_b;
 
-        // (i) Update joint configuration
         m_q += dq;
-
-        // Update error
         m_error_norm = V_b.norm();
 
-        // (j) Stall and divergence detection
         auto stall_result = detail::check_stall_divergence(
             m_error_history, m_error_norm, m_initial_error,
             m_options.stall_window, m_options.stall_threshold,
@@ -186,46 +164,28 @@ public:
             return m_status;
         }
 
-        // (k) Store condition number
         m_condition_number = (sigma_min > scalar_type(0))
             ? sigma_max / sigma_min
             : std::numeric_limits<scalar_type>::infinity();
 
-        // Manipulability: product of singular values (Yoshikawa, 1985)
         m_manipulability_value = scalar_type(1);
         for (int i = 0; i < rank; ++i)
         {
             m_manipulability_value *= sigma(i);
         }
 
-        // Enforce joint limits via LimitsPolicy
         detail::enforce_limits<LimitsPolicy>(m_q, chain);
 
         return m_status;
     }
 
-    /// Whether the solve policy has converged.
     [[nodiscard]] bool converged() const { return m_status == ik_status::converged; }
-
-    /// Current joint configuration (the candidate solution).
     [[nodiscard]] const position_type& solution() const { return m_q; }
-
-    /// Current error norm (body-frame twist magnitude).
     [[nodiscard]] scalar_type error_norm() const { return m_error_norm; }
-
-    /// Number of iterations executed so far.
     [[nodiscard]] int iterations() const { return m_iterations; }
-
-    /// Abort the solver (no-op for DLS per D-05).
     void abort() {}
-
-    /// Condition number of the body Jacobian (sigma_max / sigma_min).
     [[nodiscard]] scalar_type condition_number() const { return m_condition_number; }
-
-    /// Manipulability measure: product of singular values (Yoshikawa, 1985).
     [[nodiscard]] scalar_type manipulability() const { return m_manipulability_value; }
-
-    /// Current solve policy status.
     [[nodiscard]] ik_status status() const { return m_status; }
 
 private:

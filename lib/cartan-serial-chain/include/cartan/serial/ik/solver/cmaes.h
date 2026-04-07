@@ -1,23 +1,23 @@
-#ifndef HPP_GUARD_CARTAN_SERIAL_IK_NABLAPP_LM_SOLVE_POLICY_H
-#define HPP_GUARD_CARTAN_SERIAL_IK_NABLAPP_LM_SOLVE_POLICY_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_CMAES_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_CMAES_H
 
-/// @file nablapp_lm_solve_policy.h
-/// @brief nablapp-backed Levenberg-Marquardt IK solve policy (least-squares).
+/// @file cmaes.h
+/// @brief nablapp-backed CMA-ES derivative-free IK solve policy.
 ///
-/// Wraps nablapp's lm_policy using the least-squares problem adapter.
-/// The residual is the 6-element SE(3) body-frame error, and the Jacobian
-/// is the body Jacobian. LM is unconstrained; joint limits are enforced
-/// by clamping after each step (formulation A).
+/// Wraps nablapp's cmaes_policy for bound-constrained IK using
+/// Covariance Matrix Adaptation Evolution Strategy. Derivative-free:
+/// uses only objective evaluations with population-based search.
 ///
-/// Reference: Nielsen (1999), Levenberg-Marquardt method.
+/// Reference: Hansen & Ostermeier (2001), CMA Evolution Strategy.
 
-#include "cartan/serial/ik/ik_types.h"
-#include "cartan/serial/ik/limits_policy.h"
-#include "cartan/serial/ik/ik_solve_policy.h"
+#include "cartan/serial/ik/ik_status.h"
+#include "cartan/serial/ik/policy/error_weight.h"
+#include "cartan/serial/ik/policy/limits_policy.h"
+#include "cartan/serial/ik/concepts/solve_concept.h"
 #include "cartan/serial/ik/detail/convergence.h"
+#include "cartan/serial/ik/detail/nablapp_problem.h"
 #include "cartan/serial/ik/detail/stall_detection.h"
 #include "cartan/serial/ik/detail/limit_enforcement.h"
-#include "cartan/serial/ik/detail/nablapp_least_squares_problem.h"
 
 #include "cartan/lie/se3.h"
 #include "cartan/serial/chain/joint_state.h"
@@ -25,8 +25,8 @@
 #include "cartan/serial/fk/forward_kinematics.h"
 
 #include <nablapp/solver/options.h>
-#include <nablapp/solver/lm_policy.h>
 #include <nablapp/solver/basic_solver.h>
+#include <nablapp/solver/cmaes_policy.h>
 
 #include <Eigen/Core>
 
@@ -35,20 +35,17 @@
 #include <optional>
 #include <vector>
 
-namespace cartan
+namespace cartan::ik
 {
 
-/// nablapp-backed Levenberg-Marquardt solve policy for IK.
+/// nablapp-backed CMA-ES solve policy for derivative-free IK.
 ///
-/// Uses nablapp's LM solver with the least-squares adapter exposing
-/// the 6-element body-frame error as residuals and the body Jacobian.
-/// Joint limits are enforced via clamping after each step since LM
-/// is unconstrained.
-///
-/// This is the nablapp-backed LM. The native cartan implementation
-/// is available as lm_solve_policy.
+/// Uses the Covariance Matrix Adaptation Evolution Strategy via nablapp.
+/// Population-based: each step() runs a generation (sample, evaluate,
+/// rank, update). Needs more iterations than gradient-based methods
+/// but requires no gradient information.
 template <chain Chain, typename LimitsPolicy = clamp_limits>
-class nablapp_lm_solve_policy
+class cmaes
 {
 public:
     using chain_type = Chain;
@@ -58,19 +55,20 @@ public:
 
     using position_type = typename joint_state<scalar_type, joints>::position_type;
 
-    static_assert(std::is_floating_point_v<scalar_type>, "nablapp_lm_solve_policy requires a floating-point Scalar type");
+    static_assert(std::is_floating_point_v<scalar_type>, "cmaes requires a floating-point Scalar type");
 
     struct options
     {
-        int budget_per_step{50};
+        int budget_per_step{200};
         scalar_type stall_threshold{scalar_type(1e-10)};
         scalar_type divergence_factor{scalar_type(10)};
-        int stall_window{5};
+        int stall_window{10};
+        scalar_type initial_sigma{scalar_type(0.3)};
     };
 
-    nablapp_lm_solve_policy() = default;
+    cmaes_solve_policy() = default;
 
-    explicit nablapp_lm_solve_policy(const options& opts)
+    explicit cmaes_solve_policy(const options& opts)
         : m_options{opts}
     {}
 
@@ -92,7 +90,7 @@ public:
         auto V_b = (target.inverse() * fk.end_effector).log();
         m_initial_error = V_b.norm();
 
-        m_problem.emplace(chain, target);
+        m_problem.emplace(chain, target, m_weight);
 
         int n = chain.num_joints();
         Eigen::VectorXd x0(n);
@@ -103,11 +101,15 @@ public:
 
         nablapp::solver_options<> nab_opts;
         nab_opts.max_iterations = m_options.budget_per_step;
-        nab_opts.set_gradient_threshold(1e-14);
+        nab_opts.set_gradient_threshold(0.0);
         nab_opts.set_objective_threshold(1e-16);
+        nab_opts.set_stationarity_threshold(std::numeric_limits<double>::infinity());
         nab_opts.set_step_threshold(1e-16);
 
-        m_solver.emplace(*m_problem, x0, nab_opts);
+        typename nablapp::cmaes_policy<joints>::options_type policy_opts;
+        policy_opts.initial_sigma = static_cast<double>(m_options.initial_sigma);
+
+        m_solver.emplace(nablapp::cmaes_policy<joints>{}, *m_problem, x0, nab_opts, policy_opts);
     }
 
     ik_status step(const Chain& chain)
@@ -129,8 +131,6 @@ public:
         auto result = m_solver->step_n(m_options.budget_per_step);
 
         sync_solution_from_solver();
-
-        detail::enforce_limits<LimitsPolicy>(m_q, chain);
 
         auto fk = forward_kinematics(chain, m_q);
         auto V_b = (m_target.inverse() * fk.end_effector).log();
@@ -164,6 +164,8 @@ public:
             return m_status;
         }
 
+        detail::enforce_limits<LimitsPolicy>(m_q, chain);
+
         return m_status;
     }
 
@@ -176,7 +178,7 @@ public:
 
 private:
     using nablapp_solver = nablapp::basic_solver<
-        nablapp::lm_policy<joints>, joints, detail::nablapp_ik_least_squares_problem<Chain>>;
+        nablapp::cmaes_policy<joints>, joints, detail::nablapp_ik_problem<Chain>>;
 
     void sync_solution_from_solver()
     {
@@ -195,6 +197,7 @@ private:
     const Chain* m_chain{nullptr};
     se3<scalar_type> m_target{se3<scalar_type>::identity()};
     convergence_criteria<scalar_type> m_criteria{};
+    error_weight<scalar_type> m_weight{};
     options m_options{};
     position_type m_q{};
     std::vector<scalar_type> m_error_history;
@@ -202,7 +205,7 @@ private:
     scalar_type m_error_norm{std::numeric_limits<scalar_type>::max()};
     int m_iterations{};
     ik_status m_status{ik_status::running};
-    std::optional<detail::nablapp_ik_least_squares_problem<Chain>> m_problem;
+    std::optional<detail::nablapp_ik_problem<Chain>> m_problem;
     std::optional<nablapp_solver> m_solver;
 };
 

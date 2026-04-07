@@ -1,8 +1,8 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_CONVERGENCE_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_CONVERGENCE_H
 
-#include "cartan/serial/ik/ik_types.h"
-#include "cartan/serial/ik/error_weight.h"
+#include "cartan/serial/ik/ik_status.h"
+#include "cartan/serial/ik/policy/error_weight.h"
 
 #include <Eigen/Core>
 

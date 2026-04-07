@@ -8,7 +8,7 @@
 /// free function template. Policies call this in their step() method
 /// instead of relying on post-hoc enforcement by the solver.
 
-#include "cartan/serial/ik/limits_policy.h"
+#include "cartan/serial/ik/policy/limits_policy.h"
 
 #include "cartan/serial/chain/joint_state.h"
 #include "cartan/serial/fk/jacobian.h"

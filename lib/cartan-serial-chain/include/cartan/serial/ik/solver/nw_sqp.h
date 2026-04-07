@@ -1,7 +1,7 @@
-#ifndef HPP_GUARD_CARTAN_SERIAL_IK_NW_SQP_SOLVE_POLICY_H
-#define HPP_GUARD_CARTAN_SERIAL_IK_NW_SQP_SOLVE_POLICY_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_NW_SQP_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_NW_SQP_H
 
-/// @file nw_sqp_solve_policy.h
+/// @file nw_sqp.h
 /// @brief nablapp-backed N&W SQP IK solve policy with inequality constraints.
 ///
 /// Wraps nablapp's nw_sqp_policy for constrained IK using formulation B
@@ -9,10 +9,10 @@
 ///
 /// Reference: Nocedal & Wright, Chapter 18 (SQP methods).
 
-#include "cartan/serial/ik/ik_types.h"
-#include "cartan/serial/ik/error_weight.h"
-#include "cartan/serial/ik/limits_policy.h"
-#include "cartan/serial/ik/ik_solve_policy.h"
+#include "cartan/serial/ik/ik_status.h"
+#include "cartan/serial/ik/policy/error_weight.h"
+#include "cartan/serial/ik/policy/limits_policy.h"
+#include "cartan/serial/ik/concepts/solve_concept.h"
 #include "cartan/serial/ik/detail/convergence.h"
 #include "cartan/serial/ik/detail/stall_detection.h"
 #include "cartan/serial/ik/detail/limit_enforcement.h"
@@ -34,7 +34,7 @@
 #include <optional>
 #include <vector>
 
-namespace cartan
+namespace cartan::ik
 {
 
 /// nablapp-backed N&W SQP solve policy for IK with inequality constraints.
@@ -44,7 +44,7 @@ namespace cartan
 /// box constraints, which is the natural formulation for SQP with
 /// Lagrangian-based globalization.
 template <chain Chain, typename LimitsPolicy = clamp_limits>
-class nw_sqp_solve_policy
+class nw_sqp
 {
 public:
     using chain_type = Chain;
@@ -54,7 +54,7 @@ public:
 
     using position_type = typename joint_state<scalar_type, joints>::position_type;
 
-    static_assert(std::is_floating_point_v<scalar_type>, "nw_sqp_solve_policy requires a floating-point Scalar type");
+    static_assert(std::is_floating_point_v<scalar_type>, "nw_sqp requires a floating-point Scalar type");
 
     struct options
     {

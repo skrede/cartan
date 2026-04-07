@@ -8,8 +8,8 @@
 /// nablapp::bound_constrained concepts so that nablapp solvers
 /// (kraft_slsqp_policy, bobyqa_policy) can optimize cartan IK objectives.
 
-#include "cartan/serial/ik/error_weight.h"
-#include "cartan/serial/ik/analytical_gradient.h"
+#include "cartan/serial/ik/policy/error_weight.h"
+#include "cartan/serial/ik/solver/detail/analytical_gradient.h"
 
 #include "cartan/lie/se3.h"
 #include "cartan/serial/chain/chain_concept.h"

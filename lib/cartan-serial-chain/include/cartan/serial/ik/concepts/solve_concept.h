@@ -1,22 +1,22 @@
-#ifndef HPP_GUARD_CARTAN_SERIAL_IK_IK_SOLVE_POLICY_H
-#define HPP_GUARD_CARTAN_SERIAL_IK_IK_SOLVE_POLICY_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_CONCEPTS_SOLVE_CONCEPT_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_CONCEPTS_SOLVE_CONCEPT_H
 
-/// @file ik_solve_policy.h
+/// @file solve_concept.h
 /// @brief Single-parameter concept for IK solve policies.
 ///
-/// The ik_solve_policy concept extracts S::chain_type to determine the chain
+/// The solve_policy concept extracts S::chain_type to determine the chain
 /// type the policy operates on, along with S::scalar_type, S::joints, and
 /// S::limits_type for trait access. This enables policies to work with any
 /// chain type satisfying the chain concept.
 
-#include "cartan/serial/ik/ik_types.h"
+#include "cartan/serial/ik/ik_status.h"
 
 #include "cartan/lie/se3.h"
 #include "cartan/serial/chain/joint_state.h"
 
 #include <concepts>
 
-namespace cartan
+namespace cartan::ik
 {
 
 /// Concept for a single-parameter IK solve policy.
@@ -29,7 +29,7 @@ namespace cartan
 ///
 /// And satisfy the step/query lifecycle interface parameterized by those traits.
 template <typename S>
-concept ik_solve_policy = requires
+concept solve_policy = requires
 {
     typename S::chain_type;
     typename S::scalar_type;

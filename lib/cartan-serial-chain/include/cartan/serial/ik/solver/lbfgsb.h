@@ -1,7 +1,7 @@
-#ifndef HPP_GUARD_CARTAN_SERIAL_IK_LBFGSB_SOLVE_POLICY_H
-#define HPP_GUARD_CARTAN_SERIAL_IK_LBFGSB_SOLVE_POLICY_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_LBFGSB_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_LBFGSB_H
 
-/// @file lbfgsb_solve_policy.h
+/// @file lbfgsb.h
 /// @brief L-BFGS-B IK solve policy with generalized Cauchy point and subspace minimization.
 ///
 /// Convergence-optimized IK solver using the analytical gradient (SE(3) log
@@ -11,15 +11,14 @@
 ///
 /// Reference: Byrd, Lu, Nocedal, Zhu. A Limited Memory Algorithm for Bound
 ///            Constrained Optimization. SIAM J. Scientific Computing, 1995.
-///            Decisions D-04, D-05, D-06 (CONV-01).
 
 #include "cartan/types.h"
 
-#include "cartan/serial/ik/ik_types.h"
-#include "cartan/serial/ik/limits_policy.h"
-#include "cartan/serial/ik/error_weight.h"
-#include "cartan/serial/ik/ik_solve_policy.h"
-#include "cartan/serial/ik/analytical_gradient.h"
+#include "cartan/serial/ik/ik_status.h"
+#include "cartan/serial/ik/policy/limits_policy.h"
+#include "cartan/serial/ik/policy/error_weight.h"
+#include "cartan/serial/ik/concepts/solve_concept.h"
+#include "cartan/serial/ik/solver/detail/analytical_gradient.h"
 #include "cartan/serial/ik/detail/convergence.h"
 #include "cartan/serial/ik/detail/stall_detection.h"
 #include "cartan/serial/ik/detail/limit_enforcement.h"
@@ -35,12 +34,12 @@
 #include <vector>
 #include <algorithm>
 
-namespace cartan
+namespace cartan::ik
 {
 
 /// L-BFGS-B IK solve policy: convergence-optimized via analytical gradient.
 ///
-/// Each step() call performs one L-BFGS-B iteration (per D-06):
+/// Each step() call performs one L-BFGS-B iteration:
 /// 1. Convergence check
 /// 2. Generalized Cauchy point (GCP) to identify active set
 /// 3. Two-loop recursion for L-BFGS direction on free variables
@@ -52,7 +51,7 @@ namespace cartan
 /// Reference: Byrd, Lu, Nocedal, Zhu, SIAM J. Sci. Comput., 1995.
 template <chain Chain, typename LimitsPolicy = clamp_limits,
           typename ObjectivePolicy = ik_se3_objective<Chain>>
-class lbfgsb_solve_policy
+class builtin_lbfgsb
 {
 public:
     using chain_type = Chain;
@@ -62,9 +61,8 @@ public:
 
     using position_type = typename joint_state<scalar_type, joints>::position_type;
 
-    static_assert(std::is_floating_point_v<scalar_type>, "lbfgsb_solve_policy requires a floating-point Scalar type");
+    static_assert(std::is_floating_point_v<scalar_type>, "builtin_lbfgsb requires a floating-point Scalar type");
 
-    /// Tunable parameters for the L-BFGS-B solve policy.
     struct options
     {
         int history_depth{5};
@@ -76,14 +74,13 @@ public:
         int stall_window{15};
     };
 
-    lbfgsb_solve_policy() = default;
+    builtin_lbfgsb() = default;
 
-    explicit lbfgsb_solve_policy(const options& opts)
+    explicit builtin_lbfgsb(const options& opts)
         : m_options(opts)
     {
     }
 
-    /// Initialize with chain, target, seed, and convergence criteria.
     void setup(
         const Chain& chain,
         const se3<scalar_type>& target,
@@ -93,7 +90,6 @@ public:
         setup(chain, target, q0, criteria, error_weight<scalar_type>{});
     }
 
-    /// Initialize with chain, target, seed, criteria, and error weight.
     void setup(
         const Chain& chain,
         const se3<scalar_type>& target,
@@ -119,10 +115,8 @@ public:
             m_upper(i) = chain.limits()[i].position_max;
         }
 
-        // Clamp initial q to bounds
         m_q = m_q.cwiseMax(m_lower).cwiseMin(m_upper);
 
-        // Evaluate initial objective and gradient
         auto result = ObjectivePolicy::evaluate_with_gradient(chain, m_target, m_q, m_weight);
         m_f = result.info.objective;
         m_gradient = result.gradient;
@@ -131,13 +125,11 @@ public:
         m_error_norm = result.info.body_error.norm();
         m_initial_error = m_error_norm;
 
-        // Clear L-BFGS history
         m_s_history.clear();
         m_y_history.clear();
         m_rho_history.clear();
     }
 
-    /// Execute one L-BFGS-B iteration (per D-06).
     ik_status step(const Chain& chain)
     {
         if (m_status != ik_status::running)
@@ -145,14 +137,12 @@ public:
             return m_status;
         }
 
-        // (1) Convergence check using weighted error norms
         if (detail::is_converged(m_body_error, m_weight, m_criteria))
         {
             m_status = ik_status::converged;
             return m_status;
         }
 
-        // (2) Iteration limit check
         ++m_iterations;
         if (m_iterations >= m_criteria.max_iterations)
         {
@@ -162,7 +152,6 @@ public:
 
         int n = static_cast<int>(m_q.size());
 
-        // (3) Compute descent direction with fallback to projected gradient
         auto [direction, directional_derivative, max_alpha] = compute_descent_direction(n);
         if (max_alpha < std::numeric_limits<scalar_type>::epsilon() ||
             directional_derivative >= scalar_type(0))
@@ -171,7 +160,6 @@ public:
             return m_status;
         }
 
-        // (4) Backtracking Armijo line search with bound clamping
         position_type q_old = m_q;
         position_type g_old = m_gradient;
         scalar_type f_old = m_f;
@@ -182,10 +170,8 @@ public:
             return m_status;
         }
 
-        // (5) Update L-BFGS history with curvature pair
         update_lbfgs_history(q_old, g_old);
 
-        // (6) Stall/divergence detection and limit enforcement
         update_stall_detection();
         detail::enforce_limits<LimitsPolicy>(m_q, chain);
 
@@ -200,7 +186,6 @@ public:
     [[nodiscard]] ik_status status() const { return m_status; }
 
 private:
-    /// Compute descent direction via L-BFGS, with fallback to projected gradient.
     struct descent_result
     {
         position_type direction;
@@ -220,7 +205,6 @@ private:
 
         scalar_type dd = m_gradient.dot(direction);
 
-        // If not a descent direction, fallback to projected negative gradient
         if (dd >= scalar_type(0))
         {
             direction = projected_negative_gradient(n);
@@ -231,7 +215,6 @@ private:
         return {direction, dd, max_alpha};
     }
 
-    /// Backtracking Armijo line search with bound clamping. Returns true if accepted.
     bool armijo_line_search(
         const Chain& chain,
         const position_type& direction,
@@ -267,7 +250,6 @@ private:
         return false;
     }
 
-    /// Update L-BFGS history with the latest curvature pair (s, y).
     void update_lbfgs_history(const position_type& q_old, const position_type& g_old)
     {
         position_type s_k = m_q - q_old;
@@ -294,53 +276,36 @@ private:
         }
     }
 
-    /// L-BFGS two-loop recursion with generalized Cauchy point projection.
-    ///
-    /// Combines the L-BFGS search direction with the active-set identification
-    /// from the generalized Cauchy point (Byrd et al., 1995, Section 4):
-    /// variables at their bounds with gradient pushing into the bound are fixed
-    /// (the "active set"), while free variables use the L-BFGS direction for
-    /// subspace minimization.
     position_type compute_lbfgs_direction(int n)
     {
-        // Generalized Cauchy point: identify active set at current point.
-        // A variable is "active" (clamped at its breakpoint) if at a bound and
-        // the gradient pushes into that bound.
         position_type q_r = m_gradient;
 
         std::size_t m = m_s_history.size();
         std::vector<scalar_type> alpha_store(m);
 
-        // First loop (backward)
         for (std::size_t i = m; i-- > 0;)
         {
             alpha_store[i] = m_rho_history[i] * m_s_history[i].dot(q_r);
             q_r -= alpha_store[i] * m_y_history[i];
         }
 
-        // Scale by gamma (initial Hessian approximation H0 = gamma * I)
         q_r *= m_gamma;
 
-        // Second loop (forward)
         for (std::size_t i = 0; i < m; ++i)
         {
             scalar_type beta = m_rho_history[i] * m_y_history[i].dot(q_r);
             q_r += (alpha_store[i] - beta) * m_s_history[i];
         }
 
-        // Subspace minimization: direction = -H^{-1} * g on free variables,
-        // zero on active set (generalized Cauchy point bound identification)
         position_type direction = -q_r;
 
         for (int i = 0; i < n; ++i)
         {
-            // At lower bound and direction pushes further below
             if (m_q(i) <= m_lower(i) + std::numeric_limits<scalar_type>::epsilon() &&
                 direction(i) < scalar_type(0))
             {
                 direction(i) = scalar_type(0);
             }
-            // At upper bound and direction pushes further above
             if (m_q(i) >= m_upper(i) - std::numeric_limits<scalar_type>::epsilon() &&
                 direction(i) > scalar_type(0))
             {
@@ -351,7 +316,6 @@ private:
         return direction;
     }
 
-    /// Projected negative gradient: steepest descent direction projected to bounds.
     position_type projected_negative_gradient(int n)
     {
         position_type direction = -m_gradient;
@@ -371,7 +335,6 @@ private:
         return direction;
     }
 
-    /// Compute maximum step size before hitting any bound.
     scalar_type compute_max_step(const position_type& direction, int n)
     {
         scalar_type max_alpha = std::numeric_limits<scalar_type>::max();
@@ -391,7 +354,6 @@ private:
         return max_alpha;
     }
 
-    /// Update stall and divergence detection.
     void update_stall_detection()
     {
         auto stall_result = detail::check_stall_divergence(
@@ -425,6 +387,15 @@ private:
     int m_iterations{};
     ik_status m_status{ik_status::running};
 };
+
+#ifdef CARTAN_BUILD_ARGMIN
+#include "cartan/serial/ik/solver/argmin_lbfgsb.h"
+template <chain Chain, typename LimitsPolicy = clamp_limits>
+using lbfgsb = argmin_lbfgsb<Chain, LimitsPolicy>;
+#else
+template <chain Chain, typename LimitsPolicy = clamp_limits>
+using lbfgsb = builtin_lbfgsb<Chain, LimitsPolicy>;
+#endif
 
 }
 

@@ -1,19 +1,20 @@
-#ifndef HPP_GUARD_CARTAN_SERIAL_IK_CMAES_SOLVE_POLICY_H
-#define HPP_GUARD_CARTAN_SERIAL_IK_CMAES_SOLVE_POLICY_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_ARGMIN_SLSQP_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_ARGMIN_SLSQP_H
 
-/// @file cmaes_solve_policy.h
-/// @brief nablapp-backed CMA-ES derivative-free IK solve policy.
+/// @file argmin_slsqp.h
+/// @brief nablapp-backed SLSQP gradient-based IK solve policy with box constraints.
 ///
-/// Wraps nablapp's cmaes_policy for bound-constrained IK using
-/// Covariance Matrix Adaptation Evolution Strategy. Derivative-free:
-/// uses only objective evaluations with population-based search.
+/// Wraps nablapp's kraft_slsqp_policy for constrained IK, using joint
+/// limits as box constraints and the analytical gradient from
+/// ik_se3_objective (SE(3) log Jacobian). Always available -- nablapp
+/// is a required dependency of cartan::kinematics.
 ///
-/// Reference: Hansen & Ostermeier (2001), CMA Evolution Strategy.
+/// Reference: Kraft 1988, N&W Ch. 18 (SQP methods).
 
-#include "cartan/serial/ik/ik_types.h"
-#include "cartan/serial/ik/error_weight.h"
-#include "cartan/serial/ik/limits_policy.h"
-#include "cartan/serial/ik/ik_solve_policy.h"
+#include "cartan/serial/ik/ik_status.h"
+#include "cartan/serial/ik/policy/error_weight.h"
+#include "cartan/serial/ik/policy/limits_policy.h"
+#include "cartan/serial/ik/concepts/solve_concept.h"
 #include "cartan/serial/ik/detail/convergence.h"
 #include "cartan/serial/ik/detail/nablapp_problem.h"
 #include "cartan/serial/ik/detail/stall_detection.h"
@@ -26,26 +27,29 @@
 
 #include <nablapp/solver/options.h>
 #include <nablapp/solver/basic_solver.h>
-#include <nablapp/solver/cmaes_policy.h>
+#include <nablapp/solver/kraft_slsqp_policy.h>
 
 #include <Eigen/Core>
 
 #include <cmath>
 #include <limits>
-#include <optional>
+#include <memory>
 #include <vector>
 
-namespace cartan
+namespace cartan::ik
 {
 
-/// nablapp-backed CMA-ES solve policy for derivative-free IK.
+/// nablapp-backed SLSQP solve policy for constrained IK with box constraints.
 ///
-/// Uses the Covariance Matrix Adaptation Evolution Strategy via nablapp.
-/// Population-based: each step() runs a generation (sample, evaluate,
-/// rank, update). Needs more iterations than gradient-based methods
-/// but requires no gradient information.
+/// Uses Kraft's Sequential Least Squares Programming algorithm via nablapp,
+/// with analytical gradient through the SE(3) log Jacobian. Each step()
+/// call runs a budget of nablapp iterations, allowing cooperative scheduling
+/// with other policies in basic_ik_solver.
+///
+/// This is the default (unprefixed) SLSQP policy. The NLopt-backed variant
+/// is available as nlopt_slsqp_solve_policy behind CARTAN_HAS_NLOPT.
 template <chain Chain, typename LimitsPolicy = clamp_limits>
-class cmaes_solve_policy
+class argmin_slsqp
 {
 public:
     using chain_type = Chain;
@@ -55,20 +59,19 @@ public:
 
     using position_type = typename joint_state<scalar_type, joints>::position_type;
 
-    static_assert(std::is_floating_point_v<scalar_type>, "cmaes_solve_policy requires a floating-point Scalar type");
+    static_assert(std::is_floating_point_v<scalar_type>, "argmin_slsqp requires a floating-point Scalar type");
 
     struct options
     {
-        int budget_per_step{200};
+        int budget_per_step{50};
         scalar_type stall_threshold{scalar_type(1e-10)};
         scalar_type divergence_factor{scalar_type(10)};
-        int stall_window{10};
-        scalar_type initial_sigma{scalar_type(0.3)};
+        int stall_window{5};
     };
 
-    cmaes_solve_policy() = default;
+    slsqp_solve_policy() = default;
 
-    explicit cmaes_solve_policy(const options& opts)
+    explicit slsqp_solve_policy(const options& opts)
         : m_options{opts}
     {}
 
@@ -101,15 +104,11 @@ public:
 
         nablapp::solver_options<> nab_opts;
         nab_opts.max_iterations = m_options.budget_per_step;
-        nab_opts.set_gradient_threshold(0.0);
-        nab_opts.set_objective_threshold(1e-16);
-        nab_opts.set_stationarity_threshold(std::numeric_limits<double>::infinity());
-        nab_opts.set_step_threshold(1e-16);
+        nab_opts.set_gradient_threshold(1e-12);
+        nab_opts.set_objective_threshold(1e-14);
+        nab_opts.set_step_threshold(1e-14);
 
-        typename nablapp::cmaes_policy<joints>::options_type policy_opts;
-        policy_opts.initial_sigma = static_cast<double>(m_options.initial_sigma);
-
-        m_solver.emplace(nablapp::cmaes_policy<joints>{}, *m_problem, x0, nab_opts, policy_opts);
+        m_solver.emplace(*m_problem, x0, nab_opts);
     }
 
     ik_status step(const Chain& chain)
@@ -178,7 +177,7 @@ public:
 
 private:
     using nablapp_solver = nablapp::basic_solver<
-        nablapp::cmaes_policy<joints>, joints, detail::nablapp_ik_problem<Chain>>;
+        nablapp::kraft_slsqp_policy<joints>, joints, detail::nablapp_ik_problem<Chain>>;
 
     void sync_solution_from_solver()
     {

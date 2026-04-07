@@ -1,10 +1,10 @@
-#ifndef HPP_GUARD_CARTAN_SERIAL_IK_ANALYTICAL_GRADIENT_H
-#define HPP_GUARD_CARTAN_SERIAL_IK_ANALYTICAL_GRADIENT_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_DETAIL_ANALYTICAL_GRADIENT_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_DETAIL_ANALYTICAL_GRADIENT_H
 
 #include "cartan/types.h"
 
 #include "cartan/lie/se3.h"
-#include "cartan/serial/ik/error_weight.h"
+#include "cartan/serial/ik/policy/error_weight.h"
 #include "cartan/lie/se3_left_jacobian.h"
 #include "cartan/serial/chain/chain_concept.h"
 #include "cartan/serial/fk/jacobian.h"

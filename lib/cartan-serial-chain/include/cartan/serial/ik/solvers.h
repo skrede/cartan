@@ -1,24 +1,21 @@
-#ifndef HPP_GUARD_CARTAN_SERIAL_IK_DEFAULT_SOLVERS_H
-#define HPP_GUARD_CARTAN_SERIAL_IK_DEFAULT_SOLVERS_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_SOLVERS_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_SOLVERS_H
 
-/// @file default_solvers.h
+/// @file solvers.h
 /// @brief Factory functions, builders, and type aliases for common IK solver configurations.
 ///
 /// Provides three layers of solver construction:
-///   1. Type aliases (speed_solver, convergence_solver, default_solver) for direct use.
-///   2. Preset factories (make_speed_solver, make_convergence_solver, make_default_solver)
+///   1. Type aliases (speed_ik_runner, robust_ik_runner, dual_ik_runner) for direct use.
+///   2. Preset factories (make_speed_ik_runner, make_robust_ik_runner, make_dual_ik_runner)
 ///      returning builders with .build() as the materialization point.
 ///   3. Composable builder (make_solver) for custom policy compositions via .policy().build().
-///
-/// Reference: Decisions D-07 (solver presets), D-08 (racing default), D-10 (builder pattern),
-///            D-11 (type aliases), D-12 (factory namespace).
 
-#include "cartan/serial/ik/limits_policy.h"
-#include "cartan/serial/ik/basic_ik_solver.h"
-#include "cartan/serial/ik/ik_solve_policy.h"
-#include "cartan/serial/ik/lbfgsb_solve_policy.h"
-#include "cartan/serial/ik/restart_solve_policy.h"
-#include "cartan/serial/ik/projected_lm_solve_policy.h"
+#include "cartan/serial/ik/policy/limits_policy.h"
+#include "cartan/serial/ik/basic_ik_runner.h"
+#include "cartan/serial/ik/concepts/solve_concept.h"
+#include "cartan/serial/ik/solver/lbfgsb.h"
+#include "cartan/serial/ik/wrapper/restart_wrapper.h"
+#include "cartan/serial/ik/solver/projected_lm.h"
 
 #include "cartan/serial/chain/chain_concept.h"
 
@@ -33,17 +30,17 @@ namespace cartan
 
 /// Speed-optimized: restart-wrapped projected LM (fast per-iteration, multi-start).
 template <chain Chain>
-using speed_solver = restart_solve_policy<Chain,
-    projected_lm_solve_policy<Chain, no_limits>, no_limits>;
+using speed_ik_runner = ik::restart_wrapper<Chain,
+    ik::projected_lm<Chain, no_limits>, no_limits>;
 
 /// Convergence-optimized: restart-wrapped L-BFGS-B (robust convergence, multi-start).
 template <chain Chain>
-using convergence_solver = restart_solve_policy<Chain,
-    lbfgsb_solve_policy<Chain, no_limits>, no_limits>;
+using robust_ik_runner = ik::restart_wrapper<Chain,
+    ik::builtin_lbfgsb<Chain, no_limits>, no_limits>;
 
-/// Default: races speed_solver against convergence_solver via variadic basic_ik_solver.
+/// Default: races speed_ik_runner against robust_ik_runner via variadic basic_ik_runner.
 template <chain Chain>
-using default_solver = basic_ik_solver<speed_solver<Chain>, convergence_solver<Chain>>;
+using dual_ik_runner = basic_ik_runner<speed_ik_runner<Chain>, robust_ik_runner<Chain>>;
 
 // ---------------------------------------------------------------------------
 // Composable builder
@@ -62,9 +59,8 @@ public:
     {
     }
 
-    /// Add a policy to the solver composition.
     template <typename Policy>
-        requires ik_solve_policy<Policy>
+        requires ik::solve_policy<Policy>
     auto policy(Policy p) &&
     {
         return solver_builder<Chain, Policies..., Policy>{
@@ -72,11 +68,10 @@ public:
         };
     }
 
-    /// Build the configured solver.
     auto build() &&
     {
         return std::apply([](auto&&... ps) {
-            return basic_ik_solver{std::forward<decltype(ps)>(ps)...};
+            return basic_ik_runner{std::forward<decltype(ps)>(ps)...};
         }, std::move(m_policies));
     }
 
@@ -89,10 +84,6 @@ private:
 // ---------------------------------------------------------------------------
 
 /// Preset solver builder -- wraps a fixed single-policy configuration.
-///
-/// Exposes parameter tuning (restart count, etc.) but NOT policy composition.
-/// Call `.build()` to materialize the solver. This enables future extensions
-/// like `.from_config(cfg).build()`.
 template <chain Chain, typename Policy>
 class preset_solver_builder
 {
@@ -102,10 +93,9 @@ public:
     {
     }
 
-    /// Build the configured solver.
     auto build() &&
     {
-        return basic_ik_solver{std::move(m_policy)};
+        return basic_ik_runner{std::move(m_policy)};
     }
 
 private:
@@ -123,10 +113,9 @@ public:
     {
     }
 
-    /// Build the configured solver.
     auto build() &&
     {
-        return basic_ik_solver{std::move(m_policy1), std::move(m_policy2)};
+        return basic_ik_runner{std::move(m_policy1), std::move(m_policy2)};
     }
 
 private:
@@ -139,33 +128,30 @@ private:
 // ---------------------------------------------------------------------------
 
 /// Create a speed-optimized solver builder (restart-wrapped projected LM).
-/// Call `.build()` to materialize the solver.
 template <chain Chain>
-auto make_speed_solver()
+auto make_speed_ik_runner()
 {
-    return preset_solver_builder<Chain, speed_solver<Chain>>{
-        speed_solver<Chain>{}
+    return preset_solver_builder<Chain, speed_ik_runner<Chain>>{
+        speed_ik_runner<Chain>{}
     };
 }
 
 /// Create a convergence-optimized solver builder (restart-wrapped L-BFGS-B).
-/// Call `.build()` to materialize the solver.
 template <chain Chain>
-auto make_convergence_solver()
+auto make_robust_ik_runner()
 {
-    return preset_solver_builder<Chain, convergence_solver<Chain>>{
-        convergence_solver<Chain>{}
+    return preset_solver_builder<Chain, robust_ik_runner<Chain>>{
+        robust_ik_runner<Chain>{}
     };
 }
 
 /// Create the default solver builder (races speed + convergence policies).
-/// Call `.build()` to materialize the solver.
 template <chain Chain>
-auto make_default_solver()
+auto make_dual_ik_runner()
 {
     return preset_racing_builder<Chain,
-        speed_solver<Chain>, convergence_solver<Chain>>{
-        speed_solver<Chain>{}, convergence_solver<Chain>{}
+        speed_ik_runner<Chain>, robust_ik_runner<Chain>>{
+        speed_ik_runner<Chain>{}, robust_ik_runner<Chain>{}
     };
 }
 

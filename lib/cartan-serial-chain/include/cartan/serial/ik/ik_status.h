@@ -1,14 +1,11 @@
-#ifndef HPP_GUARD_CARTAN_SERIAL_IK_IK_TYPES_H
-#define HPP_GUARD_CARTAN_SERIAL_IK_IK_TYPES_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_IK_STATUS_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_IK_STATUS_H
 
-/// @file ik_types.h
-/// @brief Foundation types for inverse kinematics: status, objective,
-///        failure enums, convergence criteria, result, and error structs.
+/// @file ik_status.h
+/// @brief Status, objective, failure enums, convergence criteria, and solver
+///        options for inverse kinematics.
 ///
 /// Reference: Lynch & Park, Modern Robotics, Ch. 6.2, p. 227-233.
-
-#include "cartan/serial/chain/joint_state.h"
-#include "cartan/serial/chain/storage_trait.h"
 
 #include <type_traits>
 
@@ -17,7 +14,6 @@ namespace cartan
 
 /// Status returned by each IK stepper step() call.
 /// Stepper is running until it converges, hits a limit, or fails.
-/// Reference: D-04 decision.
 enum class ik_status
 {
     running,
@@ -28,8 +24,7 @@ enum class ik_status
     iteration_limit
 };
 
-/// Objective for the IK solve — controls secondary optimization.
-/// Reference: D-09 decision, inspired by TRAC-IK's SolveType.
+/// Objective for the IK solve -- controls secondary optimization.
 enum class ik_objective
 {
     speed,
@@ -39,7 +34,6 @@ enum class ik_objective
 };
 
 /// Failure reason reported in ik_error when solve does not converge.
-/// Reference: D-17 decision.
 enum class ik_failure
 {
     unreachable,
@@ -52,7 +46,6 @@ enum class ik_failure
 
 /// Runtime convergence criteria for IK solvers.
 /// Separate position and orientation tolerances per Lynch & Park Ch. 6.2.
-/// Reference: D-08 decision.
 template <typename Scalar = double>
 struct convergence_criteria
 {
@@ -75,33 +68,6 @@ struct solver_options
     ik_objective objective{ik_objective::speed};
     int max_total_iterations{500};
     unsigned int halton_seed{42};
-};
-
-/// Successful IK result containing solution configuration and diagnostics.
-/// Reference: D-15 decision.
-template <typename Scalar = double, int N = dynamic>
-struct ik_result
-{
-    static_assert(std::is_floating_point_v<Scalar>, "ik_result requires a floating-point Scalar type");
-
-    joint_state<Scalar, N> solution;
-    Scalar final_error_norm{};
-    int iterations{};
-    int solver_index{};
-};
-
-/// IK error containing failure diagnostics.
-/// Reference: D-16 decision.
-template <typename Scalar = double, int N = dynamic>
-struct ik_error
-{
-    static_assert(std::is_floating_point_v<Scalar>, "ik_error requires a floating-point Scalar type");
-
-    ik_failure reason;
-    typename joint_state<Scalar, N>::position_type last_q;
-    Scalar last_error_norm{};
-    Scalar condition_number{};
-    bool near_singular{};
 };
 
 }

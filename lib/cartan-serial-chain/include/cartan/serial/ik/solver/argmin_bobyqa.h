@@ -1,24 +1,23 @@
-#ifndef HPP_GUARD_CARTAN_SERIAL_IK_AUGMENTED_LAGRANGIAN_SOLVE_POLICY_H
-#define HPP_GUARD_CARTAN_SERIAL_IK_AUGMENTED_LAGRANGIAN_SOLVE_POLICY_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_ARGMIN_BOBYQA_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_ARGMIN_BOBYQA_H
 
-/// @file augmented_lagrangian_solve_policy.h
-/// @brief nablapp-backed augmented Lagrangian IK solve policy.
+/// @file argmin_bobyqa.h
+/// @brief nablapp-backed BOBYQA derivative-free IK solve policy with box constraints.
 ///
-/// Wraps nablapp's augmented_lagrangian_policy with lbfgsb_policy as
-/// the inner solver. Uses formulation B (inequality constraints encoding
-/// joint limits as g_i(q) >= 0) for the outer augmented Lagrangian and
-/// box constraints for the inner L-BFGS-B subproblem.
+/// Wraps nablapp's bobyqa_policy for constrained IK, using joint limits
+/// as box constraints. Derivative-free -- uses only objective evaluations.
+/// Always available -- nablapp is a required dependency of cartan::kinematics.
 ///
-/// Reference: K&W Section 10.9, N&W Section 17.4.
+/// Reference: Powell 2009, BOBYQA algorithm for bound constrained optimization.
 
-#include "cartan/serial/ik/ik_types.h"
-#include "cartan/serial/ik/error_weight.h"
-#include "cartan/serial/ik/limits_policy.h"
-#include "cartan/serial/ik/ik_solve_policy.h"
+#include "cartan/serial/ik/ik_status.h"
+#include "cartan/serial/ik/policy/error_weight.h"
+#include "cartan/serial/ik/policy/limits_policy.h"
+#include "cartan/serial/ik/concepts/solve_concept.h"
 #include "cartan/serial/ik/detail/convergence.h"
+#include "cartan/serial/ik/detail/nablapp_problem.h"
 #include "cartan/serial/ik/detail/stall_detection.h"
 #include "cartan/serial/ik/detail/limit_enforcement.h"
-#include "cartan/serial/ik/detail/nablapp_constrained_problem.h"
 
 #include "cartan/lie/se3.h"
 #include "cartan/serial/chain/joint_state.h"
@@ -27,28 +26,29 @@
 
 #include <nablapp/solver/options.h>
 #include <nablapp/solver/basic_solver.h>
-#include <nablapp/solver/lbfgsb_policy.h>
-#include <nablapp/solver/augmented_lagrangian_policy.h>
+#include <nablapp/solver/bobyqa_policy.h>
 
 #include <Eigen/Core>
 
 #include <cmath>
 #include <limits>
-#include <optional>
+#include <memory>
 #include <vector>
 
-namespace cartan
+namespace cartan::ik
 {
 
-/// nablapp-backed augmented Lagrangian solve policy for constrained IK.
+/// nablapp-backed BOBYQA solve policy for constrained IK with box constraints.
 ///
-/// Converts the constrained IK problem into a sequence of bound-constrained
-/// subproblems solved by L-BFGS-B. Joint limits are expressed as inequality
-/// constraints (formulation B) in the outer augmented Lagrangian loop.
-/// Each step() performs one outer iteration (full inner solve + multiplier
-/// update), so the budget is higher than gradient-based policies.
+/// Uses Powell's Bound Optimization BY Quadratic Approximation via nablapp.
+/// Derivative-free: builds a quadratic interpolation model of the objective
+/// and uses trust-region steps. Each step() call runs a budget of nablapp
+/// iterations for cooperative scheduling in basic_ik_solver.
+///
+/// This is the default (unprefixed) BOBYQA policy. The NLopt-backed variant
+/// is available as nlopt_bobyqa_solve_policy behind CARTAN_HAS_NLOPT.
 template <chain Chain, typename LimitsPolicy = clamp_limits>
-class augmented_lagrangian_solve_policy
+class argmin_bobyqa
 {
 public:
     using chain_type = Chain;
@@ -58,19 +58,19 @@ public:
 
     using position_type = typename joint_state<scalar_type, joints>::position_type;
 
-    static_assert(std::is_floating_point_v<scalar_type>, "augmented_lagrangian_solve_policy requires a floating-point Scalar type");
+    static_assert(std::is_floating_point_v<scalar_type>, "argmin_bobyqa requires a floating-point Scalar type");
 
     struct options
     {
-        int budget_per_step{100};
+        int budget_per_step{50};
         scalar_type stall_threshold{scalar_type(1e-10)};
         scalar_type divergence_factor{scalar_type(10)};
         int stall_window{5};
     };
 
-    augmented_lagrangian_solve_policy() = default;
+    bobyqa_solve_policy() = default;
 
-    explicit augmented_lagrangian_solve_policy(const options& opts)
+    explicit bobyqa_solve_policy(const options& opts)
         : m_options{opts}
     {}
 
@@ -103,9 +103,10 @@ public:
 
         nablapp::solver_options<> nab_opts;
         nab_opts.max_iterations = m_options.budget_per_step;
-        nab_opts.set_gradient_threshold(1e-14);
-        nab_opts.set_objective_threshold(1e-16);
-        nab_opts.set_step_threshold(1e-16);
+        nab_opts.set_gradient_threshold(0.0);
+        nab_opts.set_objective_threshold(1e-14);
+        nab_opts.set_stationarity_threshold(std::numeric_limits<double>::infinity());
+        nab_opts.set_step_threshold(1e-14);
 
         m_solver.emplace(*m_problem, x0, nab_opts);
     }
@@ -176,8 +177,7 @@ public:
 
 private:
     using nablapp_solver = nablapp::basic_solver<
-        nablapp::augmented_lagrangian_policy<nablapp::lbfgsb_policy<joints>>, joints,
-        detail::nablapp_constrained_ik_problem<Chain>>;
+        nablapp::bobyqa_policy<joints>, joints, detail::nablapp_ik_problem<Chain>>;
 
     void sync_solution_from_solver()
     {
@@ -204,7 +204,7 @@ private:
     scalar_type m_error_norm{std::numeric_limits<scalar_type>::max()};
     int m_iterations{};
     ik_status m_status{ik_status::running};
-    std::optional<detail::nablapp_constrained_ik_problem<Chain>> m_problem;
+    std::optional<detail::nablapp_ik_problem<Chain>> m_problem;
     std::optional<nablapp_solver> m_solver;
 };
 

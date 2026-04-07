@@ -6,28 +6,37 @@
 ///
 /// Includes all IK types, solve policies, solver, and factory functions.
 
-#include "cartan/serial/ik/ik_types.h"
-#include "cartan/serial/ik/error_weight.h"
-#include "cartan/serial/ik/limits_policy.h"
-#include "cartan/serial/ik/ik_solve_policy.h"
-#include "cartan/serial/ik/lm_solve_policy.h"
-#include "cartan/serial/ik/dls_solve_policy.h"
-#include "cartan/serial/ik/basic_ik_solver.h"
-#include "cartan/serial/ik/default_solvers.h"
-#include "cartan/serial/ik/slsqp_solve_policy.h"
-#include "cartan/serial/ik/bobyqa_solve_policy.h"
-#include "cartan/serial/ik/lbfgsb_solve_policy.h"
-#include "cartan/serial/ik/cmaes_solve_policy.h"
-#include "cartan/serial/ik/analytical_gradient.h"
-#include "cartan/serial/ik/restart_solve_policy.h"
-#include "cartan/serial/ik/halton_seed_generator.h"
-#include "cartan/serial/ik/nw_sqp_solve_policy.h"
-#include "cartan/serial/ik/nlopt_slsqp_solve_policy.h"
-#include "cartan/serial/ik/nlopt_bobyqa_solve_policy.h"
-#include "cartan/serial/ik/nablapp_lm_solve_policy.h"
-#include "cartan/serial/ik/projected_lm_solve_policy.h"
-#include "cartan/serial/ik/newton_raphson_solve_policy.h"
-#include "cartan/serial/ik/nablapp_lbfgsb_solve_policy.h"
-#include "cartan/serial/ik/augmented_lagrangian_solve_policy.h"
+#include "cartan/serial/ik/ik_status.h"
+#include "cartan/serial/ik/ik_result.h"
+#include "cartan/serial/ik/basic_ik_runner.h"
+#include "cartan/serial/ik/solvers.h"
+
+#include "cartan/serial/ik/solver/dls.h"
+#include "cartan/serial/ik/solver/lm.h"
+#include "cartan/serial/ik/solver/lbfgsb.h"
+#include "cartan/serial/ik/solver/projected_lm.h"
+#include "cartan/serial/ik/solver/newton_raphson.h"
+#include "cartan/serial/ik/solver/cmaes.h"
+
+#include "cartan/serial/ik/wrapper/restart_wrapper.h"
+
+#include "cartan/serial/ik/concepts/solve_concept.h"
+
+#include "cartan/serial/ik/policy/limits_policy.h"
+#include "cartan/serial/ik/policy/error_weight.h"
+
+#ifdef CARTAN_BUILD_ARGMIN
+#include "cartan/serial/ik/solver/argmin_lm.h"
+#include "cartan/serial/ik/solver/argmin_lbfgsb.h"
+#include "cartan/serial/ik/solver/argmin_slsqp.h"
+#include "cartan/serial/ik/solver/argmin_bobyqa.h"
+#include "cartan/serial/ik/solver/nw_sqp.h"
+#include "cartan/serial/ik/solver/augmented_lagrangian.h"
+#endif
+
+#ifdef CARTAN_HAS_NLOPT
+#include "cartan/serial/ik/solver/nlopt_slsqp.h"
+#include "cartan/serial/ik/solver/nlopt_bobyqa.h"
+#endif
 
 #endif

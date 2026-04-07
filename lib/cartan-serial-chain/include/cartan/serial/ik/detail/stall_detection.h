@@ -1,7 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_STALL_DETECTION_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_STALL_DETECTION_H
 
-#include "cartan/serial/ik/ik_types.h"
+#include "cartan/serial/ik/ik_status.h"
 
 #include <cmath>
 #include <vector>

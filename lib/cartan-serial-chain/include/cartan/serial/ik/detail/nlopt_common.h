@@ -16,8 +16,8 @@
 
 #include "cartan/types.h"
 
-#include "cartan/serial/ik/ik_types.h"
-#include "cartan/serial/ik/limits_policy.h"
+#include "cartan/serial/ik/ik_status.h"
+#include "cartan/serial/ik/policy/limits_policy.h"
 #include "cartan/serial/ik/detail/limit_enforcement.h"
 
 #include "cartan/lie/se3.h"
