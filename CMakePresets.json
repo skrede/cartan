@@ -81,6 +81,23 @@
             }
         },
         {
+            "name": "bench-profile",
+            "displayName": "Benchmarks (profiling-friendly: DWARF + frame pointers)",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/bench-profile",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_CXX_FLAGS": "-g -fno-omit-frame-pointer",
+                "CMAKE_C_FLAGS": "-g -fno-omit-frame-pointer",
+                "CARTAN_BUILD_BENCHMARKS": "ON",
+                "CARTAN_BUILD_TRAC_IK": "ON",
+                "CARTAN_BUILD_NLOPT": "ON",
+                "CARTAN_BUILD_PROFILING": "ON",
+                "CARTAN_BUILD_ARGMIN": "ON",
+                "CARTAN_CMAKE_FETCH_DEPS": "ON"
+            }
+        },
+        {
             "name": "fuzz",
             "displayName": "Fuzz testing",
             "generator": "Ninja",
@@ -117,6 +134,10 @@
         {
             "name": "bench",
             "configurePreset": "bench"
+        },
+        {
+            "name": "bench-profile",
+            "configurePreset": "bench-profile"
         },
         {
             "name": "fuzz",
