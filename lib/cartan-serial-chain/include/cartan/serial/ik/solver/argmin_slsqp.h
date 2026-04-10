@@ -87,6 +87,7 @@ public:
         m_iterations = 0;
         m_error_norm = std::numeric_limits<scalar_type>::max();
         m_status = ik_status::running;
+        m_termination_reason = ik_termination_reason::unknown;
         m_error_history.clear();
 
         auto fk = forward_kinematics(chain, q0);
@@ -124,6 +125,7 @@ public:
         if (m_iterations >= m_criteria.max_iterations)
         {
             m_status = ik_status::iteration_limit;
+            m_termination_reason = ik_termination_reason::iteration_limit;
             return m_status;
         }
 
@@ -138,6 +140,7 @@ public:
         if (cartan::detail::is_converged_unweighted(V_b, m_criteria))
         {
             m_status = ik_status::converged;
+            m_termination_reason = ik_termination_reason::converged;
             return m_status;
         }
 
@@ -148,18 +151,16 @@ public:
         if (stall_result != ik_status::running)
         {
             m_status = stall_result;
+            m_termination_reason = (stall_result == ik_status::diverged)
+                ? ik_termination_reason::divergence_detected
+                : ik_termination_reason::stall_detected;
             return m_status;
         }
 
-        if (result.status == nablapp::solver_status::converged
-            || result.status == nablapp::solver_status::ftol_reached
-            || result.status == nablapp::solver_status::stalled
-            || result.status == nablapp::solver_status::xtol_reached
-            || result.status == nablapp::solver_status::roundoff_limited
-            || result.status == nablapp::solver_status::objective_stalled
-            || result.status == nablapp::solver_status::aborted)
+        if (is_inner_terminal(result.status))
         {
             m_status = ik_status::stalled;
+            m_termination_reason = map_nablapp_status(result.status);
             return m_status;
         }
 
@@ -173,11 +174,53 @@ public:
     [[nodiscard]] scalar_type error_norm() const { return m_error_norm; }
     [[nodiscard]] int iterations() const { return m_iterations; }
     [[nodiscard]] ik_status status() const { return m_status; }
-    void abort() { m_status = ik_status::stalled; }
+    [[nodiscard]] ik_termination_reason termination_reason() const { return m_termination_reason; }
+    void abort()
+    {
+        m_status = ik_status::stalled;
+        m_termination_reason = ik_termination_reason::solver_aborted;
+    }
 
 private:
     using nablapp_solver = nablapp::basic_solver<
         nablapp::kraft_slsqp_policy<joints>, joints, cartan::detail::nablapp_ik_problem<Chain>>;
+
+    static constexpr bool is_inner_terminal(nablapp::solver_status s) noexcept
+    {
+        switch (s)
+        {
+            case nablapp::solver_status::converged:
+            case nablapp::solver_status::ftol_reached:
+            case nablapp::solver_status::xtol_reached:
+            case nablapp::solver_status::stalled:
+            case nablapp::solver_status::objective_stalled:
+            case nablapp::solver_status::roundoff_limited:
+            case nablapp::solver_status::aborted:
+            case nablapp::solver_status::diverged:
+            case nablapp::solver_status::max_iterations:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    static constexpr ik_termination_reason map_nablapp_status(nablapp::solver_status s) noexcept
+    {
+        switch (s)
+        {
+            case nablapp::solver_status::converged:         return ik_termination_reason::solver_converged_pose_missed;
+            case nablapp::solver_status::ftol_reached:      return ik_termination_reason::solver_ftol_reached;
+            case nablapp::solver_status::xtol_reached:      return ik_termination_reason::solver_xtol_reached;
+            case nablapp::solver_status::stalled:           return ik_termination_reason::solver_stalled;
+            case nablapp::solver_status::objective_stalled: return ik_termination_reason::solver_objective_stalled;
+            case nablapp::solver_status::roundoff_limited:  return ik_termination_reason::solver_roundoff_limited;
+            case nablapp::solver_status::aborted:           return ik_termination_reason::solver_aborted;
+            case nablapp::solver_status::budget_exhausted:  return ik_termination_reason::solver_budget_exhausted;
+            case nablapp::solver_status::max_iterations:    return ik_termination_reason::solver_max_iterations;
+            case nablapp::solver_status::diverged:          return ik_termination_reason::solver_diverged;
+            default:                                        return ik_termination_reason::unknown;
+        }
+    }
 
     void sync_solution_from_solver()
     {
@@ -204,6 +247,7 @@ private:
     scalar_type m_error_norm{std::numeric_limits<scalar_type>::max()};
     int m_iterations{};
     ik_status m_status{ik_status::running};
+    ik_termination_reason m_termination_reason{ik_termination_reason::unknown};
     std::optional<cartan::detail::nablapp_ik_problem<Chain>> m_problem;
     std::optional<nablapp_solver> m_solver;
 };
