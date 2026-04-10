@@ -197,6 +197,16 @@ public:
     {
         return m_solver ? m_solver->state().line_search_calls : 0;
     }
+
+    /// Cumulative number of kraft_slsqp_policy::step() invocations since
+    /// setup(), read from the inner nablapp solver's state. This is the
+    /// inner step count that pairs with line_search_calls to compute
+    /// average backtracks per nablapp step. Zero if the solver has not
+    /// been set up.
+    [[nodiscard]] std::uint32_t nablapp_iterations() const
+    {
+        return m_solver ? m_solver->state().iteration : 0;
+    }
     void abort()
     {
         m_status = ik_status::stalled;
