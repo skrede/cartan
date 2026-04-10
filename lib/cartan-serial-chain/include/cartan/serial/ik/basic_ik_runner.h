@@ -51,6 +51,24 @@ consteval bool all_policies_agree()
                  && First::joints == Rest::joints) && ...);
 }
 
+/// Detects whether a policy exposes `termination_reason()` for fine-grained
+/// failure diagnostics. Policies that opt out are reported as
+/// `ik_termination_reason::unknown`.
+template <typename Policy>
+concept reports_termination_reason = requires(const Policy& p)
+{
+    { p.termination_reason() } -> std::convertible_to<ik_termination_reason>;
+};
+
+template <typename Policy>
+constexpr ik_termination_reason policy_termination_reason(const Policy& p) noexcept
+{
+    if constexpr (reports_termination_reason<Policy>)
+        return p.termination_reason();
+    else
+        return ik_termination_reason::unknown;
+}
+
 /// Variadic policy-based IK solver with cooperative interleaved racing.
 ///
 /// When instantiated with a single policy, behaves identically to a
@@ -214,6 +232,7 @@ private:
         scalar_type error_norm;
         int iterations;
         bool converged;
+        ik_termination_reason termination_reason{ik_termination_reason::unknown};
     };
 
     ik_status step_single()
@@ -300,7 +319,8 @@ private:
                 .q = policy.solution(),
                 .error_norm = policy.error_norm(),
                 .iterations = policy.iterations(),
-                .converged = true
+                .converged = true,
+                .termination_reason = policy_termination_reason(policy)
             });
             m_found_convergence = true;
 
@@ -320,7 +340,8 @@ private:
                 .q = policy.solution(),
                 .error_norm = policy.error_norm(),
                 .iterations = policy.iterations(),
-                .converged = false
+                .converged = false,
+                .termination_reason = policy_termination_reason(policy)
             });
         }
         else
@@ -516,11 +537,13 @@ private:
         ik_error<scalar_type, joints> err;
         err.near_singular = false;
         err.condition_number = scalar_type(0);
+        err.termination_reason = ik_termination_reason::unknown;
 
         if constexpr (sizeof...(Policies) == 1)
         {
             err.last_q = std::get<0>(m_policies).solution();
             err.last_error_norm = std::get<0>(m_policies).error_norm();
+            err.termination_reason = policy_termination_reason(std::get<0>(m_policies));
         }
         else
         {
@@ -536,8 +559,10 @@ private:
             }
             if (m_results[static_cast<std::size_t>(best_fail)])
             {
-                err.last_q = m_results[static_cast<std::size_t>(best_fail)]->q;
-                err.last_error_norm = m_results[static_cast<std::size_t>(best_fail)]->error_norm;
+                const auto& best = *m_results[static_cast<std::size_t>(best_fail)];
+                err.last_q = best.q;
+                err.last_error_norm = best.error_norm;
+                err.termination_reason = best.termination_reason;
             }
             else
             {

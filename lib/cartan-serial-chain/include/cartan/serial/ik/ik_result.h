@@ -35,6 +35,7 @@ struct ik_error
     static_assert(std::is_floating_point_v<Scalar>, "ik_error requires a floating-point Scalar type");
 
     ik_failure reason;
+    ik_termination_reason termination_reason{ik_termination_reason::unknown};
     typename joint_state<Scalar, N>::position_type last_q;
     Scalar last_error_norm{};
     Scalar condition_number{};
