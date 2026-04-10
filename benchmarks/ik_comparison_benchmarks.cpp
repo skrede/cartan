@@ -1031,6 +1031,94 @@ static void bm_comparison_ur3e_nablapp_slsqp_c1_1em3(benchmark::State& state)
 }
 BENCHMARK(bm_comparison_ur3e_nablapp_slsqp_c1_1em3)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
+// Standalone phi_ls counter read — diagnostic only.
+//
+// Constructs argmin_slsqp directly (no restart_wrapper, no
+// basic_ik_runner) so the cumulative line_search_calls counter on
+// kraft_slsqp_policy::state_type survives across the entire solve
+// without being reset on a restart. Reports mean calls/nablapp_step
+// across 1000 UR3e poses as a benchmark counter. Answers nablapp
+// turn-07 revised hypothesis test: <=1.3 means backtracks are not
+// the driver; ~2-2.5 matches HS071 compile-time baseline; >=3 means
+// backtracks are elevated and nonmonotone merit / c1 loosening is
+// warranted.
+//
+// Two budget points bracket the answer: one with the production
+// budget_per_step=50 (matching the racing-runner configuration) and
+// one with 500 (so one cartan::argmin_slsqp::step() runs the
+// kraft_slsqp to convergence or termination in isolation).
+template <int BudgetPerStep>
+static void bm_comparison_ur3e_nablapp_slsqp_phi_ls_calls_impl(benchmark::State& state)
+{
+    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    static const target_set<double, 6> ts(chain, num_targets, 42);
+    const auto criteria = nablapp_comparison_criteria();
+
+    cartan::ik::argmin_slsqp<chain_t<6>>::options slsqp_opts{};
+    slsqp_opts.budget_per_step = BudgetPerStep;
+
+    std::size_t idx = 0;
+    std::uint64_t total_ls = 0;
+    std::uint64_t total_nablapp_steps = 0;
+    int total_cartan_outer = 0;
+    int successes = 0;
+
+    for (auto _ : state)
+    {
+        auto& target = ts.targets[idx % static_cast<std::size_t>(num_targets)];
+        auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
+        ++idx;
+
+        cartan::ik::argmin_slsqp<chain_t<6>> solver{slsqp_opts};
+        solver.setup(chain, target, q_seed, criteria);
+
+        while (solver.status() == cartan::ik_status::running)
+        {
+            solver.step(chain);
+        }
+
+        total_ls += solver.line_search_calls();
+        total_nablapp_steps += static_cast<std::uint64_t>(solver.nablapp_iterations());
+        total_cartan_outer += solver.iterations();
+        if (solver.status() == cartan::ik_status::converged)
+            ++successes;
+
+        benchmark::DoNotOptimize(solver);
+    }
+
+    auto total = static_cast<int>(idx);
+    state.counters["Success_rate"] = benchmark::Counter(
+        100.0 * static_cast<double>(successes) / std::max(total, 1),
+        benchmark::Counter::kAvgThreads);
+    state.counters["total_phi_ls_calls"] = benchmark::Counter(
+        static_cast<double>(total_ls), benchmark::Counter::kDefaults);
+    state.counters["total_nablapp_steps"] = benchmark::Counter(
+        static_cast<double>(total_nablapp_steps), benchmark::Counter::kDefaults);
+    state.counters["phi_ls_per_nablapp_step"] = benchmark::Counter(
+        static_cast<double>(total_ls) / std::max<double>(1.0, static_cast<double>(total_nablapp_steps)),
+        benchmark::Counter::kDefaults);
+    state.counters["avg_nablapp_step_per_pose"] = benchmark::Counter(
+        static_cast<double>(total_nablapp_steps) / std::max(total, 1),
+        benchmark::Counter::kDefaults);
+    state.counters["avg_cartan_outer_iter"] = benchmark::Counter(
+        static_cast<double>(total_cartan_outer) / std::max(total, 1),
+        benchmark::Counter::kDefaults);
+    state.counters["budget"] = benchmark::Counter(
+        static_cast<double>(BudgetPerStep), benchmark::Counter::kDefaults);
+}
+
+static void bm_comparison_ur3e_nablapp_slsqp_phi_ls_calls_budget50(benchmark::State& state)
+{
+    bm_comparison_ur3e_nablapp_slsqp_phi_ls_calls_impl<50>(state);
+}
+BENCHMARK(bm_comparison_ur3e_nablapp_slsqp_phi_ls_calls_budget50)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_ur3e_nablapp_slsqp_phi_ls_calls_budget500(benchmark::State& state)
+{
+    bm_comparison_ur3e_nablapp_slsqp_phi_ls_calls_impl<500>(state);
+}
+BENCHMARK(bm_comparison_ur3e_nablapp_slsqp_phi_ls_calls_budget500)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
 #ifdef CARTAN_HAS_NLOPT
 static void bm_comparison_ur3e_nlopt_slsqp(benchmark::State& state)
 {
