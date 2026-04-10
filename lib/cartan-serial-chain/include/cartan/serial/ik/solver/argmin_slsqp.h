@@ -35,6 +35,7 @@
 #include <limits>
 #include <memory>
 #include <vector>
+#include <cstdint>
 
 namespace cartan::ik
 {
@@ -67,6 +68,15 @@ public:
         scalar_type stall_threshold{scalar_type(1e-10)};
         scalar_type divergence_factor{scalar_type(10)};
         int stall_window{5};
+
+        /// Armijo sufficient-decrease parameter c1 forwarded to
+        /// kraft_slsqp_policy's embedded merit line search. Nablapp's default
+        /// is 1e-4; looser values (1e-3) accept more trial steps and cut
+        /// backtracks on expensive-objective problems like IK where each
+        /// phi(alpha) call costs a full FK pass. Tightening below 1e-5 is
+        /// generally a no-op because the Armijo condition on a well-scaled
+        /// merit function dominates before c1 matters.
+        double line_search_c1{1e-4};
     };
 
     argmin_slsqp() = default;
@@ -109,7 +119,10 @@ public:
         nab_opts.set_objective_threshold(1e-14);
         nab_opts.set_step_threshold(1e-14);
 
-        m_solver.emplace(*m_problem, x0, nab_opts);
+        typename nablapp::kraft_slsqp_policy<joints>::options_type policy_opts{};
+        policy_opts.line_search.c1 = m_options.line_search_c1;
+
+        m_solver.emplace(*m_problem, x0, nab_opts, policy_opts);
     }
 
     ik_status step(const Chain& chain)
@@ -175,6 +188,15 @@ public:
     [[nodiscard]] int iterations() const { return m_iterations; }
     [[nodiscard]] ik_status status() const { return m_status; }
     [[nodiscard]] ik_termination_reason termination_reason() const { return m_termination_reason; }
+
+    /// Cumulative number of phi(alpha) line-search calls the underlying
+    /// kraft_slsqp_policy has made since setup(). Zero if the solver has
+    /// not been set up. Exposed so benchmarks can measure average backtracks
+    /// per solver step without reaching into nablapp internals.
+    [[nodiscard]] std::uint64_t line_search_calls() const
+    {
+        return m_solver ? m_solver->state().line_search_calls : 0;
+    }
     void abort()
     {
         m_status = ik_status::stalled;
