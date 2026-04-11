@@ -88,6 +88,7 @@ public:
         m_criteria = criteria;
         m_iterations = 0;
         m_restart_count = 0;
+        m_objective_calls = 0;
         m_error_norm = std::numeric_limits<scalar_type>::max();
         m_status = ik_status::running;
 
@@ -175,6 +176,20 @@ public:
 
     [[nodiscard]] int iterations() const { return m_iterations; }
 
+    /// Cumulative number of times `objective_func` was invoked by nlopt
+    /// since the last `setup()` call. Counts both value-only and
+    /// value+gradient evaluations (no distinction — nlopt dispatches
+    /// through the same callback and branches on `grad.empty()`). This
+    /// is the correct denominator for a per-nlopt-inner-iteration wall
+    /// measurement: one invocation per nlopt inner iteration regardless
+    /// of how many cartan-outer `step()` rounds or internal restarts
+    /// happened during the pose's solve. Zero if `setup()` has not been
+    /// called.
+    [[nodiscard]] std::uint64_t nlopt_objective_calls() const
+    {
+        return m_objective_calls;
+    }
+
     void abort()
     {
         m_opt.force_stop();
@@ -191,6 +206,7 @@ private:
         void* data)
     {
         auto* self = static_cast<nlopt_slsqp*>(data);
+        ++self->m_objective_calls;
         int n = static_cast<int>(x.size());
         auto q = cartan::detail::stdvec_to_eigen<scalar_type, joints>(x);
 
@@ -223,6 +239,7 @@ private:
     int m_iterations{};
     int m_eval_count{};
     int m_restart_count{};
+    std::uint64_t m_objective_calls{};
     ik_status m_status{ik_status::running};
     std::mt19937 m_rng{std::random_device{}()};
 };

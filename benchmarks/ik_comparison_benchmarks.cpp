@@ -1382,6 +1382,73 @@ static void bm_comparison_ur3e_nablapp_slsqp_last_check_results_alias(benchmark:
 BENCHMARK(bm_comparison_ur3e_nablapp_slsqp_last_check_results_alias)
     ->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
+#ifdef CARTAN_HAS_NLOPT
+// Direct-drive NLopt SLSQP bench that also captures nlopt's per-pose
+// objective function call count (via the nlopt_objective_calls accessor
+// on cartan::ik::nlopt_slsqp). Purpose: indirect per-inner-iteration
+// wall measurement for nlopt on UR3e, to compare against nablapp's
+// ~11.4 us/inner-step figure. Same 1000 UR3e poses, seed 42, cartan-
+// tight criteria, direct-drive (no restart_wrapper, no basic_ik_runner)
+// to expose the native nlopt counter without wrapper interference.
+//
+// `nlopt_iter_count` in the counter output is the cumulative count of
+// objective callback invocations divided by total solves = average
+// nlopt inner iterations per pose. Each invocation corresponds to one
+// nlopt SLSQP inner iteration (one value-only or value+gradient call).
+// nlopt dispatches value-only and gradient through the same callback
+// and branches on `grad.empty()`, so this is a unified counter.
+static void bm_comparison_ur3e_nlopt_slsqp_inner_iter_count(benchmark::State& state)
+{
+    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    static const target_set<double, 6> ts(chain, num_targets, 42);
+    const auto criteria = nablapp_comparison_criteria();
+
+    cartan::ik::nlopt_slsqp<chain_t<6>>::options slsqp_opts{};
+    slsqp_opts.budget_per_step = 500;
+
+    std::size_t idx = 0;
+    std::uint64_t total_calls = 0;
+    std::uint64_t solves = 0;
+    std::uint64_t pose_successes = 0;
+
+    for (auto _ : state)
+    {
+        auto& target = ts.targets[idx % static_cast<std::size_t>(num_targets)];
+        auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
+        ++idx;
+
+        cartan::ik::nlopt_slsqp<chain_t<6>> solver{slsqp_opts};
+        solver.setup(chain, target, q_seed, criteria);
+
+        while (solver.status() == cartan::ik_status::running)
+        {
+            solver.step(chain);
+        }
+
+        total_calls += solver.nlopt_objective_calls();
+        if (solver.status() == cartan::ik_status::converged)
+        {
+            ++pose_successes;
+        }
+        ++solves;
+
+        benchmark::DoNotOptimize(solver);
+    }
+
+    const auto total = std::max<std::uint64_t>(solves, 1);
+    state.counters["Success_rate"] = benchmark::Counter(
+        100.0 * static_cast<double>(pose_successes) / static_cast<double>(total),
+        benchmark::Counter::kDefaults);
+    state.counters["nlopt_iter_count"] = benchmark::Counter(
+        static_cast<double>(total_calls) / static_cast<double>(total),
+        benchmark::Counter::kDefaults);
+    state.counters["total_solves"] = benchmark::Counter(
+        static_cast<double>(total), benchmark::Counter::kDefaults);
+}
+BENCHMARK(bm_comparison_ur3e_nlopt_slsqp_inner_iter_count)
+    ->Iterations(1000)->Unit(benchmark::kMicrosecond);
+#endif
+
 // Runner-wrapped companion to bm_comparison_ur3e_nablapp_slsqp_grad_sweep.
 // Replicates bm_comparison_ur3e_nablapp_slsqp (default_convergence, restart
 // wrapper, basic_ik_runner) but preconfigures argmin_slsqp with a custom
