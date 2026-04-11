@@ -899,6 +899,13 @@ template <int N>
 using nablapp_slsqp_solver = cartan::basic_ik_runner<
     cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::argmin_slsqp<chain_t<N>>>>;
 
+// NLopt-compatible convergence variant: same solver, different stopping rules.
+// Uses nablapp::slsqp_compatible_convergence (ftol_rel + xtol_rel + stall,
+// no gradient-norm check) via argmin_slsqp_nlopt_compat.
+template <int N>
+using nablapp_slsqp_nlopt_compat_solver = cartan::basic_ik_runner<
+    cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::argmin_slsqp_nlopt_compat<chain_t<N>>>>;
+
 template <int N>
 using nablapp_lbfgsb_solver = cartan::basic_ik_runner<
     cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::argmin_lbfgsb<chain_t<N>>>>;
@@ -953,6 +960,21 @@ static void bm_comparison_ur3e_nablapp_slsqp(benchmark::State& state)
     bm_nablapp_comparison<6, nablapp_slsqp_solver<6>>(state, chain, ts, nablapp_comparison_criteria());
 }
 BENCHMARK(bm_comparison_ur3e_nablapp_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+// NLopt-compatible convergence variant of the UR3e SLSQP bench.
+// Uses argmin_slsqp_nlopt_compat which instantiates argmin_slsqp with
+// nablapp::slsqp_compatible_convergence. The default ftol_rel=1e-10 /
+// xtol_rel=1e-10 relative thresholds on argmin_slsqp::options match
+// NLopt SLSQP's stop-rule behavior. This is the key experiment for the
+// "nablapp takes 4x more outer iterations than nlopt" gap.
+static void bm_comparison_ur3e_nablapp_slsqp_nlopt_compat(benchmark::State& state)
+{
+    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    static const target_set<double, 6> ts(chain, num_targets, 42);
+    bm_nablapp_comparison<6, nablapp_slsqp_nlopt_compat_solver<6>>(
+        state, chain, ts, nablapp_comparison_criteria());
+}
+BENCHMARK(bm_comparison_ur3e_nablapp_slsqp_nlopt_compat)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 // Armijo c1 sweep for nablapp SLSQP on UR3e IK. Diagnostic benchmark set
 // accompanying the phi_ls backtrack investigation: loosening c1 reduces
@@ -1130,6 +1152,75 @@ BENCHMARK(bm_comparison_ur3e_nablapp_slsqp_phi_ls_calls_budget500)->Iterations(1
 // with the fixed-6 variant above, this isolates whether the compile-
 // time N path adds the ~0.9 backtracks/step delta at N=6 that nablapp
 // measured at N=4 on HS071 (2.0 compile-time vs 1.11 dynamic).
+// Diagnostic: reads the last_check_results telemetry from nablapp's
+// convergence policy on a single direct-drive UR3e solve per iteration.
+// Answers the turn-11 falsification test: at cartan-tight tolerances
+// (gradient=1e-12, objective=1e-14, step=1e-14), which of the four
+// default_convergence criteria actually fires? Expected per nablapp's
+// turn-11 corrected mechanism: [0] gradient_tolerance NEVER fires
+// (unreachable near singular poses), [2] step_tolerance fires.
+//
+// Emits one counter per criterion plus the first-firing index. 0 means
+// "did not fire" (nullopt), otherwise the nablapp::solver_status enum
+// value the criterion would have reported.
+static void bm_comparison_ur3e_nablapp_slsqp_last_check_results(benchmark::State& state)
+{
+    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    static const target_set<double, 6> ts(chain, num_targets, 42);
+    const auto criteria = nablapp_comparison_criteria();
+
+    cartan::ik::argmin_slsqp<chain_t<6>>::options slsqp_opts{};
+    slsqp_opts.budget_per_step = 500;
+
+    std::size_t idx = 0;
+    std::array<std::uint64_t, 4> criterion_fire_count{};
+    std::uint64_t solves = 0;
+
+    for (auto _ : state)
+    {
+        auto& target = ts.targets[idx % static_cast<std::size_t>(num_targets)];
+        auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
+        ++idx;
+
+        cartan::ik::argmin_slsqp<chain_t<6>> solver{slsqp_opts};
+        solver.setup(chain, target, q_seed, criteria);
+
+        while (solver.status() == cartan::ik_status::running)
+        {
+            solver.step(chain);
+        }
+
+        const auto results = solver.last_check_results();
+        for (std::size_t i = 0; i < results.size(); ++i)
+        {
+            if (results[i].has_value())
+            {
+                ++criterion_fire_count[i];
+            }
+        }
+        ++solves;
+
+        benchmark::DoNotOptimize(solver);
+    }
+
+    const auto total = std::max<std::uint64_t>(solves, 1);
+    state.counters["grad_tol_fire_pct"] = benchmark::Counter(
+        100.0 * static_cast<double>(criterion_fire_count[0]) / static_cast<double>(total),
+        benchmark::Counter::kDefaults);
+    state.counters["obj_tol_fire_pct"] = benchmark::Counter(
+        100.0 * static_cast<double>(criterion_fire_count[1]) / static_cast<double>(total),
+        benchmark::Counter::kDefaults);
+    state.counters["step_tol_fire_pct"] = benchmark::Counter(
+        100.0 * static_cast<double>(criterion_fire_count[2]) / static_cast<double>(total),
+        benchmark::Counter::kDefaults);
+    state.counters["stall_tol_fire_pct"] = benchmark::Counter(
+        100.0 * static_cast<double>(criterion_fire_count[3]) / static_cast<double>(total),
+        benchmark::Counter::kDefaults);
+    state.counters["total_solves"] = benchmark::Counter(
+        static_cast<double>(total), benchmark::Counter::kDefaults);
+}
+BENCHMARK(bm_comparison_ur3e_nablapp_slsqp_last_check_results)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
 static void bm_comparison_ur3e_nablapp_slsqp_phi_ls_calls_dynamicN(benchmark::State& state)
 {
     using dynamic_chain = cartan::kinematic_chain<double, cartan::dynamic>;
