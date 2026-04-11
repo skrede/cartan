@@ -190,6 +190,20 @@ public:
         return m_objective_calls;
     }
 
+    /// Number of times the cartan-side `needs_restart` perturbation loop
+    /// fired during this pose's solve (see `nlopt_slsqp::step`). Each
+    /// fire corresponds to one nlopt optimize() that returned
+    /// SUCCESS/FTOL/XTOL without pose-tolerance convergence (or
+    /// MAXEVAL with stalled error), followed by
+    /// `perturb_nlopt_solution` + `reset_nlopt_optimizer` and a
+    /// subsequent step() that re-runs optimize on the perturbed seed.
+    /// Capped by `options::max_restarts` (default 10). Reset in
+    /// `setup()`.
+    [[nodiscard]] int nlopt_restart_count() const
+    {
+        return m_restart_count;
+    }
+
     void abort()
     {
         m_opt.force_stop();
