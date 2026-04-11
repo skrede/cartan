@@ -26,6 +26,7 @@
 #include "cartan/serial/fk/forward_kinematics.h"
 
 #include <nablapp/solver/options.h>
+#include <nablapp/solver/convergence.h>
 #include <nablapp/solver/basic_solver.h>
 #include <nablapp/solver/kraft_slsqp_policy.h>
 
@@ -35,6 +36,9 @@
 #include <limits>
 #include <memory>
 #include <vector>
+#include <array>
+#include <optional>
+#include <type_traits>
 #include <cstdint>
 
 namespace cartan::ik
@@ -49,7 +53,17 @@ namespace cartan::ik
 ///
 /// This is the default (unprefixed) SLSQP policy. The NLopt-backed variant
 /// is available as nlopt_slsqp_solve_policy behind CARTAN_HAS_NLOPT.
-template <chain Chain, typename LimitsPolicy = clamp_limits>
+///
+/// The Convergence template parameter lets consumers opt out of nablapp's
+/// default four-criterion convergence policy in favor of alternatives like
+/// `nablapp::slsqp_compatible_convergence` which mirrors NLopt's SLSQP
+/// stop rules (ftol_rel + xtol_rel + stall, no gradient-norm check). See
+/// `nablapp/solver/convergence.h`. The relative thresholds are configured
+/// via `options::objective_threshold_rel` and `options::step_threshold_rel`
+/// when the alternative policy is used.
+template <chain Chain,
+          typename LimitsPolicy = clamp_limits,
+          typename Convergence = nablapp::default_convergence>
 class argmin_slsqp
 {
 public:
@@ -77,6 +91,20 @@ public:
         /// generally a no-op because the Armijo condition on a well-scaled
         /// merit function dominates before c1 matters.
         double line_search_c1{1e-4};
+
+        /// Absolute thresholds consumed by the default nablapp convergence
+        /// policy (gradient / objective / step + stall). Ignored when
+        /// Convergence is `nablapp::slsqp_compatible_convergence`.
+        double gradient_threshold{1e-12};
+        double objective_threshold{1e-14};
+        double step_threshold{1e-14};
+
+        /// Relative thresholds consumed by `slsqp_compatible_convergence`
+        /// (objective_tolerance_rel + step_tolerance_rel + stall). Default
+        /// values mirror NLopt SLSQP's `ftol_rel` / `xtol_rel` = 1e-10.
+        /// Ignored when Convergence is `nablapp::default_convergence`.
+        double objective_threshold_rel{1e-10};
+        double step_threshold_rel{1e-10};
     };
 
     argmin_slsqp() = default;
@@ -113,16 +141,12 @@ public:
             x0[i] = static_cast<double>(q0[i]);
         }
 
-        nablapp::solver_options<> nab_opts;
-        nab_opts.max_iterations = m_options.budget_per_step;
-        nab_opts.set_gradient_threshold(1e-12);
-        nab_opts.set_objective_threshold(1e-14);
-        nab_opts.set_step_threshold(1e-14);
+        build_nablapp_opts(m_nab_opts);
 
         typename nablapp::kraft_slsqp_policy<joints>::options_type policy_opts{};
         policy_opts.line_search.c1 = m_options.line_search_c1;
 
-        m_solver.emplace(*m_problem, x0, nab_opts, policy_opts);
+        m_solver.emplace(*m_problem, x0, m_nab_opts, policy_opts);
     }
 
     ik_status step(const Chain& chain)
@@ -142,7 +166,8 @@ public:
             return m_status;
         }
 
-        auto result = m_solver->step_n(m_options.budget_per_step);
+        auto result = m_solver->step_n(
+            static_cast<std::uint32_t>(m_options.budget_per_step), m_nab_opts);
 
         sync_solution_from_solver();
 
@@ -192,10 +217,17 @@ public:
     /// Cumulative number of phi(alpha) line-search calls the underlying
     /// kraft_slsqp_policy has made since setup(). Zero if the solver has
     /// not been set up. Exposed so benchmarks can measure average backtracks
-    /// per solver step without reaching into nablapp internals.
+    /// per solver step without reaching into nablapp internals. Gracefully
+    /// returns 0 on nablapp versions predating the counter member (shipped
+    /// in nablapp commit 95ffe8d).
     [[nodiscard]] std::uint64_t line_search_calls() const
     {
-        return m_solver ? m_solver->state().line_search_calls : 0;
+        if (!m_solver) return 0;
+        using state_t = std::remove_cvref_t<decltype(m_solver->state())>;
+        if constexpr (requires(const state_t& s) { s.line_search_calls; })
+            return m_solver->state().line_search_calls;
+        else
+            return 0;
     }
 
     /// Cumulative number of kraft_slsqp_policy::step() invocations since
@@ -205,7 +237,38 @@ public:
     /// been set up.
     [[nodiscard]] std::uint32_t nablapp_iterations() const
     {
-        return m_solver ? m_solver->state().iteration : 0;
+        if (!m_solver) return 0;
+        using state_t = std::remove_cvref_t<decltype(m_solver->state())>;
+        if constexpr (requires(const state_t& s) { s.iteration; })
+            return m_solver->state().iteration;
+        else
+            return 0;
+    }
+
+    /// Per-criterion convergence telemetry from the last solve, read from
+    /// the nablapp opts owned by this argmin_slsqp instance. Each entry is
+    /// `std::optional<nablapp::solver_status>`: nullopt means the criterion
+    /// did not fire on the terminating iteration, non-nullopt means it did
+    /// (the value is the nablapp solver_status the criterion would have
+    /// reported). All criteria are evaluated on every iteration — the
+    /// first-in-order non-nullopt entry is the terminator that actually
+    /// drove the solver's exit, but later criteria also populate the
+    /// array so consumers can see which additional criteria would have
+    /// fired. Requires nablapp HEAD >= 21a0acf (phase 24.2 delivery).
+    ///
+    /// Note: reads from the member `m_nab_opts.convergence.last_check_results_`
+    /// rather than from `m_solver->convergence()` because basic_solver's
+    /// explicit-opts `step_n(budget, opts)` overload (which argmin_slsqp
+    /// uses to forward a typed convergence policy per call) writes the
+    /// per-iteration telemetry into the caller's opts, not into the solver's
+    /// stored_convergence_. The stored_convergence_ back-copy is only done
+    /// by the no-opts `step_n(budget)` overload.
+    [[nodiscard]] auto last_check_results() const
+    {
+        if constexpr (requires { m_nab_opts.convergence.last_check_results(); })
+            return m_nab_opts.convergence.last_check_results();
+        else
+            return std::array<std::optional<nablapp::solver_status>, 4>{};
     }
     void abort()
     {
@@ -216,6 +279,23 @@ public:
 private:
     using nablapp_solver = nablapp::basic_solver<
         nablapp::kraft_slsqp_policy<joints>, joints, cartan::detail::nablapp_ik_problem<Chain>>;
+    using nablapp_opts_type = nablapp::solver_options<Convergence>;
+
+    void build_nablapp_opts(nablapp_opts_type& opts) const
+    {
+        opts.max_iterations = static_cast<std::uint32_t>(m_options.budget_per_step);
+        if constexpr (std::is_same_v<Convergence, nablapp::default_convergence>)
+        {
+            opts.set_gradient_threshold(m_options.gradient_threshold);
+            opts.set_objective_threshold(m_options.objective_threshold);
+            opts.set_step_threshold(m_options.step_threshold);
+        }
+        else
+        {
+            opts.set_objective_threshold_rel(m_options.objective_threshold_rel);
+            opts.set_step_threshold_rel(m_options.step_threshold_rel);
+        }
+    }
 
     static constexpr bool is_inner_terminal(nablapp::solver_status s) noexcept
     {
@@ -282,7 +362,20 @@ private:
     ik_termination_reason m_termination_reason{ik_termination_reason::unknown};
     std::optional<cartan::detail::nablapp_ik_problem<Chain>> m_problem;
     std::optional<nablapp_solver> m_solver;
+    nablapp_opts_type m_nab_opts{};
 };
+
+/// NLopt-compatible convergence variant of argmin_slsqp.
+///
+/// Drops nablapp's gradient_tolerance_criterion in favor of NLopt's
+/// ftol_rel + xtol_rel + stall stop rules (`nablapp::slsqp_compatible_convergence`).
+/// Intended for IK workloads where the outer pose tolerance is the
+/// ground truth and the inner solver just needs to make efficient
+/// progress toward it — not for unconstrained minimization where a
+/// gradient-norm stationarity certificate is load-bearing.
+template <chain Chain, typename LimitsPolicy = clamp_limits>
+using argmin_slsqp_nlopt_compat =
+    argmin_slsqp<Chain, LimitsPolicy, nablapp::slsqp_compatible_convergence>;
 
 }
 
