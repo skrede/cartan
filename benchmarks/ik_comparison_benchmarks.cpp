@@ -42,6 +42,7 @@
 #include <random>
 #include <vector>
 #include <algorithm>
+#include <cmath>
 
 namespace
 {
@@ -1220,6 +1221,239 @@ static void bm_comparison_ur3e_nablapp_slsqp_last_check_results(benchmark::State
         static_cast<double>(total), benchmark::Counter::kDefaults);
 }
 BENCHMARK(bm_comparison_ur3e_nablapp_slsqp_last_check_results)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+// Gradient-threshold sweep on UR3e SLSQP with default_convergence, direct-
+// drive (no runner, no restart wrapper). Parameterizes cartan's
+// `gradient_threshold` via state.range(0) as a negative-log10 exponent:
+// Arg(6) -> 1e-6, Arg(12) -> 1e-12. objective_threshold and step_threshold
+// are held at cartan-tight 1e-14 so only the gradient knob moves. Emits
+// wall per solve, pose-tolerance success rate, avg iterations of converged
+// solves, and the full last_check_results firing profile at each point.
+// Tests whether relaxing gradient_threshold recovers wall on the 19.2%
+// gradient_tolerance-bound UR3e subset without degrading the 80.8% step_
+// tolerance-bound subset or losing pose-tolerance success.
+static void bm_comparison_ur3e_nablapp_slsqp_grad_sweep(benchmark::State& state)
+{
+    const int exponent = static_cast<int>(state.range(0));
+    const double gradient_threshold = std::pow(10.0, -static_cast<double>(exponent));
+
+    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    static const target_set<double, 6> ts(chain, num_targets, 42);
+    const auto criteria = nablapp_comparison_criteria();
+
+    cartan::ik::argmin_slsqp<chain_t<6>>::options slsqp_opts{};
+    slsqp_opts.budget_per_step = 500;
+    slsqp_opts.gradient_threshold = gradient_threshold;
+
+    std::size_t idx = 0;
+    std::array<std::uint64_t, 4> criterion_fire_count{};
+    std::uint64_t solves = 0;
+    std::uint64_t pose_successes = 0;
+    std::uint64_t total_iterations = 0;
+
+    for (auto _ : state)
+    {
+        auto& target = ts.targets[idx % static_cast<std::size_t>(num_targets)];
+        auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
+        ++idx;
+
+        cartan::ik::argmin_slsqp<chain_t<6>> solver{slsqp_opts};
+        solver.setup(chain, target, q_seed, criteria);
+
+        while (solver.status() == cartan::ik_status::running)
+        {
+            solver.step(chain);
+        }
+
+        const auto results = solver.last_check_results();
+        for (std::size_t i = 0; i < results.size() && i < criterion_fire_count.size(); ++i)
+        {
+            if (results[i].has_value())
+            {
+                ++criterion_fire_count[i];
+            }
+        }
+        if (solver.status() == cartan::ik_status::converged)
+        {
+            ++pose_successes;
+            total_iterations += static_cast<std::uint64_t>(solver.iterations());
+        }
+        ++solves;
+
+        benchmark::DoNotOptimize(solver);
+    }
+
+    const auto total = std::max<std::uint64_t>(solves, 1);
+    const auto converged = std::max<std::uint64_t>(pose_successes, 1);
+    state.counters["grad_threshold"] = benchmark::Counter(
+        gradient_threshold, benchmark::Counter::kDefaults);
+    state.counters["Success_rate"] = benchmark::Counter(
+        100.0 * static_cast<double>(pose_successes) / static_cast<double>(total),
+        benchmark::Counter::kDefaults);
+    state.counters["avg_iterations"] = benchmark::Counter(
+        static_cast<double>(total_iterations) / static_cast<double>(converged),
+        benchmark::Counter::kDefaults);
+    state.counters["grad_tol_fire_pct"] = benchmark::Counter(
+        100.0 * static_cast<double>(criterion_fire_count[0]) / static_cast<double>(total),
+        benchmark::Counter::kDefaults);
+    state.counters["obj_tol_fire_pct"] = benchmark::Counter(
+        100.0 * static_cast<double>(criterion_fire_count[1]) / static_cast<double>(total),
+        benchmark::Counter::kDefaults);
+    state.counters["step_tol_fire_pct"] = benchmark::Counter(
+        100.0 * static_cast<double>(criterion_fire_count[2]) / static_cast<double>(total),
+        benchmark::Counter::kDefaults);
+    state.counters["stall_tol_fire_pct"] = benchmark::Counter(
+        100.0 * static_cast<double>(criterion_fire_count[3]) / static_cast<double>(total),
+        benchmark::Counter::kDefaults);
+    state.counters["total_solves"] = benchmark::Counter(
+        static_cast<double>(total), benchmark::Counter::kDefaults);
+}
+BENCHMARK(bm_comparison_ur3e_nablapp_slsqp_grad_sweep)
+    ->Arg(6)->Arg(8)->Arg(10)->Arg(12)
+    ->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+// Alias-path companion to bm_comparison_ur3e_nablapp_slsqp_last_check_results.
+// Same direct-drive pattern, but instantiates argmin_slsqp_nlopt_compat
+// (nablapp::slsqp_compatible_convergence: 3 criteria — ftol_rel, xtol_rel,
+// stall_tolerance). Tests the alias-mapping hypothesis: which default_
+// convergence firing slot each alias criterion inherits when the alias
+// replaces absolute thresholds with relative ones at 1e-10.
+static void bm_comparison_ur3e_nablapp_slsqp_last_check_results_alias(benchmark::State& state)
+{
+    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    static const target_set<double, 6> ts(chain, num_targets, 42);
+    const auto criteria = nablapp_comparison_criteria();
+
+    cartan::ik::argmin_slsqp_nlopt_compat<chain_t<6>>::options slsqp_opts{};
+    slsqp_opts.budget_per_step = 500;
+
+    std::size_t idx = 0;
+    std::array<std::uint64_t, 3> criterion_fire_count{};
+    std::uint64_t solves = 0;
+    std::uint64_t pose_successes = 0;
+
+    for (auto _ : state)
+    {
+        auto& target = ts.targets[idx % static_cast<std::size_t>(num_targets)];
+        auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
+        ++idx;
+
+        cartan::ik::argmin_slsqp_nlopt_compat<chain_t<6>> solver{slsqp_opts};
+        solver.setup(chain, target, q_seed, criteria);
+
+        while (solver.status() == cartan::ik_status::running)
+        {
+            solver.step(chain);
+        }
+
+        const auto results = solver.last_check_results();
+        for (std::size_t i = 0; i < results.size() && i < criterion_fire_count.size(); ++i)
+        {
+            if (results[i].has_value())
+            {
+                ++criterion_fire_count[i];
+            }
+        }
+        if (solver.status() == cartan::ik_status::converged)
+        {
+            ++pose_successes;
+        }
+        ++solves;
+
+        benchmark::DoNotOptimize(solver);
+    }
+
+    const auto total = std::max<std::uint64_t>(solves, 1);
+    state.counters["Success_rate"] = benchmark::Counter(
+        100.0 * static_cast<double>(pose_successes) / static_cast<double>(total),
+        benchmark::Counter::kDefaults);
+    state.counters["ftol_rel_fire_pct"] = benchmark::Counter(
+        100.0 * static_cast<double>(criterion_fire_count[0]) / static_cast<double>(total),
+        benchmark::Counter::kDefaults);
+    state.counters["xtol_rel_fire_pct"] = benchmark::Counter(
+        100.0 * static_cast<double>(criterion_fire_count[1]) / static_cast<double>(total),
+        benchmark::Counter::kDefaults);
+    state.counters["stall_tol_fire_pct"] = benchmark::Counter(
+        100.0 * static_cast<double>(criterion_fire_count[2]) / static_cast<double>(total),
+        benchmark::Counter::kDefaults);
+    state.counters["total_solves"] = benchmark::Counter(
+        static_cast<double>(total), benchmark::Counter::kDefaults);
+}
+BENCHMARK(bm_comparison_ur3e_nablapp_slsqp_last_check_results_alias)
+    ->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+// Runner-wrapped companion to bm_comparison_ur3e_nablapp_slsqp_grad_sweep.
+// Replicates bm_comparison_ur3e_nablapp_slsqp (default_convergence, restart
+// wrapper, basic_ik_runner) but preconfigures argmin_slsqp with a custom
+// gradient_threshold so wall and success rate are directly comparable to
+// the 2554 us / 91.3% baseline at cartan-tight 1e-12. This is the bench
+// that answers "does relaxing gradient_threshold recover wall without
+// losing runner-wrapped success"; the direct-drive sweep above only
+// observes one nablapp inner pass per pose and does not exercise the
+// restart retry loop that the published 91.3% success rate relies on.
+static void bm_comparison_ur3e_nablapp_slsqp_grad_sweep_runner(benchmark::State& state)
+{
+    const int exponent = static_cast<int>(state.range(0));
+    const double gradient_threshold = std::pow(10.0, -static_cast<double>(exponent));
+
+    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    static const target_set<double, 6> ts(chain, num_targets, 42);
+    const auto criteria = nablapp_comparison_criteria();
+
+    cartan::ik::argmin_slsqp<chain_t<6>>::options inner_opts{};
+    inner_opts.gradient_threshold = gradient_threshold;
+
+    std::size_t idx = 0;
+    int successes = 0;
+    int total_iterations = 0;
+    double total_pos_error = 0.0;
+    double total_ori_error = 0.0;
+
+    for (auto _ : state)
+    {
+        auto& target = ts.targets[idx % static_cast<std::size_t>(num_targets)];
+        auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
+        ++idx;
+
+        cartan::ik::argmin_slsqp<chain_t<6>> inner{inner_opts};
+        cartan::ik::restart_wrapper<chain_t<6>, cartan::ik::argmin_slsqp<chain_t<6>>>
+            wrapper{std::move(inner)};
+        nablapp_slsqp_solver<6> solver{std::move(wrapper)};
+
+        solver.setup(chain, target, q_seed, criteria);
+        auto result = solver.solve();
+
+        if (result.has_value())
+        {
+            ++successes;
+            total_iterations += result->iterations;
+            auto [pos_err, ori_err] = cartan::benchmarks::compute_pose_errors(
+                chain, result->solution.position, target);
+            total_pos_error += pos_err;
+            total_ori_error += ori_err;
+        }
+        benchmark::DoNotOptimize(result);
+    }
+
+    const auto total = std::max<int>(static_cast<int>(idx), 1);
+    state.counters["grad_threshold"] = benchmark::Counter(
+        gradient_threshold, benchmark::Counter::kDefaults);
+    state.counters["Success_rate"] = benchmark::Counter(
+        100.0 * static_cast<double>(successes) / static_cast<double>(total),
+        benchmark::Counter::kDefaults);
+    state.counters["avg_iterations"] = benchmark::Counter(
+        static_cast<double>(total_iterations) / std::max(successes, 1),
+        benchmark::Counter::kDefaults);
+    state.counters["avg_position_error"] = benchmark::Counter(
+        total_pos_error / std::max(successes, 1),
+        benchmark::Counter::kDefaults);
+    state.counters["avg_orientation_error"] = benchmark::Counter(
+        total_ori_error / std::max(successes, 1),
+        benchmark::Counter::kDefaults);
+}
+BENCHMARK(bm_comparison_ur3e_nablapp_slsqp_grad_sweep_runner)
+    ->Arg(6)->Arg(8)->Arg(10)->Arg(12)
+    ->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_ur3e_nablapp_slsqp_phi_ls_calls_dynamicN(benchmark::State& state)
 {
