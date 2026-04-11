@@ -1312,6 +1312,106 @@ BENCHMARK(bm_comparison_ur3e_nablapp_slsqp_grad_sweep)
     ->Arg(6)->Arg(8)->Arg(10)->Arg(12)
     ->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
+// Budget-per-step sweep on UR3e SLSQP with cartan-tight default_
+// convergence, direct-drive (no runner, no restart wrapper).
+// state.range(0) is `budget_per_step` (nablapp `max_iterations` per
+// cartan-outer step). Holds gradient_threshold = 1e-12 and cartan-
+// tight objective/step thresholds so only the inner iteration budget
+// moves. Emits wall per solve, direct-drive pose-tolerance success
+// rate, avg nablapp-inner-steps of converged solves, cartan-outer
+// iteration count (from solver.iterations()), and the last_check_
+// results firing profile at each budget.
+//
+// Falsification test for the iteration-budget-exhaustion hypothesis:
+// if 80%+ of UR3e poses currently fail direct-drive because they are
+// not converging to pose tolerance within ~37 inner steps, raising
+// budget_per_step from 500 → 1000 → 2000 → 4000 should raise direct-
+// drive success rate. If success is flat across the sweep, the
+// budget is not the exit reason and H1 is falsified.
+static void bm_comparison_ur3e_nablapp_slsqp_budget_sweep(benchmark::State& state)
+{
+    const int budget_per_step = static_cast<int>(state.range(0));
+
+    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    static const target_set<double, 6> ts(chain, num_targets, 42);
+    const auto criteria = nablapp_comparison_criteria();
+
+    cartan::ik::argmin_slsqp<chain_t<6>>::options slsqp_opts{};
+    slsqp_opts.budget_per_step = budget_per_step;
+    slsqp_opts.gradient_threshold = 1e-12;
+
+    std::size_t idx = 0;
+    std::array<std::uint64_t, 4> criterion_fire_count{};
+    std::uint64_t solves = 0;
+    std::uint64_t pose_successes = 0;
+    std::uint64_t total_outer_iterations = 0;
+    std::uint64_t total_outer_iter_converged = 0;
+
+    for (auto _ : state)
+    {
+        auto& target = ts.targets[idx % static_cast<std::size_t>(num_targets)];
+        auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
+        ++idx;
+
+        cartan::ik::argmin_slsqp<chain_t<6>> solver{slsqp_opts};
+        solver.setup(chain, target, q_seed, criteria);
+
+        while (solver.status() == cartan::ik_status::running)
+        {
+            solver.step(chain);
+        }
+
+        const auto results = solver.last_check_results();
+        for (std::size_t i = 0; i < results.size() && i < criterion_fire_count.size(); ++i)
+        {
+            if (results[i].has_value())
+            {
+                ++criterion_fire_count[i];
+            }
+        }
+        total_outer_iterations += static_cast<std::uint64_t>(solver.iterations());
+        if (solver.status() == cartan::ik_status::converged)
+        {
+            ++pose_successes;
+            total_outer_iter_converged += static_cast<std::uint64_t>(solver.iterations());
+        }
+        ++solves;
+
+        benchmark::DoNotOptimize(solver);
+    }
+
+    const auto total = std::max<std::uint64_t>(solves, 1);
+    const auto converged = std::max<std::uint64_t>(pose_successes, 1);
+    state.counters["budget_per_step"] = benchmark::Counter(
+        static_cast<double>(budget_per_step), benchmark::Counter::kDefaults);
+    state.counters["Success_rate"] = benchmark::Counter(
+        100.0 * static_cast<double>(pose_successes) / static_cast<double>(total),
+        benchmark::Counter::kDefaults);
+    state.counters["avg_outer_iter_converged"] = benchmark::Counter(
+        static_cast<double>(total_outer_iter_converged) / static_cast<double>(converged),
+        benchmark::Counter::kDefaults);
+    state.counters["avg_outer_iter_all"] = benchmark::Counter(
+        static_cast<double>(total_outer_iterations) / static_cast<double>(total),
+        benchmark::Counter::kDefaults);
+    state.counters["grad_tol_fire_pct"] = benchmark::Counter(
+        100.0 * static_cast<double>(criterion_fire_count[0]) / static_cast<double>(total),
+        benchmark::Counter::kDefaults);
+    state.counters["obj_tol_fire_pct"] = benchmark::Counter(
+        100.0 * static_cast<double>(criterion_fire_count[1]) / static_cast<double>(total),
+        benchmark::Counter::kDefaults);
+    state.counters["step_tol_fire_pct"] = benchmark::Counter(
+        100.0 * static_cast<double>(criterion_fire_count[2]) / static_cast<double>(total),
+        benchmark::Counter::kDefaults);
+    state.counters["stall_tol_fire_pct"] = benchmark::Counter(
+        100.0 * static_cast<double>(criterion_fire_count[3]) / static_cast<double>(total),
+        benchmark::Counter::kDefaults);
+    state.counters["total_solves"] = benchmark::Counter(
+        static_cast<double>(total), benchmark::Counter::kDefaults);
+}
+BENCHMARK(bm_comparison_ur3e_nablapp_slsqp_budget_sweep)
+    ->Arg(500)->Arg(1000)->Arg(2000)->Arg(4000)
+    ->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
 // Alias-path companion to bm_comparison_ur3e_nablapp_slsqp_last_check_results.
 // Same direct-drive pattern, but instantiates argmin_slsqp_nlopt_compat
 // (nablapp::slsqp_compatible_convergence: 3 criteria — ftol_rel, xtol_rel,
@@ -1446,6 +1546,110 @@ static void bm_comparison_ur3e_nlopt_slsqp_inner_iter_count(benchmark::State& st
         static_cast<double>(total), benchmark::Counter::kDefaults);
 }
 BENCHMARK(bm_comparison_ur3e_nlopt_slsqp_inner_iter_count)
+    ->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+// Direct-drive NLopt SLSQP bench that captures how often the cartan-
+// side `needs_restart` perturbation loop fires per pose during a
+// single cartan-outer solve. The loop is wrapped around nlopt (see
+// nlopt_slsqp::step line 146-161): when nlopt returns SUCCESS/FTOL/
+// XTOL without pose-tolerance convergence (or MAXEVAL with stalled
+// error), cartan perturbs the seed and re-runs optimize. Capped by
+// options::max_restarts = 10.
+//
+// Falsification test for the hypothesis that nlopt's per-pose direct-
+// drive success rate (65.6% on UR3e) is mostly sourced from this
+// perturb-and-retry resilience rather than from one-shot convergence.
+// Threshold: if the mean restart_count per pose is >= 2.0 the
+// hypothesis is live; if it is < 0.5 the hypothesis is falsified and
+// nlopt is finding pose-feasible minima on the first optimize() call.
+//
+// Note on framing: this is a cartan-side perturbation wrapper around
+// nlopt, not an nlopt-internal feature. nlopt itself has no
+// `max_restarts` parameter — the `cartan::detail::needs_restart`
+// predicate and `perturb_nlopt_solution` call together form the retry
+// loop.
+static void bm_comparison_ur3e_nlopt_slsqp_restart_count(benchmark::State& state)
+{
+    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    static const target_set<double, 6> ts(chain, num_targets, 42);
+    const auto criteria = nablapp_comparison_criteria();
+
+    cartan::ik::nlopt_slsqp<chain_t<6>>::options slsqp_opts{};
+    slsqp_opts.budget_per_step = 500;
+
+    std::size_t idx = 0;
+    std::uint64_t total_restarts = 0;
+    std::uint64_t solves = 0;
+    std::uint64_t pose_successes = 0;
+    std::uint64_t poses_with_zero_restarts = 0;
+    std::uint64_t poses_with_at_least_one_restart = 0;
+    std::uint64_t successes_with_zero_restarts = 0;
+    int max_restarts_seen = 0;
+
+    for (auto _ : state)
+    {
+        auto& target = ts.targets[idx % static_cast<std::size_t>(num_targets)];
+        auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
+        ++idx;
+
+        cartan::ik::nlopt_slsqp<chain_t<6>> solver{slsqp_opts};
+        solver.setup(chain, target, q_seed, criteria);
+
+        while (solver.status() == cartan::ik_status::running)
+        {
+            solver.step(chain);
+        }
+
+        const int rc = solver.nlopt_restart_count();
+        total_restarts += static_cast<std::uint64_t>(rc);
+        if (rc == 0)
+        {
+            ++poses_with_zero_restarts;
+        }
+        else
+        {
+            ++poses_with_at_least_one_restart;
+        }
+        if (rc > max_restarts_seen)
+        {
+            max_restarts_seen = rc;
+        }
+        if (solver.status() == cartan::ik_status::converged)
+        {
+            ++pose_successes;
+            if (rc == 0)
+            {
+                ++successes_with_zero_restarts;
+            }
+        }
+        ++solves;
+
+        benchmark::DoNotOptimize(solver);
+    }
+
+    const auto total = std::max<std::uint64_t>(solves, 1);
+    state.counters["Success_rate"] = benchmark::Counter(
+        100.0 * static_cast<double>(pose_successes) / static_cast<double>(total),
+        benchmark::Counter::kDefaults);
+    state.counters["avg_restarts_per_pose"] = benchmark::Counter(
+        static_cast<double>(total_restarts) / static_cast<double>(total),
+        benchmark::Counter::kDefaults);
+    state.counters["zero_restart_pose_pct"] = benchmark::Counter(
+        100.0 * static_cast<double>(poses_with_zero_restarts) / static_cast<double>(total),
+        benchmark::Counter::kDefaults);
+    state.counters["any_restart_pose_pct"] = benchmark::Counter(
+        100.0 * static_cast<double>(poses_with_at_least_one_restart) / static_cast<double>(total),
+        benchmark::Counter::kDefaults);
+    state.counters["zero_restart_success_pct"] = benchmark::Counter(
+        100.0 * static_cast<double>(successes_with_zero_restarts) / static_cast<double>(total),
+        benchmark::Counter::kDefaults);
+    state.counters["max_restart_count"] = benchmark::Counter(
+        static_cast<double>(max_restarts_seen),
+        benchmark::Counter::kDefaults);
+    state.counters["total_solves"] = benchmark::Counter(
+        static_cast<double>(total), benchmark::Counter::kDefaults);
+}
+BENCHMARK(bm_comparison_ur3e_nlopt_slsqp_restart_count)
     ->Iterations(1000)->Unit(benchmark::kMicrosecond);
 #endif
 
