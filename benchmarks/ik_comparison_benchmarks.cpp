@@ -22,6 +22,9 @@
 #include <cartan/serial/ik/solver/nw_sqp.h>
 #include <cartan/serial/ik/wrapper/restart_wrapper.h>
 #include <cartan/serial/ik/solver/argmin_lbfgsb.h>
+#include <cartan/serial/ik/detail/nablapp_problem.h>
+#include <cartan/serial/ik/solver/detail/analytical_gradient.h>
+#include <cartan/serial/fk/forward_kinematics.h>
 
 #ifdef CARTAN_HAS_NLOPT
 #include <cartan/serial/ik/solver/nlopt_bobyqa.h>
@@ -1206,5 +1209,118 @@ REGISTER_7DOF_NABLAPP_COMPARISON(panda,      make_panda_chain)
 REGISTER_7DOF_NABLAPP_COMPARISON(fetch,      make_fetch_chain)
 REGISTER_7DOF_NABLAPP_COMPARISON(baxter,     make_baxter_chain)
 REGISTER_7DOF_NABLAPP_COMPARISON(kuka_lwr4,  make_kuka_lwr4_chain)
+
+// ============================================================================
+// Per-call micro benchmarks — interprets the turn-04 perf roll-up
+// ============================================================================
+//
+// Measures the raw per-call cost of the four kernels that together account
+// for ~41% of nablapp_slsqp wall in cartan turn-04:
+//
+//   forward_kinematics(chain, q)
+//   ik_se3_objective::evaluate(chain, target, q)
+//   ik_se3_objective::evaluate_with_gradient(chain, target, q)
+//   nablapp_ik_problem::value(x)            [adapter wrapping evaluate]
+//   nablapp_ik_problem::gradient(x, g)      [adapter wrapping evaluate_with_gradient]
+//
+// Both solvers go through `ik_se3_objective`, so a per-call gap between
+// the plain evaluate and the nablapp adapter path indicates pure adapter
+// overhead (position_type conversion, etc.). A per-call gap between
+// evaluate and evaluate_with_gradient measures the cost of the SE(3)
+// log Jacobian contribution on top of the objective.
+//
+// Target and seed are fixed (the first UR3e target from the same seed=42
+// set used by bm_comparison_ur3e_*) so run-to-run variance comes purely
+// from the kernel, not the workload.
+
+struct ur3e_per_call_fixture
+{
+    ur3e_per_call_fixture()
+        : chain{cartan::benchmarks::make_ur3e_chain<double>()}
+        , ts{chain, num_targets, 42}
+        , problem{chain, ts.targets[0], cartan::error_weight<double>{}}
+    {
+        x = Eigen::Vector<double, 6>{};
+        for (int i = 0; i < 6; ++i)
+        {
+            x[i] = ts.seeds[0][i];
+        }
+        g = Eigen::Vector<double, 6>::Zero();
+    }
+
+    cartan::kinematic_chain<double, 6> chain;
+    target_set<double, 6> ts;
+    cartan::detail::nablapp_ik_problem<chain_t<6>> problem;
+    Eigen::Vector<double, 6> x;
+    Eigen::Vector<double, 6> g;
+};
+
+inline ur3e_per_call_fixture& ur3e_per_call()
+{
+    static ur3e_per_call_fixture instance;
+    return instance;
+}
+
+static void bm_ur3e_per_call_forward_kinematics(benchmark::State& state)
+{
+    auto& f = ur3e_per_call();
+    auto q = f.problem.to_position(f.x);
+    for (auto _ : state)
+    {
+        auto fk = cartan::forward_kinematics(f.chain, q);
+        benchmark::DoNotOptimize(fk);
+    }
+}
+BENCHMARK(bm_ur3e_per_call_forward_kinematics)->Unit(benchmark::kNanosecond);
+
+static void bm_ur3e_per_call_ik_se3_objective_evaluate(benchmark::State& state)
+{
+    auto& f = ur3e_per_call();
+    auto q = f.problem.to_position(f.x);
+    cartan::error_weight<double> w{};
+    for (auto _ : state)
+    {
+        auto result = cartan::ik_se3_objective<chain_t<6>>::evaluate(
+            f.chain, f.ts.targets[0], q, w);
+        benchmark::DoNotOptimize(result);
+    }
+}
+BENCHMARK(bm_ur3e_per_call_ik_se3_objective_evaluate)->Unit(benchmark::kNanosecond);
+
+static void bm_ur3e_per_call_ik_se3_objective_evaluate_with_gradient(benchmark::State& state)
+{
+    auto& f = ur3e_per_call();
+    auto q = f.problem.to_position(f.x);
+    cartan::error_weight<double> w{};
+    for (auto _ : state)
+    {
+        auto result = cartan::ik_se3_objective<chain_t<6>>::evaluate_with_gradient(
+            f.chain, f.ts.targets[0], q, w);
+        benchmark::DoNotOptimize(result);
+    }
+}
+BENCHMARK(bm_ur3e_per_call_ik_se3_objective_evaluate_with_gradient)->Unit(benchmark::kNanosecond);
+
+static void bm_ur3e_per_call_nablapp_adapter_value(benchmark::State& state)
+{
+    auto& f = ur3e_per_call();
+    for (auto _ : state)
+    {
+        double v = f.problem.value(f.x);
+        benchmark::DoNotOptimize(v);
+    }
+}
+BENCHMARK(bm_ur3e_per_call_nablapp_adapter_value)->Unit(benchmark::kNanosecond);
+
+static void bm_ur3e_per_call_nablapp_adapter_gradient(benchmark::State& state)
+{
+    auto& f = ur3e_per_call();
+    for (auto _ : state)
+    {
+        f.problem.gradient(f.x, f.g);
+        benchmark::DoNotOptimize(f.g);
+    }
+}
+BENCHMARK(bm_ur3e_per_call_nablapp_adapter_gradient)->Unit(benchmark::kNanosecond);
 
 } // anonymous namespace
