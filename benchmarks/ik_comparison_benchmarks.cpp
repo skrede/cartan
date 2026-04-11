@@ -1122,6 +1122,74 @@ static void bm_comparison_ur3e_nablapp_slsqp_phi_ls_calls_budget500(benchmark::S
 }
 BENCHMARK(bm_comparison_ur3e_nablapp_slsqp_phi_ls_calls_budget500)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
+// Dynamic-N variant: construct argmin_slsqp against a kinematic_chain
+// with runtime-known joint count. This instantiates
+// kraft_slsqp_policy<cartan::dynamic> (== nablapp::dynamic_dimension),
+// which is the pre-workspace-templating code path that Eigen dispatches
+// to its dynamic kernels rather than the fixed-6 specialization. Paired
+// with the fixed-6 variant above, this isolates whether the compile-
+// time N path adds the ~0.9 backtracks/step delta at N=6 that nablapp
+// measured at N=4 on HS071 (2.0 compile-time vs 1.11 dynamic).
+static void bm_comparison_ur3e_nablapp_slsqp_phi_ls_calls_dynamicN(benchmark::State& state)
+{
+    using dynamic_chain = cartan::kinematic_chain<double, cartan::dynamic>;
+
+    auto chain = cartan::benchmarks::make_ur3e_chain_dynamic<double>();
+    static const target_set<double, cartan::dynamic> ts(chain, num_targets, 42);
+    const auto criteria = nablapp_comparison_criteria();
+
+    cartan::ik::argmin_slsqp<dynamic_chain>::options slsqp_opts{};
+    slsqp_opts.budget_per_step = 500;
+
+    std::size_t idx = 0;
+    std::uint64_t total_ls = 0;
+    std::uint64_t total_nablapp_steps = 0;
+    int total_cartan_outer = 0;
+    int successes = 0;
+
+    for (auto _ : state)
+    {
+        auto& target = ts.targets[idx % static_cast<std::size_t>(num_targets)];
+        auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
+        ++idx;
+
+        cartan::ik::argmin_slsqp<dynamic_chain> solver{slsqp_opts};
+        solver.setup(chain, target, q_seed, criteria);
+
+        while (solver.status() == cartan::ik_status::running)
+        {
+            solver.step(chain);
+        }
+
+        total_ls += solver.line_search_calls();
+        total_nablapp_steps += static_cast<std::uint64_t>(solver.nablapp_iterations());
+        total_cartan_outer += solver.iterations();
+        if (solver.status() == cartan::ik_status::converged)
+            ++successes;
+
+        benchmark::DoNotOptimize(solver);
+    }
+
+    auto total = static_cast<int>(idx);
+    state.counters["Success_rate"] = benchmark::Counter(
+        100.0 * static_cast<double>(successes) / std::max(total, 1),
+        benchmark::Counter::kAvgThreads);
+    state.counters["total_phi_ls_calls"] = benchmark::Counter(
+        static_cast<double>(total_ls), benchmark::Counter::kDefaults);
+    state.counters["total_nablapp_steps"] = benchmark::Counter(
+        static_cast<double>(total_nablapp_steps), benchmark::Counter::kDefaults);
+    state.counters["phi_ls_per_nablapp_step"] = benchmark::Counter(
+        static_cast<double>(total_ls) / std::max<double>(1.0, static_cast<double>(total_nablapp_steps)),
+        benchmark::Counter::kDefaults);
+    state.counters["avg_nablapp_step_per_pose"] = benchmark::Counter(
+        static_cast<double>(total_nablapp_steps) / std::max(total, 1),
+        benchmark::Counter::kDefaults);
+    state.counters["avg_cartan_outer_iter"] = benchmark::Counter(
+        static_cast<double>(total_cartan_outer) / std::max(total, 1),
+        benchmark::Counter::kDefaults);
+}
+BENCHMARK(bm_comparison_ur3e_nablapp_slsqp_phi_ls_calls_dynamicN)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
 #ifdef CARTAN_HAS_NLOPT
 static void bm_comparison_ur3e_nlopt_slsqp(benchmark::State& state)
 {
