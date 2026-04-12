@@ -1,4 +1,4 @@
-/// @file ik_lm_benchmarks.cpp
+/// @file basic_ik_lm_benchmarks.cpp
 /// @brief LM stepper IK benchmarks for 3/6/7-DOF chains.
 ///
 /// Reports custom counters: success_rate, avg_iterations,

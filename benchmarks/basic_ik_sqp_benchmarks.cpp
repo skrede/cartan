@@ -1,4 +1,4 @@
-/// @file ik_sqp_benchmarks.cpp
+/// @file basic_ik_sqp_benchmarks.cpp
 /// @brief BOBYQA solve policy IK benchmarks for 3/6/7-DOF chains (NLopt-dependent).
 ///
 /// Reports custom counters: success_rate, avg_iterations,

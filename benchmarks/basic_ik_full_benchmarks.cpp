@@ -1,5 +1,5 @@
-/// @file ik_native_benchmarks.cpp
-/// @brief Full matrix benchmarks for native IK solvers across all robots.
+/// @file basic_ik_full_benchmarks.cpp
+/// @brief Full matrix benchmarks for basic_ik_runner solvers across all robots.
 ///
 /// Benchmarks every solver configuration against all 9 robots with 1,000
 /// FK-generated targets per robot (seed=42). Solver configs include individual
