@@ -15,7 +15,7 @@
 #include <random>
 #include <algorithm>
 
-static void bm_ik_lm_3r_planar(benchmark::State& state)
+static void bm_ik_cartan_lm_3r_planar(benchmark::State& state)
 {
     auto chain = cartan::benchmarks::make_3r_planar_chain<double>();
     cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 100};
@@ -62,9 +62,9 @@ static void bm_ik_lm_3r_planar(benchmark::State& state)
         total_ori_error / std::max(successes, 1),
         benchmark::Counter::kAvgThreads);
 }
-BENCHMARK(bm_ik_lm_3r_planar)->Iterations(10000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_ik_cartan_lm_3r_planar)->Iterations(10000)->Unit(benchmark::kMicrosecond);
 
-static void bm_ik_lm_ur3e(benchmark::State& state)
+static void bm_ik_cartan_lm_ur3e(benchmark::State& state)
 {
     auto chain = cartan::benchmarks::make_ur3e_chain<double>();
     cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 100};
@@ -111,9 +111,9 @@ static void bm_ik_lm_ur3e(benchmark::State& state)
         total_ori_error / std::max(successes, 1),
         benchmark::Counter::kAvgThreads);
 }
-BENCHMARK(bm_ik_lm_ur3e)->Iterations(10000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_ik_cartan_lm_ur3e)->Iterations(10000)->Unit(benchmark::kMicrosecond);
 
-static void bm_ik_lm_lbr_med14(benchmark::State& state)
+static void bm_ik_cartan_lm_lbr_med14(benchmark::State& state)
 {
     auto chain = cartan::benchmarks::make_lbr_med14_chain<double>();
     cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 100};
@@ -160,4 +160,4 @@ static void bm_ik_lm_lbr_med14(benchmark::State& state)
         total_ori_error / std::max(successes, 1),
         benchmark::Counter::kAvgThreads);
 }
-BENCHMARK(bm_ik_lm_lbr_med14)->Iterations(10000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_ik_cartan_lm_lbr_med14)->Iterations(10000)->Unit(benchmark::kMicrosecond);

@@ -167,37 +167,37 @@ inline cartan::convergence_criteria<double> nlopt_criteria()                { re
 // Register native + nablapp solver benchmarks for a 6-DOF robot.
 #define REGISTER_6DOF_PROFILING(ROBOT, CHAIN_FN)                                                       \
                                                                                                        \
-static void bm_profiling_##ROBOT##_speed(benchmark::State& state)                                      \
+static void bm_profiling_##ROBOT##_cartan_speed(benchmark::State& state)                                      \
 {                                                                                                      \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                                \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                     \
     bm_full_solver<6, speed_ik_solver<6>>(state, chain, ts, speed_criteria());                       \
 }                                                                                                      \
-BENCHMARK(bm_profiling_##ROBOT##_speed)->Iterations(1000)->Unit(benchmark::kMicrosecond);               \
+BENCHMARK(bm_profiling_##ROBOT##_cartan_speed)->Iterations(1000)->Unit(benchmark::kMicrosecond);               \
                                                                                                        \
-static void bm_profiling_##ROBOT##_convergence(benchmark::State& state)                                \
+static void bm_profiling_##ROBOT##_cartan_convergence(benchmark::State& state)                                \
 {                                                                                                      \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                                \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                     \
     bm_full_solver<6, convergence_ik_solver<6>>(state, chain, ts, convergence_criteria_tuned());     \
 }                                                                                                      \
-BENCHMARK(bm_profiling_##ROBOT##_convergence)->Iterations(1000)->Unit(benchmark::kMicrosecond);         \
+BENCHMARK(bm_profiling_##ROBOT##_cartan_convergence)->Iterations(1000)->Unit(benchmark::kMicrosecond);         \
                                                                                                        \
-static void bm_profiling_##ROBOT##_restart_lm(benchmark::State& state)                                 \
+static void bm_profiling_##ROBOT##_cartan_restart_lm(benchmark::State& state)                                 \
 {                                                                                                      \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                                \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                     \
     bm_full_solver<6, restart_lm_ik_solver<6>>(state, chain, ts, restart_lm_criteria());             \
 }                                                                                                      \
-BENCHMARK(bm_profiling_##ROBOT##_restart_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);          \
+BENCHMARK(bm_profiling_##ROBOT##_cartan_restart_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);          \
                                                                                                        \
-static void bm_profiling_##ROBOT##_racing(benchmark::State& state)                                     \
+static void bm_profiling_##ROBOT##_cartan_racing(benchmark::State& state)                                     \
 {                                                                                                      \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                                \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                     \
     bm_full_solver<6, racing_solver<6>>(state, chain, ts, convergence_criteria_tuned());             \
 }                                                                                                      \
-BENCHMARK(bm_profiling_##ROBOT##_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);              \
+BENCHMARK(bm_profiling_##ROBOT##_cartan_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);              \
                                                                                                        \
 static void bm_profiling_##ROBOT##_nablapp_slsqp(benchmark::State& state)                              \
 {                                                                                                      \
@@ -225,37 +225,37 @@ BENCHMARK(bm_profiling_##ROBOT##_nlopt_slsqp)->Iterations(1000)->Unit(benchmark:
 // Register native + nablapp solver benchmarks for a 7-DOF robot.
 #define REGISTER_7DOF_PROFILING(ROBOT, CHAIN_FN)                                                       \
                                                                                                        \
-static void bm_profiling_##ROBOT##_speed(benchmark::State& state)                                      \
+static void bm_profiling_##ROBOT##_cartan_speed(benchmark::State& state)                                      \
 {                                                                                                      \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                                \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                     \
     bm_full_solver<7, speed_ik_solver<7>>(state, chain, ts, speed_criteria());                       \
 }                                                                                                      \
-BENCHMARK(bm_profiling_##ROBOT##_speed)->Iterations(1000)->Unit(benchmark::kMicrosecond);               \
+BENCHMARK(bm_profiling_##ROBOT##_cartan_speed)->Iterations(1000)->Unit(benchmark::kMicrosecond);               \
                                                                                                        \
-static void bm_profiling_##ROBOT##_convergence(benchmark::State& state)                                \
+static void bm_profiling_##ROBOT##_cartan_convergence(benchmark::State& state)                                \
 {                                                                                                      \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                                \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                     \
     bm_full_solver<7, convergence_ik_solver<7>>(state, chain, ts, convergence_criteria_tuned());     \
 }                                                                                                      \
-BENCHMARK(bm_profiling_##ROBOT##_convergence)->Iterations(1000)->Unit(benchmark::kMicrosecond);         \
+BENCHMARK(bm_profiling_##ROBOT##_cartan_convergence)->Iterations(1000)->Unit(benchmark::kMicrosecond);         \
                                                                                                        \
-static void bm_profiling_##ROBOT##_restart_lm(benchmark::State& state)                                 \
+static void bm_profiling_##ROBOT##_cartan_restart_lm(benchmark::State& state)                                 \
 {                                                                                                      \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                                \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                     \
     bm_full_solver<7, restart_lm_ik_solver<7>>(state, chain, ts, restart_lm_criteria());             \
 }                                                                                                      \
-BENCHMARK(bm_profiling_##ROBOT##_restart_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);          \
+BENCHMARK(bm_profiling_##ROBOT##_cartan_restart_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);          \
                                                                                                        \
-static void bm_profiling_##ROBOT##_racing(benchmark::State& state)                                     \
+static void bm_profiling_##ROBOT##_cartan_racing(benchmark::State& state)                                     \
 {                                                                                                      \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                                \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                     \
     bm_full_solver<7, racing_solver<7>>(state, chain, ts, convergence_criteria_tuned());             \
 }                                                                                                      \
-BENCHMARK(bm_profiling_##ROBOT##_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);              \
+BENCHMARK(bm_profiling_##ROBOT##_cartan_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);              \
                                                                                                        \
 static void bm_profiling_##ROBOT##_nablapp_slsqp(benchmark::State& state)                              \
 {                                                                                                      \
