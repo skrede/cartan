@@ -22,12 +22,58 @@
 
 #include <vector>
 #include <random>
+#include <cmath>
+#include <numbers>
 #include <algorithm>
 
 namespace
 {
 
 constexpr int num_targets = 100;
+constexpr double wrap_tol = 0.1;
+
+template <typename VecA, typename VecB>
+bool is_wrap_equivalent(const VecA& a, const VecB& b, int n)
+{
+    constexpr double two_pi = 2.0 * std::numbers::pi;
+    for (int j = 0; j < n; ++j)
+    {
+        double diff = std::fmod(std::abs(a[j] - b[j]), two_pi);
+        if (diff > two_pi - wrap_tol)
+            diff = two_pi - diff;
+        if (diff > wrap_tol)
+            return false;
+    }
+    return true;
+}
+
+template <typename Scalar, int N>
+int count_unwrapped(
+    const std::vector<cartan::ik_result<Scalar, N>>& solutions,
+    int n_joints)
+{
+    if (solutions.empty()) return 0;
+
+    std::vector<bool> is_wrap(solutions.size(), false);
+    for (std::size_t i = 1; i < solutions.size(); ++i)
+    {
+        for (std::size_t j = 0; j < i; ++j)
+        {
+            if (!is_wrap[j] && is_wrap_equivalent(
+                    solutions[i].solution.position,
+                    solutions[j].solution.position, n_joints))
+            {
+                is_wrap[i] = true;
+                break;
+            }
+        }
+    }
+
+    int unique = 0;
+    for (bool w : is_wrap)
+        if (!w) ++unique;
+    return unique;
+}
 
 template <typename Scalar, int N>
 struct target_set
@@ -64,10 +110,15 @@ void bm_exhaustive(
 {
     using runner_type = cartan::exhaustive_ik_runner<cartan::kinematic_chain<double, N>, Policy>;
 
+    int n_joints = chain.num_joints();
+
     std::size_t idx = 0;
     int total_solutions = 0;
+    int total_unwrapped = 0;
     int min_solutions = options.max_restarts + 1;
     int max_solutions = 0;
+    int min_unwrapped = options.max_restarts + 1;
+    int max_unwrapped = 0;
     int total_before_dedup = 0;
     int total_fk_failed = 0;
     int targets_with_solutions = 0;
@@ -84,7 +135,10 @@ void bm_exhaustive(
         auto result = runner.solve(chain, target, seed, criteria, options);
 
         int n_sol = static_cast<int>(result.solutions.size());
+        int n_unwrapped = count_unwrapped(result.solutions, n_joints);
+
         total_solutions += n_sol;
+        total_unwrapped += n_unwrapped;
         total_before_dedup += result.solutions_before_dedup;
         total_fk_failed += result.fk_validations_failed;
         total_restarts += result.restarts_attempted;
@@ -97,6 +151,8 @@ void bm_exhaustive(
 
         min_solutions = std::min(min_solutions, n_sol);
         max_solutions = std::max(max_solutions, n_sol);
+        min_unwrapped = std::min(min_unwrapped, n_unwrapped);
+        max_unwrapped = std::max(max_unwrapped, n_unwrapped);
 
         benchmark::DoNotOptimize(result);
     }
@@ -135,6 +191,23 @@ void bm_exhaustive(
 
     state.counters["Avg_best_error"] = benchmark::Counter(
         total_best_error / std::max(targets_with_solutions, 1),
+        benchmark::Counter::kAvgThreads);
+
+    state.counters["Avg_unwrapped"] = benchmark::Counter(
+        static_cast<double>(total_unwrapped) / std::max(total, 1),
+        benchmark::Counter::kAvgThreads);
+
+    state.counters["Min_unwrapped"] = benchmark::Counter(
+        static_cast<double>(min_unwrapped),
+        benchmark::Counter::kAvgThreads);
+
+    state.counters["Max_unwrapped"] = benchmark::Counter(
+        static_cast<double>(max_unwrapped),
+        benchmark::Counter::kAvgThreads);
+
+    state.counters["Wrap_ratio"] = benchmark::Counter(
+        100.0 * static_cast<double>(total_solutions - total_unwrapped)
+            / std::max(total_solutions, 1),
         benchmark::Counter::kAvgThreads);
 }
 
