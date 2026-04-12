@@ -38,6 +38,7 @@
 #include <vector>
 #include <array>
 #include <optional>
+#include <random>
 #include <type_traits>
 #include <cstdint>
 
@@ -82,6 +83,9 @@ public:
         scalar_type stall_threshold{scalar_type(1e-10)};
         scalar_type divergence_factor{scalar_type(10)};
         int stall_window{5};
+        int max_restarts{10};
+        scalar_type restart_scale{scalar_type(0.1)};
+        std::optional<unsigned> rng_seed{};
 
         /// Armijo sufficient-decrease parameter c1 forwarded to
         /// kraft_slsqp_policy's embedded merit line search. Nablapp's default
@@ -127,6 +131,9 @@ public:
         m_status = ik_status::running;
         m_termination_reason = ik_termination_reason::unknown;
         m_error_history.clear();
+        m_restart_count = 0;
+        if (m_options.rng_seed)
+            m_rng.seed(*m_options.rng_seed);
 
         auto fk = forward_kinematics(chain, q0);
         auto V_b = (target.inverse() * fk.end_effector).log();
@@ -197,6 +204,28 @@ public:
 
         if (is_inner_terminal(result.status))
         {
+            if (m_restart_count < m_options.max_restarts)
+            {
+                ++m_restart_count;
+                auto q_perturbed = perturb_solution(m_q, *m_chain);
+
+                m_error_history.clear();
+                auto fk_new = forward_kinematics(*m_chain, q_perturbed);
+                auto V_b_new = (m_target.inverse() * fk_new.end_effector).log();
+                m_initial_error = V_b_new.norm();
+
+                int n = m_chain->num_joints();
+                Eigen::VectorXd x0(n);
+                for (int i = 0; i < n; ++i)
+                    x0[i] = static_cast<double>(q_perturbed[i]);
+                m_solver->reset_clear(x0);
+
+                build_nablapp_opts(m_nab_opts);
+
+                m_q = q_perturbed;
+                return ik_status::running;
+            }
+
             m_status = ik_status::stalled;
             m_termination_reason = map_nablapp_status(result.status);
             return m_status;
@@ -213,6 +242,7 @@ public:
     [[nodiscard]] int iterations() const { return m_iterations; }
     [[nodiscard]] ik_status status() const { return m_status; }
     [[nodiscard]] ik_termination_reason termination_reason() const { return m_termination_reason; }
+    [[nodiscard]] int restart_count() const { return m_restart_count; }
 
     /// Cumulative number of phi(alpha) line-search calls the underlying
     /// kraft_slsqp_policy has made since setup(). Zero if the solver has
@@ -280,6 +310,29 @@ private:
     using nablapp_solver = nablapp::basic_solver<
         nablapp::kraft_slsqp_policy<joints>, joints, cartan::detail::nablapp_ik_problem<Chain>>;
     using nablapp_opts_type = nablapp::solver_options<Convergence>;
+
+    position_type perturb_solution(const position_type& q, const Chain& chain)
+    {
+        int n = chain.num_joints();
+        const auto& limits = chain.limits();
+        std::uniform_real_distribution<double> dist(-1.0, 1.0);
+
+        position_type q_new;
+        if constexpr (joints == dynamic)
+            q_new.resize(n);
+
+        for (int i = 0; i < n; ++i)
+        {
+            auto idx = static_cast<std::size_t>(i);
+            auto range = limits[idx].position_max - limits[idx].position_min;
+            auto perturbation = static_cast<scalar_type>(dist(m_rng)) * m_options.restart_scale * range;
+            q_new[i] = std::clamp(
+                q[i] + perturbation,
+                limits[idx].position_min,
+                limits[idx].position_max);
+        }
+        return q_new;
+    }
 
     void build_nablapp_opts(nablapp_opts_type& opts) const
     {
@@ -363,6 +416,8 @@ private:
     std::optional<cartan::detail::nablapp_ik_problem<Chain>> m_problem;
     std::optional<nablapp_solver> m_solver;
     nablapp_opts_type m_nab_opts{};
+    int m_restart_count{};
+    std::mt19937 m_rng{std::random_device{}()};
 };
 
 /// NLopt-compatible convergence variant of argmin_slsqp.
