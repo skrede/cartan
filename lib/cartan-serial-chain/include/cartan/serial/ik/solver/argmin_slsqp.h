@@ -84,7 +84,7 @@ public:
         scalar_type divergence_factor{scalar_type(10)};
         int stall_window{5};
         int max_restarts{10};
-        scalar_type restart_scale{scalar_type(0.1)};
+        scalar_type restart_scale{scalar_type(0.5)};
         std::optional<unsigned> rng_seed{};
 
         /// Armijo sufficient-decrease parameter c1 forwarded to

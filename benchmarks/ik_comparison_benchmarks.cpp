@@ -1412,6 +1412,75 @@ BENCHMARK(bm_comparison_ur3e_nablapp_slsqp_budget_sweep)
     ->Arg(500)->Arg(1000)->Arg(2000)->Arg(4000)
     ->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
+static void bm_comparison_ur3e_nablapp_slsqp_retry(benchmark::State& state)
+{
+    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    static const target_set<double, 6> ts(chain, num_targets, 42);
+    const auto criteria = nablapp_comparison_criteria();
+
+    const auto restart_scale = static_cast<double>(state.range(0)) / 100.0;
+
+    cartan::ik::argmin_slsqp<chain_t<6>>::options slsqp_opts{};
+    slsqp_opts.max_restarts = 10;
+    slsqp_opts.restart_scale = restart_scale;
+
+    std::size_t idx = 0;
+    std::uint64_t solves = 0;
+    std::uint64_t pose_successes = 0;
+    std::uint64_t total_restarts = 0;
+    std::uint64_t total_restarts_converged = 0;
+    std::uint64_t total_outer_iterations = 0;
+
+    for (auto _ : state)
+    {
+        auto& target = ts.targets[idx % static_cast<std::size_t>(num_targets)];
+        auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
+        ++idx;
+
+        cartan::ik::argmin_slsqp<chain_t<6>> solver{slsqp_opts};
+        solver.setup(chain, target, q_seed, criteria);
+
+        while (solver.status() == cartan::ik_status::running)
+        {
+            solver.step(chain);
+        }
+
+        total_restarts += static_cast<std::uint64_t>(solver.restart_count());
+        total_outer_iterations += static_cast<std::uint64_t>(solver.iterations());
+
+        if (solver.status() == cartan::ik_status::converged)
+        {
+            ++pose_successes;
+            total_restarts_converged += static_cast<std::uint64_t>(solver.restart_count());
+        }
+        ++solves;
+
+        benchmark::DoNotOptimize(solver);
+    }
+
+    const auto total = std::max<std::uint64_t>(solves, 1);
+    const auto converged = std::max<std::uint64_t>(pose_successes, 1);
+    state.counters["restart_scale"] = benchmark::Counter(
+        restart_scale, benchmark::Counter::kDefaults);
+    state.counters["Success_rate"] = benchmark::Counter(
+        100.0 * static_cast<double>(pose_successes) / static_cast<double>(total),
+        benchmark::Counter::kDefaults);
+    state.counters["avg_restarts_all"] = benchmark::Counter(
+        static_cast<double>(total_restarts) / static_cast<double>(total),
+        benchmark::Counter::kDefaults);
+    state.counters["avg_restarts_converged"] = benchmark::Counter(
+        static_cast<double>(total_restarts_converged) / static_cast<double>(converged),
+        benchmark::Counter::kDefaults);
+    state.counters["avg_outer_iter_all"] = benchmark::Counter(
+        static_cast<double>(total_outer_iterations) / static_cast<double>(total),
+        benchmark::Counter::kDefaults);
+    state.counters["total_solves"] = benchmark::Counter(
+        static_cast<double>(total), benchmark::Counter::kDefaults);
+}
+BENCHMARK(bm_comparison_ur3e_nablapp_slsqp_retry)
+    ->Arg(10)->Arg(30)->Arg(50)->Arg(70)->Arg(100)
+    ->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
 // Alias-path companion to bm_comparison_ur3e_nablapp_slsqp_last_check_results.
 // Same direct-drive pattern, but instantiates argmin_slsqp_nlopt_compat
 // (nablapp::slsqp_compatible_convergence: 3 criteria — ftol_rel, xtol_rel,
