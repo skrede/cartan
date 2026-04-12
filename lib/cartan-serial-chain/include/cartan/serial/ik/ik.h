@@ -9,6 +9,7 @@
 #include "cartan/serial/ik/ik_status.h"
 #include "cartan/serial/ik/ik_result.h"
 #include "cartan/serial/ik/basic_ik_runner.h"
+#include "cartan/serial/ik/ik_validation.h"
 #include "cartan/serial/ik/solvers.h"
 
 #include "cartan/serial/ik/solver/dls.h"
@@ -16,6 +17,7 @@
 #include "cartan/serial/ik/solver/lbfgsb.h"
 #include "cartan/serial/ik/solver/projected_lm.h"
 #include "cartan/serial/ik/solver/newton_raphson.h"
+#include "cartan/serial/ik/solver/exhaustive_ik_runner.h"
 
 #include "cartan/serial/ik/wrapper/restart_wrapper.h"
 
