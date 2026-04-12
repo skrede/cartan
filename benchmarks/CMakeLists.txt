@@ -30,18 +30,21 @@ cartan_add_benchmark(lie_group_benchmarks lie_group_benchmarks.cpp)
 cartan_add_benchmark(fk_benchmarks fk_benchmarks.cpp)
 cartan_add_benchmark(jacobian_benchmarks jacobian_benchmarks.cpp)
 
-# IK solve policy benchmarks
-cartan_add_benchmark(ik_dls_benchmarks ik_dls_benchmarks.cpp)
-cartan_add_benchmark(ik_lm_benchmarks ik_lm_benchmarks.cpp)
+# IK solve policy benchmarks (basic_ik_runner)
+cartan_add_benchmark(basic_ik_dls_benchmarks basic_ik_dls_benchmarks.cpp)
+cartan_add_benchmark(basic_ik_lm_benchmarks basic_ik_lm_benchmarks.cpp)
+
+# Exhaustive IK solver benchmarks
+cartan_add_benchmark(exhaustive_ik_full_benchmarks exhaustive_ik_full_benchmarks.cpp)
 
 # BOBYQA/SLSQP benchmarks require NLopt
 if (CARTAN_BUILD_NLOPT)
     if (NOT TARGET NLopt::nlopt)
         find_package(NLopt CONFIG REQUIRED)
     endif()
-    cartan_add_benchmark(ik_sqp_benchmarks ik_sqp_benchmarks.cpp)
-    target_compile_definitions(ik_sqp_benchmarks PRIVATE CARTAN_HAS_NLOPT)
-    target_link_libraries(ik_sqp_benchmarks PRIVATE NLopt::nlopt)
+    cartan_add_benchmark(basic_ik_sqp_benchmarks basic_ik_sqp_benchmarks.cpp)
+    target_compile_definitions(basic_ik_sqp_benchmarks PRIVATE CARTAN_HAS_NLOPT)
+    target_link_libraries(basic_ik_sqp_benchmarks PRIVATE NLopt::nlopt)
 endif()
 
 # TRAC-IK comparison benchmarks (requires orocos-kdl + NLopt via trac_ik)
@@ -66,11 +69,11 @@ if (CARTAN_BUILD_TRAC_IK)
         target_link_libraries(ik_comparison_benchmarks PRIVATE NLopt::nlopt)
     endif()
 
-    cartan_add_benchmark(ik_full_benchmarks ik_full_benchmarks.cpp)
-    target_link_libraries(ik_full_benchmarks PRIVATE trac_ik)
+    cartan_add_benchmark(basic_ik_full_benchmarks basic_ik_full_benchmarks.cpp)
+    target_link_libraries(basic_ik_full_benchmarks PRIVATE trac_ik)
     if(CARTAN_BUILD_NLOPT)
-        target_compile_definitions(ik_full_benchmarks PRIVATE CARTAN_HAS_NLOPT)
-        target_link_libraries(ik_full_benchmarks PRIVATE NLopt::nlopt)
+        target_compile_definitions(basic_ik_full_benchmarks PRIVATE CARTAN_HAS_NLOPT)
+        target_link_libraries(basic_ik_full_benchmarks PRIVATE NLopt::nlopt)
     endif()
 
     cartan_add_benchmark(fk_comparison_benchmarks fk_comparison_benchmarks.cpp)
