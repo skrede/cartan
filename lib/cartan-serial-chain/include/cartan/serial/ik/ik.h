@@ -33,6 +33,8 @@
 #include "cartan/serial/ik/solver/argmin_slsqp.h"
 #include "cartan/serial/ik/solver/argmin_bobyqa.h"
 #include "cartan/serial/ik/solver/nw_sqp.h"
+#include "cartan/serial/ik/solver/filter_slsqp.h"
+#include "cartan/serial/ik/solver/filter_nw_sqp.h"
 #include "cartan/serial/ik/solver/augmented_lagrangian.h"
 #endif
 

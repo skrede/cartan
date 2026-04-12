@@ -29,6 +29,8 @@
 #include <cartan/serial/ik/solver/nw_sqp.h>
 #include <cartan/serial/ik/solver/argmin_lm.h>
 #include <cartan/serial/ik/solver/argmin_lbfgsb.h>
+#include <cartan/serial/ik/solver/filter_slsqp.h>
+#include <cartan/serial/ik/solver/filter_nw_sqp.h>
 #include <cartan/serial/ik/solver/augmented_lagrangian.h>
 
 #ifdef CARTAN_HAS_NLOPT
@@ -612,6 +614,18 @@ using auglag_restart = cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::augme
 template <int N>
 using auglag_ik_solver = cartan::basic_ik_runner<auglag_restart<N>>;
 
+// nablapp filter SLSQP (Fletcher-Leyffer filter acceptance, compact L-BFGS Hessian)
+template <int N>
+using filter_slsqp_restart = cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::filter_slsqp<chain_t<N>>>;
+template <int N>
+using filter_slsqp_ik_solver = cartan::basic_ik_runner<filter_slsqp_restart<N>>;
+
+// nablapp filter NW-SQP (Fletcher-Leyffer filter acceptance, dense BFGS Hessian)
+template <int N>
+using filter_nw_sqp_restart = cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::filter_nw_sqp<chain_t<N>>>;
+template <int N>
+using filter_nw_sqp_ik_solver = cartan::basic_ik_runner<filter_nw_sqp_restart<N>>;
+
 // Racing: variadic solver (speed + convergence policies)
 template <int N>
 using racing_solver = cartan::dual_ik_runner<chain_t<N>>;
@@ -635,6 +649,8 @@ inline cartan::convergence_criteria<double> nablapp_lbfgsb_criteria() { return {
 inline cartan::convergence_criteria<double> nw_sqp_criteria()         { return {1e-5, 1e-5, 500}; }
 inline cartan::convergence_criteria<double> nablapp_lm_criteria()     { return {1e-5, 1e-5, 200}; }
 inline cartan::convergence_criteria<double> auglag_criteria()         { return {1e-5, 1e-5, 500}; }
+inline cartan::convergence_criteria<double> filter_slsqp_criteria()  { return {1e-5, 1e-5, 500}; }
+inline cartan::convergence_criteria<double> filter_nw_sqp_criteria() { return {1e-5, 1e-5, 500}; }
 
 // ============================================================================
 // Macro-based benchmark registration to avoid per-robot boilerplate
@@ -812,7 +828,23 @@ static void bm_full_##ROBOT##_auglag(benchmark::State& state)                   
     static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
     bm_full_solver<6, auglag_ik_solver<6>>(state, chain, ts, auglag_criteria());                   \
 }                                                                                                     \
-BENCHMARK(bm_full_##ROBOT##_auglag)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_full_##ROBOT##_auglag)->Iterations(1000)->Unit(benchmark::kMicrosecond);               \
+                                                                                                      \
+static void bm_full_##ROBOT##_filter_slsqp(benchmark::State& state)                                \
+{                                                                                                     \
+    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
+    bm_full_solver<6, filter_slsqp_ik_solver<6>>(state, chain, ts, filter_slsqp_criteria());       \
+}                                                                                                     \
+BENCHMARK(bm_full_##ROBOT##_filter_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);         \
+                                                                                                      \
+static void bm_full_##ROBOT##_filter_nw_sqp(benchmark::State& state)                               \
+{                                                                                                     \
+    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
+    bm_full_solver<6, filter_nw_sqp_ik_solver<6>>(state, chain, ts, filter_nw_sqp_criteria());     \
+}                                                                                                     \
+BENCHMARK(bm_full_##ROBOT##_filter_nw_sqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 // Register all native solver benchmarks for a 7-DOF robot.
 #define REGISTER_7DOF_BENCHMARKS(ROBOT, CHAIN_FN)                                                   \
@@ -983,7 +1015,23 @@ static void bm_full_##ROBOT##_auglag(benchmark::State& state)                   
     static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
     bm_full_solver<7, auglag_ik_solver<7>>(state, chain, ts, auglag_criteria());                   \
 }                                                                                                     \
-BENCHMARK(bm_full_##ROBOT##_auglag)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_full_##ROBOT##_auglag)->Iterations(1000)->Unit(benchmark::kMicrosecond);               \
+                                                                                                      \
+static void bm_full_##ROBOT##_filter_slsqp(benchmark::State& state)                                \
+{                                                                                                     \
+    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
+    bm_full_solver<7, filter_slsqp_ik_solver<7>>(state, chain, ts, filter_slsqp_criteria());       \
+}                                                                                                     \
+BENCHMARK(bm_full_##ROBOT##_filter_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);         \
+                                                                                                      \
+static void bm_full_##ROBOT##_filter_nw_sqp(benchmark::State& state)                               \
+{                                                                                                     \
+    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
+    bm_full_solver<7, filter_nw_sqp_ik_solver<7>>(state, chain, ts, filter_nw_sqp_criteria());     \
+}                                                                                                     \
+BENCHMARK(bm_full_##ROBOT##_filter_nw_sqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 // ============================================================================
 // 6-DOF robots: UR3e, KR6 SIXX, ABB IRB120, Jaco2
