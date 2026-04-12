@@ -61,6 +61,7 @@ cartan_add_test(analytical_solver_6r_test analytical_solver_6r_test.cpp)
 if(CARTAN_BUILD_ARGMIN)
     cartan_add_test(nablapp_adapters_compile_test nablapp_adapters_compile_test.cpp)
     cartan_add_test(nablapp_policies_test nablapp_policies_test.cpp)
+    cartan_add_test(argmin_slsqp_restart_test argmin_slsqp_restart_test.cpp)
 endif()
 
 cartan_add_test(fk_sweep_test fk_sweep_test.cpp)
