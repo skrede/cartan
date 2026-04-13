@@ -65,7 +65,7 @@ spp::ik_status run_stepper(
 // Concept satisfaction
 // ============================================================================
 
-TEST_CASE("restart_solve_policy concept satisfaction", "[ik][restart]")
+TEST_CASE("restart_wrapper concept satisfaction", "[ik][restart]")
 {
     static_assert(spp::ik::solve_policy<
         spp::ik::restart_wrapper<spp::kinematic_chain<double, 6>, spp::ik::projected_lm<spp::kinematic_chain<double, 6>>>>);
@@ -75,7 +75,7 @@ TEST_CASE("restart_solve_policy concept satisfaction", "[ik][restart]")
 // Trivial convergence (FK roundtrip, no restart needed)
 // ============================================================================
 
-TEST_CASE("restart_solve_policy trivial convergence", "[ik][restart]")
+TEST_CASE("restart_wrapper trivial convergence", "[ik][restart]")
 {
     auto chain = make_ur5_like_chain();
 
@@ -105,7 +105,7 @@ TEST_CASE("restart_solve_policy trivial convergence", "[ik][restart]")
 // Re-seeds after stall
 // ============================================================================
 
-TEST_CASE("restart_solve_policy re-seeds after stall", "[ik][restart]")
+TEST_CASE("restart_wrapper re-seeds after stall", "[ik][restart]")
 {
     auto chain = make_ur5_like_chain();
 
@@ -155,7 +155,7 @@ TEST_CASE("restart_solve_policy re-seeds after stall", "[ik][restart]")
 // Warm-start lambda
 // ============================================================================
 
-TEST_CASE("restart_solve_policy warm-start lambda", "[ik][restart]")
+TEST_CASE("restart_wrapper warm-start lambda", "[ik][restart]")
 {
     auto chain = make_ur5_like_chain();
 
@@ -187,7 +187,7 @@ TEST_CASE("restart_solve_policy warm-start lambda", "[ik][restart]")
 // max_restarts exhaustion
 // ============================================================================
 
-TEST_CASE("restart_solve_policy max_restarts exhaustion", "[ik][restart]")
+TEST_CASE("restart_wrapper max_restarts exhaustion", "[ik][restart]")
 {
     auto chain = make_ur5_like_chain();
 
@@ -219,7 +219,7 @@ TEST_CASE("restart_solve_policy max_restarts exhaustion", "[ik][restart]")
 // Iterations is cumulative across restarts
 // ============================================================================
 
-TEST_CASE("restart_solve_policy iterations is cumulative", "[ik][restart]")
+TEST_CASE("restart_wrapper iterations is cumulative", "[ik][restart]")
 {
     auto chain = make_ur5_like_chain();
 
@@ -255,7 +255,7 @@ TEST_CASE("restart_solve_policy iterations is cumulative", "[ik][restart]")
 // Abort propagates to inner stepper
 // ============================================================================
 
-TEST_CASE("restart_solve_policy abort propagates", "[ik][restart]")
+TEST_CASE("restart_wrapper abort propagates", "[ik][restart]")
 {
     auto chain = make_ur5_like_chain();
 
@@ -279,11 +279,11 @@ TEST_CASE("restart_solve_policy abort propagates", "[ik][restart]")
 // Composes with racing_scheduler (compile check)
 // ============================================================================
 
-TEST_CASE("restart_solve_policy composes with racing_scheduler", "[ik][restart]")
+TEST_CASE("restart_wrapper composes with racing_scheduler", "[ik][restart]")
 {
-    // This is a compile-time check: racing_scheduler accepts restart_solve_policy
+    // This is a compile-time check: racing_scheduler accepts restart_wrapper
     // via its Solver template parameter. racing_scheduler uses basic_ik_solver<..., Stepper>
-    // so we check that basic_ik_solver accepts restart_solve_policy.
+    // so we check that basic_ik_solver accepts restart_wrapper.
     using restart_type = spp::ik::restart_wrapper<spp::kinematic_chain<double, 6>, spp::ik::projected_lm<spp::kinematic_chain<double, 6>>>;
     static_assert(spp::ik::solve_policy<restart_type>);
 
