@@ -17,13 +17,15 @@
 #include <cartan/serial/ik/solvers.h>
 #include <cartan/serial/ik/basic_ik_runner.h>
 #include <cartan/serial/ik/solver/lm.h>
+#include <cartan/serial/ik/wrapper/restart_wrapper.h>
+#ifdef CARTAN_BUILD_ARGMIN
 #include <cartan/serial/ik/solver/argmin_slsqp.h>
 #include <cartan/serial/ik/solver/argmin_bobyqa.h>
 #include <cartan/serial/ik/solver/nw_sqp.h>
-#include <cartan/serial/ik/wrapper/restart_wrapper.h>
 #include <cartan/serial/ik/solver/argmin_lbfgsb.h>
 #include <cartan/serial/ik/detail/nablapp_problem.h>
 #include <cartan/serial/ik/solver/detail/analytical_gradient.h>
+#endif
 #include <cartan/serial/fk/forward_kinematics.h>
 
 #ifdef CARTAN_HAS_NLOPT
@@ -836,6 +838,7 @@ static void bm_comparison_kuka_lwr4_cartan_racing(benchmark::State& state)
 }
 BENCHMARK(bm_comparison_kuka_lwr4_cartan_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
+#ifdef CARTAN_BUILD_ARGMIN
 // ============================================================================
 // nablapp comparison benchmarks (three D-10 axes)
 // ============================================================================
@@ -2055,5 +2058,6 @@ static void bm_ur3e_per_call_nablapp_adapter_gradient(benchmark::State& state)
     }
 }
 BENCHMARK(bm_ur3e_per_call_nablapp_adapter_gradient)->Unit(benchmark::kNanosecond);
+#endif
 
 } // anonymous namespace
