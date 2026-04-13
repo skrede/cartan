@@ -86,7 +86,7 @@ spp::ik_status run_stepper(
 // Concept satisfaction
 // ============================================================================
 
-TEST_CASE("projected_lm_solve_policy concept satisfaction", "[ik][projected_lm]")
+TEST_CASE("projected_lm concept satisfaction", "[ik][projected_lm]")
 {
     static_assert(spp::ik::solve_policy<spp::ik::projected_lm<spp::kinematic_chain<double, 6>>>);
 }
@@ -95,7 +95,7 @@ TEST_CASE("projected_lm_solve_policy concept satisfaction", "[ik][projected_lm]"
 // FK roundtrip convergence
 // ============================================================================
 
-TEST_CASE("projected_lm_solve_policy FK roundtrip", "[ik][projected_lm]")
+TEST_CASE("projected_lm FK roundtrip", "[ik][projected_lm]")
 {
     auto chain = make_ur5_like_chain();
 
@@ -126,7 +126,7 @@ TEST_CASE("projected_lm_solve_policy FK roundtrip", "[ik][projected_lm]")
 // Respects tight joint limits
 // ============================================================================
 
-TEST_CASE("projected_lm_solve_policy respects tight limits", "[ik][projected_lm]")
+TEST_CASE("projected_lm respects tight limits", "[ik][projected_lm]")
 {
     auto chain = make_ur5_tight_limits_chain();
 
@@ -157,7 +157,7 @@ TEST_CASE("projected_lm_solve_policy respects tight limits", "[ik][projected_lm]
 // Active set: joints at limits with gradient pushing outward are held fixed
 // ============================================================================
 
-TEST_CASE("projected_lm_solve_policy active set holds joints at limits", "[ik][projected_lm]")
+TEST_CASE("projected_lm active set holds joints at limits", "[ik][projected_lm]")
 {
     auto chain = make_ur5_tight_limits_chain();
 
@@ -188,7 +188,7 @@ TEST_CASE("projected_lm_solve_policy active set holds joints at limits", "[ik][p
 // Dogleg option converges
 // ============================================================================
 
-TEST_CASE("projected_lm_solve_policy dogleg converges", "[ik][projected_lm]")
+TEST_CASE("projected_lm dogleg converges", "[ik][projected_lm]")
 {
     auto chain = make_ur5_like_chain();
 
@@ -221,7 +221,7 @@ TEST_CASE("projected_lm_solve_policy dogleg converges", "[ik][projected_lm]")
 // Error weight affects convergence
 // ============================================================================
 
-TEST_CASE("projected_lm_solve_policy with error weight", "[ik][projected_lm]")
+TEST_CASE("projected_lm with error weight", "[ik][projected_lm]")
 {
     auto chain = make_ur5_like_chain();
 
@@ -255,7 +255,7 @@ TEST_CASE("projected_lm_solve_policy with error weight", "[ik][projected_lm]")
 // Stall detection
 // ============================================================================
 
-TEST_CASE("projected_lm_solve_policy stall detection", "[ik][projected_lm]")
+TEST_CASE("projected_lm stall detection", "[ik][projected_lm]")
 {
     auto chain = make_ur5_like_chain();
 
@@ -287,7 +287,7 @@ TEST_CASE("projected_lm_solve_policy stall detection", "[ik][projected_lm]")
 // Divergence detection
 // ============================================================================
 
-TEST_CASE("projected_lm_solve_policy divergence detection", "[ik][projected_lm]")
+TEST_CASE("projected_lm divergence detection", "[ik][projected_lm]")
 {
     auto chain = make_ur5_like_chain();
 

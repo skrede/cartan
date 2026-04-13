@@ -65,7 +65,7 @@ spp::ik_status run_stepper(
 // Concept satisfaction
 // ============================================================================
 
-TEST_CASE("lbfgsb_solve_policy concept satisfaction", "[ik][lbfgsb]")
+TEST_CASE("lbfgsb concept satisfaction", "[ik][lbfgsb]")
 {
     static_assert(spp::ik::solve_policy<spp::ik::builtin_lbfgsb<spp::kinematic_chain<double, 6>>>);
 }
@@ -74,7 +74,7 @@ TEST_CASE("lbfgsb_solve_policy concept satisfaction", "[ik][lbfgsb]")
 // FK roundtrip convergence
 // ============================================================================
 
-TEST_CASE("lbfgsb_solve_policy FK roundtrip", "[ik][lbfgsb]")
+TEST_CASE("lbfgsb FK roundtrip", "[ik][lbfgsb]")
 {
     auto chain = make_ur5_like_chain();
 
@@ -105,7 +105,7 @@ TEST_CASE("lbfgsb_solve_policy FK roundtrip", "[ik][lbfgsb]")
 // Convergence with tight joint limits
 // ============================================================================
 
-TEST_CASE("lbfgsb_solve_policy with tight limits", "[ik][lbfgsb]")
+TEST_CASE("lbfgsb with tight limits", "[ik][lbfgsb]")
 {
     // UR5 chain but joint 3 has tight limits [-0.5, 0.5]
     auto s1 = spp::screw_axis<double>::revolute({0, 0, 1}, {0, 0, 0});
@@ -151,7 +151,7 @@ TEST_CASE("lbfgsb_solve_policy with tight limits", "[ik][lbfgsb]")
 // Iterations count (one per step() call, per D-06)
 // ============================================================================
 
-TEST_CASE("lbfgsb_solve_policy iterations count", "[ik][lbfgsb]")
+TEST_CASE("lbfgsb iterations count", "[ik][lbfgsb]")
 {
     auto chain = make_ur5_like_chain();
 
@@ -177,7 +177,7 @@ TEST_CASE("lbfgsb_solve_policy iterations count", "[ik][lbfgsb]")
 // ObjectivePolicy template works
 // ============================================================================
 
-TEST_CASE("lbfgsb_solve_policy ObjectivePolicy template", "[ik][lbfgsb]")
+TEST_CASE("lbfgsb ObjectivePolicy template", "[ik][lbfgsb]")
 {
     // Verify default ObjectivePolicy is ik_se3_objective
     using chain6 = spp::kinematic_chain<double, 6>;
@@ -190,7 +190,7 @@ TEST_CASE("lbfgsb_solve_policy ObjectivePolicy template", "[ik][lbfgsb]")
 // Convergence with error_weight
 // ============================================================================
 
-TEST_CASE("lbfgsb_solve_policy with error weight", "[ik][lbfgsb]")
+TEST_CASE("lbfgsb with error weight", "[ik][lbfgsb]")
 {
     auto chain = make_ur5_like_chain();
 
@@ -218,7 +218,7 @@ TEST_CASE("lbfgsb_solve_policy with error weight", "[ik][lbfgsb]")
 // Stall detection
 // ============================================================================
 
-TEST_CASE("lbfgsb_solve_policy stall detection", "[ik][lbfgsb]")
+TEST_CASE("lbfgsb stall detection", "[ik][lbfgsb]")
 {
     // UR5 chain with very tight limits on all joints -- unreachable target
     auto s1 = spp::screw_axis<double>::revolute({0, 0, 1}, {0, 0, 0});
