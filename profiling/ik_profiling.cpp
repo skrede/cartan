@@ -10,8 +10,11 @@
 #include <cartan/serial/ik/basic_ik_runner.h>
 #include <cartan/serial/ik/solvers.h>
 #include <cartan/serial/ik/solver/dls.h>
-#include <cartan/serial/ik/solver/argmin_slsqp.h>
 #include <cartan/serial/ik/solver/lbfgsb.h>
+
+#ifdef CARTAN_BUILD_ARGMIN
+#include <cartan/serial/ik/solver/argmin_slsqp.h>
+#endif
 #include <cartan/serial/ik/wrapper/restart_wrapper.h>
 #include <cartan/serial/ik/solver/projected_lm.h>
 #include <cartan/serial/ik/solver/newton_raphson.h>
@@ -134,12 +137,14 @@ using restart_lm_ik_solver = cartan::basic_ik_runner<restart_lm<N>>;
 template <int N>
 using racing_solver = cartan::dual_ik_runner<chain_t<N>>;
 
-// nablapp family (always available)
+#ifdef CARTAN_BUILD_ARGMIN
+// nablapp family (available when argmin is built)
 template <int N>
 using nablapp_slsqp_restart = cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::argmin_slsqp<chain_t<N>>>;
 
 template <int N>
 using nablapp_slsqp_solver = cartan::basic_ik_runner<nablapp_slsqp_restart<N>>;
+#endif
 
 // NLopt family (behind CARTAN_HAS_NLOPT)
 #ifdef CARTAN_HAS_NLOPT
@@ -157,7 +162,9 @@ using nlopt_slsqp_solver = cartan::basic_ik_runner<nlopt_slsqp_restart<N>>;
 inline cartan::convergence_criteria<double> speed_criteria()                { return {1e-5, 1e-5, 200}; }
 inline cartan::convergence_criteria<double> convergence_criteria_tuned()    { return {1e-5, 1e-5, 500}; }
 inline cartan::convergence_criteria<double> restart_lm_criteria()           { return {1e-5, 1e-5, 200}; }
+#ifdef CARTAN_BUILD_ARGMIN
 inline cartan::convergence_criteria<double> nablapp_criteria()              { return {1e-5, 1e-5, 500}; }
+#endif
 inline cartan::convergence_criteria<double> nlopt_criteria()                { return {1e-5, 1e-5, 500}; }
 
 // ============================================================================
@@ -197,7 +204,10 @@ static void bm_profiling_##ROBOT##_cartan_racing(benchmark::State& state)       
     static const target_set<double, 6> ts(chain, num_targets, 42);                                     \
     bm_full_solver<6, racing_solver<6>>(state, chain, ts, convergence_criteria_tuned());             \
 }                                                                                                      \
-BENCHMARK(bm_profiling_##ROBOT##_cartan_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);              \
+BENCHMARK(bm_profiling_##ROBOT##_cartan_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+#ifdef CARTAN_BUILD_ARGMIN
+#define REGISTER_6DOF_NABLAPP_PROFILING(ROBOT, CHAIN_FN)                                               \
                                                                                                        \
 static void bm_profiling_##ROBOT##_nablapp_slsqp(benchmark::State& state)                              \
 {                                                                                                      \
@@ -206,6 +216,9 @@ static void bm_profiling_##ROBOT##_nablapp_slsqp(benchmark::State& state)       
     bm_full_solver<6, nablapp_slsqp_solver<6>>(state, chain, ts, nablapp_criteria());                \
 }                                                                                                      \
 BENCHMARK(bm_profiling_##ROBOT##_nablapp_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+#else
+#define REGISTER_6DOF_NABLAPP_PROFILING(ROBOT, CHAIN_FN)
+#endif
 
 // Register NLopt solver benchmarks for a 6-DOF robot.
 #ifdef CARTAN_HAS_NLOPT
@@ -255,7 +268,10 @@ static void bm_profiling_##ROBOT##_cartan_racing(benchmark::State& state)       
     static const target_set<double, 7> ts(chain, num_targets, 42);                                     \
     bm_full_solver<7, racing_solver<7>>(state, chain, ts, convergence_criteria_tuned());             \
 }                                                                                                      \
-BENCHMARK(bm_profiling_##ROBOT##_cartan_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);              \
+BENCHMARK(bm_profiling_##ROBOT##_cartan_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+#ifdef CARTAN_BUILD_ARGMIN
+#define REGISTER_7DOF_NABLAPP_PROFILING(ROBOT, CHAIN_FN)                                               \
                                                                                                        \
 static void bm_profiling_##ROBOT##_nablapp_slsqp(benchmark::State& state)                              \
 {                                                                                                      \
@@ -264,6 +280,9 @@ static void bm_profiling_##ROBOT##_nablapp_slsqp(benchmark::State& state)       
     bm_full_solver<7, nablapp_slsqp_solver<7>>(state, chain, ts, nablapp_criteria());                \
 }                                                                                                      \
 BENCHMARK(bm_profiling_##ROBOT##_nablapp_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+#else
+#define REGISTER_7DOF_NABLAPP_PROFILING(ROBOT, CHAIN_FN)
+#endif
 
 // Register NLopt solver benchmarks for a 7-DOF robot.
 #ifdef CARTAN_HAS_NLOPT
@@ -285,15 +304,19 @@ BENCHMARK(bm_profiling_##ROBOT##_nlopt_slsqp)->Iterations(1000)->Unit(benchmark:
 // ============================================================================
 
 REGISTER_6DOF_PROFILING(ur3e, make_ur3e_chain)
+REGISTER_6DOF_NABLAPP_PROFILING(ur3e, make_ur3e_chain)
 REGISTER_6DOF_NLOPT_PROFILING(ur3e, make_ur3e_chain)
 
 REGISTER_6DOF_PROFILING(kr6_sixx, make_kr6_sixx_chain)
+REGISTER_6DOF_NABLAPP_PROFILING(kr6_sixx, make_kr6_sixx_chain)
 REGISTER_6DOF_NLOPT_PROFILING(kr6_sixx, make_kr6_sixx_chain)
 
 REGISTER_6DOF_PROFILING(abb_irb120, make_abb_irb120_chain)
+REGISTER_6DOF_NABLAPP_PROFILING(abb_irb120, make_abb_irb120_chain)
 REGISTER_6DOF_NLOPT_PROFILING(abb_irb120, make_abb_irb120_chain)
 
 REGISTER_6DOF_PROFILING(jaco2, make_jaco2_chain)
+REGISTER_6DOF_NABLAPP_PROFILING(jaco2, make_jaco2_chain)
 REGISTER_6DOF_NLOPT_PROFILING(jaco2, make_jaco2_chain)
 
 // ============================================================================
@@ -301,18 +324,23 @@ REGISTER_6DOF_NLOPT_PROFILING(jaco2, make_jaco2_chain)
 // ============================================================================
 
 REGISTER_7DOF_PROFILING(lbr_med14, make_lbr_med14_chain)
+REGISTER_7DOF_NABLAPP_PROFILING(lbr_med14, make_lbr_med14_chain)
 REGISTER_7DOF_NLOPT_PROFILING(lbr_med14, make_lbr_med14_chain)
 
 REGISTER_7DOF_PROFILING(panda, make_panda_chain)
+REGISTER_7DOF_NABLAPP_PROFILING(panda, make_panda_chain)
 REGISTER_7DOF_NLOPT_PROFILING(panda, make_panda_chain)
 
 REGISTER_7DOF_PROFILING(fetch, make_fetch_chain)
+REGISTER_7DOF_NABLAPP_PROFILING(fetch, make_fetch_chain)
 REGISTER_7DOF_NLOPT_PROFILING(fetch, make_fetch_chain)
 
 REGISTER_7DOF_PROFILING(baxter, make_baxter_chain)
+REGISTER_7DOF_NABLAPP_PROFILING(baxter, make_baxter_chain)
 REGISTER_7DOF_NLOPT_PROFILING(baxter, make_baxter_chain)
 
 REGISTER_7DOF_PROFILING(kuka_lwr4, make_kuka_lwr4_chain)
+REGISTER_7DOF_NABLAPP_PROFILING(kuka_lwr4, make_kuka_lwr4_chain)
 REGISTER_7DOF_NLOPT_PROFILING(kuka_lwr4, make_kuka_lwr4_chain)
 
 }

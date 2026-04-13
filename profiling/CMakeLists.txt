@@ -20,6 +20,12 @@ target_link_libraries(ik_profiling
 )
 target_compile_options(ik_profiling PRIVATE ${CARTAN_WARNING_FLAGS})
 
+# Argmin (nablapp) solvers are optional
+if (CARTAN_BUILD_ARGMIN)
+    target_compile_definitions(ik_profiling PRIVATE CARTAN_BUILD_ARGMIN)
+    target_link_libraries(ik_profiling PRIVATE nablapp::nablapp)
+endif()
+
 # NLopt solvers are optional
 if (CARTAN_BUILD_NLOPT)
     if (NOT TARGET NLopt::nlopt)

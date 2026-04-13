@@ -25,6 +25,7 @@
 #include <cartan/serial/ik/solver/newton_raphson.h>
 #include <cartan/serial/ik/solvers.h>
 
+#ifdef CARTAN_BUILD_ARGMIN
 #include <cartan/serial/ik/solver/argmin_slsqp.h>
 #include <cartan/serial/ik/solver/nw_sqp.h>
 #include <cartan/serial/ik/solver/argmin_lm.h>
@@ -32,6 +33,7 @@
 #include <cartan/serial/ik/solver/filter_slsqp.h>
 #include <cartan/serial/ik/solver/filter_nw_sqp.h>
 #include <cartan/serial/ik/solver/augmented_lagrangian.h>
+#endif
 
 #ifdef CARTAN_HAS_NLOPT
 #include <cartan/serial/ik/solver/nlopt_bobyqa.h>
@@ -583,7 +585,8 @@ template <int N>
 using slsqp_ik_solver = cartan::basic_ik_runner<slsqp_restart<N>>;
 #endif
 
-// nablapp solvers (always available)
+#ifdef CARTAN_BUILD_ARGMIN
+// nablapp solvers (available when argmin is built)
 template <int N>
 using nablapp_slsqp_restart = cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::argmin_slsqp<chain_t<N>>>;
 
@@ -625,6 +628,7 @@ template <int N>
 using filter_nw_sqp_restart = cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::filter_nw_sqp<chain_t<N>>>;
 template <int N>
 using filter_nw_sqp_ik_solver = cartan::basic_ik_runner<filter_nw_sqp_restart<N>>;
+#endif
 
 // Racing: variadic solver (speed + convergence policies)
 template <int N>
@@ -644,6 +648,7 @@ inline cartan::convergence_criteria<double> restart_lm_criteria() { return {1e-5
 inline cartan::convergence_criteria<double> nr_criteria()       { return {1e-5, 1e-5, 200}; }
 inline cartan::convergence_criteria<double> bobyqa_criteria()   { return {1e-5, 1e-5, 500}; }
 inline cartan::convergence_criteria<double> slsqp_criteria()    { return {1e-5, 1e-5, 500}; }
+#ifdef CARTAN_BUILD_ARGMIN
 inline cartan::convergence_criteria<double> nablapp_slsqp_criteria()  { return {1e-5, 1e-5, 500}; }
 inline cartan::convergence_criteria<double> nablapp_lbfgsb_criteria() { return {1e-5, 1e-5, 500}; }
 inline cartan::convergence_criteria<double> nw_sqp_criteria()         { return {1e-5, 1e-5, 500}; }
@@ -651,6 +656,7 @@ inline cartan::convergence_criteria<double> nablapp_lm_criteria()     { return {
 inline cartan::convergence_criteria<double> auglag_criteria()         { return {1e-5, 1e-5, 500}; }
 inline cartan::convergence_criteria<double> filter_slsqp_criteria()  { return {1e-5, 1e-5, 500}; }
 inline cartan::convergence_criteria<double> filter_nw_sqp_criteria() { return {1e-5, 1e-5, 500}; }
+#endif
 
 // ============================================================================
 // Macro-based benchmark registration to avoid per-robot boilerplate
@@ -787,7 +793,8 @@ BENCHMARK(bm_full_##ROBOT##_nlopt_slsqp)->Iterations(1000)->Unit(benchmark::kMic
 #define REGISTER_6DOF_NLOPT(ROBOT, CHAIN_FN)
 #endif
 
-// Register nablapp solver benchmarks for a 6-DOF robot (always available).
+#ifdef CARTAN_BUILD_ARGMIN
+// Register nablapp solver benchmarks for a 6-DOF robot.
 #define REGISTER_6DOF_NABLAPP(ROBOT, CHAIN_FN)                                                        \
                                                                                                       \
 static void bm_full_##ROBOT##_nablapp_slsqp(benchmark::State& state)                               \
@@ -845,6 +852,9 @@ static void bm_full_##ROBOT##_nablapp_filter_nw_sqp(benchmark::State& state)    
     bm_full_solver<6, filter_nw_sqp_ik_solver<6>>(state, chain, ts, filter_nw_sqp_criteria());     \
 }                                                                                                     \
 BENCHMARK(bm_full_##ROBOT##_nablapp_filter_nw_sqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+#else
+#define REGISTER_6DOF_NABLAPP(ROBOT, CHAIN_FN)
+#endif
 
 // Register all native solver benchmarks for a 7-DOF robot.
 #define REGISTER_7DOF_BENCHMARKS(ROBOT, CHAIN_FN)                                                   \
@@ -974,7 +984,8 @@ BENCHMARK(bm_full_##ROBOT##_nlopt_slsqp)->Iterations(1000)->Unit(benchmark::kMic
 #define REGISTER_7DOF_NLOPT(ROBOT, CHAIN_FN)
 #endif
 
-// Register nablapp solver benchmarks for a 7-DOF robot (always available).
+#ifdef CARTAN_BUILD_ARGMIN
+// Register nablapp solver benchmarks for a 7-DOF robot.
 #define REGISTER_7DOF_NABLAPP(ROBOT, CHAIN_FN)                                                        \
                                                                                                       \
 static void bm_full_##ROBOT##_nablapp_slsqp(benchmark::State& state)                               \
@@ -1032,6 +1043,9 @@ static void bm_full_##ROBOT##_nablapp_filter_nw_sqp(benchmark::State& state)    
     bm_full_solver<7, filter_nw_sqp_ik_solver<7>>(state, chain, ts, filter_nw_sqp_criteria());     \
 }                                                                                                     \
 BENCHMARK(bm_full_##ROBOT##_nablapp_filter_nw_sqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+#else
+#define REGISTER_7DOF_NABLAPP(ROBOT, CHAIN_FN)
+#endif
 
 // ============================================================================
 // 6-DOF robots: UR3e, KR6 SIXX, ABB IRB120, Jaco2
@@ -1094,6 +1108,7 @@ REGISTER_7DOF_NABLAPP(kuka_lwr4,    make_kuka_lwr4_chain)
 // dynamic-dimension chain_t<cartan::dynamic> (runtime N) using the same nablapp
 // policy. Quantifies the compile-time dimension benefit from nablapp develop.
 
+#ifdef CARTAN_BUILD_ARGMIN
 using dynamic_chain = cartan::kinematic_chain<double, cartan::dynamic>;
 
 using nablapp_slsqp_dynamic_restart = cartan::ik::restart_wrapper<dynamic_chain, cartan::ik::argmin_slsqp<dynamic_chain>>;
@@ -1117,5 +1132,6 @@ static void bm_full_ur3e_nablapp_slsqp_dynamic(benchmark::State& state)
     bm_full_solver<cartan::dynamic, nablapp_slsqp_dynamic_solver>(state, chain, ts, nablapp_slsqp_criteria());
 }
 BENCHMARK(bm_full_ur3e_nablapp_slsqp_dynamic)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+#endif
 
 }
