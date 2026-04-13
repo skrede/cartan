@@ -3,6 +3,9 @@
 
 #include <cartan/serial/ik/ik_status.h>
 #include <cartan/serial/ik/solver/projected_lm.h>
+#ifdef CARTAN_BUILD_ARGMIN
+#include <cartan/serial/ik/solver/argmin_slsqp.h>
+#endif
 
 #include <cartan/lie/se3.h>
 #include <cartan/lie/so3.h>
@@ -272,3 +275,40 @@ TEST_CASE("exhaustive_ik_runner ranking strategies", "[ik][exhaustive]")
         }
     }
 }
+
+#ifdef CARTAN_BUILD_ARGMIN
+
+using ur5_argmin_slsqp = spp::ik::argmin_slsqp<ur5_chain>;
+
+TEST_CASE("exhaustive_ik_runner<argmin_slsqp> concept satisfaction and solve", "[ik][exhaustive][argmin]")
+{
+    auto chain = make_ur5_like_chain();
+    Eigen::Vector<double, 6> q_known;
+    q_known << 0.5, -0.3, 0.8, -0.2, 0.4, 0.1;
+
+    auto fk = spp::forward_kinematics(chain, q_known);
+    auto target = fk.end_effector;
+
+    spp::convergence_criteria<double> criteria;
+    criteria.position_tol = 1e-4;
+    criteria.orientation_tol = 1e-4;
+    criteria.max_iterations = 200;
+
+    spp::exhaustive_options<double> options;
+    options.max_restarts = 20;
+
+    Eigen::Vector<double, 6> seed = Eigen::Vector<double, 6>::Zero();
+
+    spp::exhaustive_ik_runner<ur5_chain, ur5_argmin_slsqp> runner;
+    auto result = runner.solve(chain, target, seed, criteria, options);
+
+    REQUIRE(result.restarts_attempted == 20);
+    REQUIRE(result.solutions.size() >= 1);
+
+    for (const auto& sol : result.solutions)
+    {
+        REQUIRE(spp::verify_solution(chain, target, sol.solution.position, criteria));
+    }
+}
+
+#endif
