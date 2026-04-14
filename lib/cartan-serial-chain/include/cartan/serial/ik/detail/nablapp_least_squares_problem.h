@@ -89,6 +89,36 @@ public:
         }
     }
 
+    Eigen::Vector<double, N> lower_bounds() const
+    {
+        int n = m_chain->num_joints();
+        Eigen::Vector<double, N> lb;
+        if constexpr (N == dynamic)
+        {
+            lb.resize(n);
+        }
+        for (int i = 0; i < n; ++i)
+        {
+            lb[i] = static_cast<double>(m_chain->limits()[static_cast<std::size_t>(i)].position_min);
+        }
+        return lb;
+    }
+
+    Eigen::Vector<double, N> upper_bounds() const
+    {
+        int n = m_chain->num_joints();
+        Eigen::Vector<double, N> ub;
+        if constexpr (N == dynamic)
+        {
+            ub.resize(n);
+        }
+        for (int i = 0; i < n; ++i)
+        {
+            ub[i] = static_cast<double>(m_chain->limits()[static_cast<std::size_t>(i)].position_max);
+        }
+        return ub;
+    }
+
 private:
     template <typename Derived>
     position_type to_position(const Eigen::MatrixBase<Derived>& x) const
