@@ -35,6 +35,8 @@
 #include "cartan/serial/ik/solver/nw_sqp.h"
 #include "cartan/serial/ik/solver/filter_slsqp.h"
 #include "cartan/serial/ik/solver/filter_nw_sqp.h"
+#include "cartan/serial/ik/solver/argmin_projected_gn.h"
+#include "cartan/serial/ik/solver/argmin_projected_gradient_gn.h"
 #include "cartan/serial/ik/solver/augmented_lagrangian.h"
 #endif
 
