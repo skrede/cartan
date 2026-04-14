@@ -23,6 +23,8 @@
 #include <cartan/serial/ik/solver/argmin_bobyqa.h>
 #include <cartan/serial/ik/solver/nw_sqp.h>
 #include <cartan/serial/ik/solver/argmin_lbfgsb.h>
+#include <cartan/serial/ik/solver/argmin_projected_gn.h>
+#include <cartan/serial/ik/solver/argmin_projected_gradient_gn.h>
 #include <cartan/serial/ik/detail/nablapp_problem.h>
 #include <cartan/serial/ik/solver/detail/analytical_gradient.h>
 #endif
@@ -918,6 +920,14 @@ template <int N>
 using nablapp_nw_sqp_solver = cartan::basic_ik_runner<
     cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::nw_sqp<chain_t<N>>>>;
 
+template <int N>
+using nablapp_projected_gn_comparison_solver = cartan::basic_ik_runner<
+    cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::argmin_projected_gn<chain_t<N>>>>;
+
+template <int N>
+using nablapp_projected_gradient_gn_comparison_solver = cartan::basic_ik_runner<
+    cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::argmin_projected_gradient_gn<chain_t<N>>>>;
+
 // NLopt solver type aliases (gated behind CARTAN_HAS_NLOPT)
 #ifdef CARTAN_HAS_NLOPT
 template <int N>
@@ -964,6 +974,24 @@ static void bm_comparison_ur3e_nablapp_slsqp(benchmark::State& state)
     bm_nablapp_comparison<6, nablapp_slsqp_solver<6>>(state, chain, ts, nablapp_comparison_criteria());
 }
 BENCHMARK(bm_comparison_ur3e_nablapp_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_ur3e_nablapp_projected_gn(benchmark::State& state)
+{
+    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    static const target_set<double, 6> ts(chain, num_targets, 42);
+    bm_nablapp_comparison<6, nablapp_projected_gn_comparison_solver<6>>(
+        state, chain, ts, nablapp_comparison_criteria());
+}
+BENCHMARK(bm_comparison_ur3e_nablapp_projected_gn)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_ur3e_nablapp_projected_gradient_gn(benchmark::State& state)
+{
+    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    static const target_set<double, 6> ts(chain, num_targets, 42);
+    bm_nablapp_comparison<6, nablapp_projected_gradient_gn_comparison_solver<6>>(
+        state, chain, ts, nablapp_comparison_criteria());
+}
+BENCHMARK(bm_comparison_ur3e_nablapp_projected_gradient_gn)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 // NLopt-compatible convergence variant of the UR3e SLSQP bench.
 // Uses argmin_slsqp_nlopt_compat which instantiates argmin_slsqp with
