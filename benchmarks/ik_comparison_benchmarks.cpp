@@ -25,6 +25,8 @@
 #include <cartan/serial/ik/solver/argmin_lbfgsb.h>
 #include <cartan/serial/ik/solver/argmin_projected_gn.h>
 #include <cartan/serial/ik/solver/argmin_projected_gradient_gn.h>
+#include <cartan/serial/ik/solver/mma.h>
+#include <cartan/serial/ik/solver/gcmma.h>
 #include <cartan/serial/ik/detail/nablapp_problem.h>
 #include <cartan/serial/ik/solver/detail/analytical_gradient.h>
 #endif
@@ -928,6 +930,102 @@ template <int N>
 using nablapp_projected_gradient_gn_comparison_solver = cartan::basic_ik_runner<
     cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::argmin_projected_gradient_gn<chain_t<N>>>>;
 
+template <int N>
+using nablapp_mma_solver = cartan::basic_ik_runner<
+    cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::mma<chain_t<N>>>>;
+
+template <int N>
+using nablapp_gcmma_solver = cartan::basic_ik_runner<
+    cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::gcmma<chain_t<N>>>>;
+
+// Cascade-disabling overrides for A/B against nablapp's policy-internal
+// stall signals (asymptote-floor, rho/raa-saturated, KKT-jump). Setting
+// the two counter defaults to uint16 max and the KKT-jump factor to a
+// huge value effectively silences the three-signal cascade so the outer
+// termination reduces to max_iterations + framework-side stall-tolerance.
+// Reference: nablapp turn-27 §3 instructions for the cascade A/B probe.
+template <int N>
+typename cartan::ik::mma<chain_t<N>>::options mma_cascade_off_options()
+{
+    typename cartan::ik::mma<chain_t<N>>::options opts{};
+    opts.policy_options.asymptote_floor_stall_consecutive_count = std::uint16_t{65535};
+    opts.policy_options.rho_saturated_stall_consecutive_count  = std::uint16_t{65535};
+    opts.policy_options.kkt_jump_threshold_factor              = 1.0e18;
+    return opts;
+}
+
+template <int N>
+typename cartan::ik::gcmma<chain_t<N>>::options gcmma_cascade_off_options()
+{
+    typename cartan::ik::gcmma<chain_t<N>>::options opts{};
+    opts.policy_options.asymptote_floor_stall_consecutive_count = std::uint16_t{65535};
+    opts.policy_options.raa_saturated_stall_consecutive_count  = std::uint16_t{65535};
+    opts.policy_options.kkt_jump_threshold_factor              = 1.0e18;
+    return opts;
+}
+
+// Generic bench for an inner solver whose options struct is passed in.
+// Wraps the inner solver with restart_wrapper and then basic_ik_runner,
+// mirroring nablapp_slsqp_solver<N> construction. Used for MMA/GCMMA
+// cascade-on vs cascade-off A/B — the OptsCtor returns the desired
+// inner options per bench configuration.
+template <int N, typename InnerSolver, typename OptsCtor>
+void bm_nablapp_inner_options_comparison(
+    benchmark::State& state,
+    const cartan::kinematic_chain<double, N>& chain,
+    const target_set<double, N>& ts,
+    const cartan::convergence_criteria<double>& criteria,
+    OptsCtor opts_ctor)
+{
+    using wrapped_t = cartan::ik::restart_wrapper<chain_t<N>, InnerSolver>;
+    using runner_t = cartan::basic_ik_runner<wrapped_t>;
+
+    std::size_t idx = 0;
+    int successes = 0;
+    int total_iterations = 0;
+    double total_pos_error = 0.0;
+    double total_ori_error = 0.0;
+
+    for (auto _ : state)
+    {
+        auto& target = ts.targets[idx % static_cast<std::size_t>(num_targets)];
+        auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
+        ++idx;
+
+        InnerSolver inner{opts_ctor()};
+        wrapped_t wrapper{std::move(inner)};
+        runner_t solver{std::move(wrapper)};
+
+        solver.setup(chain, target, q_seed, criteria);
+        auto result = solver.solve();
+
+        if (result.has_value())
+        {
+            ++successes;
+            total_iterations += result->iterations;
+            auto [pos_err, ori_err] = cartan::benchmarks::compute_pose_errors(
+                chain, result->solution.position, target);
+            total_pos_error += pos_err;
+            total_ori_error += ori_err;
+        }
+        benchmark::DoNotOptimize(result);
+    }
+
+    auto total = static_cast<int>(idx);
+    state.counters["Success_rate"] = benchmark::Counter(
+        100.0 * static_cast<double>(successes) / std::max(total, 1),
+        benchmark::Counter::kAvgThreads);
+    state.counters["avg_iterations"] = benchmark::Counter(
+        static_cast<double>(total_iterations) / std::max(successes, 1),
+        benchmark::Counter::kAvgThreads);
+    state.counters["avg_position_error"] = benchmark::Counter(
+        total_pos_error / std::max(successes, 1),
+        benchmark::Counter::kAvgThreads);
+    state.counters["avg_orientation_error"] = benchmark::Counter(
+        total_ori_error / std::max(successes, 1),
+        benchmark::Counter::kAvgThreads);
+}
+
 // NLopt solver type aliases (gated behind CARTAN_HAS_NLOPT)
 #ifdef CARTAN_HAS_NLOPT
 template <int N>
@@ -992,6 +1090,45 @@ static void bm_comparison_ur3e_nablapp_projected_gradient_gn(benchmark::State& s
         state, chain, ts, nablapp_comparison_criteria());
 }
 BENCHMARK(bm_comparison_ur3e_nablapp_projected_gradient_gn)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+// MMA / GCMMA cascade-on and cascade-off entries for UR3e — the primary
+// workload requested in nablapp turn-27 for tuning the policy-internal
+// stall cascade K defaults.
+static void bm_comparison_ur3e_nablapp_mma(benchmark::State& state)
+{
+    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    static const target_set<double, 6> ts(chain, num_targets, 42);
+    bm_nablapp_comparison<6, nablapp_mma_solver<6>>(state, chain, ts, nablapp_comparison_criteria());
+}
+BENCHMARK(bm_comparison_ur3e_nablapp_mma)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_ur3e_nablapp_mma_cascade_off(benchmark::State& state)
+{
+    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    static const target_set<double, 6> ts(chain, num_targets, 42);
+    bm_nablapp_inner_options_comparison<6, cartan::ik::mma<chain_t<6>>>(
+        state, chain, ts, nablapp_comparison_criteria(),
+        []{ return mma_cascade_off_options<6>(); });
+}
+BENCHMARK(bm_comparison_ur3e_nablapp_mma_cascade_off)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_ur3e_nablapp_gcmma(benchmark::State& state)
+{
+    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    static const target_set<double, 6> ts(chain, num_targets, 42);
+    bm_nablapp_comparison<6, nablapp_gcmma_solver<6>>(state, chain, ts, nablapp_comparison_criteria());
+}
+BENCHMARK(bm_comparison_ur3e_nablapp_gcmma)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+
+static void bm_comparison_ur3e_nablapp_gcmma_cascade_off(benchmark::State& state)
+{
+    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    static const target_set<double, 6> ts(chain, num_targets, 42);
+    bm_nablapp_inner_options_comparison<6, cartan::ik::gcmma<chain_t<6>>>(
+        state, chain, ts, nablapp_comparison_criteria(),
+        []{ return gcmma_cascade_off_options<6>(); });
+}
+BENCHMARK(bm_comparison_ur3e_nablapp_gcmma_cascade_off)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 // NLopt-compatible convergence variant of the UR3e SLSQP bench.
 // Uses argmin_slsqp_nlopt_compat which instantiates argmin_slsqp with
@@ -1934,7 +2071,41 @@ static void bm_comparison_##ROBOT##_nw_sqp(benchmark::State& state)             
     static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
     bm_nablapp_comparison<6, nablapp_nw_sqp_solver<6>>(state, chain, ts, nablapp_comparison_criteria()); \
 }                                                                                                     \
-BENCHMARK(bm_comparison_##ROBOT##_nw_sqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_##ROBOT##_nw_sqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);           \
+                                                                                                      \
+static void bm_comparison_##ROBOT##_nablapp_mma(benchmark::State& state)                              \
+{                                                                                                     \
+    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
+    bm_nablapp_comparison<6, nablapp_mma_solver<6>>(state, chain, ts, nablapp_comparison_criteria()); \
+}                                                                                                     \
+BENCHMARK(bm_comparison_##ROBOT##_nablapp_mma)->Iterations(1000)->Unit(benchmark::kMicrosecond);      \
+                                                                                                      \
+static void bm_comparison_##ROBOT##_nablapp_mma_cascade_off(benchmark::State& state)                  \
+{                                                                                                     \
+    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
+    bm_nablapp_inner_options_comparison<6, cartan::ik::mma<chain_t<6>>>(                              \
+        state, chain, ts, nablapp_comparison_criteria(), []{ return mma_cascade_off_options<6>(); }); \
+}                                                                                                     \
+BENCHMARK(bm_comparison_##ROBOT##_nablapp_mma_cascade_off)->Iterations(1000)->Unit(benchmark::kMicrosecond); \
+                                                                                                      \
+static void bm_comparison_##ROBOT##_nablapp_gcmma(benchmark::State& state)                            \
+{                                                                                                     \
+    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
+    bm_nablapp_comparison<6, nablapp_gcmma_solver<6>>(state, chain, ts, nablapp_comparison_criteria()); \
+}                                                                                                     \
+BENCHMARK(bm_comparison_##ROBOT##_nablapp_gcmma)->Iterations(1000)->Unit(benchmark::kMicrosecond);    \
+                                                                                                      \
+static void bm_comparison_##ROBOT##_nablapp_gcmma_cascade_off(benchmark::State& state)                \
+{                                                                                                     \
+    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
+    bm_nablapp_inner_options_comparison<6, cartan::ik::gcmma<chain_t<6>>>(                            \
+        state, chain, ts, nablapp_comparison_criteria(), []{ return gcmma_cascade_off_options<6>(); }); \
+}                                                                                                     \
+BENCHMARK(bm_comparison_##ROBOT##_nablapp_gcmma_cascade_off)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 #define REGISTER_7DOF_NABLAPP_COMPARISON(ROBOT, CHAIN_FN)                                             \
                                                                                                       \
@@ -1960,7 +2131,41 @@ static void bm_comparison_##ROBOT##_nw_sqp(benchmark::State& state)             
     static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
     bm_nablapp_comparison<7, nablapp_nw_sqp_solver<7>>(state, chain, ts, nablapp_comparison_criteria()); \
 }                                                                                                     \
-BENCHMARK(bm_comparison_##ROBOT##_nw_sqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_##ROBOT##_nw_sqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);           \
+                                                                                                      \
+static void bm_comparison_##ROBOT##_nablapp_mma(benchmark::State& state)                              \
+{                                                                                                     \
+    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
+    bm_nablapp_comparison<7, nablapp_mma_solver<7>>(state, chain, ts, nablapp_comparison_criteria()); \
+}                                                                                                     \
+BENCHMARK(bm_comparison_##ROBOT##_nablapp_mma)->Iterations(1000)->Unit(benchmark::kMicrosecond);      \
+                                                                                                      \
+static void bm_comparison_##ROBOT##_nablapp_mma_cascade_off(benchmark::State& state)                  \
+{                                                                                                     \
+    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
+    bm_nablapp_inner_options_comparison<7, cartan::ik::mma<chain_t<7>>>(                              \
+        state, chain, ts, nablapp_comparison_criteria(), []{ return mma_cascade_off_options<7>(); }); \
+}                                                                                                     \
+BENCHMARK(bm_comparison_##ROBOT##_nablapp_mma_cascade_off)->Iterations(1000)->Unit(benchmark::kMicrosecond); \
+                                                                                                      \
+static void bm_comparison_##ROBOT##_nablapp_gcmma(benchmark::State& state)                            \
+{                                                                                                     \
+    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
+    bm_nablapp_comparison<7, nablapp_gcmma_solver<7>>(state, chain, ts, nablapp_comparison_criteria()); \
+}                                                                                                     \
+BENCHMARK(bm_comparison_##ROBOT##_nablapp_gcmma)->Iterations(1000)->Unit(benchmark::kMicrosecond);    \
+                                                                                                      \
+static void bm_comparison_##ROBOT##_nablapp_gcmma_cascade_off(benchmark::State& state)                \
+{                                                                                                     \
+    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
+    bm_nablapp_inner_options_comparison<7, cartan::ik::gcmma<chain_t<7>>>(                            \
+        state, chain, ts, nablapp_comparison_criteria(), []{ return gcmma_cascade_off_options<7>(); }); \
+}                                                                                                     \
+BENCHMARK(bm_comparison_##ROBOT##_nablapp_gcmma_cascade_off)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 // 6-DOF headline nablapp entries
 REGISTER_6DOF_NABLAPP_COMPARISON(kr6_sixx,   make_kr6_sixx_chain)
