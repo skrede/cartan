@@ -388,15 +388,21 @@ private:
     ik_status m_status{ik_status::running};
 };
 
-#ifdef CARTAN_BUILD_ARGMIN
-#include "cartan/serial/ik/solver/argmin_lbfgsb.h"
-template <chain Chain, typename LimitsPolicy = clamp_limits>
-using lbfgsb = argmin_lbfgsb<Chain, LimitsPolicy>;
-#else
+#ifndef CARTAN_BUILD_ARGMIN
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 using lbfgsb = builtin_lbfgsb<Chain, LimitsPolicy>;
 #endif
 
 }
+
+#ifdef CARTAN_BUILD_ARGMIN
+#include "cartan/serial/ik/solver/argmin_lbfgsb.h"
+
+namespace cartan::ik
+{
+template <chain Chain, typename LimitsPolicy = clamp_limits>
+using lbfgsb = argmin_lbfgsb<Chain, LimitsPolicy>;
+}
+#endif
 
 #endif
