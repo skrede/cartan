@@ -84,6 +84,15 @@ if (CARTAN_BUILD_TRAC_IK)
         target_link_libraries(basic_ik_full_benchmarks PRIVATE NLopt::nlopt)
     endif()
 
+    if(CARTAN_BUILD_ARGMIN)
+        add_executable(slsqp_per_pose_capture slsqp_per_pose_capture.cpp)
+        target_link_libraries(slsqp_per_pose_capture
+            PRIVATE
+            cartan::cartan
+            nablapp::nablapp)
+        target_compile_options(slsqp_per_pose_capture PRIVATE ${CARTAN_WARNING_FLAGS})
+    endif()
+
     cartan_add_benchmark(fk_comparison_benchmarks fk_comparison_benchmarks.cpp)
     target_link_libraries(fk_comparison_benchmarks PRIVATE trac_ik)
 
