@@ -417,7 +417,10 @@ private:
     std::optional<nablapp_solver> m_solver;
     nablapp_opts_type m_nab_opts{};
     int m_restart_count{};
-    std::mt19937 m_rng{std::random_device{}()};
+    // Default to a deterministic seed so per-pose benchmark captures are
+    // reproducible across binary runs. Callers wanting nondeterministic
+    // restarts should set options::rng_seed to a varying value at construction.
+    std::mt19937 m_rng{0};
 };
 
 /// NLopt-compatible convergence variant of argmin_slsqp.
