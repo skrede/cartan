@@ -332,7 +332,7 @@ private:
     std::optional<nablapp_solver> m_solver;
     nablapp_opts_type m_nab_opts{};
     int m_restart_count{};
-    std::mt19937 m_rng{std::random_device{}()};
+    std::mt19937 m_rng{0};
 };
 
 }

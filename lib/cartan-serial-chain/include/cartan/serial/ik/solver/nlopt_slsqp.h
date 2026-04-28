@@ -255,7 +255,7 @@ private:
     int m_restart_count{};
     std::uint64_t m_objective_calls{};
     ik_status m_status{ik_status::running};
-    std::mt19937 m_rng{std::random_device{}()};
+    std::mt19937 m_rng{0};
 };
 
 }
