@@ -91,6 +91,13 @@ if (CARTAN_BUILD_TRAC_IK)
             cartan::cartan
             nablapp::nablapp)
         target_compile_options(slsqp_per_pose_capture PRIVATE ${CARTAN_WARNING_FLAGS})
+
+        add_executable(slsqp_per_pose_trace slsqp_per_pose_trace.cpp)
+        target_link_libraries(slsqp_per_pose_trace
+            PRIVATE
+            cartan::cartan
+            nablapp::nablapp)
+        target_compile_options(slsqp_per_pose_trace PRIVATE ${CARTAN_WARNING_FLAGS})
     endif()
 
     cartan_add_benchmark(fk_comparison_benchmarks fk_comparison_benchmarks.cpp)
