@@ -100,6 +100,16 @@ if (CARTAN_BUILD_TRAC_IK)
         target_compile_options(slsqp_per_pose_trace PRIVATE ${CARTAN_WARNING_FLAGS})
     endif()
 
+    if(CARTAN_BUILD_NLOPT)
+        add_executable(nlopt_slsqp_per_pose_capture nlopt_slsqp_per_pose_capture.cpp)
+        target_compile_definitions(nlopt_slsqp_per_pose_capture PRIVATE CARTAN_HAS_NLOPT)
+        target_link_libraries(nlopt_slsqp_per_pose_capture
+            PRIVATE
+            cartan::cartan
+            NLopt::nlopt)
+        target_compile_options(nlopt_slsqp_per_pose_capture PRIVATE ${CARTAN_WARNING_FLAGS})
+    endif()
+
     cartan_add_benchmark(fk_comparison_benchmarks fk_comparison_benchmarks.cpp)
     target_link_libraries(fk_comparison_benchmarks PRIVATE trac_ik)
 
