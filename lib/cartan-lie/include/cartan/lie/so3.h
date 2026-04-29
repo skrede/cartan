@@ -128,6 +128,15 @@ public:
         }
     }
 
+    /// Construct from a known-unit quaternion, skipping normalize().
+    /// Caller must ensure ||q|| ~= 1; debug builds validate.
+    so3(const quaternion<Scalar>& q, trusted_unit_t)
+        : m_quaternion(q)
+    {
+        assert(std::abs(m_quaternion.squaredNorm() - Scalar(1))
+               < detail::sqrt_epsilon_v<Scalar>);
+    }
+
     /// Exponential map: so(3) -> SO(3) via quaternion form.
     /// phi is the axis-angle vector (axis * angle).
     /// Ref: Barfoot, State Estimation for Robotics, Eq. 8.23, p. 285.
@@ -242,7 +251,8 @@ public:
     /// Identity element: zero rotation (unit quaternion w=1).
     [[nodiscard]] static so3 identity()
     {
-        return so3(quaternion<Scalar>(Scalar(1), Scalar(0), Scalar(0), Scalar(0)));
+        return so3(quaternion<Scalar>(Scalar(1), Scalar(0), Scalar(0), Scalar(0)),
+                   trusted_unit);
     }
 
     /// Construct from 3x3 rotation matrix with validation (D-09).

@@ -23,6 +23,14 @@ struct fast_policy
     static constexpr bool assert_valid = false;
 };
 
+/// Tag type for the unchecked "trusted unit" construction path on so3 / se3.
+/// Use when the caller can prove the input is already a unit quaternion
+/// (e.g. exact axis-angle output from exp, conjugate of a unit, identity).
+/// The construction skips normalize() unconditionally; debug builds still
+/// validate via assert().
+struct trusted_unit_t {};
+inline constexpr trusted_unit_t trusted_unit{};
+
 /// Selects the stricter of two policies: if either normalizes, the result normalizes.
 /// Used for mixed-policy compose operations (D-08).
 template <typename P1, typename P2>
