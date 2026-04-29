@@ -87,7 +87,11 @@ TEST_CASE("SE(3) left Jacobian matches finite difference", "[se3_left_jacobian]"
         auto T_plus = cartan::se3<double>::exp(v_plus);
         auto T_minus = cartan::se3<double>::exp(v_minus);
 
-        auto diff = (T_plus * T.inverse()).log() - (T_minus * T.inverse()).log();
+        // Materialize the log() prvalues before subtracting; otherwise the
+        // Eigen expression template binds to dangling temporaries.
+        cartan::vector6<double> log_plus  = (T_plus  * T.inverse()).log();
+        cartan::vector6<double> log_minus = (T_minus * T.inverse()).log();
+        cartan::vector6<double> diff = log_plus - log_minus;
         J_fd.col(i) = diff / (2.0 * eps);
     }
 
