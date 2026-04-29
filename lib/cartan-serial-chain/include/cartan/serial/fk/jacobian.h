@@ -55,13 +55,16 @@ jacobian_matrix<Scalar, N> space_jacobian_loop(
     }
 
     // Column 0: J_s0 = S_0 (Ad_{T_{-1}} = Ad_I = I)
-    J.col(0) = axes[0].to_vector();
+    detail::jacobian_column_identity_runtime(chain.kind(0), J.col(0), axes[0]);
 
     // Columns 1..n-1: J_si = Ad_{T_{i-1}} * S_i
     for (int i = 1; i < n; ++i)
     {
-        J.col(i) = fk.intermediates[static_cast<std::size_t>(i - 1)].adjoint()
-                    * axes[static_cast<std::size_t>(i)].to_vector();
+        detail::jacobian_column_runtime(
+            chain.kind(i),
+            J.col(i),
+            fk.intermediates[static_cast<std::size_t>(i - 1)],
+            axes[static_cast<std::size_t>(i)]);
     }
 
     return J;
@@ -79,11 +82,22 @@ jacobian_matrix<Scalar, N> space_jacobian_unrolled_impl(
     const auto& axes = chain.axes();
     jacobian_matrix<Scalar, N> J;
 
-    ((J.col(static_cast<int>(Is)) =
-        (Is == 0)
-            ? axes[0].to_vector()
-            : fk.intermediates[Is - 1].adjoint() * axes[Is].to_vector()),
-     ...);
+    ([&]<std::size_t I>()
+    {
+        if constexpr (I == 0)
+        {
+            jacobian_column_identity_runtime(
+                chain.kind(0), J.col(0), axes[0]);
+        }
+        else
+        {
+            jacobian_column_runtime(
+                chain.kind(static_cast<int>(I)),
+                J.col(static_cast<int>(I)),
+                fk.intermediates[I - 1],
+                axes[I]);
+        }
+    }.template operator()<Is>(), ...);
 
     return J;
 }

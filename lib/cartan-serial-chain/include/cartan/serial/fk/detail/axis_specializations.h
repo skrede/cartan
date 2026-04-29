@@ -7,6 +7,7 @@
 #include "cartan/lie/so3.h"
 
 #include "cartan/serial/chain/joint_tags.h"
+#include "cartan/serial/chain/joint_kind.h"
 #include "cartan/serial/chain/screw_axis.h"
 
 #include <cmath>
@@ -229,6 +230,78 @@ void jacobian_column(
         matrix3<Scalar> R = T_prev.rotation().matrix();
         col.template head<3>().setZero();
         col.template tail<3>() = R.col(2);
+    }
+}
+
+/// Runtime dispatch for per-joint SE(3) exponential.
+///
+/// Used by kinematic_chain's FK loop to route into the same compile-time
+/// specializations as static_chain, based on the cached joint_kind. The
+/// general fallback uses the standard se3::exp path.
+template <typename Scalar>
+[[nodiscard]] se3<Scalar> exp_joint_runtime(
+    joint_kind kind,
+    Scalar q,
+    const screw_axis<Scalar>& axis)
+{
+    switch (kind)
+    {
+        case joint_kind::revolute_x:  return exp_joint<revolute_x>(q, axis);
+        case joint_kind::revolute_y:  return exp_joint<revolute_y>(q, axis);
+        case joint_kind::revolute_z:  return exp_joint<revolute_z>(q, axis);
+        case joint_kind::prismatic_x: return exp_joint<prismatic_x>(q, axis);
+        case joint_kind::prismatic_y: return exp_joint<prismatic_y>(q, axis);
+        case joint_kind::prismatic_z: return exp_joint<prismatic_z>(q, axis);
+        case joint_kind::general:
+        default:
+            return se3<Scalar>::exp(axis.to_vector() * q);
+    }
+}
+
+/// Runtime dispatch for the first space-Jacobian column at identity.
+template <typename Scalar, typename ColExpr>
+void jacobian_column_identity_runtime(
+    joint_kind kind,
+    ColExpr&& col,
+    const screw_axis<Scalar>& axis)
+{
+    switch (kind)
+    {
+        case joint_kind::revolute_x:  jacobian_column_identity<revolute_x>(col, axis); return;
+        case joint_kind::revolute_y:  jacobian_column_identity<revolute_y>(col, axis); return;
+        case joint_kind::revolute_z:  jacobian_column_identity<revolute_z>(col, axis); return;
+        case joint_kind::prismatic_x: jacobian_column_identity<prismatic_x>(col, axis); return;
+        case joint_kind::prismatic_y: jacobian_column_identity<prismatic_y>(col, axis); return;
+        case joint_kind::prismatic_z: jacobian_column_identity<prismatic_z>(col, axis); return;
+        case joint_kind::general:
+        default:
+            col = axis.to_vector();
+            return;
+    }
+}
+
+/// Runtime dispatch for non-first space-Jacobian columns.
+/// Computes J_si = Ad_{T_{i-1}} * S_i without materializing the 6x6 adjoint
+/// when the axis is principal-axis-aligned.
+template <typename Scalar, typename ColExpr>
+void jacobian_column_runtime(
+    joint_kind kind,
+    ColExpr&& col,
+    const se3<Scalar>& T_prev,
+    const screw_axis<Scalar>& axis)
+{
+    switch (kind)
+    {
+        case joint_kind::revolute_x:  jacobian_column<revolute_x>(col, T_prev, axis); return;
+        case joint_kind::revolute_y:  jacobian_column<revolute_y>(col, T_prev, axis); return;
+        case joint_kind::revolute_z:  jacobian_column<revolute_z>(col, T_prev, axis); return;
+        case joint_kind::prismatic_x: jacobian_column<prismatic_x>(col, T_prev, axis); return;
+        case joint_kind::prismatic_y: jacobian_column<prismatic_y>(col, T_prev, axis); return;
+        case joint_kind::prismatic_z: jacobian_column<prismatic_z>(col, T_prev, axis); return;
+        case joint_kind::general:
+        default:
+            col = T_prev.adjoint() * axis.to_vector();
+            return;
     }
 }
 
