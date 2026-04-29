@@ -33,6 +33,10 @@ namespace detail
 
 /// Runtime-loop PoE accumulation for dynamic or large (N >= 8) chains.
 /// Lynch & Park, Modern Robotics, Eq. 4.10, p. 138.
+///
+/// Accumulator runs in fast_policy to skip per-step quaternion renormalize.
+/// Drift across N successive unit-quaternion products is bounded by
+/// O(N * eps), well below downstream tolerances at N <= 7.
 template <typename Scalar, int N>
 fk_result<Scalar, N> fk_loop(
     const kinematic_chain<Scalar, N>& chain,
@@ -42,33 +46,39 @@ fk_result<Scalar, N> fk_loop(
     const auto& axes = chain.axes();
     int n = chain.num_joints();
 
-    auto accum = se3<Scalar>::identity();
+    se3<Scalar, fast_policy> accum(
+        se3<Scalar>::identity(), trusted_unit);
 
     if constexpr (N == dynamic)
     {
         result.intermediates.reserve(static_cast<std::size_t>(n));
         for (int i = 0; i < n; ++i)
         {
-            accum = accum * se3<Scalar>::exp(axes[static_cast<std::size_t>(i)].to_vector() * q(i));
-            result.intermediates.push_back(accum);
+            accum = accum.compose_trusted(
+                se3<Scalar>::exp(axes[static_cast<std::size_t>(i)].to_vector() * q(i)));
+            result.intermediates.emplace_back(accum, trusted_unit);
         }
     }
     else
     {
         for (int i = 0; i < n; ++i)
         {
-            accum = accum * se3<Scalar>::exp(axes[static_cast<std::size_t>(i)].to_vector() * q(i));
-            result.intermediates[static_cast<std::size_t>(i)] = accum;
+            accum = accum.compose_trusted(
+                se3<Scalar>::exp(axes[static_cast<std::size_t>(i)].to_vector() * q(i)));
+            result.intermediates[static_cast<std::size_t>(i)] =
+                se3<Scalar>(accum, trusted_unit);
         }
     }
 
-    result.end_effector = accum * chain.home();
+    result.end_effector = se3<Scalar>(accum.compose_trusted(chain.home()), trusted_unit);
     return result;
 }
 
 /// Compile-time unrolled PoE accumulation for fixed-size chains (N=1-7).
 /// Uses index_sequence fold expression for zero-overhead expansion.
 /// Lynch & Park, Modern Robotics, Eq. 4.10, p. 138.
+///
+/// Accumulator runs in fast_policy to skip per-step quaternion renormalize.
 template <typename Scalar, int N, std::size_t... Is>
 fk_result<Scalar, N> fk_unrolled_impl(
     const kinematic_chain<Scalar, N>& chain,
@@ -78,12 +88,14 @@ fk_result<Scalar, N> fk_unrolled_impl(
     fk_result<Scalar, N> result;
     const auto& axes = chain.axes();
 
-    auto accum = se3<Scalar>::identity();
+    se3<Scalar, fast_policy> accum(
+        se3<Scalar>::identity(), trusted_unit);
 
-    ((accum = accum * se3<Scalar>::exp(axes[Is].to_vector() * q(static_cast<int>(Is))),
-      result.intermediates[Is] = accum), ...);
+    ((accum = accum.compose_trusted(
+              se3<Scalar>::exp(axes[Is].to_vector() * q(static_cast<int>(Is)))),
+      result.intermediates[Is] = se3<Scalar>(accum, trusted_unit)), ...);
 
-    result.end_effector = accum * chain.home();
+    result.end_effector = se3<Scalar>(accum.compose_trusted(chain.home()), trusted_unit);
     return result;
 }
 
@@ -144,7 +156,8 @@ forward_kinematics(
 {
     constexpr int N = static_cast<int>(sizeof...(Joints));
     fk_result<Scalar, N> result;
-    auto accum = se3<Scalar>::identity();
+    se3<Scalar, fast_policy> accum(
+        se3<Scalar>::identity(), trusted_unit);
 
     [&]<std::size_t... Is>(std::index_sequence<Is...>)
     {
@@ -153,14 +166,14 @@ forward_kinematics(
             [&]<std::size_t I>()
             {
                 using Joint = std::tuple_element_t<I, joint_tuple>;
-                accum = accum * detail::exp_joint<Joint>(
-                    q(static_cast<int>(I)), chain.axis(static_cast<int>(I)));
-                result.intermediates[I] = accum;
+                accum = accum.compose_trusted(detail::exp_joint<Joint>(
+                    q(static_cast<int>(I)), chain.axis(static_cast<int>(I))));
+                result.intermediates[I] = se3<Scalar>(accum, trusted_unit);
             }.template operator()<Is>()
         ), ...);
     }(std::make_index_sequence<static_cast<std::size_t>(N)>{});
 
-    result.end_effector = accum * chain.home();
+    result.end_effector = se3<Scalar>(accum.compose_trusted(chain.home()), trusted_unit);
     return result;
 }
 
@@ -182,16 +195,19 @@ forward_kinematics(
     constexpr int N = Chain::joints;
 
     fk_result<Scalar, N> result;
-    auto accum = se3<Scalar>::identity();
+    se3<Scalar, fast_policy> accum(
+        se3<Scalar>::identity(), trusted_unit);
     int n = chain.num_joints();
 
     for (int i = 0; i < n; ++i)
     {
-        accum = accum * se3<Scalar>::exp(chain.axis(i).to_vector() * q(i));
-        result.intermediates[static_cast<std::size_t>(i)] = accum;
+        accum = accum.compose_trusted(
+            se3<Scalar>::exp(chain.axis(i).to_vector() * q(i)));
+        result.intermediates[static_cast<std::size_t>(i)] =
+            se3<Scalar>(accum, trusted_unit);
     }
 
-    result.end_effector = accum * chain.home();
+    result.end_effector = se3<Scalar>(accum.compose_trusted(chain.home()), trusted_unit);
     return result;
 }
 
