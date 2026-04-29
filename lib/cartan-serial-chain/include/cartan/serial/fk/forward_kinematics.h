@@ -55,7 +55,9 @@ fk_result<Scalar, N> fk_loop(
         for (int i = 0; i < n; ++i)
         {
             accum = accum.compose_trusted(
-                se3<Scalar>::exp(axes[static_cast<std::size_t>(i)].to_vector() * q(i)));
+                detail::exp_joint_runtime(
+                    chain.kind(i), q(i),
+                    axes[static_cast<std::size_t>(i)]));
             result.intermediates.emplace_back(accum, trusted_unit);
         }
     }
@@ -64,7 +66,9 @@ fk_result<Scalar, N> fk_loop(
         for (int i = 0; i < n; ++i)
         {
             accum = accum.compose_trusted(
-                se3<Scalar>::exp(axes[static_cast<std::size_t>(i)].to_vector() * q(i)));
+                detail::exp_joint_runtime(
+                    chain.kind(i), q(i),
+                    axes[static_cast<std::size_t>(i)]));
             result.intermediates[static_cast<std::size_t>(i)] =
                 se3<Scalar>(accum, trusted_unit);
         }
@@ -92,7 +96,10 @@ fk_result<Scalar, N> fk_unrolled_impl(
         se3<Scalar>::identity(), trusted_unit);
 
     ((accum = accum.compose_trusted(
-              se3<Scalar>::exp(axes[Is].to_vector() * q(static_cast<int>(Is)))),
+              detail::exp_joint_runtime(
+                  chain.kind(static_cast<int>(Is)),
+                  q(static_cast<int>(Is)),
+                  axes[Is])),
       result.intermediates[Is] = se3<Scalar>(accum, trusted_unit)), ...);
 
     result.end_effector = se3<Scalar>(accum.compose_trusted(chain.home()), trusted_unit);

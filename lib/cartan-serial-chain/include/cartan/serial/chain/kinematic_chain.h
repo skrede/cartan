@@ -15,6 +15,7 @@
 
 #include "cartan/serial/chain/screw_axis.h"
 #include "cartan/serial/chain/joint_limits.h"
+#include "cartan/serial/chain/joint_kind.h"
 #include "cartan/serial/chain/storage_trait.h"
 #include "cartan/serial/chain/chain_concept.h"
 
@@ -22,6 +23,7 @@
 
 #include <vector>
 #include <cassert>
+#include <cstddef>
 #include <type_traits>
 
 namespace cartan
@@ -43,6 +45,7 @@ public:
 
     using screw_storage = detail::storage_t<N, screw_axis<Scalar>>;
     using limits_storage = detail::storage_t<N, joint_limits<Scalar>>;
+    using kind_storage = detail::storage_t<N, joint_kind>;
 
     /// Construct a kinematic chain from home configuration, screw axes, and limits.
     /// @param home   End-effector pose at zero configuration (the M matrix).
@@ -57,6 +60,14 @@ public:
         , m_limits(std::move(limits))
     {
         assert(m_axes.size() == m_limits.size());
+        if constexpr (N == dynamic)
+        {
+            m_kinds.resize(m_axes.size());
+        }
+        for (std::size_t i = 0; i < m_axes.size(); ++i)
+        {
+            m_kinds[i] = detect_joint_kind(m_axes[i]);
+        }
     }
 
     /// Home configuration (M matrix): end-effector pose at zero joint angles.
@@ -80,6 +91,15 @@ public:
         return m_axes[static_cast<std::size_t>(i)];
     }
 
+    /// Cached joint_kind for joint i, used by FK/Jacobian fast-path dispatch.
+    [[nodiscard]] joint_kind kind(int i) const
+    {
+        return m_kinds[static_cast<std::size_t>(i)];
+    }
+
+    /// All cached joint_kinds.
+    [[nodiscard]] const kind_storage& kinds() const { return m_kinds; }
+
     /// Convert a fixed-size chain to a dynamic chain.
     /// Only available when N is a fixed (non-dynamic) value.
     [[nodiscard]] kinematic_chain<Scalar, dynamic> to_dynamic() const
@@ -95,6 +115,7 @@ private:
     se3<Scalar> m_home;         ///< End-effector home pose (M matrix)
     screw_storage m_axes;       ///< Space-frame screw axes S1..Sn
     limits_storage m_limits;    ///< Joint limits
+    kind_storage m_kinds{};     ///< Cached axis classification per joint
 };
 
 static_assert(chain<kinematic_chain<double, 3>>,
