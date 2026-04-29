@@ -31,6 +31,31 @@ public:
     {
     }
 
+    /// Construct from another-policy se3 without renormalizing the rotation.
+    /// Caller must ensure the source rotation is unit; debug builds validate
+    /// via the so3 trusted constructor's assert.
+    template <typename P2>
+    se3(const se3<Scalar, P2>& other, trusted_unit_t)
+        : m_rotation(other.rotation().quaternion_ref(), trusted_unit)
+        , m_translation(other.translation())
+    {
+    }
+
+    /// Group composition without renormalizing the result rotation.
+    /// Returns fast_policy se3; caller takes responsibility for accumulated
+    /// drift. Designed for FK chain accumulators where N successive unit
+    /// quaternion products keep ||q||^2 - 1 bounded by O(N * eps).
+    template <typename P2>
+    [[nodiscard]] se3<Scalar, fast_policy>
+    compose_trusted(const se3<Scalar, P2>& rhs) const
+    {
+        quaternion<Scalar> q = m_rotation.quaternion_ref()
+                             * rhs.rotation().quaternion_ref();
+        vector3<Scalar> t = m_rotation.act(rhs.translation()) + m_translation;
+        return se3<Scalar, fast_policy>(
+            so3<Scalar, fast_policy>(q), t);
+    }
+
     /// Exponential map: se(3) twist -> SE(3) transform.
     /// Twist V = (omega, rho) uses omega-first convention (D-11).
     /// Ref: Lynch & Park, Modern Robotics, Prop. 3.25/Eq. 3.88, p. 103.
