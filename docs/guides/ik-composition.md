@@ -146,9 +146,9 @@ auto solver = cartan::make_solver<double, 7>()
     .build();
 ```
 
-## nablapp Solvers
+## argmin Solvers
 
-The nablapp-backed policies (`slsqp_solve_policy`, `bobyqa_solve_policy`) are always available as nablapp is a required dependency of `cartan::kinematics`. They provide constrained optimization with joint limits as box bounds.
+The argmin-backed policies (`slsqp_solve_policy`, `bobyqa_solve_policy`) are always available as argmin is a required dependency of `cartan::kinematics`. They provide constrained optimization with joint limits as box bounds.
 
 ```cpp
 #include <cartan/ik/basic_ik_solver.h>
@@ -170,7 +170,7 @@ cartan::basic_ik_solver solver{cartan::bobyqa_solve_policy<double, 7>{}};
 
 ## Mixing Families
 
-Any combination of native, nablapp, and NLopt policies can race together in a single `basic_ik_solver`:
+Any combination of native, argmin, and NLopt policies can race together in a single `basic_ik_solver`:
 
 ```cpp
 #include <cartan/ik/basic_ik_solver.h>
@@ -178,7 +178,7 @@ Any combination of native, nablapp, and NLopt policies can race together in a si
 #include <cartan/ik/projected_lm_solve_policy.h>
 #include <cartan/ik/slsqp_solve_policy.h>
 
-// Race a native restart+projected-LM against nablapp SLSQP
+// Race a native restart+projected-LM against argmin SLSQP
 cartan::basic_ik_solver solver{
     cartan::restart_solve_policy{cartan::projected_lm_solve_policy<double, 7>{}},
     cartan::slsqp_solve_policy<double, 7>{}

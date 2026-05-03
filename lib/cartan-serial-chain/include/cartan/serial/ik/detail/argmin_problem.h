@@ -1,12 +1,12 @@
-#ifndef HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_NABLAPP_UNCONSTRAINED_PROBLEM_H
-#define HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_NABLAPP_UNCONSTRAINED_PROBLEM_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_ARGMIN_PROBLEM_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_ARGMIN_PROBLEM_H
 
-/// @file detail/nablapp_unconstrained_problem.h
-/// @brief Unconstrained adapter (formulation A) for nablapp solvers.
+/// @file detail/argmin_problem.h
+/// @brief Adapter wrapping cartan IK problem as argmin problem formulation.
 ///
-/// Satisfies nablapp::objective and nablapp::differentiable without
-/// bounds. Joint limits are enforced externally by the solve policy
-/// via clamping after each step.
+/// Satisfies argmin::objective, argmin::differentiable, and
+/// argmin::bound_constrained concepts so that argmin solvers
+/// (kraft_slsqp_policy, bobyqa_policy) can optimize cartan IK objectives.
 
 #include "cartan/serial/ik/policy/error_weight.h"
 #include "cartan/serial/ik/solver/detail/analytical_gradient.h"
@@ -19,13 +19,13 @@
 namespace cartan::detail
 {
 
-/// Unconstrained IK problem adapter for nablapp (formulation A).
+/// Adapts a cartan IK problem (chain + target + weight) to the argmin
+/// problem formulation concepts (objective, differentiable, bound_constrained).
 ///
-/// Provides objective and gradient only. No bounds are exposed to
-/// the solver; the calling solve policy is responsible for clamping
-/// the iterate to joint limits after each nablapp step.
+/// Uses ik_se3_objective for consistent objective and gradient evaluation
+/// with SE(3) log Jacobian analytical gradient.
 template <chain Chain>
-class nablapp_unconstrained_ik_problem
+class argmin_ik_problem
 {
     using Scalar = typename Chain::scalar_type;
     static constexpr int N = Chain::joints;
@@ -34,7 +34,7 @@ class nablapp_unconstrained_ik_problem
 public:
     static constexpr int problem_dimension = N;
 
-    nablapp_unconstrained_ik_problem(
+    argmin_ik_problem(
         const Chain& chain,
         const se3<Scalar>& target,
         const error_weight<Scalar>& weight)
@@ -70,7 +70,36 @@ public:
         }
     }
 
-private:
+    Eigen::Vector<double, N> lower_bounds() const
+    {
+        int n = m_chain->num_joints();
+        Eigen::Vector<double, N> lb;
+        if constexpr (N == dynamic)
+        {
+            lb.resize(n);
+        }
+        for (int i = 0; i < n; ++i)
+        {
+            lb[i] = static_cast<double>(m_chain->limits()[static_cast<std::size_t>(i)].position_min);
+        }
+        return lb;
+    }
+
+    Eigen::Vector<double, N> upper_bounds() const
+    {
+        int n = m_chain->num_joints();
+        Eigen::Vector<double, N> ub;
+        if constexpr (N == dynamic)
+        {
+            ub.resize(n);
+        }
+        for (int i = 0; i < n; ++i)
+        {
+            ub[i] = static_cast<double>(m_chain->limits()[static_cast<std::size_t>(i)].position_max);
+        }
+        return ub;
+    }
+
     template <typename Derived>
     position_type to_position(const Eigen::MatrixBase<Derived>& x) const
     {
@@ -95,6 +124,7 @@ private:
         }
     }
 
+private:
     const Chain* m_chain;
     se3<Scalar> m_target;
     error_weight<Scalar> m_weight;

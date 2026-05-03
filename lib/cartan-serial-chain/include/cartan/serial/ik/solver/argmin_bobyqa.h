@@ -2,11 +2,11 @@
 #define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_ARGMIN_BOBYQA_H
 
 /// @file argmin_bobyqa.h
-/// @brief nablapp-backed BOBYQA derivative-free IK solve policy with box constraints.
+/// @brief argmin-backed BOBYQA derivative-free IK solve policy with box constraints.
 ///
-/// Wraps nablapp's bobyqa_policy for constrained IK, using joint limits
+/// Wraps argmin's bobyqa_policy for constrained IK, using joint limits
 /// as box constraints. Derivative-free -- uses only objective evaluations.
-/// Always available -- nablapp is a required dependency of cartan::kinematics.
+/// Always available -- argmin is a required dependency of cartan::kinematics.
 ///
 /// Reference: Powell 2009, BOBYQA algorithm for bound constrained optimization.
 
@@ -15,7 +15,7 @@
 #include "cartan/serial/ik/policy/limits_policy.h"
 #include "cartan/serial/ik/concepts/solve_concept.h"
 #include "cartan/serial/ik/detail/convergence.h"
-#include "cartan/serial/ik/detail/nablapp_problem.h"
+#include "cartan/serial/ik/detail/argmin_problem.h"
 #include "cartan/serial/ik/detail/stall_detection.h"
 #include "cartan/serial/ik/detail/limit_enforcement.h"
 
@@ -24,9 +24,9 @@
 #include "cartan/serial/chain/chain_concept.h"
 #include "cartan/serial/fk/forward_kinematics.h"
 
-#include <nablapp/solver/options.h>
-#include <nablapp/solver/basic_solver.h>
-#include <nablapp/solver/bobyqa_policy.h>
+#include <argmin/solver/options.h>
+#include <argmin/solver/basic_solver.h>
+#include <argmin/solver/bobyqa_policy.h>
 
 #include <Eigen/Core>
 
@@ -38,11 +38,11 @@
 namespace cartan::ik
 {
 
-/// nablapp-backed BOBYQA solve policy for constrained IK with box constraints.
+/// argmin-backed BOBYQA solve policy for constrained IK with box constraints.
 ///
-/// Uses Powell's Bound Optimization BY Quadratic Approximation via nablapp.
+/// Uses Powell's Bound Optimization BY Quadratic Approximation via argmin.
 /// Derivative-free: builds a quadratic interpolation model of the objective
-/// and uses trust-region steps. Each step() call runs a budget of nablapp
+/// and uses trust-region steps. Each step() call runs a budget of argmin
 /// iterations for cooperative scheduling in basic_ik_solver.
 ///
 /// This is the default (unprefixed) BOBYQA policy. The NLopt-backed variant
@@ -101,7 +101,7 @@ public:
             x0[i] = static_cast<double>(q0[i]);
         }
 
-        nablapp::solver_options<> nab_opts;
+        argmin::solver_options<> nab_opts;
         nab_opts.max_iterations = m_options.budget_per_step;
         nab_opts.set_gradient_threshold(0.0);
         nab_opts.set_objective_threshold(1e-14);
@@ -151,13 +151,13 @@ public:
             return m_status;
         }
 
-        if (result.status == nablapp::solver_status::converged
-            || result.status == nablapp::solver_status::ftol_reached
-            || result.status == nablapp::solver_status::stalled
-            || result.status == nablapp::solver_status::xtol_reached
-            || result.status == nablapp::solver_status::roundoff_limited
-            || result.status == nablapp::solver_status::objective_stalled
-            || result.status == nablapp::solver_status::aborted)
+        if (result.status == argmin::solver_status::converged
+            || result.status == argmin::solver_status::ftol_reached
+            || result.status == argmin::solver_status::stalled
+            || result.status == argmin::solver_status::xtol_reached
+            || result.status == argmin::solver_status::roundoff_limited
+            || result.status == argmin::solver_status::objective_stalled
+            || result.status == argmin::solver_status::aborted)
         {
             m_status = ik_status::stalled;
             return m_status;
@@ -176,8 +176,8 @@ public:
     void abort() { m_status = ik_status::stalled; }
 
 private:
-    using nablapp_solver = nablapp::basic_solver<
-        nablapp::bobyqa_policy<joints>, joints, cartan::detail::nablapp_ik_problem<Chain>>;
+    using argmin_solver = argmin::basic_solver<
+        argmin::bobyqa_policy<joints>, joints, cartan::detail::argmin_ik_problem<Chain>>;
 
     void sync_solution_from_solver()
     {
@@ -204,8 +204,8 @@ private:
     scalar_type m_error_norm{std::numeric_limits<scalar_type>::max()};
     int m_iterations{};
     ik_status m_status{ik_status::running};
-    std::optional<cartan::detail::nablapp_ik_problem<Chain>> m_problem;
-    std::optional<nablapp_solver> m_solver;
+    std::optional<cartan::detail::argmin_ik_problem<Chain>> m_problem;
+    std::optional<argmin_solver> m_solver;
 };
 
 }

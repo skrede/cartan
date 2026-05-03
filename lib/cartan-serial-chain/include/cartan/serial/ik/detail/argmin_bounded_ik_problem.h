@@ -1,12 +1,12 @@
-#ifndef HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_NABLAPP_BOUNDED_IK_PROBLEM_H
-#define HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_NABLAPP_BOUNDED_IK_PROBLEM_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_ARGMIN_BOUNDED_IK_PROBLEM_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_ARGMIN_BOUNDED_IK_PROBLEM_H
 
-/// @file detail/nablapp_bounded_ik_problem.h
-/// @brief Bound-constrained adapter for nablapp solvers that treat joint
+/// @file detail/argmin_bounded_ik_problem.h
+/// @brief Bound-constrained adapter for argmin solvers that treat joint
 ///        limits as box constraints (no inequality constraints).
 ///
-/// Satisfies nablapp::objective, nablapp::differentiable, and
-/// nablapp::bound_constrained. Joint limits are returned from
+/// Satisfies argmin::objective, argmin::differentiable, and
+/// argmin::bound_constrained. Joint limits are returned from
 /// lower_bounds() / upper_bounds() so policies with native box-constrained
 /// handling (mma_policy, gcmma_policy, lbfgsb_policy) use the natural
 /// formulation rather than encoding limits as 2n redundant inequality
@@ -29,14 +29,14 @@
 namespace cartan::detail
 {
 
-/// Bound-constrained IK problem adapter for nablapp.
+/// Bound-constrained IK problem adapter for argmin.
 ///
 /// Exposes the IK SE(3) log-error objective and analytical gradient,
 /// plus joint limits as box bounds. No inequality or equality
 /// constraints are reported, keeping the formulation clean for native
 /// bound-constrained policies (MMA / GCMMA / L-BFGS-B).
 template <chain Chain>
-class nablapp_bounded_ik_problem
+class argmin_bounded_ik_problem
 {
     using Scalar = typename Chain::scalar_type;
     static constexpr int N = Chain::joints;
@@ -45,7 +45,7 @@ class nablapp_bounded_ik_problem
 public:
     static constexpr int problem_dimension = N;
 
-    nablapp_bounded_ik_problem(
+    argmin_bounded_ik_problem(
         const Chain& chain,
         const se3<Scalar>& target,
         const error_weight<Scalar>& weight)
@@ -84,7 +84,7 @@ public:
     int num_equality() const { return 0; }
     int num_inequality() const { return 0; }
 
-    // Stub methods required by nablapp::constrained concept (MMA / GCMMA
+    // Stub methods required by argmin::constrained concept (MMA / GCMMA
     // static_assert constrained<Problem>). Never invoked at runtime
     // because both counts above are zero, but must be present for the
     // concept to be satisfied.

@@ -27,7 +27,7 @@
 #include <cartan/serial/ik/solver/argmin_projected_gradient_gn.h>
 #include <cartan/serial/ik/solver/mma.h>
 #include <cartan/serial/ik/solver/gcmma.h>
-#include <cartan/serial/ik/detail/nablapp_problem.h>
+#include <cartan/serial/ik/detail/argmin_problem.h>
 #include <cartan/serial/ik/solver/detail/analytical_gradient.h>
 #endif
 #include <cartan/serial/fk/forward_kinematics.h>
@@ -844,12 +844,12 @@ BENCHMARK(bm_comparison_kuka_lwr4_cartan_racing)->Iterations(1000)->Unit(benchma
 
 #ifdef CARTAN_BUILD_ARGMIN
 // ============================================================================
-// nablapp comparison benchmarks (three D-10 axes)
+// argmin comparison benchmarks (three D-10 axes)
 // ============================================================================
 
-/// Generic nablapp-backed solver comparison benchmark.
+/// Generic argmin-backed solver comparison benchmark.
 template <int N, typename Solver>
-void bm_nablapp_comparison(
+void bm_argmin_comparison(
     benchmark::State& state,
     const cartan::kinematic_chain<double, N>& chain,
     const target_set<double, N>& ts,
@@ -902,40 +902,40 @@ void bm_nablapp_comparison(
 template <int N>
 using chain_t = cartan::kinematic_chain<double, N>;
 
-// nablapp solver type aliases for comparison benchmarks
+// argmin solver type aliases for comparison benchmarks
 template <int N>
-using nablapp_slsqp_solver = cartan::basic_ik_runner<
+using argmin_slsqp_solver = cartan::basic_ik_runner<
     cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::argmin_slsqp<chain_t<N>>>>;
 
 // NLopt-compatible convergence variant: same solver, different stopping rules.
-// Uses nablapp::slsqp_compatible_convergence (ftol_rel + xtol_rel + stall,
+// Uses argmin::slsqp_compatible_convergence (ftol_rel + xtol_rel + stall,
 // no gradient-norm check) via argmin_slsqp_nlopt_compat.
 template <int N>
-using nablapp_slsqp_nlopt_compat_solver = cartan::basic_ik_runner<
+using argmin_slsqp_nlopt_compat_solver = cartan::basic_ik_runner<
     cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::argmin_slsqp_nlopt_compat<chain_t<N>>>>;
 
 template <int N>
-using nablapp_lbfgsb_solver = cartan::basic_ik_runner<
+using argmin_lbfgsb_solver = cartan::basic_ik_runner<
     cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::argmin_lbfgsb<chain_t<N>>>>;
 
 template <int N>
-using nablapp_nw_sqp_solver = cartan::basic_ik_runner<
+using argmin_nw_sqp_solver = cartan::basic_ik_runner<
     cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::nw_sqp<chain_t<N>>>>;
 
 template <int N>
-using nablapp_projected_gn_comparison_solver = cartan::basic_ik_runner<
+using argmin_projected_gn_comparison_solver = cartan::basic_ik_runner<
     cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::argmin_projected_gn<chain_t<N>>>>;
 
 template <int N>
-using nablapp_projected_gradient_gn_comparison_solver = cartan::basic_ik_runner<
+using argmin_projected_gradient_gn_comparison_solver = cartan::basic_ik_runner<
     cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::argmin_projected_gradient_gn<chain_t<N>>>>;
 
 template <int N>
-using nablapp_mma_solver = cartan::basic_ik_runner<
+using argmin_mma_solver = cartan::basic_ik_runner<
     cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::mma<chain_t<N>>>>;
 
 template <int N>
-using nablapp_gcmma_solver = cartan::basic_ik_runner<
+using argmin_gcmma_solver = cartan::basic_ik_runner<
     cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::gcmma<chain_t<N>>>>;
 
 // NLopt solver type aliases (gated behind CARTAN_HAS_NLOPT)
@@ -950,102 +950,102 @@ using nlopt_bobyqa_solver = cartan::basic_ik_runner<
 #endif
 
 // Convergence criteria shared across comparison benchmarks
-inline cartan::convergence_criteria<double> nablapp_comparison_criteria() { return {1e-5, 1e-5, 500}; }
+inline cartan::convergence_criteria<double> argmin_comparison_criteria() { return {1e-5, 1e-5, 500}; }
 
 // ============================================================================
 // Axis 1: Formulation comparison (bound-constrained vs inequality-constrained)
 // ============================================================================
-// UR3e representative: nablapp SLSQP (bound-constrained) vs NW-SQP (inequality)
+// UR3e representative: argmin SLSQP (bound-constrained) vs NW-SQP (inequality)
 
-static void bm_comparison_ur3e_nablapp_slsqp_bounded(benchmark::State& state)
+static void bm_comparison_ur3e_argmin_slsqp_bounded(benchmark::State& state)
 {
     auto chain = cartan::benchmarks::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
-    bm_nablapp_comparison<6, nablapp_slsqp_solver<6>>(state, chain, ts, nablapp_comparison_criteria());
+    bm_argmin_comparison<6, argmin_slsqp_solver<6>>(state, chain, ts, argmin_comparison_criteria());
 }
-BENCHMARK(bm_comparison_ur3e_nablapp_slsqp_bounded)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_ur3e_argmin_slsqp_bounded)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_ur3e_nw_sqp_inequality(benchmark::State& state)
 {
     auto chain = cartan::benchmarks::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
-    bm_nablapp_comparison<6, nablapp_nw_sqp_solver<6>>(state, chain, ts, nablapp_comparison_criteria());
+    bm_argmin_comparison<6, argmin_nw_sqp_solver<6>>(state, chain, ts, argmin_comparison_criteria());
 }
 BENCHMARK(bm_comparison_ur3e_nw_sqp_inequality)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 // ============================================================================
-// Axis 2: Backend head-to-head (nablapp vs NLopt same-algorithm)
+// Axis 2: Backend head-to-head (argmin vs NLopt same-algorithm)
 // ============================================================================
 
-static void bm_comparison_ur3e_nablapp_slsqp(benchmark::State& state)
+static void bm_comparison_ur3e_argmin_slsqp(benchmark::State& state)
 {
     auto chain = cartan::benchmarks::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
-    bm_nablapp_comparison<6, nablapp_slsqp_solver<6>>(state, chain, ts, nablapp_comparison_criteria());
+    bm_argmin_comparison<6, argmin_slsqp_solver<6>>(state, chain, ts, argmin_comparison_criteria());
 }
-BENCHMARK(bm_comparison_ur3e_nablapp_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_ur3e_argmin_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
-static void bm_comparison_ur3e_nablapp_projected_gn(benchmark::State& state)
+static void bm_comparison_ur3e_argmin_projected_gn(benchmark::State& state)
 {
     auto chain = cartan::benchmarks::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
-    bm_nablapp_comparison<6, nablapp_projected_gn_comparison_solver<6>>(
-        state, chain, ts, nablapp_comparison_criteria());
+    bm_argmin_comparison<6, argmin_projected_gn_comparison_solver<6>>(
+        state, chain, ts, argmin_comparison_criteria());
 }
-BENCHMARK(bm_comparison_ur3e_nablapp_projected_gn)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_ur3e_argmin_projected_gn)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
-static void bm_comparison_ur3e_nablapp_projected_gradient_gn(benchmark::State& state)
+static void bm_comparison_ur3e_argmin_projected_gradient_gn(benchmark::State& state)
 {
     auto chain = cartan::benchmarks::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
-    bm_nablapp_comparison<6, nablapp_projected_gradient_gn_comparison_solver<6>>(
-        state, chain, ts, nablapp_comparison_criteria());
+    bm_argmin_comparison<6, argmin_projected_gradient_gn_comparison_solver<6>>(
+        state, chain, ts, argmin_comparison_criteria());
 }
-BENCHMARK(bm_comparison_ur3e_nablapp_projected_gradient_gn)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_ur3e_argmin_projected_gradient_gn)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 // MMA / GCMMA entries for UR3e.
-static void bm_comparison_ur3e_nablapp_mma(benchmark::State& state)
+static void bm_comparison_ur3e_argmin_mma(benchmark::State& state)
 {
     auto chain = cartan::benchmarks::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
-    bm_nablapp_comparison<6, nablapp_mma_solver<6>>(state, chain, ts, nablapp_comparison_criteria());
+    bm_argmin_comparison<6, argmin_mma_solver<6>>(state, chain, ts, argmin_comparison_criteria());
 }
-BENCHMARK(bm_comparison_ur3e_nablapp_mma)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_ur3e_argmin_mma)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
-static void bm_comparison_ur3e_nablapp_gcmma(benchmark::State& state)
+static void bm_comparison_ur3e_argmin_gcmma(benchmark::State& state)
 {
     auto chain = cartan::benchmarks::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
-    bm_nablapp_comparison<6, nablapp_gcmma_solver<6>>(state, chain, ts, nablapp_comparison_criteria());
+    bm_argmin_comparison<6, argmin_gcmma_solver<6>>(state, chain, ts, argmin_comparison_criteria());
 }
-BENCHMARK(bm_comparison_ur3e_nablapp_gcmma)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_ur3e_argmin_gcmma)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 // NLopt-compatible convergence variant of the UR3e SLSQP bench.
 // Uses argmin_slsqp_nlopt_compat which instantiates argmin_slsqp with
-// nablapp::slsqp_compatible_convergence. The default ftol_rel=1e-10 /
+// argmin::slsqp_compatible_convergence. The default ftol_rel=1e-10 /
 // xtol_rel=1e-10 relative thresholds on argmin_slsqp::options match
 // NLopt SLSQP's stop-rule behavior. This is the key experiment for the
-// "nablapp takes 4x more outer iterations than nlopt" gap.
-static void bm_comparison_ur3e_nablapp_slsqp_nlopt_compat(benchmark::State& state)
+// "argmin takes 4x more outer iterations than nlopt" gap.
+static void bm_comparison_ur3e_argmin_slsqp_nlopt_compat(benchmark::State& state)
 {
     auto chain = cartan::benchmarks::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
-    bm_nablapp_comparison<6, nablapp_slsqp_nlopt_compat_solver<6>>(
-        state, chain, ts, nablapp_comparison_criteria());
+    bm_argmin_comparison<6, argmin_slsqp_nlopt_compat_solver<6>>(
+        state, chain, ts, argmin_comparison_criteria());
 }
-BENCHMARK(bm_comparison_ur3e_nablapp_slsqp_nlopt_compat)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_ur3e_argmin_slsqp_nlopt_compat)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
-// Armijo c1 sweep for nablapp SLSQP on UR3e IK. Diagnostic benchmark set
+// Armijo c1 sweep for argmin SLSQP on UR3e IK. Diagnostic benchmark set
 // accompanying the phi_ls backtrack investigation: loosening c1 reduces
 // Armijo aggressiveness, cutting backtrack calls on expensive-objective
 // problems like IK where every phi(alpha) call is a full FK evaluation.
 // Reference: N&W Eq. 3.6a, p. 33. Three points bracket the default 1e-4.
 template <double C1>
-static void bm_comparison_ur3e_nablapp_slsqp_c1_impl(benchmark::State& state)
+static void bm_comparison_ur3e_argmin_slsqp_c1_impl(benchmark::State& state)
 {
     auto chain = cartan::benchmarks::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
-    const auto criteria = nablapp_comparison_criteria();
+    const auto criteria = argmin_comparison_criteria();
 
     cartan::ik::argmin_slsqp<chain_t<6>>::options slsqp_opts{};
     slsqp_opts.line_search_c1 = C1;
@@ -1064,7 +1064,7 @@ static void bm_comparison_ur3e_nablapp_slsqp_c1_impl(benchmark::State& state)
 
         cartan::ik::argmin_slsqp<chain_t<6>> inner{slsqp_opts};
         cartan::ik::restart_wrapper<chain_t<6>, cartan::ik::argmin_slsqp<chain_t<6>>> wrapper{std::move(inner)};
-        nablapp_slsqp_solver<6> solver{std::move(wrapper)};
+        argmin_slsqp_solver<6> solver{std::move(wrapper)};
 
         solver.setup(chain, target, q_seed, criteria);
         auto result = solver.solve();
@@ -1097,31 +1097,31 @@ static void bm_comparison_ur3e_nablapp_slsqp_c1_impl(benchmark::State& state)
     state.counters["c1"] = benchmark::Counter(C1, benchmark::Counter::kDefaults);
 }
 
-static void bm_comparison_ur3e_nablapp_slsqp_c1_1em5(benchmark::State& state)
+static void bm_comparison_ur3e_argmin_slsqp_c1_1em5(benchmark::State& state)
 {
-    bm_comparison_ur3e_nablapp_slsqp_c1_impl<1e-5>(state);
+    bm_comparison_ur3e_argmin_slsqp_c1_impl<1e-5>(state);
 }
-BENCHMARK(bm_comparison_ur3e_nablapp_slsqp_c1_1em5)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_ur3e_argmin_slsqp_c1_1em5)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
-static void bm_comparison_ur3e_nablapp_slsqp_c1_1em4(benchmark::State& state)
+static void bm_comparison_ur3e_argmin_slsqp_c1_1em4(benchmark::State& state)
 {
-    bm_comparison_ur3e_nablapp_slsqp_c1_impl<1e-4>(state);
+    bm_comparison_ur3e_argmin_slsqp_c1_impl<1e-4>(state);
 }
-BENCHMARK(bm_comparison_ur3e_nablapp_slsqp_c1_1em4)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_ur3e_argmin_slsqp_c1_1em4)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
-static void bm_comparison_ur3e_nablapp_slsqp_c1_1em3(benchmark::State& state)
+static void bm_comparison_ur3e_argmin_slsqp_c1_1em3(benchmark::State& state)
 {
-    bm_comparison_ur3e_nablapp_slsqp_c1_impl<1e-3>(state);
+    bm_comparison_ur3e_argmin_slsqp_c1_impl<1e-3>(state);
 }
-BENCHMARK(bm_comparison_ur3e_nablapp_slsqp_c1_1em3)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_ur3e_argmin_slsqp_c1_1em3)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 // Standalone phi_ls counter read — diagnostic only.
 //
 // Constructs argmin_slsqp directly (no restart_wrapper, no
 // basic_ik_runner) so the cumulative line_search_calls counter on
 // kraft_slsqp_policy::state_type survives across the entire solve
-// without being reset on a restart. Reports mean calls/nablapp_step
-// across 1000 UR3e poses as a benchmark counter. Answers nablapp
+// without being reset on a restart. Reports mean calls/argmin_step
+// across 1000 UR3e poses as a benchmark counter. Answers argmin
 // turn-07 revised hypothesis test: <=1.3 means backtracks are not
 // the driver; ~2-2.5 matches HS071 compile-time baseline; >=3 means
 // backtracks are elevated and nonmonotone merit / c1 loosening is
@@ -1132,18 +1132,18 @@ BENCHMARK(bm_comparison_ur3e_nablapp_slsqp_c1_1em3)->Iterations(1000)->Unit(benc
 // one with 500 (so one cartan::argmin_slsqp::step() runs the
 // kraft_slsqp to convergence or termination in isolation).
 template <int BudgetPerStep>
-static void bm_comparison_ur3e_nablapp_slsqp_phi_ls_calls_impl(benchmark::State& state)
+static void bm_comparison_ur3e_argmin_slsqp_phi_ls_calls_impl(benchmark::State& state)
 {
     auto chain = cartan::benchmarks::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
-    const auto criteria = nablapp_comparison_criteria();
+    const auto criteria = argmin_comparison_criteria();
 
     cartan::ik::argmin_slsqp<chain_t<6>>::options slsqp_opts{};
     slsqp_opts.budget_per_step = BudgetPerStep;
 
     std::size_t idx = 0;
     std::uint64_t total_ls = 0;
-    std::uint64_t total_nablapp_steps = 0;
+    std::uint64_t total_argmin_steps = 0;
     int total_cartan_outer = 0;
     int successes = 0;
 
@@ -1162,7 +1162,7 @@ static void bm_comparison_ur3e_nablapp_slsqp_phi_ls_calls_impl(benchmark::State&
         }
 
         total_ls += solver.line_search_calls();
-        total_nablapp_steps += static_cast<std::uint64_t>(solver.nablapp_iterations());
+        total_argmin_steps += static_cast<std::uint64_t>(solver.argmin_iterations());
         total_cartan_outer += solver.iterations();
         if (solver.status() == cartan::ik_status::converged)
             ++successes;
@@ -1176,13 +1176,13 @@ static void bm_comparison_ur3e_nablapp_slsqp_phi_ls_calls_impl(benchmark::State&
         benchmark::Counter::kAvgThreads);
     state.counters["total_phi_ls_calls"] = benchmark::Counter(
         static_cast<double>(total_ls), benchmark::Counter::kDefaults);
-    state.counters["total_nablapp_steps"] = benchmark::Counter(
-        static_cast<double>(total_nablapp_steps), benchmark::Counter::kDefaults);
-    state.counters["phi_ls_per_nablapp_step"] = benchmark::Counter(
-        static_cast<double>(total_ls) / std::max<double>(1.0, static_cast<double>(total_nablapp_steps)),
+    state.counters["total_argmin_steps"] = benchmark::Counter(
+        static_cast<double>(total_argmin_steps), benchmark::Counter::kDefaults);
+    state.counters["phi_ls_per_argmin_step"] = benchmark::Counter(
+        static_cast<double>(total_ls) / std::max<double>(1.0, static_cast<double>(total_argmin_steps)),
         benchmark::Counter::kDefaults);
-    state.counters["avg_nablapp_step_per_pose"] = benchmark::Counter(
-        static_cast<double>(total_nablapp_steps) / std::max(total, 1),
+    state.counters["avg_argmin_step_per_pose"] = benchmark::Counter(
+        static_cast<double>(total_argmin_steps) / std::max(total, 1),
         benchmark::Counter::kDefaults);
     state.counters["avg_cartan_outer_iter"] = benchmark::Counter(
         static_cast<double>(total_cartan_outer) / std::max(total, 1),
@@ -1191,42 +1191,42 @@ static void bm_comparison_ur3e_nablapp_slsqp_phi_ls_calls_impl(benchmark::State&
         static_cast<double>(BudgetPerStep), benchmark::Counter::kDefaults);
 }
 
-static void bm_comparison_ur3e_nablapp_slsqp_phi_ls_calls_budget50(benchmark::State& state)
+static void bm_comparison_ur3e_argmin_slsqp_phi_ls_calls_budget50(benchmark::State& state)
 {
-    bm_comparison_ur3e_nablapp_slsqp_phi_ls_calls_impl<50>(state);
+    bm_comparison_ur3e_argmin_slsqp_phi_ls_calls_impl<50>(state);
 }
-BENCHMARK(bm_comparison_ur3e_nablapp_slsqp_phi_ls_calls_budget50)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_ur3e_argmin_slsqp_phi_ls_calls_budget50)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
-static void bm_comparison_ur3e_nablapp_slsqp_phi_ls_calls_budget500(benchmark::State& state)
+static void bm_comparison_ur3e_argmin_slsqp_phi_ls_calls_budget500(benchmark::State& state)
 {
-    bm_comparison_ur3e_nablapp_slsqp_phi_ls_calls_impl<500>(state);
+    bm_comparison_ur3e_argmin_slsqp_phi_ls_calls_impl<500>(state);
 }
-BENCHMARK(bm_comparison_ur3e_nablapp_slsqp_phi_ls_calls_budget500)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_ur3e_argmin_slsqp_phi_ls_calls_budget500)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 // Dynamic-N variant: construct argmin_slsqp against a kinematic_chain
 // with runtime-known joint count. This instantiates
-// kraft_slsqp_policy<cartan::dynamic> (== nablapp::dynamic_dimension),
+// kraft_slsqp_policy<cartan::dynamic> (== argmin::dynamic_dimension),
 // which is the pre-workspace-templating code path that Eigen dispatches
 // to its dynamic kernels rather than the fixed-6 specialization. Paired
 // with the fixed-6 variant above, this isolates whether the compile-
-// time N path adds the ~0.9 backtracks/step delta at N=6 that nablapp
+// time N path adds the ~0.9 backtracks/step delta at N=6 that argmin
 // measured at N=4 on HS071 (2.0 compile-time vs 1.11 dynamic).
-// Diagnostic: reads the last_check_results telemetry from nablapp's
+// Diagnostic: reads the last_check_results telemetry from argmin's
 // convergence policy on a single direct-drive UR3e solve per iteration.
 // Answers the turn-11 falsification test: at cartan-tight tolerances
 // (gradient=1e-12, objective=1e-14, step=1e-14), which of the four
-// default_convergence criteria actually fires? Expected per nablapp's
+// default_convergence criteria actually fires? Expected per argmin's
 // turn-11 corrected mechanism: [0] gradient_tolerance NEVER fires
 // (unreachable near singular poses), [2] step_tolerance fires.
 //
 // Emits one counter per criterion plus the first-firing index. 0 means
-// "did not fire" (nullopt), otherwise the nablapp::solver_status enum
+// "did not fire" (nullopt), otherwise the argmin::solver_status enum
 // value the criterion would have reported.
-static void bm_comparison_ur3e_nablapp_slsqp_last_check_results(benchmark::State& state)
+static void bm_comparison_ur3e_argmin_slsqp_last_check_results(benchmark::State& state)
 {
     auto chain = cartan::benchmarks::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
-    const auto criteria = nablapp_comparison_criteria();
+    const auto criteria = argmin_comparison_criteria();
 
     cartan::ik::argmin_slsqp<chain_t<6>>::options slsqp_opts{};
     slsqp_opts.budget_per_step = 500;
@@ -1278,7 +1278,7 @@ static void bm_comparison_ur3e_nablapp_slsqp_last_check_results(benchmark::State
     state.counters["total_solves"] = benchmark::Counter(
         static_cast<double>(total), benchmark::Counter::kDefaults);
 }
-BENCHMARK(bm_comparison_ur3e_nablapp_slsqp_last_check_results)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_ur3e_argmin_slsqp_last_check_results)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 // Gradient-threshold sweep on UR3e SLSQP with default_convergence, direct-
 // drive (no runner, no restart wrapper). Parameterizes cartan's
@@ -1290,14 +1290,14 @@ BENCHMARK(bm_comparison_ur3e_nablapp_slsqp_last_check_results)->Iterations(1000)
 // Tests whether relaxing gradient_threshold recovers wall on the 19.2%
 // gradient_tolerance-bound UR3e subset without degrading the 80.8% step_
 // tolerance-bound subset or losing pose-tolerance success.
-static void bm_comparison_ur3e_nablapp_slsqp_grad_sweep(benchmark::State& state)
+static void bm_comparison_ur3e_argmin_slsqp_grad_sweep(benchmark::State& state)
 {
     const int exponent = static_cast<int>(state.range(0));
     const double gradient_threshold = std::pow(10.0, -static_cast<double>(exponent));
 
     auto chain = cartan::benchmarks::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
-    const auto criteria = nablapp_comparison_criteria();
+    const auto criteria = argmin_comparison_criteria();
 
     cartan::ik::argmin_slsqp<chain_t<6>>::options slsqp_opts{};
     slsqp_opts.budget_per_step = 500;
@@ -1366,17 +1366,17 @@ static void bm_comparison_ur3e_nablapp_slsqp_grad_sweep(benchmark::State& state)
     state.counters["total_solves"] = benchmark::Counter(
         static_cast<double>(total), benchmark::Counter::kDefaults);
 }
-BENCHMARK(bm_comparison_ur3e_nablapp_slsqp_grad_sweep)
+BENCHMARK(bm_comparison_ur3e_argmin_slsqp_grad_sweep)
     ->Arg(6)->Arg(8)->Arg(10)->Arg(12)
     ->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 // Budget-per-step sweep on UR3e SLSQP with cartan-tight default_
 // convergence, direct-drive (no runner, no restart wrapper).
-// state.range(0) is `budget_per_step` (nablapp `max_iterations` per
+// state.range(0) is `budget_per_step` (argmin `max_iterations` per
 // cartan-outer step). Holds gradient_threshold = 1e-12 and cartan-
 // tight objective/step thresholds so only the inner iteration budget
 // moves. Emits wall per solve, direct-drive pose-tolerance success
-// rate, avg nablapp-inner-steps of converged solves, cartan-outer
+// rate, avg argmin-inner-steps of converged solves, cartan-outer
 // iteration count (from solver.iterations()), and the last_check_
 // results firing profile at each budget.
 //
@@ -1386,13 +1386,13 @@ BENCHMARK(bm_comparison_ur3e_nablapp_slsqp_grad_sweep)
 // budget_per_step from 500 → 1000 → 2000 → 4000 should raise direct-
 // drive success rate. If success is flat across the sweep, the
 // budget is not the exit reason and H1 is falsified.
-static void bm_comparison_ur3e_nablapp_slsqp_budget_sweep(benchmark::State& state)
+static void bm_comparison_ur3e_argmin_slsqp_budget_sweep(benchmark::State& state)
 {
     const int budget_per_step = static_cast<int>(state.range(0));
 
     auto chain = cartan::benchmarks::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
-    const auto criteria = nablapp_comparison_criteria();
+    const auto criteria = argmin_comparison_criteria();
 
     cartan::ik::argmin_slsqp<chain_t<6>>::options slsqp_opts{};
     slsqp_opts.budget_per_step = budget_per_step;
@@ -1466,15 +1466,15 @@ static void bm_comparison_ur3e_nablapp_slsqp_budget_sweep(benchmark::State& stat
     state.counters["total_solves"] = benchmark::Counter(
         static_cast<double>(total), benchmark::Counter::kDefaults);
 }
-BENCHMARK(bm_comparison_ur3e_nablapp_slsqp_budget_sweep)
+BENCHMARK(bm_comparison_ur3e_argmin_slsqp_budget_sweep)
     ->Arg(500)->Arg(1000)->Arg(2000)->Arg(4000)
     ->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
-static void bm_comparison_ur3e_nablapp_slsqp_retry(benchmark::State& state)
+static void bm_comparison_ur3e_argmin_slsqp_retry(benchmark::State& state)
 {
     auto chain = cartan::benchmarks::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
-    const auto criteria = nablapp_comparison_criteria();
+    const auto criteria = argmin_comparison_criteria();
 
     const auto restart_scale = static_cast<double>(state.range(0)) / 100.0;
 
@@ -1535,21 +1535,21 @@ static void bm_comparison_ur3e_nablapp_slsqp_retry(benchmark::State& state)
     state.counters["total_solves"] = benchmark::Counter(
         static_cast<double>(total), benchmark::Counter::kDefaults);
 }
-BENCHMARK(bm_comparison_ur3e_nablapp_slsqp_retry)
+BENCHMARK(bm_comparison_ur3e_argmin_slsqp_retry)
     ->Arg(10)->Arg(30)->Arg(50)->Arg(70)->Arg(100)
     ->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
-// Alias-path companion to bm_comparison_ur3e_nablapp_slsqp_last_check_results.
+// Alias-path companion to bm_comparison_ur3e_argmin_slsqp_last_check_results.
 // Same direct-drive pattern, but instantiates argmin_slsqp_nlopt_compat
-// (nablapp::slsqp_compatible_convergence: 3 criteria — ftol_rel, xtol_rel,
+// (argmin::slsqp_compatible_convergence: 3 criteria — ftol_rel, xtol_rel,
 // stall_tolerance). Tests the alias-mapping hypothesis: which default_
 // convergence firing slot each alias criterion inherits when the alias
 // replaces absolute thresholds with relative ones at 1e-10.
-static void bm_comparison_ur3e_nablapp_slsqp_last_check_results_alias(benchmark::State& state)
+static void bm_comparison_ur3e_argmin_slsqp_last_check_results_alias(benchmark::State& state)
 {
     auto chain = cartan::benchmarks::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
-    const auto criteria = nablapp_comparison_criteria();
+    const auto criteria = argmin_comparison_criteria();
 
     cartan::ik::argmin_slsqp_nlopt_compat<chain_t<6>>::options slsqp_opts{};
     slsqp_opts.budget_per_step = 500;
@@ -1606,14 +1606,14 @@ static void bm_comparison_ur3e_nablapp_slsqp_last_check_results_alias(benchmark:
     state.counters["total_solves"] = benchmark::Counter(
         static_cast<double>(total), benchmark::Counter::kDefaults);
 }
-BENCHMARK(bm_comparison_ur3e_nablapp_slsqp_last_check_results_alias)
+BENCHMARK(bm_comparison_ur3e_argmin_slsqp_last_check_results_alias)
     ->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 #ifdef CARTAN_HAS_NLOPT
 // Direct-drive NLopt SLSQP bench that also captures nlopt's per-pose
 // objective function call count (via the nlopt_objective_calls accessor
 // on cartan::ik::nlopt_slsqp). Purpose: indirect per-inner-iteration
-// wall measurement for nlopt on UR3e, to compare against nablapp's
+// wall measurement for nlopt on UR3e, to compare against argmin's
 // ~11.4 us/inner-step figure. Same 1000 UR3e poses, seed 42, cartan-
 // tight criteria, direct-drive (no restart_wrapper, no basic_ik_runner)
 // to expose the native nlopt counter without wrapper interference.
@@ -1628,7 +1628,7 @@ static void bm_comparison_ur3e_nlopt_slsqp_inner_iter_count(benchmark::State& st
 {
     auto chain = cartan::benchmarks::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
-    const auto criteria = nablapp_comparison_criteria();
+    const auto criteria = argmin_comparison_criteria();
 
     cartan::ik::nlopt_slsqp<chain_t<6>>::options slsqp_opts{};
     slsqp_opts.budget_per_step = 500;
@@ -1699,7 +1699,7 @@ static void bm_comparison_ur3e_nlopt_slsqp_restart_count(benchmark::State& state
 {
     auto chain = cartan::benchmarks::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
-    const auto criteria = nablapp_comparison_criteria();
+    const auto criteria = argmin_comparison_criteria();
 
     cartan::ik::nlopt_slsqp<chain_t<6>>::options slsqp_opts{};
     slsqp_opts.budget_per_step = 500;
@@ -1780,23 +1780,23 @@ BENCHMARK(bm_comparison_ur3e_nlopt_slsqp_restart_count)
     ->Iterations(1000)->Unit(benchmark::kMicrosecond);
 #endif
 
-// Runner-wrapped companion to bm_comparison_ur3e_nablapp_slsqp_grad_sweep.
-// Replicates bm_comparison_ur3e_nablapp_slsqp (default_convergence, restart
+// Runner-wrapped companion to bm_comparison_ur3e_argmin_slsqp_grad_sweep.
+// Replicates bm_comparison_ur3e_argmin_slsqp (default_convergence, restart
 // wrapper, basic_ik_runner) but preconfigures argmin_slsqp with a custom
 // gradient_threshold so wall and success rate are directly comparable to
 // the 2554 us / 91.3% baseline at cartan-tight 1e-12. This is the bench
 // that answers "does relaxing gradient_threshold recover wall without
 // losing runner-wrapped success"; the direct-drive sweep above only
-// observes one nablapp inner pass per pose and does not exercise the
+// observes one argmin inner pass per pose and does not exercise the
 // restart retry loop that the published 91.3% success rate relies on.
-static void bm_comparison_ur3e_nablapp_slsqp_grad_sweep_runner(benchmark::State& state)
+static void bm_comparison_ur3e_argmin_slsqp_grad_sweep_runner(benchmark::State& state)
 {
     const int exponent = static_cast<int>(state.range(0));
     const double gradient_threshold = std::pow(10.0, -static_cast<double>(exponent));
 
     auto chain = cartan::benchmarks::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
-    const auto criteria = nablapp_comparison_criteria();
+    const auto criteria = argmin_comparison_criteria();
 
     cartan::ik::argmin_slsqp<chain_t<6>>::options inner_opts{};
     inner_opts.gradient_threshold = gradient_threshold;
@@ -1816,7 +1816,7 @@ static void bm_comparison_ur3e_nablapp_slsqp_grad_sweep_runner(benchmark::State&
         cartan::ik::argmin_slsqp<chain_t<6>> inner{inner_opts};
         cartan::ik::restart_wrapper<chain_t<6>, cartan::ik::argmin_slsqp<chain_t<6>>>
             wrapper{std::move(inner)};
-        nablapp_slsqp_solver<6> solver{std::move(wrapper)};
+        argmin_slsqp_solver<6> solver{std::move(wrapper)};
 
         solver.setup(chain, target, q_seed, criteria);
         auto result = solver.solve();
@@ -1849,24 +1849,24 @@ static void bm_comparison_ur3e_nablapp_slsqp_grad_sweep_runner(benchmark::State&
         total_ori_error / std::max(successes, 1),
         benchmark::Counter::kDefaults);
 }
-BENCHMARK(bm_comparison_ur3e_nablapp_slsqp_grad_sweep_runner)
+BENCHMARK(bm_comparison_ur3e_argmin_slsqp_grad_sweep_runner)
     ->Arg(6)->Arg(8)->Arg(10)->Arg(12)
     ->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
-static void bm_comparison_ur3e_nablapp_slsqp_phi_ls_calls_dynamicN(benchmark::State& state)
+static void bm_comparison_ur3e_argmin_slsqp_phi_ls_calls_dynamicN(benchmark::State& state)
 {
     using dynamic_chain = cartan::kinematic_chain<double, cartan::dynamic>;
 
     auto chain = cartan::benchmarks::make_ur3e_chain_dynamic<double>();
     static const target_set<double, cartan::dynamic> ts(chain, num_targets, 42);
-    const auto criteria = nablapp_comparison_criteria();
+    const auto criteria = argmin_comparison_criteria();
 
     cartan::ik::argmin_slsqp<dynamic_chain>::options slsqp_opts{};
     slsqp_opts.budget_per_step = 500;
 
     std::size_t idx = 0;
     std::uint64_t total_ls = 0;
-    std::uint64_t total_nablapp_steps = 0;
+    std::uint64_t total_argmin_steps = 0;
     int total_cartan_outer = 0;
     int successes = 0;
 
@@ -1885,7 +1885,7 @@ static void bm_comparison_ur3e_nablapp_slsqp_phi_ls_calls_dynamicN(benchmark::St
         }
 
         total_ls += solver.line_search_calls();
-        total_nablapp_steps += static_cast<std::uint64_t>(solver.nablapp_iterations());
+        total_argmin_steps += static_cast<std::uint64_t>(solver.argmin_iterations());
         total_cartan_outer += solver.iterations();
         if (solver.status() == cartan::ik_status::converged)
             ++successes;
@@ -1899,26 +1899,26 @@ static void bm_comparison_ur3e_nablapp_slsqp_phi_ls_calls_dynamicN(benchmark::St
         benchmark::Counter::kAvgThreads);
     state.counters["total_phi_ls_calls"] = benchmark::Counter(
         static_cast<double>(total_ls), benchmark::Counter::kDefaults);
-    state.counters["total_nablapp_steps"] = benchmark::Counter(
-        static_cast<double>(total_nablapp_steps), benchmark::Counter::kDefaults);
-    state.counters["phi_ls_per_nablapp_step"] = benchmark::Counter(
-        static_cast<double>(total_ls) / std::max<double>(1.0, static_cast<double>(total_nablapp_steps)),
+    state.counters["total_argmin_steps"] = benchmark::Counter(
+        static_cast<double>(total_argmin_steps), benchmark::Counter::kDefaults);
+    state.counters["phi_ls_per_argmin_step"] = benchmark::Counter(
+        static_cast<double>(total_ls) / std::max<double>(1.0, static_cast<double>(total_argmin_steps)),
         benchmark::Counter::kDefaults);
-    state.counters["avg_nablapp_step_per_pose"] = benchmark::Counter(
-        static_cast<double>(total_nablapp_steps) / std::max(total, 1),
+    state.counters["avg_argmin_step_per_pose"] = benchmark::Counter(
+        static_cast<double>(total_argmin_steps) / std::max(total, 1),
         benchmark::Counter::kDefaults);
     state.counters["avg_cartan_outer_iter"] = benchmark::Counter(
         static_cast<double>(total_cartan_outer) / std::max(total, 1),
         benchmark::Counter::kDefaults);
 }
-BENCHMARK(bm_comparison_ur3e_nablapp_slsqp_phi_ls_calls_dynamicN)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_ur3e_argmin_slsqp_phi_ls_calls_dynamicN)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 #ifdef CARTAN_HAS_NLOPT
 static void bm_comparison_ur3e_nlopt_slsqp(benchmark::State& state)
 {
     auto chain = cartan::benchmarks::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
-    bm_nablapp_comparison<6, nlopt_slsqp_solver<6>>(state, chain, ts, nablapp_comparison_criteria());
+    bm_argmin_comparison<6, nlopt_slsqp_solver<6>>(state, chain, ts, argmin_comparison_criteria());
 }
 BENCHMARK(bm_comparison_ur3e_nlopt_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
@@ -1926,128 +1926,128 @@ static void bm_comparison_ur3e_nlopt_bobyqa(benchmark::State& state)
 {
     auto chain = cartan::benchmarks::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
-    bm_nablapp_comparison<6, nlopt_bobyqa_solver<6>>(state, chain, ts, nablapp_comparison_criteria());
+    bm_argmin_comparison<6, nlopt_bobyqa_solver<6>>(state, chain, ts, argmin_comparison_criteria());
 }
 BENCHMARK(bm_comparison_ur3e_nlopt_bobyqa)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 #endif
 
 // ============================================================================
-// Axis 3: Headline comparison (best nablapp configs vs TRAC-IK)
+// Axis 3: Headline comparison (best argmin configs vs TRAC-IK)
 // ============================================================================
-// Registers nablapp SLSQP, L-BFGS-B, and NW-SQP for all 9 robots alongside
+// Registers argmin SLSQP, L-BFGS-B, and NW-SQP for all 9 robots alongside
 // the existing TRAC-IK entries. Uses same target set (seed 42) for fair comparison.
 
-#define REGISTER_6DOF_NABLAPP_COMPARISON(ROBOT, CHAIN_FN)                                             \
+#define REGISTER_6DOF_ARGMIN_COMPARISON(ROBOT, CHAIN_FN)                                             \
                                                                                                       \
-static void bm_comparison_##ROBOT##_nablapp_slsqp(benchmark::State& state)                           \
+static void bm_comparison_##ROBOT##_argmin_slsqp(benchmark::State& state)                           \
 {                                                                                                     \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
-    bm_nablapp_comparison<6, nablapp_slsqp_solver<6>>(state, chain, ts, nablapp_comparison_criteria()); \
+    bm_argmin_comparison<6, argmin_slsqp_solver<6>>(state, chain, ts, argmin_comparison_criteria()); \
 }                                                                                                     \
-BENCHMARK(bm_comparison_##ROBOT##_nablapp_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);    \
+BENCHMARK(bm_comparison_##ROBOT##_argmin_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);    \
                                                                                                       \
-static void bm_comparison_##ROBOT##_nablapp_lbfgsb(benchmark::State& state)                          \
+static void bm_comparison_##ROBOT##_argmin_lbfgsb(benchmark::State& state)                          \
 {                                                                                                     \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
-    bm_nablapp_comparison<6, nablapp_lbfgsb_solver<6>>(state, chain, ts, nablapp_comparison_criteria()); \
+    bm_argmin_comparison<6, argmin_lbfgsb_solver<6>>(state, chain, ts, argmin_comparison_criteria()); \
 }                                                                                                     \
-BENCHMARK(bm_comparison_##ROBOT##_nablapp_lbfgsb)->Iterations(1000)->Unit(benchmark::kMicrosecond);   \
+BENCHMARK(bm_comparison_##ROBOT##_argmin_lbfgsb)->Iterations(1000)->Unit(benchmark::kMicrosecond);   \
                                                                                                       \
 static void bm_comparison_##ROBOT##_nw_sqp(benchmark::State& state)                                  \
 {                                                                                                     \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
-    bm_nablapp_comparison<6, nablapp_nw_sqp_solver<6>>(state, chain, ts, nablapp_comparison_criteria()); \
+    bm_argmin_comparison<6, argmin_nw_sqp_solver<6>>(state, chain, ts, argmin_comparison_criteria()); \
 }                                                                                                     \
 BENCHMARK(bm_comparison_##ROBOT##_nw_sqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);           \
                                                                                                       \
-static void bm_comparison_##ROBOT##_nablapp_mma(benchmark::State& state)                              \
+static void bm_comparison_##ROBOT##_argmin_mma(benchmark::State& state)                              \
 {                                                                                                     \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
-    bm_nablapp_comparison<6, nablapp_mma_solver<6>>(state, chain, ts, nablapp_comparison_criteria()); \
+    bm_argmin_comparison<6, argmin_mma_solver<6>>(state, chain, ts, argmin_comparison_criteria()); \
 }                                                                                                     \
-BENCHMARK(bm_comparison_##ROBOT##_nablapp_mma)->Iterations(1000)->Unit(benchmark::kMicrosecond);      \
+BENCHMARK(bm_comparison_##ROBOT##_argmin_mma)->Iterations(1000)->Unit(benchmark::kMicrosecond);      \
                                                                                                       \
-static void bm_comparison_##ROBOT##_nablapp_gcmma(benchmark::State& state)                            \
+static void bm_comparison_##ROBOT##_argmin_gcmma(benchmark::State& state)                            \
 {                                                                                                     \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
-    bm_nablapp_comparison<6, nablapp_gcmma_solver<6>>(state, chain, ts, nablapp_comparison_criteria()); \
+    bm_argmin_comparison<6, argmin_gcmma_solver<6>>(state, chain, ts, argmin_comparison_criteria()); \
 }                                                                                                     \
-BENCHMARK(bm_comparison_##ROBOT##_nablapp_gcmma)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_##ROBOT##_argmin_gcmma)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
-#define REGISTER_7DOF_NABLAPP_COMPARISON(ROBOT, CHAIN_FN)                                             \
+#define REGISTER_7DOF_ARGMIN_COMPARISON(ROBOT, CHAIN_FN)                                             \
                                                                                                       \
-static void bm_comparison_##ROBOT##_nablapp_slsqp(benchmark::State& state)                           \
+static void bm_comparison_##ROBOT##_argmin_slsqp(benchmark::State& state)                           \
 {                                                                                                     \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
-    bm_nablapp_comparison<7, nablapp_slsqp_solver<7>>(state, chain, ts, nablapp_comparison_criteria()); \
+    bm_argmin_comparison<7, argmin_slsqp_solver<7>>(state, chain, ts, argmin_comparison_criteria()); \
 }                                                                                                     \
-BENCHMARK(bm_comparison_##ROBOT##_nablapp_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);    \
+BENCHMARK(bm_comparison_##ROBOT##_argmin_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);    \
                                                                                                       \
-static void bm_comparison_##ROBOT##_nablapp_lbfgsb(benchmark::State& state)                          \
+static void bm_comparison_##ROBOT##_argmin_lbfgsb(benchmark::State& state)                          \
 {                                                                                                     \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
-    bm_nablapp_comparison<7, nablapp_lbfgsb_solver<7>>(state, chain, ts, nablapp_comparison_criteria()); \
+    bm_argmin_comparison<7, argmin_lbfgsb_solver<7>>(state, chain, ts, argmin_comparison_criteria()); \
 }                                                                                                     \
-BENCHMARK(bm_comparison_##ROBOT##_nablapp_lbfgsb)->Iterations(1000)->Unit(benchmark::kMicrosecond);   \
+BENCHMARK(bm_comparison_##ROBOT##_argmin_lbfgsb)->Iterations(1000)->Unit(benchmark::kMicrosecond);   \
                                                                                                       \
 static void bm_comparison_##ROBOT##_nw_sqp(benchmark::State& state)                                  \
 {                                                                                                     \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
-    bm_nablapp_comparison<7, nablapp_nw_sqp_solver<7>>(state, chain, ts, nablapp_comparison_criteria()); \
+    bm_argmin_comparison<7, argmin_nw_sqp_solver<7>>(state, chain, ts, argmin_comparison_criteria()); \
 }                                                                                                     \
 BENCHMARK(bm_comparison_##ROBOT##_nw_sqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);           \
                                                                                                       \
-static void bm_comparison_##ROBOT##_nablapp_mma(benchmark::State& state)                              \
+static void bm_comparison_##ROBOT##_argmin_mma(benchmark::State& state)                              \
 {                                                                                                     \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
-    bm_nablapp_comparison<7, nablapp_mma_solver<7>>(state, chain, ts, nablapp_comparison_criteria()); \
+    bm_argmin_comparison<7, argmin_mma_solver<7>>(state, chain, ts, argmin_comparison_criteria()); \
 }                                                                                                     \
-BENCHMARK(bm_comparison_##ROBOT##_nablapp_mma)->Iterations(1000)->Unit(benchmark::kMicrosecond);      \
+BENCHMARK(bm_comparison_##ROBOT##_argmin_mma)->Iterations(1000)->Unit(benchmark::kMicrosecond);      \
                                                                                                       \
-static void bm_comparison_##ROBOT##_nablapp_gcmma(benchmark::State& state)                            \
+static void bm_comparison_##ROBOT##_argmin_gcmma(benchmark::State& state)                            \
 {                                                                                                     \
     auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
-    bm_nablapp_comparison<7, nablapp_gcmma_solver<7>>(state, chain, ts, nablapp_comparison_criteria()); \
+    bm_argmin_comparison<7, argmin_gcmma_solver<7>>(state, chain, ts, argmin_comparison_criteria()); \
 }                                                                                                     \
-BENCHMARK(bm_comparison_##ROBOT##_nablapp_gcmma)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_##ROBOT##_argmin_gcmma)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
-// 6-DOF headline nablapp entries
-REGISTER_6DOF_NABLAPP_COMPARISON(kr6_sixx,   make_kr6_sixx_chain)
-REGISTER_6DOF_NABLAPP_COMPARISON(abb_irb120, make_abb_irb120_chain)
-REGISTER_6DOF_NABLAPP_COMPARISON(jaco2,      make_jaco2_chain)
+// 6-DOF headline argmin entries
+REGISTER_6DOF_ARGMIN_COMPARISON(kr6_sixx,   make_kr6_sixx_chain)
+REGISTER_6DOF_ARGMIN_COMPARISON(abb_irb120, make_abb_irb120_chain)
+REGISTER_6DOF_ARGMIN_COMPARISON(jaco2,      make_jaco2_chain)
 
-// 7-DOF headline nablapp entries
-REGISTER_7DOF_NABLAPP_COMPARISON(lbr_med14,  make_lbr_med14_chain)
-REGISTER_7DOF_NABLAPP_COMPARISON(panda,      make_panda_chain)
-REGISTER_7DOF_NABLAPP_COMPARISON(fetch,      make_fetch_chain)
-REGISTER_7DOF_NABLAPP_COMPARISON(baxter,     make_baxter_chain)
-REGISTER_7DOF_NABLAPP_COMPARISON(kuka_lwr4,  make_kuka_lwr4_chain)
+// 7-DOF headline argmin entries
+REGISTER_7DOF_ARGMIN_COMPARISON(lbr_med14,  make_lbr_med14_chain)
+REGISTER_7DOF_ARGMIN_COMPARISON(panda,      make_panda_chain)
+REGISTER_7DOF_ARGMIN_COMPARISON(fetch,      make_fetch_chain)
+REGISTER_7DOF_ARGMIN_COMPARISON(baxter,     make_baxter_chain)
+REGISTER_7DOF_ARGMIN_COMPARISON(kuka_lwr4,  make_kuka_lwr4_chain)
 
 // ============================================================================
 // Per-call micro benchmarks — interprets the turn-04 perf roll-up
 // ============================================================================
 //
 // Measures the raw per-call cost of the four kernels that together account
-// for ~41% of nablapp_slsqp wall in cartan turn-04:
+// for ~41% of argmin_slsqp wall in cartan turn-04:
 //
 //   forward_kinematics(chain, q)
 //   ik_se3_objective::evaluate(chain, target, q)
 //   ik_se3_objective::evaluate_with_gradient(chain, target, q)
-//   nablapp_ik_problem::value(x)            [adapter wrapping evaluate]
-//   nablapp_ik_problem::gradient(x, g)      [adapter wrapping evaluate_with_gradient]
+//   argmin_ik_problem::value(x)            [adapter wrapping evaluate]
+//   argmin_ik_problem::gradient(x, g)      [adapter wrapping evaluate_with_gradient]
 //
 // Both solvers go through `ik_se3_objective`, so a per-call gap between
-// the plain evaluate and the nablapp adapter path indicates pure adapter
+// the plain evaluate and the argmin adapter path indicates pure adapter
 // overhead (position_type conversion, etc.). A per-call gap between
 // evaluate and evaluate_with_gradient measures the cost of the SE(3)
 // log Jacobian contribution on top of the objective.
@@ -2073,7 +2073,7 @@ struct ur3e_per_call_fixture
 
     cartan::kinematic_chain<double, 6> chain;
     target_set<double, 6> ts;
-    cartan::detail::nablapp_ik_problem<chain_t<6>> problem;
+    cartan::detail::argmin_ik_problem<chain_t<6>> problem;
     Eigen::Vector<double, 6> x;
     Eigen::Vector<double, 6> g;
 };
@@ -2124,7 +2124,7 @@ static void bm_ur3e_per_call_ik_se3_objective_evaluate_with_gradient(benchmark::
 }
 BENCHMARK(bm_ur3e_per_call_ik_se3_objective_evaluate_with_gradient)->Unit(benchmark::kNanosecond);
 
-static void bm_ur3e_per_call_nablapp_adapter_value(benchmark::State& state)
+static void bm_ur3e_per_call_argmin_adapter_value(benchmark::State& state)
 {
     auto& f = ur3e_per_call();
     for (auto _ : state)
@@ -2133,9 +2133,9 @@ static void bm_ur3e_per_call_nablapp_adapter_value(benchmark::State& state)
         benchmark::DoNotOptimize(v);
     }
 }
-BENCHMARK(bm_ur3e_per_call_nablapp_adapter_value)->Unit(benchmark::kNanosecond);
+BENCHMARK(bm_ur3e_per_call_argmin_adapter_value)->Unit(benchmark::kNanosecond);
 
-static void bm_ur3e_per_call_nablapp_adapter_gradient(benchmark::State& state)
+static void bm_ur3e_per_call_argmin_adapter_gradient(benchmark::State& state)
 {
     auto& f = ur3e_per_call();
     for (auto _ : state)
@@ -2144,7 +2144,7 @@ static void bm_ur3e_per_call_nablapp_adapter_gradient(benchmark::State& state)
         benchmark::DoNotOptimize(f.g);
     }
 }
-BENCHMARK(bm_ur3e_per_call_nablapp_adapter_gradient)->Unit(benchmark::kNanosecond);
+BENCHMARK(bm_ur3e_per_call_argmin_adapter_gradient)->Unit(benchmark::kNanosecond);
 #endif
 
 } // anonymous namespace

@@ -1,17 +1,17 @@
 /// @file slsqp_per_pose_trace.cpp
 /// @brief Per-outer-step tracer for cartan::ik::argmin_slsqp on a focused
-///        pose list. Captures nablapp inner-state telemetry per outer step
+///        pose list. Captures argmin inner-state telemetry per outer step
 ///        to diagnose the 200e287 regressed-cohort failure mode.
 ///
 /// Bypasses basic_ik_runner / restart_wrapper -- drives argmin_slsqp::step()
-/// directly so we can read the inner nablapp state between calls (which the
+/// directly so we can read the inner argmin state between calls (which the
 /// runner stack hides). The argmin_slsqp object still owns its own perturb-
 /// restart logic; restart_count() reports those.
 ///
 /// Per-step trace fields (one row per outer argmin_slsqp::step() call):
 ///   robot, pose, outer_iter, status, error_norm, error_norm_prev,
 ///   x_norm, x_change_norm, sigma, objective, grad_norm,
-///   nablapp_iter_total, nablapp_iter_delta,
+///   argmin_iter_total, argmin_iter_delta,
 ///   ls_calls_total, ls_calls_delta, restart_count,
 ///   step_us
 ///
@@ -135,7 +135,7 @@ void trace_pose(
             q_norm += static_cast<double>(q[i]) * static_cast<double>(q[i]);
         q_norm = std::sqrt(q_norm);
 
-        const std::uint32_t inner_total = solver.nablapp_iterations();
+        const std::uint32_t inner_total = solver.argmin_iterations();
         const std::uint64_t lsc_total = solver.line_search_calls();
         const int restart_total = solver.restart_count();
 
@@ -229,7 +229,7 @@ int main(int argc, char** argv)
 
     out << "robot,pose,outer_iter,status,error_norm,error_norm_prev,"
            "x_norm,x_change_norm,"
-           "nablapp_iter_total,nablapp_iter_delta,"
+           "argmin_iter_total,argmin_iter_delta,"
            "ls_calls_total,ls_calls_delta,inner_restart_count,wrapper_restart_count,step_us\n";
 
     const cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 500};

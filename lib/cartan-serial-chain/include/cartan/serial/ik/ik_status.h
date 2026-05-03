@@ -49,10 +49,10 @@ enum class ik_failure
 /// `ik_status` distinguishes only five terminal cases (converged, diverged,
 /// stalled, iteration_limit, joint_limit_hit), which is too coarse for
 /// diagnosing failure clusters in SQP/BFGS-backed solvers: six underlying
-/// nablapp terminators collapse into `ik_status::stalled` without this.
+/// argmin terminators collapse into `ik_status::stalled` without this.
 ///
 /// Policies that wrap a lower-level solver (e.g. `argmin_slsqp` wrapping
-/// nablapp's `kraft_slsqp_policy`) report the specific inner terminator via
+/// argmin's `kraft_slsqp_policy`) report the specific inner terminator via
 /// `termination_reason()`. Policies that do not opt in report
 /// `ik_termination_reason::unknown`, and `basic_ik_runner` propagates the
 /// reported value into `ik_error::termination_reason`.

@@ -2,9 +2,9 @@
 #define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_AUGMENTED_LAGRANGIAN_H
 
 /// @file augmented_lagrangian.h
-/// @brief nablapp-backed augmented Lagrangian IK solve policy.
+/// @brief argmin-backed augmented Lagrangian IK solve policy.
 ///
-/// Wraps nablapp's augmented_lagrangian_policy with lbfgsb_policy as
+/// Wraps argmin's augmented_lagrangian_policy with lbfgsb_policy as
 /// the inner solver. Uses formulation B (inequality constraints encoding
 /// joint limits as g_i(q) >= 0) for the outer augmented Lagrangian and
 /// box constraints for the inner L-BFGS-B subproblem.
@@ -18,17 +18,17 @@
 #include "cartan/serial/ik/detail/convergence.h"
 #include "cartan/serial/ik/detail/stall_detection.h"
 #include "cartan/serial/ik/detail/limit_enforcement.h"
-#include "cartan/serial/ik/detail/nablapp_constrained_problem.h"
+#include "cartan/serial/ik/detail/argmin_constrained_problem.h"
 
 #include "cartan/lie/se3.h"
 #include "cartan/serial/chain/joint_state.h"
 #include "cartan/serial/chain/chain_concept.h"
 #include "cartan/serial/fk/forward_kinematics.h"
 
-#include <nablapp/solver/options.h>
-#include <nablapp/solver/basic_solver.h>
-#include <nablapp/solver/lbfgsb_policy.h>
-#include <nablapp/solver/augmented_lagrangian_policy.h>
+#include <argmin/solver/options.h>
+#include <argmin/solver/basic_solver.h>
+#include <argmin/solver/lbfgsb_policy.h>
+#include <argmin/solver/augmented_lagrangian_policy.h>
 
 #include <Eigen/Core>
 
@@ -40,7 +40,7 @@
 namespace cartan::ik
 {
 
-/// nablapp-backed augmented Lagrangian solve policy for constrained IK.
+/// argmin-backed augmented Lagrangian solve policy for constrained IK.
 ///
 /// Converts the constrained IK problem into a sequence of bound-constrained
 /// subproblems solved by L-BFGS-B. Joint limits are expressed as inequality
@@ -101,7 +101,7 @@ public:
             x0[i] = static_cast<double>(q0[i]);
         }
 
-        nablapp::solver_options<> nab_opts;
+        argmin::solver_options<> nab_opts;
         nab_opts.max_iterations = m_options.budget_per_step;
         nab_opts.set_gradient_threshold(1e-14);
         nab_opts.set_objective_threshold(1e-16);
@@ -150,13 +150,13 @@ public:
             return m_status;
         }
 
-        if (result.status == nablapp::solver_status::converged
-            || result.status == nablapp::solver_status::ftol_reached
-            || result.status == nablapp::solver_status::stalled
-            || result.status == nablapp::solver_status::xtol_reached
-            || result.status == nablapp::solver_status::roundoff_limited
-            || result.status == nablapp::solver_status::objective_stalled
-            || result.status == nablapp::solver_status::aborted)
+        if (result.status == argmin::solver_status::converged
+            || result.status == argmin::solver_status::ftol_reached
+            || result.status == argmin::solver_status::stalled
+            || result.status == argmin::solver_status::xtol_reached
+            || result.status == argmin::solver_status::roundoff_limited
+            || result.status == argmin::solver_status::objective_stalled
+            || result.status == argmin::solver_status::aborted)
         {
             m_status = ik_status::stalled;
             return m_status;
@@ -175,9 +175,9 @@ public:
     void abort() { m_status = ik_status::stalled; }
 
 private:
-    using nablapp_solver = nablapp::basic_solver<
-        nablapp::augmented_lagrangian_policy<nablapp::lbfgsb_policy<joints>>, joints,
-        cartan::detail::nablapp_constrained_ik_problem<Chain>>;
+    using argmin_solver = argmin::basic_solver<
+        argmin::augmented_lagrangian_policy<argmin::lbfgsb_policy<joints>>, joints,
+        cartan::detail::argmin_constrained_ik_problem<Chain>>;
 
     void sync_solution_from_solver()
     {
@@ -204,8 +204,8 @@ private:
     scalar_type m_error_norm{std::numeric_limits<scalar_type>::max()};
     int m_iterations{};
     ik_status m_status{ik_status::running};
-    std::optional<cartan::detail::nablapp_constrained_ik_problem<Chain>> m_problem;
-    std::optional<nablapp_solver> m_solver;
+    std::optional<cartan::detail::argmin_constrained_ik_problem<Chain>> m_problem;
+    std::optional<argmin_solver> m_solver;
 };
 
 }

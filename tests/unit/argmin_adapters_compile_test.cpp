@@ -1,7 +1,7 @@
-#include "cartan/serial/ik/detail/nablapp_problem.h"
-#include "cartan/serial/ik/detail/nablapp_unconstrained_problem.h"
-#include "cartan/serial/ik/detail/nablapp_constrained_problem.h"
-#include "cartan/serial/ik/detail/nablapp_least_squares_problem.h"
+#include "cartan/serial/ik/detail/argmin_problem.h"
+#include "cartan/serial/ik/detail/argmin_unconstrained_problem.h"
+#include "cartan/serial/ik/detail/argmin_constrained_problem.h"
+#include "cartan/serial/ik/detail/argmin_least_squares_problem.h"
 
 #include "cartan/serial/ik/policy/error_weight.h"
 
@@ -11,7 +11,7 @@
 #include "cartan/serial/chain/joint_limits.h"
 #include "cartan/serial/chain/kinematic_chain.h"
 
-#include <nablapp/formulation/concepts.h>
+#include <argmin/formulation/concepts.h>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -40,7 +40,7 @@ static spp::kinematic_chain<double, 6> make_chain()
 
 using chain6 = spp::kinematic_chain<double, 6>;
 
-TEST_CASE("nablapp adapters compile and satisfy concepts", "[nablapp][compile]")
+TEST_CASE("argmin adapters compile and satisfy concepts", "[argmin][compile]")
 {
     auto chain = make_chain();
     auto target = spp::se3<double>::identity();
@@ -48,7 +48,7 @@ TEST_CASE("nablapp adapters compile and satisfy concepts", "[nablapp][compile]")
 
     SECTION("bound-constrained adapter")
     {
-        spp::detail::nablapp_ik_problem<chain6> problem(chain, target, weight);
+        spp::detail::argmin_ik_problem<chain6> problem(chain, target, weight);
         REQUIRE(problem.dimension() == 6);
 
         Eigen::VectorXd x = Eigen::VectorXd::Zero(6);
@@ -64,14 +64,14 @@ TEST_CASE("nablapp adapters compile and satisfy concepts", "[nablapp][compile]")
         REQUIRE(lb.size() == 6);
         REQUIRE(ub.size() == 6);
 
-        static_assert(nablapp::objective<spp::detail::nablapp_ik_problem<chain6>>);
-        static_assert(nablapp::differentiable<spp::detail::nablapp_ik_problem<chain6>>);
-        static_assert(nablapp::bound_constrained<spp::detail::nablapp_ik_problem<chain6>>);
+        static_assert(argmin::objective<spp::detail::argmin_ik_problem<chain6>>);
+        static_assert(argmin::differentiable<spp::detail::argmin_ik_problem<chain6>>);
+        static_assert(argmin::bound_constrained<spp::detail::argmin_ik_problem<chain6>>);
     }
 
     SECTION("unconstrained adapter")
     {
-        spp::detail::nablapp_unconstrained_ik_problem<chain6> problem(chain, target, weight);
+        spp::detail::argmin_unconstrained_ik_problem<chain6> problem(chain, target, weight);
         REQUIRE(problem.dimension() == 6);
 
         Eigen::VectorXd x = Eigen::VectorXd::Zero(6);
@@ -82,14 +82,14 @@ TEST_CASE("nablapp adapters compile and satisfy concepts", "[nablapp][compile]")
         problem.gradient(x, g);
         REQUIRE(g.size() == 6);
 
-        static_assert(nablapp::objective<spp::detail::nablapp_unconstrained_ik_problem<chain6>>);
-        static_assert(nablapp::differentiable<spp::detail::nablapp_unconstrained_ik_problem<chain6>>);
-        static_assert(!nablapp::bound_constrained<spp::detail::nablapp_unconstrained_ik_problem<chain6>>);
+        static_assert(argmin::objective<spp::detail::argmin_unconstrained_ik_problem<chain6>>);
+        static_assert(argmin::differentiable<spp::detail::argmin_unconstrained_ik_problem<chain6>>);
+        static_assert(!argmin::bound_constrained<spp::detail::argmin_unconstrained_ik_problem<chain6>>);
     }
 
     SECTION("constrained adapter")
     {
-        spp::detail::nablapp_constrained_ik_problem<chain6> problem(chain, target, weight);
+        spp::detail::argmin_constrained_ik_problem<chain6> problem(chain, target, weight);
         REQUIRE(problem.dimension() == 6);
         REQUIRE(problem.num_equality() == 0);
         REQUIRE(problem.num_inequality() == 12);
@@ -107,14 +107,14 @@ TEST_CASE("nablapp adapters compile and satisfy concepts", "[nablapp][compile]")
         REQUIRE(J.rows() == 12);
         REQUIRE(J.cols() == 6);
 
-        static_assert(nablapp::objective<spp::detail::nablapp_constrained_ik_problem<chain6>>);
-        static_assert(nablapp::differentiable<spp::detail::nablapp_constrained_ik_problem<chain6>>);
-        static_assert(nablapp::constrained<spp::detail::nablapp_constrained_ik_problem<chain6>>);
+        static_assert(argmin::objective<spp::detail::argmin_constrained_ik_problem<chain6>>);
+        static_assert(argmin::differentiable<spp::detail::argmin_constrained_ik_problem<chain6>>);
+        static_assert(argmin::constrained<spp::detail::argmin_constrained_ik_problem<chain6>>);
     }
 
     SECTION("least-squares adapter")
     {
-        spp::detail::nablapp_ik_least_squares_problem<chain6> problem(chain, target);
+        spp::detail::argmin_ik_least_squares_problem<chain6> problem(chain, target);
         REQUIRE(problem.dimension() == 6);
         REQUIRE(problem.num_residuals() == 6);
 
@@ -131,7 +131,7 @@ TEST_CASE("nablapp adapters compile and satisfy concepts", "[nablapp][compile]")
         REQUIRE(J.rows() == 6);
         REQUIRE(J.cols() == 6);
 
-        static_assert(nablapp::objective<spp::detail::nablapp_ik_least_squares_problem<chain6>>);
-        static_assert(nablapp::least_squares<spp::detail::nablapp_ik_least_squares_problem<chain6>>);
+        static_assert(argmin::objective<spp::detail::argmin_ik_least_squares_problem<chain6>>);
+        static_assert(argmin::least_squares<spp::detail::argmin_ik_least_squares_problem<chain6>>);
     }
 }

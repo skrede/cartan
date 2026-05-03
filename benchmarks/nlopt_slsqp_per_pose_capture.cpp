@@ -5,7 +5,7 @@
 /// emitting one CSV row per (robot, pose). The pose set, seeds, and convergence
 /// criteria match slsqp_per_pose_capture.cpp exactly so the two CSVs join on
 /// (robot, pose_index) without any further alignment. Schema is identical to
-/// the nablapp-side capture.
+/// the argmin-side capture.
 ///
 /// Stack:
 ///   - convergence_criteria<double>{1e-5, 1e-5, 500}

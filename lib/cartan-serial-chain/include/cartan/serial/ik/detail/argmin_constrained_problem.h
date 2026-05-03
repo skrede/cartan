@@ -1,12 +1,12 @@
-#ifndef HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_NABLAPP_PROBLEM_H
-#define HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_NABLAPP_PROBLEM_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_ARGMIN_CONSTRAINED_PROBLEM_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_ARGMIN_CONSTRAINED_PROBLEM_H
 
-/// @file detail/nablapp_problem.h
-/// @brief Adapter wrapping cartan IK problem as nablapp problem formulation.
+/// @file detail/argmin_constrained_problem.h
+/// @brief Inequality-constrained adapter (formulation B) for argmin solvers.
 ///
-/// Satisfies nablapp::objective, nablapp::differentiable, and
-/// nablapp::bound_constrained concepts so that nablapp solvers
-/// (kraft_slsqp_policy, bobyqa_policy) can optimize cartan IK objectives.
+/// Satisfies argmin::objective, argmin::differentiable, and
+/// argmin::constrained. Joint limits are expressed as 2n inequality
+/// constraints: q_i - q_min >= 0 and q_max - q_i >= 0.
 
 #include "cartan/serial/ik/policy/error_weight.h"
 #include "cartan/serial/ik/solver/detail/analytical_gradient.h"
@@ -16,16 +16,17 @@
 
 #include <Eigen/Core>
 
+#include <cstddef>
+
 namespace cartan::detail
 {
 
-/// Adapts a cartan IK problem (chain + target + weight) to the nablapp
-/// problem formulation concepts (objective, differentiable, bound_constrained).
+/// Inequality-constrained IK problem adapter for argmin (formulation B).
 ///
-/// Uses ik_se3_objective for consistent objective and gradient evaluation
-/// with SE(3) log Jacobian analytical gradient.
+/// Provides objective, gradient, and inequality constraints encoding
+/// joint limits as g_i(q) >= 0. No equality constraints.
 template <chain Chain>
-class nablapp_ik_problem
+class argmin_constrained_ik_problem
 {
     using Scalar = typename Chain::scalar_type;
     static constexpr int N = Chain::joints;
@@ -34,7 +35,7 @@ class nablapp_ik_problem
 public:
     static constexpr int problem_dimension = N;
 
-    nablapp_ik_problem(
+    argmin_constrained_ik_problem(
         const Chain& chain,
         const se3<Scalar>& target,
         const error_weight<Scalar>& weight)
@@ -70,36 +71,42 @@ public:
         }
     }
 
-    Eigen::Vector<double, N> lower_bounds() const
+    int num_equality() const
     {
-        int n = m_chain->num_joints();
-        Eigen::Vector<double, N> lb;
-        if constexpr (N == dynamic)
-        {
-            lb.resize(n);
-        }
-        for (int i = 0; i < n; ++i)
-        {
-            lb[i] = static_cast<double>(m_chain->limits()[static_cast<std::size_t>(i)].position_min);
-        }
-        return lb;
+        return 0;
     }
 
-    Eigen::Vector<double, N> upper_bounds() const
+    int num_inequality() const
     {
-        int n = m_chain->num_joints();
-        Eigen::Vector<double, N> ub;
-        if constexpr (N == dynamic)
-        {
-            ub.resize(n);
-        }
-        for (int i = 0; i < n; ++i)
-        {
-            ub[i] = static_cast<double>(m_chain->limits()[static_cast<std::size_t>(i)].position_max);
-        }
-        return ub;
+        return 2 * m_chain->num_joints();
     }
 
+    template <typename DerivedIn, typename DerivedOut>
+    void constraints(const Eigen::MatrixBase<DerivedIn>& x, Eigen::MatrixBase<DerivedOut>& c) const
+    {
+        int n = m_chain->num_joints();
+        for (int i = 0; i < n; ++i)
+        {
+            c[i] = x[i] - static_cast<double>(
+                m_chain->limits()[static_cast<std::size_t>(i)].position_min);
+            c[n + i] = static_cast<double>(
+                m_chain->limits()[static_cast<std::size_t>(i)].position_max) - x[i];
+        }
+    }
+
+    template <typename DerivedIn, typename DerivedOut>
+    void constraint_jacobian(const Eigen::MatrixBase<DerivedIn>& /*x*/, Eigen::MatrixBase<DerivedOut>& J) const
+    {
+        int n = m_chain->num_joints();
+        J.setZero();
+        for (int i = 0; i < n; ++i)
+        {
+            J(i, i) = 1.0;
+            J(n + i, i) = -1.0;
+        }
+    }
+
+private:
     template <typename Derived>
     position_type to_position(const Eigen::MatrixBase<Derived>& x) const
     {
@@ -124,7 +131,6 @@ public:
         }
     }
 
-private:
     const Chain* m_chain;
     se3<Scalar> m_target;
     error_weight<Scalar> m_weight;
