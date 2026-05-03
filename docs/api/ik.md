@@ -19,8 +19,8 @@ See [IK Methods](../background/ik-methods.md) | [IK Composition Guide](../guides
 | `cartan::newton_raphson_solve_policy` | `<cartan/ik/newton_raphson_solve_policy.h>` |
 | `cartan::restart_solve_policy` | `<cartan/ik/restart_solve_policy.h>` |
 | `cartan::no_limits`, `cartan::clamp_limits` | `<cartan/ik/limits_policy.h>` |
-| `cartan::slsqp_solve_policy` (nablapp) | `<cartan/ik/slsqp_solve_policy.h>` |
-| `cartan::bobyqa_solve_policy` (nablapp) | `<cartan/ik/bobyqa_solve_policy.h>` |
+| `cartan::slsqp_solve_policy` (argmin) | `<cartan/ik/slsqp_solve_policy.h>` |
+| `cartan::bobyqa_solve_policy` (argmin) | `<cartan/ik/bobyqa_solve_policy.h>` |
 | `cartan::nlopt_slsqp_solve_policy` | `<cartan/ik/nlopt_slsqp_solve_policy.h>` (requires `CARTAN_HAS_NLOPT`) |
 | `cartan::nlopt_bobyqa_solve_policy` | `<cartan/ik/nlopt_bobyqa_solve_policy.h>` (requires `CARTAN_HAS_NLOPT`) |
 
@@ -244,18 +244,18 @@ template <typename Scalar = double, int N = dynamic, typename LimitsPolicy = cla
 class newton_raphson_solve_policy;
 ```
 
-### slsqp_solve_policy (nablapp)
+### slsqp_solve_policy (argmin)
 
-nablapp-backed SLSQP gradient-based solve policy with box constraints. Uses Kraft's Sequential Least Squares Programming algorithm via nablapp, with analytical gradient through the SE(3) log Jacobian. Always available (nablapp is a required dependency of `cartan::kinematics`).
+argmin-backed SLSQP gradient-based solve policy with box constraints. Uses Kraft's Sequential Least Squares Programming algorithm via argmin, with analytical gradient through the SE(3) log Jacobian. Always available (argmin is a required dependency of `cartan::kinematics`).
 
 ```cpp
 template <typename Scalar = double, int N = dynamic, typename LimitsPolicy = clamp_limits>
 class slsqp_solve_policy;
 ```
 
-### bobyqa_solve_policy (nablapp)
+### bobyqa_solve_policy (argmin)
 
-nablapp-backed BOBYQA derivative-free solve policy with box constraints. Uses the BOBYQA algorithm via nablapp, with joint limits as box bounds.
+argmin-backed BOBYQA derivative-free solve policy with box constraints. Uses the BOBYQA algorithm via argmin, with joint limits as box bounds.
 
 ```cpp
 template <typename Scalar = double, int N = dynamic, typename LimitsPolicy = clamp_limits>
@@ -264,7 +264,7 @@ class bobyqa_solve_policy;
 
 ### nlopt_slsqp_solve_policy
 
-NLopt SLSQP solve policy. Same algorithm as `slsqp_solve_policy` but backed by NLopt instead of nablapp. Guarded by `CARTAN_HAS_NLOPT`.
+NLopt SLSQP solve policy. Same algorithm as `slsqp_solve_policy` but backed by NLopt instead of argmin. Guarded by `CARTAN_HAS_NLOPT`.
 
 ```cpp
 template <typename Scalar = double, int N = dynamic, typename LimitsPolicy = clamp_limits>
@@ -311,7 +311,7 @@ Hard clamping: clamps each `q(i)` to `[position_min, position_max]`. Default for
 struct no_limits;
 ```
 
-No-op: applies no enforcement. Used when the policy handles constraints internally (e.g., `projected_lm_solve_policy`, or NLopt/nablapp policies with box constraints).
+No-op: applies no enforcement. Used when the policy handles constraints internally (e.g., `projected_lm_solve_policy`, or NLopt/argmin policies with box constraints).
 
 ## Type Aliases and Factories
 
@@ -456,16 +456,16 @@ Always available. Pure C++/Eigen implementations with zero external dependencies
 - `dls_solve_policy` -- Damped Least Squares with adaptive SVD damping
 - `newton_raphson_solve_policy` -- Newton-Raphson with weighted convergence
 
-### nablapp
+### argmin
 
-Always available (nablapp is a required dependency of `cartan::kinematics`). Provides gradient-based and derivative-free constrained optimization:
+Always available (argmin is a required dependency of `cartan::kinematics`). Provides gradient-based and derivative-free constrained optimization:
 
 - `slsqp_solve_policy` -- Kraft's SLSQP with analytical gradient via SE(3) log Jacobian
 - `bobyqa_solve_policy` -- BOBYQA derivative-free with box constraints
 
 ### NLopt (optional)
 
-Available when `CARTAN_HAS_NLOPT` is defined. Legacy backend, targeted for removal when nablapp fully replaces it:
+Available when `CARTAN_HAS_NLOPT` is defined. Legacy backend, targeted for removal when argmin fully replaces it:
 
 - `nlopt_slsqp_solve_policy` -- NLopt LD_SLSQP
 - `nlopt_bobyqa_solve_policy` -- NLopt BOBYQA
@@ -474,5 +474,5 @@ Available when `CARTAN_HAS_NLOPT` is defined. Legacy backend, targeted for remov
 
 - **Single vs. multi-policy:** `basic_ik_solver` with one policy compiles to identical code as a non-variadic solver (zero overhead). With multiple policies, cooperative round-robin racing runs all policies in the calling thread.
 - **Convergence checking** uses separate angular and linear tolerances, not combined norm. A solution that is positionally accurate but rotationally off (or vice versa) will not be accepted.
-- **nablapp and NLopt policies** handle joint limits natively via box constraints. Use `no_limits` or `clamp_limits` as appropriate; the policy's internal constraint handling takes precedence.
+- **argmin and NLopt policies** handle joint limits natively via box constraints. Use `no_limits` or `clamp_limits` as appropriate; the policy's internal constraint handling takes precedence.
 - **Near-singularity:** DLS adaptively increases damping as `sigma_min` drops. LM increases lambda on rejected steps. Both avoid wild joint motions near singularities.

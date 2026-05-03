@@ -2,9 +2,9 @@
 #define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_ARGMIN_LM_H
 
 /// @file argmin_lm.h
-/// @brief nablapp-backed Levenberg-Marquardt IK solve policy (least-squares).
+/// @brief argmin-backed Levenberg-Marquardt IK solve policy (least-squares).
 ///
-/// Wraps nablapp's lm_policy using the least-squares problem adapter.
+/// Wraps argmin's lm_policy using the least-squares problem adapter.
 /// The residual is the 6-element SE(3) body-frame error, and the Jacobian
 /// is the body Jacobian. LM is unconstrained; joint limits are enforced
 /// by clamping after each step (formulation A).
@@ -17,16 +17,16 @@
 #include "cartan/serial/ik/detail/convergence.h"
 #include "cartan/serial/ik/detail/stall_detection.h"
 #include "cartan/serial/ik/detail/limit_enforcement.h"
-#include "cartan/serial/ik/detail/nablapp_least_squares_problem.h"
+#include "cartan/serial/ik/detail/argmin_least_squares_problem.h"
 
 #include "cartan/lie/se3.h"
 #include "cartan/serial/chain/joint_state.h"
 #include "cartan/serial/chain/chain_concept.h"
 #include "cartan/serial/fk/forward_kinematics.h"
 
-#include <nablapp/solver/options.h>
-#include <nablapp/solver/lm_policy.h>
-#include <nablapp/solver/basic_solver.h>
+#include <argmin/solver/options.h>
+#include <argmin/solver/lm_policy.h>
+#include <argmin/solver/basic_solver.h>
 
 #include <Eigen/Core>
 
@@ -38,14 +38,14 @@
 namespace cartan::ik
 {
 
-/// nablapp-backed Levenberg-Marquardt solve policy for IK.
+/// argmin-backed Levenberg-Marquardt solve policy for IK.
 ///
-/// Uses nablapp's LM solver with the least-squares adapter exposing
+/// Uses argmin's LM solver with the least-squares adapter exposing
 /// the 6-element body-frame error as residuals and the body Jacobian.
 /// Joint limits are enforced via clamping after each step since LM
 /// is unconstrained.
 ///
-/// This is the nablapp-backed LM. The native cartan implementation
+/// This is the argmin-backed LM. The native cartan implementation
 /// is available as lm_solve_policy.
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 class argmin_lm
@@ -101,7 +101,7 @@ public:
             x0[i] = static_cast<double>(q0[i]);
         }
 
-        nablapp::solver_options<> nab_opts;
+        argmin::solver_options<> nab_opts;
         nab_opts.max_iterations = m_options.budget_per_step;
         nab_opts.set_gradient_threshold(1e-14);
         nab_opts.set_objective_threshold(1e-16);
@@ -152,13 +152,13 @@ public:
             return m_status;
         }
 
-        if (result.status == nablapp::solver_status::converged
-            || result.status == nablapp::solver_status::ftol_reached
-            || result.status == nablapp::solver_status::stalled
-            || result.status == nablapp::solver_status::xtol_reached
-            || result.status == nablapp::solver_status::roundoff_limited
-            || result.status == nablapp::solver_status::objective_stalled
-            || result.status == nablapp::solver_status::aborted)
+        if (result.status == argmin::solver_status::converged
+            || result.status == argmin::solver_status::ftol_reached
+            || result.status == argmin::solver_status::stalled
+            || result.status == argmin::solver_status::xtol_reached
+            || result.status == argmin::solver_status::roundoff_limited
+            || result.status == argmin::solver_status::objective_stalled
+            || result.status == argmin::solver_status::aborted)
         {
             m_status = ik_status::stalled;
             return m_status;
@@ -175,8 +175,8 @@ public:
     void abort() { m_status = ik_status::stalled; }
 
 private:
-    using nablapp_solver = nablapp::basic_solver<
-        nablapp::lm_policy<joints>, joints, cartan::detail::nablapp_ik_least_squares_problem<Chain>>;
+    using argmin_solver = argmin::basic_solver<
+        argmin::lm_policy<joints>, joints, cartan::detail::argmin_ik_least_squares_problem<Chain>>;
 
     void sync_solution_from_solver()
     {
@@ -202,8 +202,8 @@ private:
     scalar_type m_error_norm{std::numeric_limits<scalar_type>::max()};
     int m_iterations{};
     ik_status m_status{ik_status::running};
-    std::optional<cartan::detail::nablapp_ik_least_squares_problem<Chain>> m_problem;
-    std::optional<nablapp_solver> m_solver;
+    std::optional<cartan::detail::argmin_ik_least_squares_problem<Chain>> m_problem;
+    std::optional<argmin_solver> m_solver;
 };
 
 }

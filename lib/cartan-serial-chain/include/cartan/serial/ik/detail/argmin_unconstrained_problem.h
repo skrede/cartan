@@ -1,12 +1,12 @@
-#ifndef HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_NABLAPP_CONSTRAINED_PROBLEM_H
-#define HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_NABLAPP_CONSTRAINED_PROBLEM_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_ARGMIN_UNCONSTRAINED_PROBLEM_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_ARGMIN_UNCONSTRAINED_PROBLEM_H
 
-/// @file detail/nablapp_constrained_problem.h
-/// @brief Inequality-constrained adapter (formulation B) for nablapp solvers.
+/// @file detail/argmin_unconstrained_problem.h
+/// @brief Unconstrained adapter (formulation A) for argmin solvers.
 ///
-/// Satisfies nablapp::objective, nablapp::differentiable, and
-/// nablapp::constrained. Joint limits are expressed as 2n inequality
-/// constraints: q_i - q_min >= 0 and q_max - q_i >= 0.
+/// Satisfies argmin::objective and argmin::differentiable without
+/// bounds. Joint limits are enforced externally by the solve policy
+/// via clamping after each step.
 
 #include "cartan/serial/ik/policy/error_weight.h"
 #include "cartan/serial/ik/solver/detail/analytical_gradient.h"
@@ -16,17 +16,16 @@
 
 #include <Eigen/Core>
 
-#include <cstddef>
-
 namespace cartan::detail
 {
 
-/// Inequality-constrained IK problem adapter for nablapp (formulation B).
+/// Unconstrained IK problem adapter for argmin (formulation A).
 ///
-/// Provides objective, gradient, and inequality constraints encoding
-/// joint limits as g_i(q) >= 0. No equality constraints.
+/// Provides objective and gradient only. No bounds are exposed to
+/// the solver; the calling solve policy is responsible for clamping
+/// the iterate to joint limits after each argmin step.
 template <chain Chain>
-class nablapp_constrained_ik_problem
+class argmin_unconstrained_ik_problem
 {
     using Scalar = typename Chain::scalar_type;
     static constexpr int N = Chain::joints;
@@ -35,7 +34,7 @@ class nablapp_constrained_ik_problem
 public:
     static constexpr int problem_dimension = N;
 
-    nablapp_constrained_ik_problem(
+    argmin_unconstrained_ik_problem(
         const Chain& chain,
         const se3<Scalar>& target,
         const error_weight<Scalar>& weight)
@@ -68,41 +67,6 @@ public:
         for (int i = 0; i < n; ++i)
         {
             g[i] = static_cast<double>(result.gradient(i));
-        }
-    }
-
-    int num_equality() const
-    {
-        return 0;
-    }
-
-    int num_inequality() const
-    {
-        return 2 * m_chain->num_joints();
-    }
-
-    template <typename DerivedIn, typename DerivedOut>
-    void constraints(const Eigen::MatrixBase<DerivedIn>& x, Eigen::MatrixBase<DerivedOut>& c) const
-    {
-        int n = m_chain->num_joints();
-        for (int i = 0; i < n; ++i)
-        {
-            c[i] = x[i] - static_cast<double>(
-                m_chain->limits()[static_cast<std::size_t>(i)].position_min);
-            c[n + i] = static_cast<double>(
-                m_chain->limits()[static_cast<std::size_t>(i)].position_max) - x[i];
-        }
-    }
-
-    template <typename DerivedIn, typename DerivedOut>
-    void constraint_jacobian(const Eigen::MatrixBase<DerivedIn>& /*x*/, Eigen::MatrixBase<DerivedOut>& J) const
-    {
-        int n = m_chain->num_joints();
-        J.setZero();
-        for (int i = 0; i < n; ++i)
-        {
-            J(i, i) = 1.0;
-            J(n + i, i) = -1.0;
         }
     }
 

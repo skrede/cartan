@@ -1,22 +1,22 @@
 if (CARTAN_BUILD_ARGMIN)
     if (CARTAN_ARGMIN_SOURCE_DIR)
         FetchContent_Declare(
-            nablapp
+            argmin
             SOURCE_DIR "${CARTAN_ARGMIN_SOURCE_DIR}"
             EXCLUDE_FROM_ALL
         )
     else ()
         FetchContent_Declare(
-            nablapp
-            GIT_REPOSITORY https://github.com/skrede/nablapp.git
-            GIT_TAG milestone/v0.2.1
+            argmin
+            GIT_REPOSITORY https://github.com/skrede/argmin.git
+            GIT_TAG master
             EXCLUDE_FROM_ALL
         )
     endif ()
-    set(NABLAPP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-    set(NABLAPP_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-    set(NABLAPP_BUILD_BENCHMARKS OFF CACHE BOOL "" FORCE)
-    FetchContent_MakeAvailable(nablapp)
+    set(ARGMIN_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(ARGMIN_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(ARGMIN_BUILD_BENCHMARKS OFF CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(argmin)
 endif ()
 
 add_library(cartan_serial_chain INTERFACE)
@@ -36,7 +36,7 @@ target_link_libraries(cartan_serial_chain
 if (CARTAN_BUILD_ARGMIN)
     target_link_libraries(cartan_serial_chain
         INTERFACE
-        nablapp::nablapp
+        argmin::argmin
     )
 endif ()
 

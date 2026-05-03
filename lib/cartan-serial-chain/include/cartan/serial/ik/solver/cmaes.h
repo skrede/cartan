@@ -2,9 +2,9 @@
 #define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_CMAES_H
 
 /// @file cmaes.h
-/// @brief nablapp-backed CMA-ES derivative-free IK solve policy.
+/// @brief argmin-backed CMA-ES derivative-free IK solve policy.
 ///
-/// Wraps nablapp's cmaes_policy for bound-constrained IK using
+/// Wraps argmin's cmaes_policy for bound-constrained IK using
 /// Covariance Matrix Adaptation Evolution Strategy. Derivative-free:
 /// uses only objective evaluations with population-based search.
 ///
@@ -15,7 +15,7 @@
 #include "cartan/serial/ik/policy/limits_policy.h"
 #include "cartan/serial/ik/concepts/solve_concept.h"
 #include "cartan/serial/ik/detail/convergence.h"
-#include "cartan/serial/ik/detail/nablapp_problem.h"
+#include "cartan/serial/ik/detail/argmin_problem.h"
 #include "cartan/serial/ik/detail/stall_detection.h"
 #include "cartan/serial/ik/detail/limit_enforcement.h"
 
@@ -24,9 +24,9 @@
 #include "cartan/serial/chain/chain_concept.h"
 #include "cartan/serial/fk/forward_kinematics.h"
 
-#include <nablapp/solver/options.h>
-#include <nablapp/solver/basic_solver.h>
-#include <nablapp/solver/cmaes_policy.h>
+#include <argmin/solver/options.h>
+#include <argmin/solver/basic_solver.h>
+#include <argmin/solver/cmaes_policy.h>
 
 #include <Eigen/Core>
 
@@ -38,9 +38,9 @@
 namespace cartan::ik
 {
 
-/// nablapp-backed CMA-ES solve policy for derivative-free IK.
+/// argmin-backed CMA-ES solve policy for derivative-free IK.
 ///
-/// Uses the Covariance Matrix Adaptation Evolution Strategy via nablapp.
+/// Uses the Covariance Matrix Adaptation Evolution Strategy via argmin.
 /// Population-based: each step() runs a generation (sample, evaluate,
 /// rank, update). Needs more iterations than gradient-based methods
 /// but requires no gradient information.
@@ -99,17 +99,17 @@ public:
             x0[i] = static_cast<double>(q0[i]);
         }
 
-        nablapp::solver_options<> nab_opts;
+        argmin::solver_options<> nab_opts;
         nab_opts.max_iterations = m_options.budget_per_step;
         nab_opts.set_gradient_threshold(0.0);
         nab_opts.set_objective_threshold(1e-16);
         nab_opts.set_stationarity_threshold(std::numeric_limits<double>::infinity());
         nab_opts.set_step_threshold(1e-16);
 
-        typename nablapp::cmaes_policy<joints>::options_type policy_opts;
+        typename argmin::cmaes_policy<joints>::options_type policy_opts;
         policy_opts.initial_sigma = static_cast<double>(m_options.initial_sigma);
 
-        m_solver.emplace(nablapp::cmaes_policy<joints>{}, *m_problem, x0, nab_opts, policy_opts);
+        m_solver.emplace(argmin::cmaes_policy<joints>{}, *m_problem, x0, nab_opts, policy_opts);
     }
 
     ik_status step(const Chain& chain)
@@ -152,13 +152,13 @@ public:
             return m_status;
         }
 
-        if (result.status == nablapp::solver_status::converged
-            || result.status == nablapp::solver_status::ftol_reached
-            || result.status == nablapp::solver_status::stalled
-            || result.status == nablapp::solver_status::xtol_reached
-            || result.status == nablapp::solver_status::roundoff_limited
-            || result.status == nablapp::solver_status::objective_stalled
-            || result.status == nablapp::solver_status::aborted)
+        if (result.status == argmin::solver_status::converged
+            || result.status == argmin::solver_status::ftol_reached
+            || result.status == argmin::solver_status::stalled
+            || result.status == argmin::solver_status::xtol_reached
+            || result.status == argmin::solver_status::roundoff_limited
+            || result.status == argmin::solver_status::objective_stalled
+            || result.status == argmin::solver_status::aborted)
         {
             m_status = ik_status::stalled;
             return m_status;
@@ -177,8 +177,8 @@ public:
     void abort() { m_status = ik_status::stalled; }
 
 private:
-    using nablapp_solver = nablapp::basic_solver<
-        nablapp::cmaes_policy<joints>, joints, cartan::detail::nablapp_ik_problem<Chain>>;
+    using argmin_solver = argmin::basic_solver<
+        argmin::cmaes_policy<joints>, joints, cartan::detail::argmin_ik_problem<Chain>>;
 
     void sync_solution_from_solver()
     {
@@ -205,8 +205,8 @@ private:
     scalar_type m_error_norm{std::numeric_limits<scalar_type>::max()};
     int m_iterations{};
     ik_status m_status{ik_status::running};
-    std::optional<cartan::detail::nablapp_ik_problem<Chain>> m_problem;
-    std::optional<nablapp_solver> m_solver;
+    std::optional<cartan::detail::argmin_ik_problem<Chain>> m_problem;
+    std::optional<argmin_solver> m_solver;
 };
 
 }

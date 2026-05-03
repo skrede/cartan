@@ -52,7 +52,7 @@ static auto make_test_target(const chain_t& chain)
     return cartan::forward_kinematics(chain, q_known).end_effector;
 }
 
-TEST_CASE("nablapp_lbfgsb_solve_policy converges on UR5-like chain", "[ik][nablapp][lbfgsb]")
+TEST_CASE("argmin_lbfgsb_solve_policy converges on UR5-like chain", "[ik][argmin][lbfgsb]")
 {
     auto chain = make_ur5_like_chain();
     auto target = make_test_target(chain);
@@ -68,7 +68,7 @@ TEST_CASE("nablapp_lbfgsb_solve_policy converges on UR5-like chain", "[ik][nabla
     REQUIRE(result->final_error_norm < 1e-4);
 }
 
-TEST_CASE("nw_sqp_solve_policy converges on UR5-like chain", "[ik][nablapp][nw-sqp]")
+TEST_CASE("nw_sqp_solve_policy converges on UR5-like chain", "[ik][argmin][nw-sqp]")
 {
     auto chain = make_ur5_like_chain();
     auto target = make_test_target(chain);
@@ -84,7 +84,7 @@ TEST_CASE("nw_sqp_solve_policy converges on UR5-like chain", "[ik][nablapp][nw-s
     REQUIRE(result->final_error_norm < 1e-4);
 }
 
-TEST_CASE("nablapp_lm_solve_policy converges on UR5-like chain", "[ik][nablapp][lm]")
+TEST_CASE("argmin_lm_solve_policy converges on UR5-like chain", "[ik][argmin][lm]")
 {
     auto chain = make_ur5_like_chain();
     auto target = make_test_target(chain);
@@ -100,7 +100,7 @@ TEST_CASE("nablapp_lm_solve_policy converges on UR5-like chain", "[ik][nablapp][
     REQUIRE(result->final_error_norm < 1e-4);
 }
 
-TEST_CASE("cmaes_solve_policy converges on UR5-like chain", "[ik][nablapp][cmaes]")
+TEST_CASE("cmaes_solve_policy converges on UR5-like chain", "[ik][argmin][cmaes]")
 {
     auto chain = make_ur5_like_chain();
     auto target = make_test_target(chain);
@@ -134,7 +134,7 @@ TEST_CASE("cmaes_solve_policy converges on UR5-like chain", "[ik][nablapp][cmaes
     }
 }
 
-TEST_CASE("augmented_lagrangian_solve_policy converges on UR5-like chain", "[ik][nablapp][aug-lag]")
+TEST_CASE("augmented_lagrangian_solve_policy converges on UR5-like chain", "[ik][argmin][aug-lag]")
 {
     auto chain = make_ur5_like_chain();
     auto target = make_test_target(chain);

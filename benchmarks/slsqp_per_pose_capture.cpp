@@ -1,8 +1,8 @@
 /// @file slsqp_per_pose_capture.cpp
 /// @brief Per-pose SLSQP timing/accuracy capture for cross-library coordination.
 ///
-/// Runs the same nablapp_slsqp solver stack as the bm_full_*_nablapp_slsqp /
-/// bm_comparison_*_nablapp_slsqp google/benchmark cells (basic_ik_runner with
+/// Runs the same argmin_slsqp solver stack as the bm_full_*_argmin_slsqp /
+/// bm_comparison_*_argmin_slsqp google/benchmark cells (basic_ik_runner with
 /// restart_wrapper around argmin_slsqp), but emits per-pose CSV rows instead
 /// of aggregated counters, so a coordinator agent can compare distributions
 /// (not just means) before and after a per-iter optimization.
@@ -62,7 +62,7 @@ template <int N>
 using chain_t = cartan::kinematic_chain<double, N>;
 
 template <int N>
-using nablapp_slsqp_solver = cartan::basic_ik_runner<
+using argmin_slsqp_solver = cartan::basic_ik_runner<
     cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::argmin_slsqp<chain_t<N>>>>;
 
 constexpr std::string_view to_string(cartan::ik_failure r) noexcept
@@ -210,13 +210,13 @@ int main(int argc, char** argv)
     {
         auto chain = cartan::benchmarks::make_ur3e_chain<double>();
         target_set<double, 6> ts(chain, num_targets, target_seed);
-        run_per_pose<6, nablapp_slsqp_solver<6>>("ur3e", chain, ts, criteria, out);
+        run_per_pose<6, argmin_slsqp_solver<6>>("ur3e", chain, ts, criteria, out);
         std::cerr << "ur3e: 1000 poses written\n";
     }
     {
         auto chain = cartan::benchmarks::make_panda_chain<double>();
         target_set<double, 7> ts(chain, num_targets, target_seed);
-        run_per_pose<7, nablapp_slsqp_solver<7>>("panda", chain, ts, criteria, out);
+        run_per_pose<7, argmin_slsqp_solver<7>>("panda", chain, ts, criteria, out);
         std::cerr << "panda: 1000 poses written\n";
     }
 

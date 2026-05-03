@@ -2,9 +2,9 @@
 #define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_FILTER_NW_SQP_H
 
 /// @file filter_nw_sqp.h
-/// @brief nablapp-backed filter Nocedal-Wright SQP IK solve policy.
+/// @brief argmin-backed filter Nocedal-Wright SQP IK solve policy.
 ///
-/// Wraps nablapp's filter_nw_sqp_policy for constrained IK. Uses
+/// Wraps argmin's filter_nw_sqp_policy for constrained IK. Uses
 /// Fletcher-Leyffer 2002 filter acceptance with dense BFGS Hessian and
 /// active-set QP subproblem solver.
 
@@ -13,7 +13,7 @@
 #include "cartan/serial/ik/policy/limits_policy.h"
 #include "cartan/serial/ik/concepts/solve_concept.h"
 #include "cartan/serial/ik/detail/convergence.h"
-#include "cartan/serial/ik/detail/nablapp_constrained_problem.h"
+#include "cartan/serial/ik/detail/argmin_constrained_problem.h"
 #include "cartan/serial/ik/detail/stall_detection.h"
 #include "cartan/serial/ik/detail/limit_enforcement.h"
 
@@ -22,10 +22,10 @@
 #include "cartan/serial/chain/chain_concept.h"
 #include "cartan/serial/fk/forward_kinematics.h"
 
-#include <nablapp/solver/options.h>
-#include <nablapp/solver/convergence.h>
-#include <nablapp/solver/basic_solver.h>
-#include <nablapp/solver/filter_nw_sqp_policy.h>
+#include <argmin/solver/options.h>
+#include <argmin/solver/convergence.h>
+#include <argmin/solver/basic_solver.h>
+#include <argmin/solver/filter_nw_sqp_policy.h>
 
 #include <Eigen/Core>
 
@@ -44,7 +44,7 @@ namespace cartan::ik
 
 template <chain Chain,
           typename LimitsPolicy = clamp_limits,
-          typename Convergence = nablapp::default_convergence>
+          typename Convergence = argmin::default_convergence>
 class filter_nw_sqp
 {
 public:
@@ -110,7 +110,7 @@ public:
         for (int i = 0; i < n; ++i)
             x0[i] = static_cast<double>(q0[i]);
 
-        build_nablapp_opts(m_nab_opts);
+        build_argmin_opts(m_nab_opts);
 
         m_solver.emplace(*m_problem, x0, m_nab_opts);
     }
@@ -177,14 +177,14 @@ public:
                     x0[i] = static_cast<double>(q_perturbed[i]);
                 m_solver->reset_clear(x0);
 
-                build_nablapp_opts(m_nab_opts);
+                build_argmin_opts(m_nab_opts);
 
                 m_q = q_perturbed;
                 return ik_status::running;
             }
 
             m_status = ik_status::stalled;
-            m_termination_reason = map_nablapp_status(result.status);
+            m_termination_reason = map_argmin_status(result.status);
             return m_status;
         }
 
@@ -201,7 +201,7 @@ public:
     [[nodiscard]] ik_termination_reason termination_reason() const { return m_termination_reason; }
     [[nodiscard]] int restart_count() const { return m_restart_count; }
 
-    [[nodiscard]] std::uint32_t nablapp_iterations() const
+    [[nodiscard]] std::uint32_t argmin_iterations() const
     {
         if (!m_solver) return 0;
         using state_t = std::remove_cvref_t<decltype(m_solver->state())>;
@@ -216,7 +216,7 @@ public:
         if constexpr (requires { m_nab_opts.convergence.last_check_results(); })
             return m_nab_opts.convergence.last_check_results();
         else
-            return std::array<std::optional<nablapp::solver_status>, 4>{};
+            return std::array<std::optional<argmin::solver_status>, 4>{};
     }
 
     void abort()
@@ -226,9 +226,9 @@ public:
     }
 
 private:
-    using nablapp_solver = nablapp::basic_solver<
-        nablapp::filter_nw_sqp_policy<joints>, joints, cartan::detail::nablapp_constrained_ik_problem<Chain>>;
-    using nablapp_opts_type = nablapp::solver_options<Convergence>;
+    using argmin_solver = argmin::basic_solver<
+        argmin::filter_nw_sqp_policy<joints>, joints, cartan::detail::argmin_constrained_ik_problem<Chain>>;
+    using argmin_opts_type = argmin::solver_options<Convergence>;
 
     position_type perturb_solution(const position_type& q, const Chain& chain)
     {
@@ -253,10 +253,10 @@ private:
         return q_new;
     }
 
-    void build_nablapp_opts(nablapp_opts_type& opts) const
+    void build_argmin_opts(argmin_opts_type& opts) const
     {
         opts.max_iterations = static_cast<std::uint32_t>(m_options.budget_per_step);
-        if constexpr (std::is_same_v<Convergence, nablapp::default_convergence>)
+        if constexpr (std::is_same_v<Convergence, argmin::default_convergence>)
         {
             opts.set_gradient_threshold(m_options.gradient_threshold);
             opts.set_objective_threshold(m_options.objective_threshold);
@@ -269,39 +269,39 @@ private:
         }
     }
 
-    static constexpr bool is_inner_terminal(nablapp::solver_status s) noexcept
+    static constexpr bool is_inner_terminal(argmin::solver_status s) noexcept
     {
         switch (s)
         {
-            case nablapp::solver_status::converged:
-            case nablapp::solver_status::ftol_reached:
-            case nablapp::solver_status::xtol_reached:
-            case nablapp::solver_status::stalled:
-            case nablapp::solver_status::objective_stalled:
-            case nablapp::solver_status::roundoff_limited:
-            case nablapp::solver_status::aborted:
-            case nablapp::solver_status::diverged:
-            case nablapp::solver_status::max_iterations:
+            case argmin::solver_status::converged:
+            case argmin::solver_status::ftol_reached:
+            case argmin::solver_status::xtol_reached:
+            case argmin::solver_status::stalled:
+            case argmin::solver_status::objective_stalled:
+            case argmin::solver_status::roundoff_limited:
+            case argmin::solver_status::aborted:
+            case argmin::solver_status::diverged:
+            case argmin::solver_status::max_iterations:
                 return true;
             default:
                 return false;
         }
     }
 
-    static constexpr ik_termination_reason map_nablapp_status(nablapp::solver_status s) noexcept
+    static constexpr ik_termination_reason map_argmin_status(argmin::solver_status s) noexcept
     {
         switch (s)
         {
-            case nablapp::solver_status::converged:         return ik_termination_reason::solver_converged_pose_missed;
-            case nablapp::solver_status::ftol_reached:      return ik_termination_reason::solver_ftol_reached;
-            case nablapp::solver_status::xtol_reached:      return ik_termination_reason::solver_xtol_reached;
-            case nablapp::solver_status::stalled:           return ik_termination_reason::solver_stalled;
-            case nablapp::solver_status::objective_stalled: return ik_termination_reason::solver_objective_stalled;
-            case nablapp::solver_status::roundoff_limited:  return ik_termination_reason::solver_roundoff_limited;
-            case nablapp::solver_status::aborted:           return ik_termination_reason::solver_aborted;
-            case nablapp::solver_status::budget_exhausted:  return ik_termination_reason::solver_budget_exhausted;
-            case nablapp::solver_status::max_iterations:    return ik_termination_reason::solver_max_iterations;
-            case nablapp::solver_status::diverged:          return ik_termination_reason::solver_diverged;
+            case argmin::solver_status::converged:         return ik_termination_reason::solver_converged_pose_missed;
+            case argmin::solver_status::ftol_reached:      return ik_termination_reason::solver_ftol_reached;
+            case argmin::solver_status::xtol_reached:      return ik_termination_reason::solver_xtol_reached;
+            case argmin::solver_status::stalled:           return ik_termination_reason::solver_stalled;
+            case argmin::solver_status::objective_stalled: return ik_termination_reason::solver_objective_stalled;
+            case argmin::solver_status::roundoff_limited:  return ik_termination_reason::solver_roundoff_limited;
+            case argmin::solver_status::aborted:           return ik_termination_reason::solver_aborted;
+            case argmin::solver_status::budget_exhausted:  return ik_termination_reason::solver_budget_exhausted;
+            case argmin::solver_status::max_iterations:    return ik_termination_reason::solver_max_iterations;
+            case argmin::solver_status::diverged:          return ik_termination_reason::solver_diverged;
             default:                                        return ik_termination_reason::unknown;
         }
     }
@@ -328,9 +328,9 @@ private:
     int m_iterations{};
     ik_status m_status{ik_status::running};
     ik_termination_reason m_termination_reason{ik_termination_reason::unknown};
-    std::optional<cartan::detail::nablapp_constrained_ik_problem<Chain>> m_problem;
-    std::optional<nablapp_solver> m_solver;
-    nablapp_opts_type m_nab_opts{};
+    std::optional<cartan::detail::argmin_constrained_ik_problem<Chain>> m_problem;
+    std::optional<argmin_solver> m_solver;
+    argmin_opts_type m_nab_opts{};
     int m_restart_count{};
     std::mt19937 m_rng{0};
 };

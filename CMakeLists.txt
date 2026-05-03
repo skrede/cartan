@@ -38,7 +38,7 @@ option(CARTAN_BUILD_TRAC_IK "Build TRAC-IK comparison benchmarks (requires oroco
 option(CARTAN_BUILD_PROFILING "Build profiling benchmarks (no external robot library dependencies)" OFF)
 option(CARTAN_CMAKE_FETCH_DEPS "Use CMake FetchContent to download and install dependencies" OFF)
 
-set(CARTAN_ARGMIN_SOURCE_DIR "" CACHE PATH "Path to local Argmin (nablapp) source checkout")
+set(CARTAN_ARGMIN_SOURCE_DIR "" CACHE PATH "Path to local argmin source checkout")
 
 include(FetchContent)
 include(GNUInstallDirs)

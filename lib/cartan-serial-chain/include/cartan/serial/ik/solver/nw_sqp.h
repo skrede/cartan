@@ -2,9 +2,9 @@
 #define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_NW_SQP_H
 
 /// @file nw_sqp.h
-/// @brief nablapp-backed N&W SQP IK solve policy with inequality constraints.
+/// @brief argmin-backed N&W SQP IK solve policy with inequality constraints.
 ///
-/// Wraps nablapp's nw_sqp_policy for constrained IK using formulation B
+/// Wraps argmin's nw_sqp_policy for constrained IK using formulation B
 /// (inequality constraints encoding joint limits as g_i(q) >= 0).
 ///
 /// Reference: Nocedal & Wright, Chapter 18 (SQP methods).
@@ -16,16 +16,16 @@
 #include "cartan/serial/ik/detail/convergence.h"
 #include "cartan/serial/ik/detail/stall_detection.h"
 #include "cartan/serial/ik/detail/limit_enforcement.h"
-#include "cartan/serial/ik/detail/nablapp_constrained_problem.h"
+#include "cartan/serial/ik/detail/argmin_constrained_problem.h"
 
 #include "cartan/lie/se3.h"
 #include "cartan/serial/chain/joint_state.h"
 #include "cartan/serial/chain/chain_concept.h"
 #include "cartan/serial/fk/forward_kinematics.h"
 
-#include <nablapp/solver/options.h>
-#include <nablapp/solver/basic_solver.h>
-#include <nablapp/solver/nw_sqp_policy.h>
+#include <argmin/solver/options.h>
+#include <argmin/solver/basic_solver.h>
+#include <argmin/solver/nw_sqp_policy.h>
 
 #include <Eigen/Core>
 
@@ -37,9 +37,9 @@
 namespace cartan::ik
 {
 
-/// nablapp-backed N&W SQP solve policy for IK with inequality constraints.
+/// argmin-backed N&W SQP solve policy for IK with inequality constraints.
 ///
-/// Uses the Nocedal-Wright line-search SQP method via nablapp. Joint limits
+/// Uses the Nocedal-Wright line-search SQP method via argmin. Joint limits
 /// are expressed as 2n inequality constraints (formulation B) rather than
 /// box constraints, which is the natural formulation for SQP with
 /// Lagrangian-based globalization.
@@ -97,7 +97,7 @@ public:
             x0[i] = static_cast<double>(q0[i]);
         }
 
-        nablapp::solver_options<> nab_opts;
+        argmin::solver_options<> nab_opts;
         nab_opts.max_iterations = m_options.budget_per_step;
         nab_opts.set_gradient_threshold(1e-14);
         nab_opts.set_objective_threshold(1e-16);
@@ -146,13 +146,13 @@ public:
             return m_status;
         }
 
-        if (result.status == nablapp::solver_status::converged
-            || result.status == nablapp::solver_status::ftol_reached
-            || result.status == nablapp::solver_status::stalled
-            || result.status == nablapp::solver_status::xtol_reached
-            || result.status == nablapp::solver_status::roundoff_limited
-            || result.status == nablapp::solver_status::objective_stalled
-            || result.status == nablapp::solver_status::aborted)
+        if (result.status == argmin::solver_status::converged
+            || result.status == argmin::solver_status::ftol_reached
+            || result.status == argmin::solver_status::stalled
+            || result.status == argmin::solver_status::xtol_reached
+            || result.status == argmin::solver_status::roundoff_limited
+            || result.status == argmin::solver_status::objective_stalled
+            || result.status == argmin::solver_status::aborted)
         {
             m_status = ik_status::stalled;
             return m_status;
@@ -171,8 +171,8 @@ public:
     void abort() { m_status = ik_status::stalled; }
 
 private:
-    using nablapp_solver = nablapp::basic_solver<
-        nablapp::nw_sqp_policy<joints>, joints, cartan::detail::nablapp_constrained_ik_problem<Chain>>;
+    using argmin_solver = argmin::basic_solver<
+        argmin::nw_sqp_policy<joints>, joints, cartan::detail::argmin_constrained_ik_problem<Chain>>;
 
     void sync_solution_from_solver()
     {
@@ -199,8 +199,8 @@ private:
     scalar_type m_error_norm{std::numeric_limits<scalar_type>::max()};
     int m_iterations{};
     ik_status m_status{ik_status::running};
-    std::optional<cartan::detail::nablapp_constrained_ik_problem<Chain>> m_problem;
-    std::optional<nablapp_solver> m_solver;
+    std::optional<cartan::detail::argmin_constrained_ik_problem<Chain>> m_problem;
+    std::optional<argmin_solver> m_solver;
 };
 
 }

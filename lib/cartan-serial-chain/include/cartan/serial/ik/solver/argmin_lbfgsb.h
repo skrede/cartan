@@ -2,9 +2,9 @@
 #define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_ARGMIN_LBFGSB_H
 
 /// @file argmin_lbfgsb.h
-/// @brief nablapp-backed L-BFGS-B IK solve policy with box constraints.
+/// @brief argmin-backed L-BFGS-B IK solve policy with box constraints.
 ///
-/// Wraps nablapp's lbfgsb_policy for bound-constrained IK using
+/// Wraps argmin's lbfgsb_policy for bound-constrained IK using
 /// analytical gradient via the SE(3) log Jacobian. Distinct from the
 /// native lbfgsb_solve_policy which implements L-BFGS-B directly.
 ///
@@ -15,7 +15,7 @@
 #include "cartan/serial/ik/policy/limits_policy.h"
 #include "cartan/serial/ik/concepts/solve_concept.h"
 #include "cartan/serial/ik/detail/convergence.h"
-#include "cartan/serial/ik/detail/nablapp_problem.h"
+#include "cartan/serial/ik/detail/argmin_problem.h"
 #include "cartan/serial/ik/detail/stall_detection.h"
 #include "cartan/serial/ik/detail/limit_enforcement.h"
 
@@ -24,9 +24,9 @@
 #include "cartan/serial/chain/chain_concept.h"
 #include "cartan/serial/fk/forward_kinematics.h"
 
-#include <nablapp/solver/options.h>
-#include <nablapp/solver/basic_solver.h>
-#include <nablapp/solver/lbfgsb_policy.h>
+#include <argmin/solver/options.h>
+#include <argmin/solver/basic_solver.h>
+#include <argmin/solver/lbfgsb_policy.h>
 
 #include <Eigen/Core>
 
@@ -38,14 +38,14 @@
 namespace cartan::ik
 {
 
-/// nablapp-backed L-BFGS-B solve policy for bound-constrained IK.
+/// argmin-backed L-BFGS-B solve policy for bound-constrained IK.
 ///
 /// Uses the Limited-memory BFGS for Bound-constrained optimization via
-/// nablapp, with analytical gradient through the SE(3) log Jacobian.
-/// Each step() call runs a budget of nablapp iterations for cooperative
+/// argmin, with analytical gradient through the SE(3) log Jacobian.
+/// Each step() call runs a budget of argmin iterations for cooperative
 /// scheduling in basic_ik_solver.
 ///
-/// This is the nablapp-backed L-BFGS-B. The native cartan implementation
+/// This is the argmin-backed L-BFGS-B. The native cartan implementation
 /// is available as lbfgsb_solve_policy.
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 class argmin_lbfgsb
@@ -101,7 +101,7 @@ public:
             x0[i] = static_cast<double>(q0[i]);
         }
 
-        nablapp::solver_options<> nab_opts;
+        argmin::solver_options<> nab_opts;
         nab_opts.max_iterations = m_options.budget_per_step;
         nab_opts.set_gradient_threshold(1e-14);
         nab_opts.set_objective_threshold(1e-16);
@@ -150,13 +150,13 @@ public:
             return m_status;
         }
 
-        if (result.status == nablapp::solver_status::converged
-            || result.status == nablapp::solver_status::ftol_reached
-            || result.status == nablapp::solver_status::stalled
-            || result.status == nablapp::solver_status::xtol_reached
-            || result.status == nablapp::solver_status::roundoff_limited
-            || result.status == nablapp::solver_status::objective_stalled
-            || result.status == nablapp::solver_status::aborted)
+        if (result.status == argmin::solver_status::converged
+            || result.status == argmin::solver_status::ftol_reached
+            || result.status == argmin::solver_status::stalled
+            || result.status == argmin::solver_status::xtol_reached
+            || result.status == argmin::solver_status::roundoff_limited
+            || result.status == argmin::solver_status::objective_stalled
+            || result.status == argmin::solver_status::aborted)
         {
             m_status = ik_status::stalled;
             return m_status;
@@ -175,8 +175,8 @@ public:
     void abort() { m_status = ik_status::stalled; }
 
 private:
-    using nablapp_solver = nablapp::basic_solver<
-        nablapp::lbfgsb_policy<joints>, joints, cartan::detail::nablapp_ik_problem<Chain>>;
+    using argmin_solver = argmin::basic_solver<
+        argmin::lbfgsb_policy<joints>, joints, cartan::detail::argmin_ik_problem<Chain>>;
 
     void sync_solution_from_solver()
     {
@@ -203,8 +203,8 @@ private:
     scalar_type m_error_norm{std::numeric_limits<scalar_type>::max()};
     int m_iterations{};
     ik_status m_status{ik_status::running};
-    std::optional<cartan::detail::nablapp_ik_problem<Chain>> m_problem;
-    std::optional<nablapp_solver> m_solver;
+    std::optional<cartan::detail::argmin_ik_problem<Chain>> m_problem;
+    std::optional<argmin_solver> m_solver;
 };
 
 }

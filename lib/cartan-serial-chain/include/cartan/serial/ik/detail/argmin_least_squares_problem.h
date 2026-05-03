@@ -1,10 +1,10 @@
-#ifndef HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_NABLAPP_LEAST_SQUARES_PROBLEM_H
-#define HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_NABLAPP_LEAST_SQUARES_PROBLEM_H
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_ARGMIN_LEAST_SQUARES_PROBLEM_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_ARGMIN_LEAST_SQUARES_PROBLEM_H
 
-/// @file detail/nablapp_least_squares_problem.h
-/// @brief Least-squares adapter for nablapp LM solver.
+/// @file detail/argmin_least_squares_problem.h
+/// @brief Least-squares adapter for argmin LM solver.
 ///
-/// Satisfies nablapp::objective and nablapp::least_squares concepts.
+/// Satisfies argmin::objective and argmin::least_squares concepts.
 /// Exposes the 6-element SE(3) body-frame error as the residual vector
 /// and the body Jacobian as the LM Jacobian.
 
@@ -19,14 +19,14 @@
 namespace cartan::detail
 {
 
-/// Least-squares IK problem adapter for nablapp LM solver.
+/// Least-squares IK problem adapter for argmin LM solver.
 ///
 /// The residual vector is the 6-element body-frame error V_b = log(T_target^{-1} * FK(q)).
 /// The Jacobian is the body Jacobian J_b (6 x n), which is the first-order
 /// approximation of d(V_b)/dq (neglecting the SE(3) log Jacobian correction,
 /// which is accurate near convergence).
 template <chain Chain>
-class nablapp_ik_least_squares_problem
+class argmin_ik_least_squares_problem
 {
     using Scalar = typename Chain::scalar_type;
     static constexpr int N = Chain::joints;
@@ -35,7 +35,7 @@ class nablapp_ik_least_squares_problem
 public:
     static constexpr int problem_dimension = N;
 
-    nablapp_ik_least_squares_problem(
+    argmin_ik_least_squares_problem(
         const Chain& chain,
         const se3<Scalar>& target)
         : m_chain{&chain}

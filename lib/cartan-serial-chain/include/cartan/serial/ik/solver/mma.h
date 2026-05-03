@@ -2,9 +2,9 @@
 #define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_MMA_H
 
 /// @file mma.h
-/// @brief nablapp-backed Method of Moving Asymptotes IK solve policy.
+/// @brief argmin-backed Method of Moving Asymptotes IK solve policy.
 ///
-/// Wraps nablapp's mma_policy over a bound-constrained IK problem.
+/// Wraps argmin's mma_policy over a bound-constrained IK problem.
 /// Joint limits are passed through as box bounds and MMA builds
 /// Svanberg's convex separable reciprocal approximation around them.
 /// No outer augmented-Lagrangian layer is required since MMA handles
@@ -22,16 +22,16 @@
 #include "cartan/serial/ik/detail/convergence.h"
 #include "cartan/serial/ik/detail/stall_detection.h"
 #include "cartan/serial/ik/detail/limit_enforcement.h"
-#include "cartan/serial/ik/detail/nablapp_bounded_ik_problem.h"
+#include "cartan/serial/ik/detail/argmin_bounded_ik_problem.h"
 
 #include "cartan/lie/se3.h"
 #include "cartan/serial/chain/joint_state.h"
 #include "cartan/serial/chain/chain_concept.h"
 #include "cartan/serial/fk/forward_kinematics.h"
 
-#include <nablapp/solver/options.h>
-#include <nablapp/solver/basic_solver.h>
-#include <nablapp/solver/mma_policy.h>
+#include <argmin/solver/options.h>
+#include <argmin/solver/basic_solver.h>
+#include <argmin/solver/mma_policy.h>
 
 #include <Eigen/Core>
 
@@ -45,13 +45,13 @@
 namespace cartan::ik
 {
 
-/// nablapp-backed MMA solve policy for bound-constrained IK.
+/// argmin-backed MMA solve policy for bound-constrained IK.
 ///
 /// Each step() performs one outer Svanberg iteration (asymptote update +
 /// conservative convex subproblem solve). Joint limits enter as box
 /// bounds; no inequality constraints are emitted. The policy-internal
 /// stall cascade (asymptote-floor, rho-saturated, KKT-jump) surfaces
-/// through step_result.policy_status and is left at nablapp defaults
+/// through step_result.policy_status and is left at argmin defaults
 /// unless overridden via mma_options.
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 class mma
@@ -73,11 +73,11 @@ public:
         scalar_type divergence_factor{scalar_type(10)};
         int stall_window{5};
 
-        // Pass-through of nablapp mma_policy options. Leaving fields
-        // unset keeps nablapp's defaults (K_asymptote = K_saturation = 5,
+        // Pass-through of argmin mma_policy options. Leaving fields
+        // unset keeps argmin's defaults (K_asymptote = K_saturation = 5,
         // kkt_jump_threshold_factor = 1000, stall_tolerance_threshold
         // resolved to 1e-6 by basic_solver::forward_policy_hints).
-        typename nablapp::mma_policy<joints>::options_type policy_options{};
+        typename argmin::mma_policy<joints>::options_type policy_options{};
 
         double gradient_threshold{1e-14};
         double objective_threshold{1e-16};
@@ -117,14 +117,14 @@ public:
             x0[i] = static_cast<double>(q0[i]);
         }
 
-        // nablapp's iterations_ is a cumulative counter across all
+        // argmin's iterations_ is a cumulative counter across all
         // step_n(budget) calls; when iterations_ >= opts.max_iterations
         // step_n early-returns with max_iterations status and does no
         // work. The cartan wrapper loops step_n(budget_per_step) many
         // times, so max_iterations must be a large upper bound — the
         // cartan-level m_criteria.max_iterations drives the outer
         // termination instead.
-        nablapp::solver_options<> nab_opts;
+        argmin::solver_options<> nab_opts;
         nab_opts.max_iterations = static_cast<std::uint32_t>(
             std::max<int>(m_options.budget_per_step * m_criteria.max_iterations, 100000));
         nab_opts.set_gradient_threshold(m_options.gradient_threshold);
@@ -152,11 +152,11 @@ public:
 
         auto result = m_solver->step_n(m_options.budget_per_step);
 
-        // nablapp step_n returns the best-seen iterate in result.x (not
+        // argmin step_n returns the best-seen iterate in result.x (not
         // state().x, which is the last trial). For oscillation-prone
         // policies like MMA/GCMMA this distinction matters — read from
         // result.x so downstream FK / convergence checks see the iterate
-        // nablapp actually endorses.
+        // argmin actually endorses.
         sync_solution_from_result(result.x);
 
         auto fk = forward_kinematics(chain, m_q);
@@ -179,13 +179,13 @@ public:
             return m_status;
         }
 
-        if (result.status == nablapp::solver_status::converged
-            || result.status == nablapp::solver_status::ftol_reached
-            || result.status == nablapp::solver_status::stalled
-            || result.status == nablapp::solver_status::xtol_reached
-            || result.status == nablapp::solver_status::roundoff_limited
-            || result.status == nablapp::solver_status::objective_stalled
-            || result.status == nablapp::solver_status::aborted)
+        if (result.status == argmin::solver_status::converged
+            || result.status == argmin::solver_status::ftol_reached
+            || result.status == argmin::solver_status::stalled
+            || result.status == argmin::solver_status::xtol_reached
+            || result.status == argmin::solver_status::roundoff_limited
+            || result.status == argmin::solver_status::objective_stalled
+            || result.status == argmin::solver_status::aborted)
         {
             m_status = ik_status::stalled;
             return m_status;
@@ -204,9 +204,9 @@ public:
     void abort() { m_status = ik_status::stalled; }
 
 private:
-    using nablapp_solver = nablapp::basic_solver<
-        nablapp::mma_policy<joints>, joints,
-        cartan::detail::nablapp_bounded_ik_problem<Chain>>;
+    using argmin_solver = argmin::basic_solver<
+        argmin::mma_policy<joints>, joints,
+        cartan::detail::argmin_bounded_ik_problem<Chain>>;
 
     template <typename Derived>
     void sync_solution_from_result(const Eigen::MatrixBase<Derived>& x)
@@ -233,8 +233,8 @@ private:
     scalar_type m_error_norm{std::numeric_limits<scalar_type>::max()};
     int m_iterations{};
     ik_status m_status{ik_status::running};
-    std::optional<cartan::detail::nablapp_bounded_ik_problem<Chain>> m_problem;
-    std::optional<nablapp_solver> m_solver;
+    std::optional<cartan::detail::argmin_bounded_ik_problem<Chain>> m_problem;
+    std::optional<argmin_solver> m_solver;
 };
 
 }

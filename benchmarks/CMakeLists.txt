@@ -70,14 +70,14 @@ if (CARTAN_BUILD_TRAC_IK)
     endif()
     if(CARTAN_BUILD_ARGMIN)
         target_compile_definitions(ik_comparison_benchmarks PRIVATE CARTAN_BUILD_ARGMIN)
-        target_link_libraries(ik_comparison_benchmarks PRIVATE nablapp::nablapp)
+        target_link_libraries(ik_comparison_benchmarks PRIVATE argmin::argmin)
     endif()
 
     cartan_add_benchmark(basic_ik_full_benchmarks basic_ik_full_benchmarks.cpp)
     target_link_libraries(basic_ik_full_benchmarks PRIVATE trac_ik)
     if(CARTAN_BUILD_ARGMIN)
         target_compile_definitions(basic_ik_full_benchmarks PRIVATE CARTAN_BUILD_ARGMIN)
-        target_link_libraries(basic_ik_full_benchmarks PRIVATE nablapp::nablapp)
+        target_link_libraries(basic_ik_full_benchmarks PRIVATE argmin::argmin)
     endif()
     if(CARTAN_BUILD_NLOPT)
         target_compile_definitions(basic_ik_full_benchmarks PRIVATE CARTAN_HAS_NLOPT)
@@ -89,14 +89,14 @@ if (CARTAN_BUILD_TRAC_IK)
         target_link_libraries(slsqp_per_pose_capture
             PRIVATE
             cartan::cartan
-            nablapp::nablapp)
+            argmin::argmin)
         target_compile_options(slsqp_per_pose_capture PRIVATE ${CARTAN_WARNING_FLAGS})
 
         add_executable(slsqp_per_pose_trace slsqp_per_pose_trace.cpp)
         target_link_libraries(slsqp_per_pose_trace
             PRIVATE
             cartan::cartan
-            nablapp::nablapp)
+            argmin::argmin)
         target_compile_options(slsqp_per_pose_trace PRIVATE ${CARTAN_WARNING_FLAGS})
     endif()
 

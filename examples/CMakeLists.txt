@@ -19,5 +19,5 @@ target_link_libraries(ik_service_single PRIVATE cartan::cartan)
 add_executable(ik_service_multi ik_service_multi.cpp)
 target_link_libraries(ik_service_multi PRIVATE cartan::cartan)
 
-add_executable(nablapp_solvers nablapp_solvers.cpp)
-target_link_libraries(nablapp_solvers PRIVATE cartan::cartan)
+add_executable(argmin_solvers argmin_solvers.cpp)
+target_link_libraries(argmin_solvers PRIVATE cartan::cartan)

@@ -1,5 +1,5 @@
-/// @file nablapp_solvers.cpp
-/// @brief Demonstrates nablapp-backed SLSQP and BOBYQA solve policies.
+/// @file argmin_solvers.cpp
+/// @brief Demonstrates argmin-backed SLSQP and BOBYQA solve policies.
 ///
 /// Shows: ik::argmin_slsqp, ik::argmin_bobyqa, restart wrapping,
 /// and racing a argmin solver against a native cartan solver.
@@ -36,7 +36,7 @@ int main()
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 500};
 
-    // --- Section 1: nablapp SLSQP with restart wrapping ---
+    // --- Section 1: argmin SLSQP with restart wrapping ---
 
     cartan::basic_ik_runner slsqp_solver{
         cartan::ik::restart_wrapper{
@@ -45,7 +45,7 @@ int main()
     slsqp_solver.setup(chain, target, q0, criteria);
     auto slsqp_result = slsqp_solver.solve();
 
-    std::cout << "=== nablapp SLSQP + restart ===\n";
+    std::cout << "=== argmin SLSQP + restart ===\n";
     if (slsqp_result.has_value())
     {
         auto& r = slsqp_result.value();
@@ -57,7 +57,7 @@ int main()
         std::cout << "  Failed\n";
     }
 
-    // --- Section 2: nablapp BOBYQA with restart wrapping ---
+    // --- Section 2: argmin BOBYQA with restart wrapping ---
 
     cartan::basic_ik_runner bobyqa_solver{
         cartan::ik::restart_wrapper{
@@ -66,7 +66,7 @@ int main()
     bobyqa_solver.setup(chain, target, q0, criteria);
     auto bobyqa_result = bobyqa_solver.solve();
 
-    std::cout << "\n=== nablapp BOBYQA + restart ===\n";
+    std::cout << "\n=== argmin BOBYQA + restart ===\n";
     if (bobyqa_result.has_value())
     {
         auto& r = bobyqa_result.value();
@@ -78,7 +78,7 @@ int main()
         std::cout << "  Failed\n";
     }
 
-    // --- Section 3: Racing nablapp SLSQP against native projected LM ---
+    // --- Section 3: Racing argmin SLSQP against native projected LM ---
 
     cartan::basic_ik_runner racing_solver{
         cartan::ik::restart_wrapper{cartan::ik::argmin_slsqp<cartan::kinematic_chain<double, 6>>{}},
