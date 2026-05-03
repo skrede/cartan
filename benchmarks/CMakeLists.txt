@@ -116,3 +116,28 @@ if (CARTAN_BUILD_TRAC_IK)
     cartan_add_benchmark(jacobian_comparison_benchmarks jacobian_comparison_benchmarks.cpp)
     target_link_libraries(jacobian_comparison_benchmarks PRIVATE trac_ik)
 endif ()
+
+if (CARTAN_BUILD_PINOCCHIO)
+    find_package(pinocchio CONFIG REQUIRED)
+    cartan_add_benchmark(fk_pinocchio_benchmarks fk_pinocchio_benchmarks.cpp)
+    target_link_libraries(fk_pinocchio_benchmarks PRIVATE pinocchio::pinocchio)
+
+    add_executable(perf_fk_cartan_ur3e perf_fk_cartan_ur3e.cpp)
+    target_link_libraries(perf_fk_cartan_ur3e PRIVATE cartan::cartan)
+    target_compile_options(perf_fk_cartan_ur3e PRIVATE ${CARTAN_WARNING_FLAGS})
+
+    add_executable(perf_fk_pinocchio_ur3e perf_fk_pinocchio_ur3e.cpp)
+    target_link_libraries(perf_fk_pinocchio_ur3e PRIVATE cartan::cartan pinocchio::pinocchio)
+    target_compile_options(perf_fk_pinocchio_ur3e PRIVATE ${CARTAN_WARNING_FLAGS})
+
+    add_executable(perf_fk_cartan_matrix_ur3e perf_fk_cartan_matrix_ur3e.cpp)
+    target_link_libraries(perf_fk_cartan_matrix_ur3e PRIVATE cartan::cartan)
+    target_compile_options(perf_fk_cartan_matrix_ur3e PRIVATE ${CARTAN_WARNING_FLAGS})
+
+    cartan_add_benchmark(ik_comparison_pinocchio_benchmarks ik_comparison_pinocchio_benchmarks.cpp)
+    target_link_libraries(ik_comparison_pinocchio_benchmarks PRIVATE pinocchio::pinocchio)
+    if (CARTAN_BUILD_TRAC_IK)
+        target_link_libraries(ik_comparison_pinocchio_benchmarks PRIVATE trac_ik)
+        target_compile_definitions(ik_comparison_pinocchio_benchmarks PRIVATE CARTAN_HAS_TRAC_IK)
+    endif ()
+endif ()

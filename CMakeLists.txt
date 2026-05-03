@@ -35,6 +35,7 @@ option(CARTAN_BUILD_ARGMIN "Build with Argmin NLP solver backend" OFF)
 option(CARTAN_BUILD_NLOPT "Build NLopt solver backend for IK" OFF)
 option(CARTAN_BUILD_BENCHMARKS "Build benchmarks (requires Google Benchmark)" OFF)
 option(CARTAN_BUILD_TRAC_IK "Build TRAC-IK comparison benchmarks (requires orocos-kdl, NLopt)" OFF)
+option(CARTAN_BUILD_PINOCCHIO "Build Pinocchio comparison benchmarks (requires pinocchio)" OFF)
 option(CARTAN_BUILD_PROFILING "Build profiling benchmarks (no external robot library dependencies)" OFF)
 option(CARTAN_CMAKE_FETCH_DEPS "Use CMake FetchContent to download and install dependencies" OFF)
 

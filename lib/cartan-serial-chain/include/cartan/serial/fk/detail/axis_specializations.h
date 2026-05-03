@@ -16,6 +16,13 @@
 namespace cartan::detail
 {
 
+/// Single-call sin+cos returning both via reference. Avoids two libm calls.
+/// Uses GCC/clang `__builtin_sincos*` intrinsics which the compiler emits
+/// as a single sincos libm call (or fsincos instruction) per invocation.
+inline void fk_sincos(double x, double& s, double& c) { __builtin_sincos(x, &s, &c); }
+inline void fk_sincos(float x, float& s, float& c) { __builtin_sincosf(x, &s, &c); }
+inline void fk_sincos(long double x, long double& s, long double& c) { __builtin_sincosl(x, &s, &c); }
+
 /// Per-joint SE3 exponential exploiting compile-time axis knowledge.
 ///
 /// For revolute joints, builds the axis-aligned quaternion directly
@@ -255,6 +262,156 @@ template <typename Scalar>
         case joint_kind::general:
         default:
             return se3<Scalar>::exp(axis.to_vector() * q);
+    }
+}
+
+/// Per-joint SE(3) exponential returning rotation as 3x3 matrix directly,
+/// bypassing the quaternion form. Matrix-form composition (R*R, t+R*t) is
+/// significantly faster than quaternion product + quaternion-vec rotation
+/// on AVX2-class hardware due to better SIMD/ILP. The trig and translation
+/// algebra mirrors `exp_joint`; only the rotation representation changes.
+template <joint_tag JointTag, typename Scalar>
+inline void exp_joint_matrix(
+    Scalar q,
+    const screw_axis<Scalar>& axis,
+    matrix3<Scalar>& R,
+    vector3<Scalar>& t)
+{
+    if constexpr (std::same_as<JointTag, revolute_z>)
+    {
+        Scalar s_ax = axis.omega()(2);
+        Scalar theta = s_ax * q;
+        Scalar half_theta = theta / Scalar(2);
+        Scalar sin_h, cos_h;
+        fk_sincos(half_theta, sin_h, cos_h);
+        Scalar sin_t = Scalar(2) * sin_h * cos_h;
+        Scalar cos_t = Scalar(1) - Scalar(2) * sin_h * sin_h;
+        R << cos_t, -sin_t, Scalar(0),
+             sin_t,  cos_t, Scalar(0),
+             Scalar(0), Scalar(0), Scalar(1);
+        Scalar theta_sq = theta * theta;
+        Scalar sinc, omcc;
+        if (theta_sq < epsilon_v<Scalar>)
+        {
+            sinc = Scalar(1) - theta_sq / Scalar(6);
+            omcc = theta / Scalar(2) - theta * theta_sq / Scalar(24);
+        }
+        else
+        {
+            Scalar sinc_h = sin_h / half_theta;
+            sinc = sinc_h * cos_h;
+            omcc = sinc_h * sin_h;
+        }
+        vector3<Scalar> rho = axis.v() * q;
+        t(0) = sinc * rho(0) - omcc * rho(1);
+        t(1) = omcc * rho(0) + sinc * rho(1);
+        t(2) = rho(2);
+    }
+    else if constexpr (std::same_as<JointTag, revolute_y>)
+    {
+        Scalar s_ax = axis.omega()(1);
+        Scalar theta = s_ax * q;
+        Scalar half_theta = theta / Scalar(2);
+        Scalar sin_h, cos_h;
+        fk_sincos(half_theta, sin_h, cos_h);
+        Scalar sin_t = Scalar(2) * sin_h * cos_h;
+        Scalar cos_t = Scalar(1) - Scalar(2) * sin_h * sin_h;
+        R << cos_t,  Scalar(0), sin_t,
+             Scalar(0), Scalar(1), Scalar(0),
+            -sin_t,  Scalar(0), cos_t;
+        Scalar theta_sq = theta * theta;
+        Scalar sinc, omcc;
+        if (theta_sq < epsilon_v<Scalar>)
+        {
+            sinc = Scalar(1) - theta_sq / Scalar(6);
+            omcc = theta / Scalar(2) - theta * theta_sq / Scalar(24);
+        }
+        else
+        {
+            Scalar sinc_h = sin_h / half_theta;
+            sinc = sinc_h * cos_h;
+            omcc = sinc_h * sin_h;
+        }
+        vector3<Scalar> rho = axis.v() * q;
+        t(0) = sinc * rho(0) + omcc * rho(2);
+        t(1) = rho(1);
+        t(2) = -omcc * rho(0) + sinc * rho(2);
+    }
+    else if constexpr (std::same_as<JointTag, revolute_x>)
+    {
+        Scalar s_ax = axis.omega()(0);
+        Scalar theta = s_ax * q;
+        Scalar half_theta = theta / Scalar(2);
+        Scalar sin_h, cos_h;
+        fk_sincos(half_theta, sin_h, cos_h);
+        Scalar sin_t = Scalar(2) * sin_h * cos_h;
+        Scalar cos_t = Scalar(1) - Scalar(2) * sin_h * sin_h;
+        R << Scalar(1), Scalar(0), Scalar(0),
+             Scalar(0), cos_t, -sin_t,
+             Scalar(0), sin_t,  cos_t;
+        Scalar theta_sq = theta * theta;
+        Scalar sinc, omcc;
+        if (theta_sq < epsilon_v<Scalar>)
+        {
+            sinc = Scalar(1) - theta_sq / Scalar(6);
+            omcc = theta / Scalar(2) - theta * theta_sq / Scalar(24);
+        }
+        else
+        {
+            Scalar sinc_h = sin_h / half_theta;
+            sinc = sinc_h * cos_h;
+            omcc = sinc_h * sin_h;
+        }
+        vector3<Scalar> rho = axis.v() * q;
+        t(0) = rho(0);
+        t(1) = sinc * rho(1) - omcc * rho(2);
+        t(2) = omcc * rho(1) + sinc * rho(2);
+    }
+    else if constexpr (std::same_as<JointTag, prismatic_x>)
+    {
+        R.setIdentity();
+        t.setZero();
+        t(0) = q;
+    }
+    else if constexpr (std::same_as<JointTag, prismatic_y>)
+    {
+        R.setIdentity();
+        t.setZero();
+        t(1) = q;
+    }
+    else if constexpr (std::same_as<JointTag, prismatic_z>)
+    {
+        R.setIdentity();
+        t.setZero();
+        t(2) = q;
+    }
+}
+
+/// Runtime dispatch for matrix-form per-joint SE(3) exponential.
+template <typename Scalar>
+inline void exp_joint_matrix_runtime(
+    joint_kind kind,
+    Scalar q,
+    const screw_axis<Scalar>& axis,
+    matrix3<Scalar>& R,
+    vector3<Scalar>& t)
+{
+    switch (kind)
+    {
+        case joint_kind::revolute_x:  exp_joint_matrix<revolute_x>(q, axis, R, t); return;
+        case joint_kind::revolute_y:  exp_joint_matrix<revolute_y>(q, axis, R, t); return;
+        case joint_kind::revolute_z:  exp_joint_matrix<revolute_z>(q, axis, R, t); return;
+        case joint_kind::prismatic_x: exp_joint_matrix<prismatic_x>(q, axis, R, t); return;
+        case joint_kind::prismatic_y: exp_joint_matrix<prismatic_y>(q, axis, R, t); return;
+        case joint_kind::prismatic_z: exp_joint_matrix<prismatic_z>(q, axis, R, t); return;
+        case joint_kind::general:
+        default:
+        {
+            auto se = exp_joint_runtime(kind, q, axis);
+            R = se.rotation().matrix();
+            t = se.translation();
+            return;
+        }
     }
 }
 
