@@ -58,13 +58,22 @@ endif()
 
 # TRAC-IK comparison benchmarks (requires orocos-kdl + NLopt via trac_ik)
 if (CARTAN_BUILD_TRAC_IK)
-    FetchContent_Declare(
-        trac_ik_lib
-        GIT_REPOSITORY git@github.com:skrede/trac_ik_lib.git
-        GIT_TAG master
-        EXCLUDE_FROM_ALL
-        SYSTEM
-    )
+    if (CARTAN_TRAC_IK_SOURCE_DIR)
+        FetchContent_Declare(
+            trac_ik_lib
+            SOURCE_DIR "${CARTAN_TRAC_IK_SOURCE_DIR}"
+            EXCLUDE_FROM_ALL
+            SYSTEM
+        )
+    else ()
+        FetchContent_Declare(
+            trac_ik_lib
+            GIT_REPOSITORY git@github.com:skrede/trac_ik_lib.git
+            GIT_TAG master
+            EXCLUDE_FROM_ALL
+            SYSTEM
+        )
+    endif ()
     set(TRAC_IK_WITH_URDF OFF CACHE BOOL "" FORCE)
     find_package(Eigen3 CONFIG REQUIRED)
     set(EIGEN3_FOUND TRUE) # To satisfy orocos-kdl and their wrong capitalization requirement of Eigen3
