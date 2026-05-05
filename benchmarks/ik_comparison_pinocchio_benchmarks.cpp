@@ -17,6 +17,7 @@
 #include <cartan/serial/ik/policy/limits_policy.h>
 #include <cartan/serial/ik/basic_ik_runner.h>
 #include <cartan/serial/ik/solver/lm.h>
+#include <cartan/serial/ik/solver/dls.h>
 #include <cartan/serial/ik/wrapper/restart_wrapper.h>
 #include <cartan/serial/fk/forward_kinematics.h>
 
@@ -357,6 +358,56 @@ void bm_cartan_restart_lm(
         total_ori / std::max(successes, 1));
 }
 
+// Generalized driver: any Solver type satisfying the cartan::ik::solve_policy concept.
+// Used by IK_BENCH_SOLVER_VARIANTS to emit {default, _no_limits, _restart} cells per
+// base solver per robot.
+template <int N, typename Solver>
+void bm_cartan_solver(
+    benchmark::State& state,
+    const cartan::kinematic_chain<double, N>& chain,
+    const target_set<double, N>& ts,
+    int max_iter = 100)
+{
+    cartan::convergence_criteria<double> criteria{1e-5, 1e-5, max_iter};
+
+    std::size_t idx = 0;
+    int successes = 0;
+    int total_iter = 0;
+    double total_pos = 0.0, total_ori = 0.0;
+
+    for (auto _ : state)
+    {
+        auto& target = ts.targets[idx % static_cast<std::size_t>(num_targets)];
+        auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
+        ++idx;
+
+        cartan::basic_ik_runner<Solver> solver;
+        solver.setup(chain, target, q_seed, criteria);
+        auto result = solver.solve();
+
+        if (result.has_value())
+        {
+            ++successes;
+            total_iter += result->iterations;
+            auto [pos_err, ori_err] = cartan::benchmarks::compute_pose_errors(
+                chain, result->solution.position, target);
+            total_pos += pos_err;
+            total_ori += ori_err;
+        }
+        benchmark::DoNotOptimize(result);
+    }
+
+    auto total = static_cast<int>(idx);
+    state.counters["Success_pct"] = benchmark::Counter(
+        100.0 * static_cast<double>(successes) / std::max(total, 1));
+    state.counters["avg_iter"] = benchmark::Counter(
+        static_cast<double>(total_iter) / std::max(successes, 1));
+    state.counters["pos_err"] = benchmark::Counter(
+        total_pos / std::max(successes, 1));
+    state.counters["ori_err"] = benchmark::Counter(
+        total_ori / std::max(successes, 1));
+}
+
 template <int N>
 void bm_pinocchio_lm(
     benchmark::State& state,
@@ -541,13 +592,57 @@ static void bm_ik_##ROBOT##_pinocchio_lm(benchmark::State& state)               
 BENCHMARK(bm_ik_##ROBOT##_pinocchio_lm)->Iterations(2000)->Unit(benchmark::kMicrosecond); \
 IK_BENCH_ROBOT_TRAC_IK(ROBOT, FACTORY, KDL_FACTORY, KDL_LIMITS_FACTORY, N_DOF)
 
+// Per-solver macro: emits three cells per (ROBOT, SOLVER) pair —
+//   bm_ik_<robot>_<solver>           (default LimitsPolicy)
+//   bm_ik_<robot>_<solver>_no_limits (audit cell, explicit cartan::no_limits)
+//   bm_ik_<robot>_<solver>_restart   (restart_wrapper around default-flavored solver)
+//
+// SOLVER_NAME is the bare identifier used in the cell name (e.g. dls).
+// SOLVER_TPL is the qualified solver template (e.g. cartan::ik::dls).
+// The macro relies on bm_cartan_solver<N, Solver> being defined in the same TU.
+#define IK_BENCH_SOLVER_VARIANTS(ROBOT, FACTORY, N_DOF, SOLVER_NAME, SOLVER_TPL)         \
+static void bm_ik_##ROBOT##_##SOLVER_NAME(benchmark::State& state)                       \
+{                                                                                        \
+    using chain_t = cartan::kinematic_chain<double, N_DOF>;                              \
+    static auto chain = cartan::benchmarks::FACTORY<double>();                           \
+    static target_set<double, N_DOF> ts(chain, num_targets);                             \
+    bm_cartan_solver<N_DOF, SOLVER_TPL<chain_t>>(state, chain, ts);                      \
+}                                                                                        \
+BENCHMARK(bm_ik_##ROBOT##_##SOLVER_NAME)->Iterations(2000)->Unit(benchmark::kMicrosecond); \
+static void bm_ik_##ROBOT##_##SOLVER_NAME##_no_limits(benchmark::State& state)           \
+{                                                                                        \
+    using chain_t = cartan::kinematic_chain<double, N_DOF>;                              \
+    static auto chain = cartan::benchmarks::FACTORY<double>();                           \
+    static target_set<double, N_DOF> ts(chain, num_targets);                             \
+    bm_cartan_solver<N_DOF, SOLVER_TPL<chain_t, cartan::no_limits>>(state, chain, ts);   \
+}                                                                                        \
+BENCHMARK(bm_ik_##ROBOT##_##SOLVER_NAME##_no_limits)->Iterations(2000)->Unit(benchmark::kMicrosecond); \
+static void bm_ik_##ROBOT##_##SOLVER_NAME##_restart(benchmark::State& state)             \
+{                                                                                        \
+    using chain_t = cartan::kinematic_chain<double, N_DOF>;                              \
+    static auto chain = cartan::benchmarks::FACTORY<double>();                           \
+    static target_set<double, N_DOF> ts(chain, num_targets);                             \
+    bm_cartan_solver<N_DOF,                                                              \
+        cartan::ik::restart_wrapper<chain_t, SOLVER_TPL<chain_t>>>(                      \
+        state, chain, ts, /*max_iter=*/200);                                             \
+}                                                                                        \
+BENCHMARK(bm_ik_##ROBOT##_##SOLVER_NAME##_restart)->Iterations(2000)->Unit(benchmark::kMicrosecond)
+
 IK_BENCH_ROBOT(ur3e,       make_ur3e_chain,       make_ur3e_kdl_chain,       make_ur3e_kdl_limits,       6);
+IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, dls, cartan::ik::dls);
 IK_BENCH_ROBOT(kr6_sixx,   make_kr6_sixx_chain,   make_kr6_sixx_kdl_chain,   make_kr6_sixx_kdl_limits,   6);
+IK_BENCH_SOLVER_VARIANTS(kr6_sixx,   make_kr6_sixx_chain,   6, dls, cartan::ik::dls);
 IK_BENCH_ROBOT(abb_irb120, make_abb_irb120_chain, make_abb_irb120_kdl_chain, make_abb_irb120_kdl_limits, 6);
+IK_BENCH_SOLVER_VARIANTS(abb_irb120, make_abb_irb120_chain, 6, dls, cartan::ik::dls);
 IK_BENCH_ROBOT(jaco2,      make_jaco2_chain,      make_jaco2_kdl_chain,      make_jaco2_kdl_limits,      6);
+IK_BENCH_SOLVER_VARIANTS(jaco2,      make_jaco2_chain,      6, dls, cartan::ik::dls);
 IK_BENCH_ROBOT(lbr_med14,  make_lbr_med14_chain,  make_lbr_med14_kdl_chain,  make_lbr_med14_kdl_limits,  7);
+IK_BENCH_SOLVER_VARIANTS(lbr_med14,  make_lbr_med14_chain,  7, dls, cartan::ik::dls);
 IK_BENCH_ROBOT(panda,      make_panda_chain,      make_panda_kdl_chain,      make_panda_kdl_limits,      7);
+IK_BENCH_SOLVER_VARIANTS(panda,      make_panda_chain,      7, dls, cartan::ik::dls);
 IK_BENCH_ROBOT(fetch,      make_fetch_chain,      make_fetch_kdl_chain,      make_fetch_kdl_limits,      7);
+IK_BENCH_SOLVER_VARIANTS(fetch,      make_fetch_chain,      7, dls, cartan::ik::dls);
 IK_BENCH_ROBOT(baxter,     make_baxter_chain,     make_baxter_kdl_chain,     make_baxter_kdl_limits,     7);
+IK_BENCH_SOLVER_VARIANTS(baxter,     make_baxter_chain,     7, dls, cartan::ik::dls);
 
 }
