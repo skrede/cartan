@@ -12,6 +12,14 @@ else ()
     find_package(benchmark CONFIG REQUIRED)
 endif ()
 
+# benchmark_utils.h ships KDL chain factories alongside the cartan PoE ones,
+# so every benchmark target that includes it needs orocos-kdl on the link
+# line. KDL is therefore a benchmark-section-wide dependency rather than
+# a CARTAN_BUILD_TRAC_IK-gated one (the trac_ik FetchContent transitively
+# pulls KDL too, but we want the headers and link target available even
+# without trac_ik).
+find_package(orocos_kdl CONFIG REQUIRED)
+
 function(cartan_add_benchmark BENCH_NAME BENCH_SOURCE)
     add_executable(${BENCH_NAME} ${BENCH_SOURCE})
     target_link_libraries(${BENCH_NAME}
@@ -19,6 +27,7 @@ function(cartan_add_benchmark BENCH_NAME BENCH_SOURCE)
         cartan::cartan
         benchmark::benchmark
         benchmark::benchmark_main
+        orocos-kdl
     )
     target_compile_options(${BENCH_NAME} PRIVATE ${CARTAN_WARNING_FLAGS})
 endfunction()
@@ -123,15 +132,15 @@ if (CARTAN_BUILD_PINOCCHIO)
     target_link_libraries(fk_pinocchio_benchmarks PRIVATE pinocchio::pinocchio)
 
     add_executable(perf_fk_cartan_ur3e perf_fk_cartan_ur3e.cpp)
-    target_link_libraries(perf_fk_cartan_ur3e PRIVATE cartan::cartan)
+    target_link_libraries(perf_fk_cartan_ur3e PRIVATE cartan::cartan orocos-kdl)
     target_compile_options(perf_fk_cartan_ur3e PRIVATE ${CARTAN_WARNING_FLAGS})
 
     add_executable(perf_fk_pinocchio_ur3e perf_fk_pinocchio_ur3e.cpp)
-    target_link_libraries(perf_fk_pinocchio_ur3e PRIVATE cartan::cartan pinocchio::pinocchio)
+    target_link_libraries(perf_fk_pinocchio_ur3e PRIVATE cartan::cartan pinocchio::pinocchio orocos-kdl)
     target_compile_options(perf_fk_pinocchio_ur3e PRIVATE ${CARTAN_WARNING_FLAGS})
 
     add_executable(perf_fk_cartan_matrix_ur3e perf_fk_cartan_matrix_ur3e.cpp)
-    target_link_libraries(perf_fk_cartan_matrix_ur3e PRIVATE cartan::cartan)
+    target_link_libraries(perf_fk_cartan_matrix_ur3e PRIVATE cartan::cartan orocos-kdl)
     target_compile_options(perf_fk_cartan_matrix_ur3e PRIVATE ${CARTAN_WARNING_FLAGS})
 
     cartan_add_benchmark(ik_comparison_pinocchio_benchmarks ik_comparison_pinocchio_benchmarks.cpp)
