@@ -47,7 +47,7 @@ namespace cartan::ik
 ///
 /// This is the argmin-backed LM. The native cartan implementation
 /// is available as lm_solve_policy.
-template <chain Chain, typename LimitsPolicy = clamp_limits>
+template <chain Chain, typename LimitsPolicy = no_limits>
 class argmin_lm
 {
 public:

@@ -44,7 +44,7 @@ namespace cartan::ik
 ///
 /// Reference: Lynch & Park, Modern Robotics, Ch. 6.2.
 ///            Nielsen, Damping Parameter in Marquardt's Method, 1999.
-template <chain Chain, typename LimitsPolicy = clamp_limits>
+template <chain Chain, typename LimitsPolicy = no_limits>
 class builtin_lm
 {
 public:
@@ -236,8 +236,8 @@ private:
 };
 
 #ifndef CARTAN_BUILD_ARGMIN
-template <chain Chain, typename LimitsPolicy = clamp_limits>
-using lm = builtin_lm<Chain, LimitsPolicy>;
+template <chain Chain, typename LimitsPolicy = no_limits>
+using lm =builtin_lm<Chain, LimitsPolicy>;
 #endif
 
 }
@@ -247,8 +247,8 @@ using lm = builtin_lm<Chain, LimitsPolicy>;
 
 namespace cartan::ik
 {
-template <chain Chain, typename LimitsPolicy = clamp_limits>
-using lm = argmin_lm<Chain, LimitsPolicy>;
+template <chain Chain, typename LimitsPolicy = no_limits>
+using lm =argmin_lm<Chain, LimitsPolicy>;
 }
 #endif
 
