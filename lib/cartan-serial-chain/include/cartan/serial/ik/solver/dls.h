@@ -44,7 +44,7 @@ namespace cartan::ik
 ///
 /// Reference: Lynch & Park, Modern Robotics, Ch. 6.2, Eq. 6.8-6.10.
 ///            Nakamura, Advanced Robotics, Ch. 11 (adaptive DLS).
-template <chain Chain, typename LimitsPolicy = clamp_limits>
+template <chain Chain, typename LimitsPolicy = no_limits>
 class dls
 {
 public:
