@@ -16,12 +16,24 @@
 namespace cartan::detail
 {
 
-/// Single-call sin+cos returning both via reference. Avoids two libm calls.
-/// Uses GCC/clang `__builtin_sincos*` intrinsics which the compiler emits
-/// as a single sincos libm call (or fsincos instruction) per invocation.
+/// Single-call sin+cos returning both via reference. Uses the GCC
+/// `__builtin_sincos*` intrinsics where the compiler exposes them
+/// (compiler emits a single sincos libm call or fsincos instruction);
+/// falls back to separate std::sin / std::cos calls otherwise. AppleClang
+/// and MSVC take the fallback path; GCC and mainline Clang on glibc take
+/// the fast path.
+#ifndef __has_builtin
+#define __has_builtin(x) 0
+#endif
+#if __has_builtin(__builtin_sincos) && __has_builtin(__builtin_sincosf) && __has_builtin(__builtin_sincosl)
 inline void fk_sincos(double x, double& s, double& c) { __builtin_sincos(x, &s, &c); }
 inline void fk_sincos(float x, float& s, float& c) { __builtin_sincosf(x, &s, &c); }
 inline void fk_sincos(long double x, long double& s, long double& c) { __builtin_sincosl(x, &s, &c); }
+#else
+inline void fk_sincos(double x, double& s, double& c) { s = std::sin(x); c = std::cos(x); }
+inline void fk_sincos(float x, float& s, float& c) { s = std::sin(x); c = std::cos(x); }
+inline void fk_sincos(long double x, long double& s, long double& c) { s = std::sin(x); c = std::cos(x); }
+#endif
 
 /// Per-joint SE3 exponential exploiting compile-time axis knowledge.
 ///
