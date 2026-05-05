@@ -12,14 +12,17 @@
 
 #include "benchmark_utils.h"
 
-#include <cartan/serial/chain/static_chain.h>
 #include <cartan/serial/ik/ik_status.h>
-#include <cartan/serial/ik/policy/limits_policy.h>
-#include <cartan/serial/ik/basic_ik_runner.h>
 #include <cartan/serial/ik/solver/lm.h>
 #include <cartan/serial/ik/solver/dls.h>
-#include <cartan/serial/ik/wrapper/restart_wrapper.h>
+#include <cartan/serial/ik/solver/lbfgsb.h>
+#include <cartan/serial/chain/static_chain.h>
+#include <cartan/serial/ik/basic_ik_runner.h>
 #include <cartan/serial/fk/forward_kinematics.h>
+#include <cartan/serial/ik/solver/projected_lm.h>
+#include <cartan/serial/ik/policy/limits_policy.h>
+#include <cartan/serial/ik/solver/newton_raphson.h>
+#include <cartan/serial/ik/wrapper/restart_wrapper.h>
 
 #include <pinocchio/multibody/model.hpp>
 #include <pinocchio/multibody/data.hpp>
@@ -644,5 +647,7 @@ IK_BENCH_ROBOT(fetch,      make_fetch_chain,      make_fetch_kdl_chain,      mak
 IK_BENCH_SOLVER_VARIANTS(fetch,      make_fetch_chain,      7, dls, cartan::ik::dls);
 IK_BENCH_ROBOT(baxter,     make_baxter_chain,     make_baxter_kdl_chain,     make_baxter_kdl_limits,     7);
 IK_BENCH_SOLVER_VARIANTS(baxter,     make_baxter_chain,     7, dls, cartan::ik::dls);
+IK_BENCH_ROBOT(kuka_lwr4,  make_kuka_lwr4_chain,  make_kuka_lwr4_kdl_chain,  make_kuka_lwr4_kdl_limits,  7);
+IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, dls, cartan::ik::dls);
 
 }
