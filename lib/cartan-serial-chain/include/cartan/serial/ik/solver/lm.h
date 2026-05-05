@@ -153,18 +153,29 @@ public:
         position_type q_trial = m_q + dq;
         auto fk_trial = forward_kinematics(chain, q_trial);
         auto V_b_trial = (fk_trial.end_effector.inverse() * m_target).log();
-        evaluate_gain_and_update_damping(dq, g, q_trial, V_b_trial);
+        const bool accepted = evaluate_gain_and_update_damping(dq, g, q_trial, V_b_trial);
 
         m_error_norm = m_V_b.norm();
 
-        auto stall_result = cartan::detail::check_stall_divergence(
-            m_error_history, m_error_norm, m_initial_error,
-            m_options.stall_window, m_options.stall_threshold,
-            m_options.divergence_factor);
-        if (stall_result != ik_status::running)
+        // Stall/divergence detection runs only on accepted steps. Rejected
+        // LM steps are part of the normal damping calibration: a string of
+        // rejects leaves m_V_b (and therefore m_error_norm) untouched, which
+        // would otherwise trip the "no progress" rule deterministically and
+        // kill the solve before lambda has time to grow into a usable regime.
+        // m_initial_error gates divergence, so skipping the check on reject
+        // is safe -- m_error_norm is unchanged from the last accepted step,
+        // which already passed.
+        if (accepted)
         {
-            m_status = stall_result;
-            return m_status;
+            auto stall_result = cartan::detail::check_stall_divergence(
+                m_error_history, m_error_norm, m_initial_error,
+                m_options.stall_window, m_options.stall_threshold,
+                m_options.divergence_factor);
+            if (stall_result != ik_status::running)
+            {
+                m_status = stall_result;
+                return m_status;
+            }
         }
 
         cartan::detail::enforce_limits<LimitsPolicy>(m_q, chain);
@@ -181,7 +192,7 @@ public:
     [[nodiscard]] ik_status status() const { return m_status; }
 
 private:
-    void evaluate_gain_and_update_damping(
+    bool evaluate_gain_and_update_damping(
         const position_type& dq,
         const auto& g,
         const position_type& q_trial,
@@ -203,12 +214,11 @@ private:
             scalar_type factor = scalar_type(1) - std::pow(scalar_type(2) * rho - scalar_type(1), scalar_type(3));
             m_lambda *= std::max(scalar_type(1) / scalar_type(3), factor);
             m_nu = scalar_type(2);
+            return true;
         }
-        else
-        {
-            m_lambda *= m_nu;
-            m_nu *= scalar_type(2);
-        }
+        m_lambda *= m_nu;
+        m_nu *= scalar_type(2);
+        return false;
     }
 
     se3<scalar_type> m_target{se3<scalar_type>::identity()};
