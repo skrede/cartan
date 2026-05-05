@@ -695,4 +695,61 @@ IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, builtin_lbfgsb, c
 IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, newton_raphson, cartan::ik::newton_raphson);
 IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, projected_lm,   cartan::ik::projected_lm);
 
+#ifdef CARTAN_BUILD_ARGMIN
+IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, argmin_lm,                   cartan::ik::argmin_lm);
+IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, argmin_slsqp,                cartan::ik::argmin_slsqp);
+IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, argmin_bobyqa,               cartan::ik::argmin_bobyqa);
+IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, argmin_lbfgsb,               cartan::ik::argmin_lbfgsb);
+IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, argmin_projected_gn,         cartan::ik::argmin_projected_gn);
+IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, argmin_projected_gradient_gn, cartan::ik::argmin_projected_gradient_gn);
+IK_BENCH_SOLVER_VARIANTS(kr6_sixx,   make_kr6_sixx_chain,   6, argmin_lm,                   cartan::ik::argmin_lm);
+IK_BENCH_SOLVER_VARIANTS(kr6_sixx,   make_kr6_sixx_chain,   6, argmin_slsqp,                cartan::ik::argmin_slsqp);
+IK_BENCH_SOLVER_VARIANTS(kr6_sixx,   make_kr6_sixx_chain,   6, argmin_bobyqa,               cartan::ik::argmin_bobyqa);
+IK_BENCH_SOLVER_VARIANTS(kr6_sixx,   make_kr6_sixx_chain,   6, argmin_lbfgsb,               cartan::ik::argmin_lbfgsb);
+IK_BENCH_SOLVER_VARIANTS(kr6_sixx,   make_kr6_sixx_chain,   6, argmin_projected_gn,         cartan::ik::argmin_projected_gn);
+IK_BENCH_SOLVER_VARIANTS(kr6_sixx,   make_kr6_sixx_chain,   6, argmin_projected_gradient_gn, cartan::ik::argmin_projected_gradient_gn);
+IK_BENCH_SOLVER_VARIANTS(abb_irb120, make_abb_irb120_chain, 6, argmin_lm,                   cartan::ik::argmin_lm);
+IK_BENCH_SOLVER_VARIANTS(abb_irb120, make_abb_irb120_chain, 6, argmin_slsqp,                cartan::ik::argmin_slsqp);
+IK_BENCH_SOLVER_VARIANTS(abb_irb120, make_abb_irb120_chain, 6, argmin_bobyqa,               cartan::ik::argmin_bobyqa);
+IK_BENCH_SOLVER_VARIANTS(abb_irb120, make_abb_irb120_chain, 6, argmin_lbfgsb,               cartan::ik::argmin_lbfgsb);
+IK_BENCH_SOLVER_VARIANTS(abb_irb120, make_abb_irb120_chain, 6, argmin_projected_gn,         cartan::ik::argmin_projected_gn);
+IK_BENCH_SOLVER_VARIANTS(abb_irb120, make_abb_irb120_chain, 6, argmin_projected_gradient_gn, cartan::ik::argmin_projected_gradient_gn);
+IK_BENCH_SOLVER_VARIANTS(jaco2,      make_jaco2_chain,      6, argmin_lm,                   cartan::ik::argmin_lm);
+IK_BENCH_SOLVER_VARIANTS(jaco2,      make_jaco2_chain,      6, argmin_slsqp,                cartan::ik::argmin_slsqp);
+IK_BENCH_SOLVER_VARIANTS(jaco2,      make_jaco2_chain,      6, argmin_bobyqa,               cartan::ik::argmin_bobyqa);
+IK_BENCH_SOLVER_VARIANTS(jaco2,      make_jaco2_chain,      6, argmin_lbfgsb,               cartan::ik::argmin_lbfgsb);
+IK_BENCH_SOLVER_VARIANTS(jaco2,      make_jaco2_chain,      6, argmin_projected_gn,         cartan::ik::argmin_projected_gn);
+IK_BENCH_SOLVER_VARIANTS(jaco2,      make_jaco2_chain,      6, argmin_projected_gradient_gn, cartan::ik::argmin_projected_gradient_gn);
+IK_BENCH_SOLVER_VARIANTS(lbr_med14,  make_lbr_med14_chain,  7, argmin_lm,                   cartan::ik::argmin_lm);
+IK_BENCH_SOLVER_VARIANTS(lbr_med14,  make_lbr_med14_chain,  7, argmin_slsqp,                cartan::ik::argmin_slsqp);
+IK_BENCH_SOLVER_VARIANTS(lbr_med14,  make_lbr_med14_chain,  7, argmin_bobyqa,               cartan::ik::argmin_bobyqa);
+IK_BENCH_SOLVER_VARIANTS(lbr_med14,  make_lbr_med14_chain,  7, argmin_lbfgsb,               cartan::ik::argmin_lbfgsb);
+IK_BENCH_SOLVER_VARIANTS(lbr_med14,  make_lbr_med14_chain,  7, argmin_projected_gn,         cartan::ik::argmin_projected_gn);
+IK_BENCH_SOLVER_VARIANTS(lbr_med14,  make_lbr_med14_chain,  7, argmin_projected_gradient_gn, cartan::ik::argmin_projected_gradient_gn);
+IK_BENCH_SOLVER_VARIANTS(panda,      make_panda_chain,      7, argmin_lm,                   cartan::ik::argmin_lm);
+IK_BENCH_SOLVER_VARIANTS(panda,      make_panda_chain,      7, argmin_slsqp,                cartan::ik::argmin_slsqp);
+IK_BENCH_SOLVER_VARIANTS(panda,      make_panda_chain,      7, argmin_bobyqa,               cartan::ik::argmin_bobyqa);
+IK_BENCH_SOLVER_VARIANTS(panda,      make_panda_chain,      7, argmin_lbfgsb,               cartan::ik::argmin_lbfgsb);
+IK_BENCH_SOLVER_VARIANTS(panda,      make_panda_chain,      7, argmin_projected_gn,         cartan::ik::argmin_projected_gn);
+IK_BENCH_SOLVER_VARIANTS(panda,      make_panda_chain,      7, argmin_projected_gradient_gn, cartan::ik::argmin_projected_gradient_gn);
+IK_BENCH_SOLVER_VARIANTS(fetch,      make_fetch_chain,      7, argmin_lm,                   cartan::ik::argmin_lm);
+IK_BENCH_SOLVER_VARIANTS(fetch,      make_fetch_chain,      7, argmin_slsqp,                cartan::ik::argmin_slsqp);
+IK_BENCH_SOLVER_VARIANTS(fetch,      make_fetch_chain,      7, argmin_bobyqa,               cartan::ik::argmin_bobyqa);
+IK_BENCH_SOLVER_VARIANTS(fetch,      make_fetch_chain,      7, argmin_lbfgsb,               cartan::ik::argmin_lbfgsb);
+IK_BENCH_SOLVER_VARIANTS(fetch,      make_fetch_chain,      7, argmin_projected_gn,         cartan::ik::argmin_projected_gn);
+IK_BENCH_SOLVER_VARIANTS(fetch,      make_fetch_chain,      7, argmin_projected_gradient_gn, cartan::ik::argmin_projected_gradient_gn);
+IK_BENCH_SOLVER_VARIANTS(baxter,     make_baxter_chain,     7, argmin_lm,                   cartan::ik::argmin_lm);
+IK_BENCH_SOLVER_VARIANTS(baxter,     make_baxter_chain,     7, argmin_slsqp,                cartan::ik::argmin_slsqp);
+IK_BENCH_SOLVER_VARIANTS(baxter,     make_baxter_chain,     7, argmin_bobyqa,               cartan::ik::argmin_bobyqa);
+IK_BENCH_SOLVER_VARIANTS(baxter,     make_baxter_chain,     7, argmin_lbfgsb,               cartan::ik::argmin_lbfgsb);
+IK_BENCH_SOLVER_VARIANTS(baxter,     make_baxter_chain,     7, argmin_projected_gn,         cartan::ik::argmin_projected_gn);
+IK_BENCH_SOLVER_VARIANTS(baxter,     make_baxter_chain,     7, argmin_projected_gradient_gn, cartan::ik::argmin_projected_gradient_gn);
+IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, argmin_lm,                   cartan::ik::argmin_lm);
+IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, argmin_slsqp,                cartan::ik::argmin_slsqp);
+IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, argmin_bobyqa,               cartan::ik::argmin_bobyqa);
+IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, argmin_lbfgsb,               cartan::ik::argmin_lbfgsb);
+IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, argmin_projected_gn,         cartan::ik::argmin_projected_gn);
+IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, argmin_projected_gradient_gn, cartan::ik::argmin_projected_gradient_gn);
+#endif
+
 }
