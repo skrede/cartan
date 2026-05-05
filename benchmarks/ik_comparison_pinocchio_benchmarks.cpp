@@ -24,6 +24,15 @@
 #include <cartan/serial/ik/solver/newton_raphson.h>
 #include <cartan/serial/ik/wrapper/restart_wrapper.h>
 
+#ifdef CARTAN_BUILD_ARGMIN
+#include <cartan/serial/ik/solver/argmin_lm.h>
+#include <cartan/serial/ik/solver/argmin_slsqp.h>
+#include <cartan/serial/ik/solver/argmin_bobyqa.h>
+#include <cartan/serial/ik/solver/argmin_lbfgsb.h>
+#include <cartan/serial/ik/solver/argmin_projected_gn.h>
+#include <cartan/serial/ik/solver/argmin_projected_gradient_gn.h>
+#endif
+
 #include <pinocchio/multibody/model.hpp>
 #include <pinocchio/multibody/data.hpp>
 #include <pinocchio/multibody/frame.hpp>
