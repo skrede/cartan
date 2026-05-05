@@ -282,7 +282,7 @@ void bm_cartan_lm(
         auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
         ++idx;
 
-        cartan::basic_ik_runner<cartan::ik::lm<cartan::kinematic_chain<double, N>, cartan::no_limits>> solver;
+        cartan::basic_ik_runner<cartan::ik::lm<cartan::kinematic_chain<double, N>>> solver;
         solver.setup(chain, target, q_seed, criteria);
         auto result = solver.solve();
 
@@ -316,7 +316,7 @@ void bm_cartan_restart_lm(
     const target_set<double, N>& ts)
 {
     using chain_t = cartan::kinematic_chain<double, N>;
-    using restart_lm = cartan::ik::restart_wrapper<chain_t, cartan::ik::lm<chain_t, cartan::no_limits>>;
+    using restart_lm = cartan::ik::restart_wrapper<chain_t, cartan::ik::lm<chain_t>>;
     cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 200};
 
     std::size_t idx = 0;
