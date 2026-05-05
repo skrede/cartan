@@ -8,7 +8,7 @@ if (CARTAN_BUILD_ARGMIN)
     else ()
         FetchContent_Declare(
             argmin
-            GIT_REPOSITORY https://github.com/skrede/argmin.git
+            GIT_REPOSITORY git@github.com:skrede/argmin.git
             GIT_TAG master
             EXCLUDE_FROM_ALL
         )
