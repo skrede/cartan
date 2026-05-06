@@ -109,10 +109,10 @@ public:
         int n = chain.num_joints();
         m_lower.resize(n);
         m_upper.resize(n);
-        for (int i = 0; i < n; ++i)
+        for (std::size_t i = 0; i < static_cast<std::size_t>(n); ++i)
         {
-            m_lower(i) = chain.limits()[i].position_min;
-            m_upper(i) = chain.limits()[i].position_max;
+            m_lower(static_cast<int>(i)) = chain.limits()[i].position_min;
+            m_upper(static_cast<int>(i)) = chain.limits()[i].position_max;
         }
 
         m_q = m_q.cwiseMax(m_lower).cwiseMin(m_upper);
