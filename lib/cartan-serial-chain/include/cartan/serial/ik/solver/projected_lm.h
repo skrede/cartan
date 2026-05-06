@@ -3,15 +3,25 @@
 
 /// @file projected_lm.h
 /// @brief Projected Levenberg-Marquardt IK solve policy with active-set box
-///        projection and optional dogleg trust-region step.
+///        projection, optional dogleg trust-region step, and built-in
+///        Halton-seed re-seed on stall.
 ///
 /// Speed-optimized solver: active-set projection handles joint limits
 /// within the optimization step (not post-hoc clamping). The dogleg
 /// option interpolates between Cauchy point and Gauss-Newton step.
 ///
+/// On stall / divergence / per-attempt iteration_limit, the solver
+/// internally re-seeds the joint configuration from a deterministic Halton
+/// sequence and continues. Phase-30 H2 falsification confirmed that for
+/// projected LM the load-bearing recovery mechanism is the fresh
+/// low-discrepancy seed, not warm-start lambda preservation; the restart
+/// loop therefore lives inside the solver rather than in a separate
+/// wrapper layer.
+///
 /// Reference: Lynch & Park, Modern Robotics, Ch. 6.2, p. 227-233.
 ///            Nielsen, H.B., Damping Parameter in Marquardt's Method, 1999.
 ///            Nocedal & Wright, Numerical Optimization, Ch. 4 (dogleg).
+///            Beeson & Ames, "TRAC-IK", 2015 (multi-start strategy).
 
 #include "cartan/types.h"
 
@@ -22,6 +32,7 @@
 #include "cartan/serial/ik/detail/convergence.h"
 #include "cartan/serial/ik/detail/stall_detection.h"
 #include "cartan/serial/ik/detail/limit_enforcement.h"
+#include "cartan/serial/ik/solver/detail/halton_seed_generator.h"
 
 #include "cartan/lie/se3.h"
 #include "cartan/serial/fk/jacobian.h"
@@ -33,12 +44,15 @@
 
 #include <cmath>
 #include <vector>
+#include <limits>
+#include <optional>
 #include <algorithm>
 
 namespace cartan::ik
 {
 
-/// Projected Levenberg-Marquardt IK solve policy with active-set box projection.
+/// Projected Levenberg-Marquardt IK solve policy with active-set box projection
+/// and built-in Halton-seed re-seed on stall.
 template <chain Chain, typename LimitsPolicy = no_limits>
 class projected_lm
 {
@@ -58,6 +72,7 @@ public:
         scalar_type stall_threshold{scalar_type(1e-6)};
         scalar_type divergence_factor{scalar_type(10)};
         int stall_window{5};
+        int max_restarts{20};
         bool use_dogleg{false};
         scalar_type trust_region_radius{scalar_type(1.0)};
     };
@@ -79,6 +94,74 @@ public:
     }
 
     void setup(
+        const Chain& chain,
+        const se3<scalar_type>& target,
+        const position_type& q0,
+        const convergence_criteria<scalar_type>& criteria,
+        const error_weight<scalar_type>& weight)
+    {
+        m_seed_gen.emplace(chain);
+        m_restart_count = 0;
+        m_total_iterations = 0;
+        m_best_error = std::numeric_limits<scalar_type>::max();
+        m_aborted = false;
+
+        initialize_attempt(chain, target, q0, criteria, weight);
+    }
+
+    ik_status step(const Chain& chain)
+    {
+        if (m_aborted)
+        {
+            return ik_status::stalled;
+        }
+        if (m_status == ik_status::converged)
+        {
+            return m_status;
+        }
+
+        auto inner_status = perform_lm_iteration(chain);
+        ++m_total_iterations;
+
+        if (inner_status == ik_status::converged)
+        {
+            m_status = ik_status::converged;
+            return ik_status::converged;
+        }
+        if (inner_status == ik_status::running)
+        {
+            return ik_status::running;
+        }
+
+        if (m_error_norm < m_best_error)
+        {
+            m_best_error = m_error_norm;
+        }
+
+        if (m_restart_count >= m_options.max_restarts)
+        {
+            m_status = inner_status;
+            return inner_status;
+        }
+
+        auto q_new = (*m_seed_gen)(m_restart_count);
+        ++m_restart_count;
+
+        initialize_attempt(chain, m_target, q_new, m_criteria, m_weight);
+        return ik_status::running;
+    }
+
+    [[nodiscard]] bool converged() const { return m_status == ik_status::converged; }
+    [[nodiscard]] const position_type& solution() const { return m_q; }
+    [[nodiscard]] scalar_type error_norm() const { return m_error_norm; }
+    [[nodiscard]] int iterations() const { return m_total_iterations; }
+    void abort() { m_aborted = true; }
+    [[nodiscard]] scalar_type lambda() const { return m_lambda; }
+    void set_lambda(scalar_type l) { m_lambda = l; }
+    [[nodiscard]] ik_status status() const { return m_status; }
+
+private:
+    void initialize_attempt(
         const Chain& chain,
         const se3<scalar_type>& target,
         const position_type& q0,
@@ -128,7 +211,7 @@ public:
         }
     }
 
-    ik_status step(const Chain& chain)
+    ik_status perform_lm_iteration(const Chain& chain)
     {
         if (m_status != ik_status::running)
         {
@@ -170,16 +253,6 @@ public:
         return m_status;
     }
 
-    [[nodiscard]] bool converged() const { return m_status == ik_status::converged; }
-    [[nodiscard]] const position_type& solution() const { return m_q; }
-    [[nodiscard]] scalar_type error_norm() const { return m_error_norm; }
-    [[nodiscard]] int iterations() const { return m_iterations; }
-    void abort() {}
-    [[nodiscard]] scalar_type lambda() const { return m_lambda; }
-    void set_lambda(scalar_type l) { m_lambda = l; }
-    [[nodiscard]] ik_status status() const { return m_status; }
-
-private:
     ik_status check_convergence_and_limits()
     {
         if (cartan::detail::is_converged(m_V_b, m_weight, m_criteria))
@@ -428,14 +501,19 @@ private:
     convergence_criteria<scalar_type> m_criteria{};
     error_weight<scalar_type> m_weight{};
     options m_options{};
+    std::optional<halton_seed_generator<Chain>> m_seed_gen{};
     std::vector<scalar_type> m_error_history;
     scalar_type m_initial_error{};
     scalar_type m_error_norm{};
     scalar_type m_lambda{};
     scalar_type m_nu{scalar_type(2)};
     scalar_type m_delta{scalar_type(1)};
+    scalar_type m_best_error{std::numeric_limits<scalar_type>::max()};
     int m_iterations{};
+    int m_total_iterations{};
+    int m_restart_count{};
     ik_status m_status{ik_status::running};
+    bool m_aborted{false};
 };
 
 }
