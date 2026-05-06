@@ -82,7 +82,7 @@ int main()
 
     cartan::basic_ik_runner racing_solver{
         cartan::ik::restart_wrapper{cartan::ik::argmin_slsqp<cartan::kinematic_chain<double, 6>>{}},
-        cartan::ik::restart_wrapper{cartan::ik::projected_lm<cartan::kinematic_chain<double, 6>>{}}};
+        cartan::ik::projected_lm<cartan::kinematic_chain<double, 6>>{}};
 
     racing_solver.setup(chain, target, q0, criteria);
     auto racing_result = racing_solver.solve();

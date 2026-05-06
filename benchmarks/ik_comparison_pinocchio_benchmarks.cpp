@@ -640,60 +640,74 @@ static void bm_ik_##ROBOT##_##SOLVER_NAME##_restart(benchmark::State& state)    
 }                                                                                        \
 BENCHMARK(bm_ik_##ROBOT##_##SOLVER_NAME##_restart)->Iterations(2000)->Unit(benchmark::kMicrosecond)
 
+// Single-cell variant for solvers whose public template already encapsulates restart logic
+// (e.g. projected_lm self-restarts on stall via Halton re-seed). Adding _no_limits and
+// _restart variants for such solvers would emit a redundant duplicate of the default cell
+// and a pathological double-restart cell respectively, so only the default is registered.
+#define IK_BENCH_DEFAULT_ONLY(ROBOT, FACTORY, N_DOF, SOLVER_NAME, SOLVER_TPL)            \
+static void bm_ik_##ROBOT##_##SOLVER_NAME(benchmark::State& state)                       \
+{                                                                                        \
+    using chain_t = cartan::kinematic_chain<double, N_DOF>;                              \
+    static auto chain = cartan::benchmarks::FACTORY<double>();                           \
+    static target_set<double, N_DOF> ts(chain, num_targets);                             \
+    bm_cartan_solver<N_DOF, SOLVER_TPL<chain_t>>(state, chain, ts);                      \
+}                                                                                        \
+BENCHMARK(bm_ik_##ROBOT##_##SOLVER_NAME)->Iterations(2000)->Unit(benchmark::kMicrosecond)
+
 IK_BENCH_ROBOT(ur3e,       make_ur3e_chain,       make_ur3e_kdl_chain,       make_ur3e_kdl_limits,       6);
 IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, dls,            cartan::ik::dls);
 IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, builtin_lm,     cartan::ik::builtin_lm);
 IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, builtin_lbfgsb, cartan::ik::builtin_lbfgsb);
 IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, newton_raphson, cartan::ik::newton_raphson);
-IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, projected_lm,   cartan::ik::projected_lm);
+IK_BENCH_DEFAULT_ONLY(ur3e,       make_ur3e_chain,       6, projected_lm,   cartan::ik::projected_lm);
 IK_BENCH_ROBOT(kr6_sixx,   make_kr6_sixx_chain,   make_kr6_sixx_kdl_chain,   make_kr6_sixx_kdl_limits,   6);
 IK_BENCH_SOLVER_VARIANTS(kr6_sixx,   make_kr6_sixx_chain,   6, dls,            cartan::ik::dls);
 IK_BENCH_SOLVER_VARIANTS(kr6_sixx,   make_kr6_sixx_chain,   6, builtin_lm,     cartan::ik::builtin_lm);
 IK_BENCH_SOLVER_VARIANTS(kr6_sixx,   make_kr6_sixx_chain,   6, builtin_lbfgsb, cartan::ik::builtin_lbfgsb);
 IK_BENCH_SOLVER_VARIANTS(kr6_sixx,   make_kr6_sixx_chain,   6, newton_raphson, cartan::ik::newton_raphson);
-IK_BENCH_SOLVER_VARIANTS(kr6_sixx,   make_kr6_sixx_chain,   6, projected_lm,   cartan::ik::projected_lm);
+IK_BENCH_DEFAULT_ONLY(kr6_sixx,   make_kr6_sixx_chain,   6, projected_lm,   cartan::ik::projected_lm);
 IK_BENCH_ROBOT(abb_irb120, make_abb_irb120_chain, make_abb_irb120_kdl_chain, make_abb_irb120_kdl_limits, 6);
 IK_BENCH_SOLVER_VARIANTS(abb_irb120, make_abb_irb120_chain, 6, dls,            cartan::ik::dls);
 IK_BENCH_SOLVER_VARIANTS(abb_irb120, make_abb_irb120_chain, 6, builtin_lm,     cartan::ik::builtin_lm);
 IK_BENCH_SOLVER_VARIANTS(abb_irb120, make_abb_irb120_chain, 6, builtin_lbfgsb, cartan::ik::builtin_lbfgsb);
 IK_BENCH_SOLVER_VARIANTS(abb_irb120, make_abb_irb120_chain, 6, newton_raphson, cartan::ik::newton_raphson);
-IK_BENCH_SOLVER_VARIANTS(abb_irb120, make_abb_irb120_chain, 6, projected_lm,   cartan::ik::projected_lm);
+IK_BENCH_DEFAULT_ONLY(abb_irb120, make_abb_irb120_chain, 6, projected_lm,   cartan::ik::projected_lm);
 IK_BENCH_ROBOT(jaco2,      make_jaco2_chain,      make_jaco2_kdl_chain,      make_jaco2_kdl_limits,      6);
 IK_BENCH_SOLVER_VARIANTS(jaco2,      make_jaco2_chain,      6, dls,            cartan::ik::dls);
 IK_BENCH_SOLVER_VARIANTS(jaco2,      make_jaco2_chain,      6, builtin_lm,     cartan::ik::builtin_lm);
 IK_BENCH_SOLVER_VARIANTS(jaco2,      make_jaco2_chain,      6, builtin_lbfgsb, cartan::ik::builtin_lbfgsb);
 IK_BENCH_SOLVER_VARIANTS(jaco2,      make_jaco2_chain,      6, newton_raphson, cartan::ik::newton_raphson);
-IK_BENCH_SOLVER_VARIANTS(jaco2,      make_jaco2_chain,      6, projected_lm,   cartan::ik::projected_lm);
+IK_BENCH_DEFAULT_ONLY(jaco2,      make_jaco2_chain,      6, projected_lm,   cartan::ik::projected_lm);
 IK_BENCH_ROBOT(lbr_med14,  make_lbr_med14_chain,  make_lbr_med14_kdl_chain,  make_lbr_med14_kdl_limits,  7);
 IK_BENCH_SOLVER_VARIANTS(lbr_med14,  make_lbr_med14_chain,  7, dls,            cartan::ik::dls);
 IK_BENCH_SOLVER_VARIANTS(lbr_med14,  make_lbr_med14_chain,  7, builtin_lm,     cartan::ik::builtin_lm);
 IK_BENCH_SOLVER_VARIANTS(lbr_med14,  make_lbr_med14_chain,  7, builtin_lbfgsb, cartan::ik::builtin_lbfgsb);
 IK_BENCH_SOLVER_VARIANTS(lbr_med14,  make_lbr_med14_chain,  7, newton_raphson, cartan::ik::newton_raphson);
-IK_BENCH_SOLVER_VARIANTS(lbr_med14,  make_lbr_med14_chain,  7, projected_lm,   cartan::ik::projected_lm);
+IK_BENCH_DEFAULT_ONLY(lbr_med14,  make_lbr_med14_chain,  7, projected_lm,   cartan::ik::projected_lm);
 IK_BENCH_ROBOT(panda,      make_panda_chain,      make_panda_kdl_chain,      make_panda_kdl_limits,      7);
 IK_BENCH_SOLVER_VARIANTS(panda,      make_panda_chain,      7, dls,            cartan::ik::dls);
 IK_BENCH_SOLVER_VARIANTS(panda,      make_panda_chain,      7, builtin_lm,     cartan::ik::builtin_lm);
 IK_BENCH_SOLVER_VARIANTS(panda,      make_panda_chain,      7, builtin_lbfgsb, cartan::ik::builtin_lbfgsb);
 IK_BENCH_SOLVER_VARIANTS(panda,      make_panda_chain,      7, newton_raphson, cartan::ik::newton_raphson);
-IK_BENCH_SOLVER_VARIANTS(panda,      make_panda_chain,      7, projected_lm,   cartan::ik::projected_lm);
+IK_BENCH_DEFAULT_ONLY(panda,      make_panda_chain,      7, projected_lm,   cartan::ik::projected_lm);
 IK_BENCH_ROBOT(fetch,      make_fetch_chain,      make_fetch_kdl_chain,      make_fetch_kdl_limits,      7);
 IK_BENCH_SOLVER_VARIANTS(fetch,      make_fetch_chain,      7, dls,            cartan::ik::dls);
 IK_BENCH_SOLVER_VARIANTS(fetch,      make_fetch_chain,      7, builtin_lm,     cartan::ik::builtin_lm);
 IK_BENCH_SOLVER_VARIANTS(fetch,      make_fetch_chain,      7, builtin_lbfgsb, cartan::ik::builtin_lbfgsb);
 IK_BENCH_SOLVER_VARIANTS(fetch,      make_fetch_chain,      7, newton_raphson, cartan::ik::newton_raphson);
-IK_BENCH_SOLVER_VARIANTS(fetch,      make_fetch_chain,      7, projected_lm,   cartan::ik::projected_lm);
+IK_BENCH_DEFAULT_ONLY(fetch,      make_fetch_chain,      7, projected_lm,   cartan::ik::projected_lm);
 IK_BENCH_ROBOT(baxter,     make_baxter_chain,     make_baxter_kdl_chain,     make_baxter_kdl_limits,     7);
 IK_BENCH_SOLVER_VARIANTS(baxter,     make_baxter_chain,     7, dls,            cartan::ik::dls);
 IK_BENCH_SOLVER_VARIANTS(baxter,     make_baxter_chain,     7, builtin_lm,     cartan::ik::builtin_lm);
 IK_BENCH_SOLVER_VARIANTS(baxter,     make_baxter_chain,     7, builtin_lbfgsb, cartan::ik::builtin_lbfgsb);
 IK_BENCH_SOLVER_VARIANTS(baxter,     make_baxter_chain,     7, newton_raphson, cartan::ik::newton_raphson);
-IK_BENCH_SOLVER_VARIANTS(baxter,     make_baxter_chain,     7, projected_lm,   cartan::ik::projected_lm);
+IK_BENCH_DEFAULT_ONLY(baxter,     make_baxter_chain,     7, projected_lm,   cartan::ik::projected_lm);
 IK_BENCH_ROBOT(kuka_lwr4,  make_kuka_lwr4_chain,  make_kuka_lwr4_kdl_chain,  make_kuka_lwr4_kdl_limits,  7);
 IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, dls,            cartan::ik::dls);
 IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, builtin_lm,     cartan::ik::builtin_lm);
 IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, builtin_lbfgsb, cartan::ik::builtin_lbfgsb);
 IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, newton_raphson, cartan::ik::newton_raphson);
-IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, projected_lm,   cartan::ik::projected_lm);
+IK_BENCH_DEFAULT_ONLY(kuka_lwr4,  make_kuka_lwr4_chain,  7, projected_lm,   cartan::ik::projected_lm);
 
 #ifdef CARTAN_BUILD_ARGMIN
 IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, argmin_lm,                   cartan::ik::argmin_lm);
@@ -751,5 +765,6 @@ IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, argmin_lbfgsb,   
 IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, argmin_projected_gn,         cartan::ik::argmin_projected_gn);
 IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, argmin_projected_gradient_gn, cartan::ik::argmin_projected_gradient_gn);
 #endif
+
 
 }

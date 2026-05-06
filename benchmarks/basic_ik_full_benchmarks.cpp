@@ -454,9 +454,7 @@ void bm_gauss_newton(
 {
     using chain_t = cartan::kinematic_chain<double, N>;
     typename cartan::ik::projected_lm<chain_t>::options plm_opts{
-        .initial_lambda_factor = 0.0
-    };
-    typename cartan::ik::restart_wrapper<chain_t, cartan::ik::projected_lm<chain_t>>::options restart_opts{
+        .initial_lambda_factor = 0.0,
         .max_restarts = 20
     };
     cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 200};
@@ -475,9 +473,7 @@ void bm_gauss_newton(
         auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
         ++idx;
 
-        cartan::ik::projected_lm<chain_t> inner(plm_opts);
-        cartan::ik::restart_wrapper<chain_t, cartan::ik::projected_lm<chain_t>> stepper(
-            restart_opts, std::move(inner));
+        cartan::ik::projected_lm<chain_t> stepper(plm_opts);
         cartan::basic_ik_runner solver(std::move(stepper));
         solver.setup(chain, target, q_seed, criteria);
         auto result = solver.solve();
