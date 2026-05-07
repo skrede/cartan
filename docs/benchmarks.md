@@ -2,7 +2,7 @@
 
 ## Overview
 
-liepp provides a comprehensive benchmark suite measuring Lie group operations, forward kinematics, Jacobian computation, and inverse kinematics solver performance. IK benchmarks include direct comparison against TRAC-IK (Beeson & Ames, 2015) running on the same hardware under identical conditions.
+Cartan provides a comprehensive benchmark suite measuring Lie group operations, forward kinematics, Jacobian computation, and inverse kinematics solver performance. IK benchmarks include direct comparison against TRAC-IK (Beeson & Ames, 2015) running on the same hardware under identical conditions.
 
 ## Hardware
 
@@ -72,7 +72,7 @@ Direct head-to-head comparison against TRAC-IK (de-rosified, no ROS/URDF depende
 - Same 10,000 targets per robot (FK-generated, guaranteed reachable)
 - Same convergence tolerance (eps = 1e-5)
 - TRAC-IK timeout set to 10s (convergence-based, not time-based termination)
-- liepp uses LM stepper (closest algorithmic match to TRAC-IK's Newton methods)
+- Cartan uses LM stepper (closest algorithmic match to TRAC-IK's Newton methods)
 - Both run on same hardware, same compilation flags
 
 ## Results
@@ -137,35 +137,35 @@ All times are mean solve time per single IK problem. Success rate, iterations, a
 - DLS/LM error values are averaged over all attempts including failures (where error remains at the initial guess level), which inflates the reported averages.
 - Racing and Fallback schedulers show sub-micron position errors on successful solves, demonstrating tight convergence.
 
-### liepp vs TRAC-IK
+### Cartan vs TRAC-IK
 
-1,000 FK-generated reachable targets per robot, same random seed (42), same convergence tolerance (1e-5). liepp uses LM stepper; TRAC-IK uses its internal Newton + NLopt dual solver with 10s timeout.
+1,000 FK-generated reachable targets per robot, same random seed (42), same convergence tolerance (1e-5). Cartan uses LM stepper; TRAC-IK uses its internal Newton + NLopt dual solver with 10s timeout.
 
 | Robot | DOF | Solver | Success Rate | Avg Iters | Avg Pos Err | Avg Ori Err | Mean Solve Time | Speedup |
 |-------|-----|--------|-------------|-----------|-------------|-------------|-----------------|---------|
-| UR3e | 6 | liepp (LM) | 74.3% | 15.3 | 3.90e-01 | 1.35e+00 | 35.9 µs | 0.96x |
+| UR3e | 6 | Cartan (LM) | 74.3% | 15.3 | 3.90e-01 | 1.35e+00 | 35.9 µs | 0.96x |
 | UR3e | 6 | TRAC-IK | 76.8% | -- | -- | -- | 34.3 µs | baseline |
-| KR 6 SIXX | 6 | liepp (LM) | 99.4% | 14.9 | 3.91e-01 | 1.33e+00 | 31.7 µs | 0.73x |
+| KR 6 SIXX | 6 | Cartan (LM) | 99.4% | 14.9 | 3.91e-01 | 1.33e+00 | 31.7 µs | 0.73x |
 | KR 6 SIXX | 6 | TRAC-IK | 100.0% | -- | -- | -- | 23.0 µs | baseline |
-| ABB IRB 120 | 6 | liepp (LM) | 89.4% | 13.0 | 2.92e-01 | 1.15e+00 | 29.3 µs | 0.80x |
+| ABB IRB 120 | 6 | Cartan (LM) | 89.4% | 13.0 | 2.92e-01 | 1.15e+00 | 29.3 µs | 0.80x |
 | ABB IRB 120 | 6 | TRAC-IK | 100.0% | -- | -- | -- | 23.4 µs | baseline |
-| Jaco2 | 6 | liepp (LM) | 94.3% | 17.0 | 3.36e-01 | 1.38e+00 | 37.7 µs | 0.64x |
+| Jaco2 | 6 | Cartan (LM) | 94.3% | 17.0 | 3.36e-01 | 1.38e+00 | 37.7 µs | 0.64x |
 | Jaco2 | 6 | TRAC-IK | 100.0% | -- | -- | -- | 24.1 µs | baseline |
-| LBR Med 14 | 7 | liepp (LM) | 99.5% | 12.2 | 4.01e-01 | 1.27e+00 | 30.6 µs | 0.71x |
+| LBR Med 14 | 7 | Cartan (LM) | 99.5% | 12.2 | 4.01e-01 | 1.27e+00 | 30.6 µs | 0.71x |
 | LBR Med 14 | 7 | TRAC-IK | 100.0% | -- | -- | -- | 21.8 µs | baseline |
-| Panda | 7 | liepp (LM) | 92.2% | 12.7 | 3.43e-01 | 1.13e+00 | 38.4 µs | 0.59x |
+| Panda | 7 | Cartan (LM) | 92.2% | 12.7 | 3.43e-01 | 1.13e+00 | 38.4 µs | 0.59x |
 | Panda | 7 | TRAC-IK | 100.0% | -- | -- | -- | 22.6 µs | baseline |
-| Fetch | 7 | liepp (LM) | 99.7% | 12.6 | 3.07e-01 | 1.12e+00 | 30.9 µs | 0.72x |
+| Fetch | 7 | Cartan (LM) | 99.7% | 12.6 | 3.07e-01 | 1.12e+00 | 30.9 µs | 0.72x |
 | Fetch | 7 | TRAC-IK | 100.0% | -- | -- | -- | 22.3 µs | baseline |
-| Baxter | 7 | liepp (LM) | 92.7% | 12.1 | 3.63e-01 | 1.12e+00 | 31.0 µs | 0.75x |
+| Baxter | 7 | Cartan (LM) | 92.7% | 12.1 | 3.63e-01 | 1.12e+00 | 31.0 µs | 0.75x |
 | Baxter | 7 | TRAC-IK | 100.0% | -- | -- | -- | 23.2 µs | baseline |
-| KUKA LWR 4+ | 7 | liepp (LM) | 99.7% | 12.3 | 3.70e-01 | 1.26e+00 | 29.8 µs | 0.73x |
+| KUKA LWR 4+ | 7 | Cartan (LM) | 99.7% | 12.3 | 3.70e-01 | 1.26e+00 | 29.8 µs | 0.73x |
 | KUKA LWR 4+ | 7 | TRAC-IK | 100.0% | -- | -- | -- | 21.8 µs | baseline |
 
 **Notes:**
 - TRAC-IK does not expose per-solve iteration counts or error metrics through its API, so those columns show `--`.
-- liepp LM stepper is a single-algorithm solver; TRAC-IK runs a dual Newton + NLopt strategy internally, which explains its higher success rates.
-- liepp's Racing/Fallback schedulers (see IK Solver Comparison above) provide the multi-strategy approach that competes more directly with TRAC-IK's dual solver.
+- Cartan LM stepper is a single-algorithm solver; TRAC-IK runs a dual Newton + NLopt strategy internally, which explains its higher success rates.
+- Cartan's Racing/Fallback schedulers (see IK Solver Comparison above) provide the multi-strategy approach that competes more directly with TRAC-IK's dual solver.
 - Speedup < 1.0 means TRAC-IK is faster. Both solvers operate in the same order of magnitude (20-40 µs per solve).
 
 ### Beeson & Ames 2015 Reference

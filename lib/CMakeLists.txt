@@ -1,7 +1,8 @@
-add_subdirectory(liepp-lie)
-add_subdirectory(liepp-kinematics)
+add_subdirectory(cartan-lie)
+add_subdirectory(cartan-serial-chain)
+add_subdirectory(cartan-analytical)
 
-# Convenience target pulling both modules
-add_library(liepp_all INTERFACE)
-add_library(liepp::liepp ALIAS liepp_all)
-target_link_libraries(liepp_all INTERFACE liepp::lie liepp::kinematics)
+# Convenience target pulling all modules
+add_library(cartan_all INTERFACE)
+add_library(cartan::cartan ALIAS cartan_all)
+target_link_libraries(cartan_all INTERFACE cartan::lie cartan::serial_chain cartan::analytical)

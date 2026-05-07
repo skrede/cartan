@@ -1,18 +1,18 @@
-#ifdef LIEPP_HAS_NLOPT
+#ifdef CARTAN_HAS_NLOPT
 
-#include <liepp/ik/nlopt_bobyqa_solve_policy.h>
+#include <cartan/serial/ik/solver/nlopt_bobyqa.h>
 
-#include <liepp/types.h>
+#include <cartan/types.h>
 
-#include <liepp/ik/ik_types.h>
+#include <cartan/serial/ik/ik_status.h>
 
-#include <liepp/lie/se3.h>
-#include <liepp/lie/so3.h>
-#include <liepp/chain/screw_axis.h>
-#include <liepp/chain/joint_state.h>
-#include <liepp/chain/joint_limits.h>
-#include <liepp/chain/kinematic_chain.h>
-#include <liepp/kinematics/forward_kinematics.h>
+#include <cartan/lie/se3.h>
+#include <cartan/lie/so3.h>
+#include <cartan/serial/chain/screw_axis.h>
+#include <cartan/serial/chain/joint_state.h>
+#include <cartan/serial/chain/joint_limits.h>
+#include <cartan/serial/chain/kinematic_chain.h>
+#include <cartan/serial/fk/forward_kinematics.h>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -20,7 +20,7 @@
 #include <cmath>
 #include <numbers>
 
-namespace spp = liepp;
+namespace spp = cartan;
 using Catch::Approx;
 
 static spp::kinematic_chain<double, 6> make_ur5_like_chain()
@@ -57,7 +57,7 @@ spp::ik_status run_stepper(
 
 TEST_CASE("nlopt_bobyqa_solve_policy satisfies ik_solve_policy concept", "[ik][bobyqa]")
 {
-    static_assert(spp::ik_solve_policy<spp::nlopt_bobyqa_solve_policy<double, 6>>);
+    static_assert(spp::ik::solve_policy<spp::ik::nlopt_bobyqa<spp::kinematic_chain<double, 6>>>);
     SUCCEED();
 }
 
@@ -80,7 +80,7 @@ TEST_CASE("nlopt_bobyqa_solve_policy converges on UR5-like chain", "[ik][bobyqa]
     criteria.position_tol = 1e-4;
     criteria.orientation_tol = 1e-4;
 
-    spp::nlopt_bobyqa_solve_policy<double, 6> stepper;
+    spp::ik::nlopt_bobyqa<spp::kinematic_chain<double, 6>> stepper;
     stepper.setup(chain, target, q_seed, criteria);
 
     run_stepper(stepper, chain, 50);

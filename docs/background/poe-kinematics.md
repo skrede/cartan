@@ -7,7 +7,7 @@ frames -- only a fixed space frame $\{s\}$, an end-effector body frame $\{b\}$,
 and the screw axes of each joint expressed in the space frame
 [1, Ch. 4, pp. 135--168].
 
-liepp uses the PoE formulation exclusively. The advantages over D-H parameters
+Cartan uses the PoE formulation exclusively. The advantages over D-H parameters
 include: no frame-attachment ambiguity (different D-H conventions lead to
 different parameters for the same robot), uniform treatment of revolute and
 prismatic joints, and global coordinates that compose naturally with Lie group
@@ -147,7 +147,7 @@ joint is unaffected by the displacement of a more proximal joint.
 ### Relationship Between Forms
 
 The two forms are equivalent and related by the matrix identity
-$Me^{M^{-1}PM} = e^P M$. liepp uses the **space form** as its primary
+$Me^{M^{-1}PM} = e^P M$. Cartan uses the **space form** as its primary
 convention, consistent with Lynch & Park's recommendation and the natural
 composition of fixed-frame screw displacements.
 
@@ -203,11 +203,11 @@ yields the end-effector at position $(x, y) \approx (0.293, 1.707)$ rotated
 by $\pi/2$ from the base frame, which matches the geometric intuition of
 both joints bent 45 degrees.
 
-## liepp Mapping
+## Cartan Mapping
 
-The PoE concepts map directly to liepp's API:
+The PoE concepts map directly to Cartan's API:
 
-| Concept | liepp API |
+| Concept | Cartan API |
 |---------|-----------|
 | Screw axis $\mathcal{S}$ (revolute) | `screw_axis::revolute(omega, point)` |
 | Screw axis $\mathcal{S}$ (prismatic) | `screw_axis::prismatic(direction)` |
@@ -217,7 +217,7 @@ The PoE concepts map directly to liepp's API:
 | Intermediate products $T_i$ | `fk_result::intermediates` |
 | End-effector pose | `fk_result::end_effector` |
 
-liepp computes FK via the space-form PoE. For fixed-size chains ($N = 1$--$7$),
+Cartan computes FK via the space-form PoE. For fixed-size chains ($N = 1$--$7$),
 it uses a compile-time unrolled fold expression for zero-overhead expansion.
 For dynamic or larger chains, it uses a runtime loop. In both cases, all
 intermediate products $T_i = e^{[\mathcal{S}_1]\theta_1} \cdots e^{[\mathcal{S}_i]\theta_i}$

@@ -1,0 +1,521 @@
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_PROJECTED_LM_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_PROJECTED_LM_H
+
+/// @file projected_lm.h
+/// @brief Projected Levenberg-Marquardt IK solve policy with active-set box
+///        projection, optional dogleg trust-region step, and built-in
+///        Halton-seed re-seed on stall.
+///
+/// Speed-optimized solver: active-set projection handles joint limits
+/// within the optimization step (not post-hoc clamping). The dogleg
+/// option interpolates between Cauchy point and Gauss-Newton step.
+///
+/// On stall / divergence / per-attempt iteration_limit, the solver
+/// internally re-seeds the joint configuration from a deterministic Halton
+/// sequence and continues. Phase-30 H2 falsification confirmed that for
+/// projected LM the load-bearing recovery mechanism is the fresh
+/// low-discrepancy seed, not warm-start lambda preservation; the restart
+/// loop therefore lives inside the solver rather than in a separate
+/// wrapper layer.
+///
+/// Reference: Lynch & Park, Modern Robotics, Ch. 6.2, p. 227-233.
+///            Nielsen, H.B., Damping Parameter in Marquardt's Method, 1999.
+///            Nocedal & Wright, Numerical Optimization, Ch. 4 (dogleg).
+///            Beeson & Ames, "TRAC-IK", 2015 (multi-start strategy).
+
+#include "cartan/types.h"
+
+#include "cartan/serial/ik/ik_status.h"
+#include "cartan/serial/ik/policy/limits_policy.h"
+#include "cartan/serial/ik/policy/error_weight.h"
+#include "cartan/serial/ik/concepts/solve_concept.h"
+#include "cartan/serial/ik/detail/convergence.h"
+#include "cartan/serial/ik/detail/stall_detection.h"
+#include "cartan/serial/ik/detail/limit_enforcement.h"
+#include "cartan/serial/ik/solver/detail/halton_seed_generator.h"
+
+#include "cartan/lie/se3.h"
+#include "cartan/serial/fk/jacobian.h"
+#include "cartan/serial/chain/joint_state.h"
+#include "cartan/serial/chain/chain_concept.h"
+#include "cartan/serial/fk/forward_kinematics.h"
+
+#include <Eigen/Dense>
+
+#include <cmath>
+#include <vector>
+#include <limits>
+#include <optional>
+#include <algorithm>
+
+namespace cartan::ik
+{
+
+/// Projected Levenberg-Marquardt IK solve policy with active-set box projection
+/// and built-in Halton-seed re-seed on stall.
+template <chain Chain, typename LimitsPolicy = no_limits>
+class projected_lm
+{
+public:
+    using chain_type = Chain;
+    using scalar_type = typename Chain::scalar_type;
+    static constexpr int joints = Chain::joints;
+    using limits_type = LimitsPolicy;
+
+    using position_type = typename joint_state<scalar_type, joints>::position_type;
+
+    static_assert(std::is_floating_point_v<scalar_type>, "projected_lm requires a floating-point Scalar type");
+
+    struct options
+    {
+        scalar_type initial_lambda_factor{scalar_type(1e-3)};
+        scalar_type stall_threshold{scalar_type(1e-6)};
+        scalar_type divergence_factor{scalar_type(10)};
+        int stall_window{5};
+        int max_restarts{20};
+        bool use_dogleg{false};
+        scalar_type trust_region_radius{scalar_type(1.0)};
+    };
+
+    projected_lm() = default;
+
+    explicit projected_lm(const options& opts)
+        : m_options(opts)
+    {
+    }
+
+    void setup(
+        const Chain& chain,
+        const se3<scalar_type>& target,
+        const position_type& q0,
+        const convergence_criteria<scalar_type>& criteria)
+    {
+        setup(chain, target, q0, criteria, error_weight<scalar_type>{});
+    }
+
+    void setup(
+        const Chain& chain,
+        const se3<scalar_type>& target,
+        const position_type& q0,
+        const convergence_criteria<scalar_type>& criteria,
+        const error_weight<scalar_type>& weight)
+    {
+        m_seed_gen.emplace(chain);
+        m_restart_count = 0;
+        m_total_iterations = 0;
+        m_best_error = std::numeric_limits<scalar_type>::max();
+        m_aborted = false;
+
+        initialize_attempt(chain, target, q0, criteria, weight);
+    }
+
+    ik_status step(const Chain& chain)
+    {
+        if (m_aborted)
+        {
+            return ik_status::stalled;
+        }
+        if (m_status == ik_status::converged)
+        {
+            return m_status;
+        }
+
+        auto inner_status = perform_lm_iteration(chain);
+        ++m_total_iterations;
+
+        if (inner_status == ik_status::converged)
+        {
+            m_status = ik_status::converged;
+            return ik_status::converged;
+        }
+        if (inner_status == ik_status::running)
+        {
+            return ik_status::running;
+        }
+
+        if (m_error_norm < m_best_error)
+        {
+            m_best_error = m_error_norm;
+        }
+
+        if (m_restart_count >= m_options.max_restarts)
+        {
+            m_status = inner_status;
+            return inner_status;
+        }
+
+        auto q_new = (*m_seed_gen)(m_restart_count);
+        ++m_restart_count;
+
+        initialize_attempt(chain, m_target, q_new, m_criteria, m_weight);
+        return ik_status::running;
+    }
+
+    [[nodiscard]] bool converged() const { return m_status == ik_status::converged; }
+    [[nodiscard]] const position_type& solution() const { return m_q; }
+    [[nodiscard]] scalar_type error_norm() const { return m_error_norm; }
+    [[nodiscard]] int iterations() const { return m_total_iterations; }
+    void abort() { m_aborted = true; }
+    [[nodiscard]] scalar_type lambda() const { return m_lambda; }
+    void set_lambda(scalar_type l) { m_lambda = l; }
+    [[nodiscard]] ik_status status() const { return m_status; }
+
+private:
+    void initialize_attempt(
+        const Chain& chain,
+        const se3<scalar_type>& target,
+        const position_type& q0,
+        const convergence_criteria<scalar_type>& criteria,
+        const error_weight<scalar_type>& weight)
+    {
+        m_target = target;
+        m_q = q0;
+        m_criteria = criteria;
+        m_weight = weight;
+        m_iterations = 0;
+        m_status = ik_status::running;
+        m_nu = scalar_type(2);
+        m_delta = m_options.trust_region_radius;
+        m_error_history.clear();
+
+        int n = chain.num_joints();
+        if constexpr (joints == dynamic)
+        {
+            m_q_min.resize(n);
+            m_q_max.resize(n);
+        }
+        for (int i = 0; i < n; ++i)
+        {
+            m_q_min(i) = chain.limits()[static_cast<std::size_t>(i)].position_min;
+            m_q_max(i) = chain.limits()[static_cast<std::size_t>(i)].position_max;
+        }
+
+        m_q = m_q.cwiseMax(m_q_min).cwiseMin(m_q_max);
+
+        auto fk = forward_kinematics(chain, m_q);
+        m_V_b = (fk.end_effector.inverse() * m_target).log();
+        m_error_norm = m_V_b.norm();
+        m_initial_error = m_error_norm;
+
+        auto J_b = body_jacobian(chain, fk);
+        auto JtJ = (J_b.transpose() * J_b).eval();
+        scalar_type max_diag{0};
+        for (int i = 0; i < n; ++i)
+        {
+            max_diag = std::max(max_diag, JtJ(i, i));
+        }
+        m_lambda = m_options.initial_lambda_factor * max_diag;
+        if (m_lambda < std::numeric_limits<scalar_type>::epsilon())
+        {
+            m_lambda = scalar_type(1e-4);
+        }
+    }
+
+    ik_status perform_lm_iteration(const Chain& chain)
+    {
+        if (m_status != ik_status::running)
+        {
+            return m_status;
+        }
+
+        auto fk = forward_kinematics(chain, m_q);
+        m_V_b = (fk.end_effector.inverse() * m_target).log();
+
+        if (auto s = check_convergence_and_limits(); s != ik_status::running)
+        {
+            return s;
+        }
+
+        auto J_b = body_jacobian(chain, fk);
+        int n = static_cast<int>(J_b.cols());
+        auto H = (J_b.transpose() * J_b).eval();
+        auto g = (J_b.transpose() * m_V_b).eval();
+
+        auto free_indices = identify_active_set(g, n);
+        position_type dq = solve_projected_system(J_b, H, g, free_indices, n);
+
+        auto [q_trial, V_b_trial, rho] = evaluate_trial_step(chain, dq, H, g);
+
+        update_damping(rho, dq, q_trial, V_b_trial);
+
+        m_error_norm = m_V_b.norm();
+        auto stall_result = cartan::detail::check_stall_divergence(
+            m_error_history, m_error_norm, m_initial_error,
+            m_options.stall_window, m_options.stall_threshold,
+            m_options.divergence_factor);
+        if (stall_result != ik_status::running)
+        {
+            m_status = stall_result;
+            return m_status;
+        }
+
+        cartan::detail::enforce_limits<LimitsPolicy>(m_q, chain);
+        return m_status;
+    }
+
+    ik_status check_convergence_and_limits()
+    {
+        if (cartan::detail::is_converged(m_V_b, m_weight, m_criteria))
+        {
+            m_error_norm = m_V_b.norm();
+            m_status = ik_status::converged;
+            return m_status;
+        }
+
+        ++m_iterations;
+        if (m_iterations >= m_criteria.max_iterations)
+        {
+            m_error_norm = m_V_b.norm();
+            m_status = ik_status::iteration_limit;
+            return m_status;
+        }
+
+        return ik_status::running;
+    }
+
+    std::vector<int> identify_active_set(const auto& g, int n)
+    {
+        std::vector<int> free_indices;
+        free_indices.reserve(static_cast<std::size_t>(n));
+        for (int i = 0; i < n; ++i)
+        {
+            bool at_lower = (m_q(i) <= m_q_min(i) + std::numeric_limits<scalar_type>::epsilon());
+            bool at_upper = (m_q(i) >= m_q_max(i) - std::numeric_limits<scalar_type>::epsilon());
+            bool active = (at_lower && g(i) < scalar_type(0)) ||
+                          (at_upper && g(i) > scalar_type(0));
+            if (!active)
+            {
+                free_indices.push_back(i);
+            }
+        }
+        return free_indices;
+    }
+
+    template <typename JacobianType, typename HessianType, typename GradientType>
+    position_type solve_projected_system(
+        const JacobianType& J_b,
+        const HessianType& H,
+        const GradientType& g,
+        const std::vector<int>& free_indices,
+        int n)
+    {
+        int n_free = static_cast<int>(free_indices.size());
+        position_type dq;
+        if constexpr (joints == dynamic)
+        {
+            dq = position_type::Zero(n);
+        }
+        else
+        {
+            dq = position_type::Zero();
+        }
+
+        if (n_free == 0)
+        {
+            return dq;
+        }
+
+        Eigen::MatrixX<scalar_type> H_free(n_free, n_free);
+        Eigen::VectorX<scalar_type> g_free(n_free);
+        for (int i = 0; i < n_free; ++i)
+        {
+            g_free(i) = g(free_indices[static_cast<std::size_t>(i)]);
+            for (int j = 0; j < n_free; ++j)
+            {
+                H_free(i, j) = H(free_indices[static_cast<std::size_t>(i)],
+                                 free_indices[static_cast<std::size_t>(j)]);
+            }
+        }
+
+        Eigen::VectorX<scalar_type> dq_free;
+        if (m_options.use_dogleg)
+        {
+            dq_free = dogleg_step(J_b, H_free, g_free, free_indices, n_free);
+        }
+        else
+        {
+            Eigen::MatrixX<scalar_type> A = H_free;
+            for (int i = 0; i < n_free; ++i)
+            {
+                A(i, i) += m_lambda;
+            }
+            dq_free = A.ldlt().solve(g_free);
+        }
+
+        for (int i = 0; i < n_free; ++i)
+        {
+            dq(free_indices[static_cast<std::size_t>(i)]) = dq_free(i);
+        }
+        return dq;
+    }
+
+    template <typename HessianType, typename GradientType>
+    struct trial_result
+    {
+        position_type q_trial;
+        vector6<scalar_type> V_b_trial;
+        scalar_type rho;
+    };
+
+    template <typename HessianType, typename GradientType>
+    auto evaluate_trial_step(
+        const Chain& chain,
+        const position_type& dq,
+        const HessianType& H,
+        const GradientType& g) -> trial_result<HessianType, GradientType>
+    {
+        position_type q_trial = (m_q + dq).cwiseMax(m_q_min).cwiseMin(m_q_max);
+        auto fk_trial = forward_kinematics(chain, q_trial);
+        auto V_b_trial = (fk_trial.end_effector.inverse() * m_target).log();
+
+        scalar_type error_old_sq = m_V_b.squaredNorm();
+        scalar_type error_new_sq = V_b_trial.squaredNorm();
+        scalar_type actual_reduction = scalar_type(0.5) * (error_old_sq - error_new_sq);
+
+        scalar_type predicted_reduction;
+        if (m_options.use_dogleg)
+        {
+            predicted_reduction = dq.dot(g) - scalar_type(0.5) * dq.dot(H * dq);
+        }
+        else
+        {
+            predicted_reduction = scalar_type(0.5) * (dq.transpose() * (m_lambda * dq + g)).value();
+        }
+
+        scalar_type rho{0};
+        if (std::abs(predicted_reduction) > std::numeric_limits<scalar_type>::epsilon())
+        {
+            rho = actual_reduction / predicted_reduction;
+        }
+
+        return {q_trial, V_b_trial, rho};
+    }
+
+    void update_damping(
+        scalar_type rho,
+        const position_type& dq,
+        const position_type& q_trial,
+        const vector6<scalar_type>& V_b_trial)
+    {
+        if (rho > scalar_type(0))
+        {
+            m_q = q_trial;
+            m_V_b = V_b_trial;
+
+            if (m_options.use_dogleg)
+            {
+                if (rho > scalar_type(0.75))
+                {
+                    m_delta = std::max(m_delta, scalar_type(3) * dq.norm());
+                }
+                else if (rho < scalar_type(0.25))
+                {
+                    m_delta *= scalar_type(0.25);
+                }
+            }
+            else
+            {
+                scalar_type factor = scalar_type(1) - std::pow(scalar_type(2) * rho - scalar_type(1), scalar_type(3));
+                m_lambda *= std::max(scalar_type(1) / scalar_type(3), factor);
+                m_nu = scalar_type(2);
+            }
+        }
+        else
+        {
+            if (m_options.use_dogleg)
+            {
+                m_delta *= scalar_type(0.25);
+            }
+            else
+            {
+                m_lambda *= m_nu;
+                m_nu *= scalar_type(2);
+            }
+        }
+    }
+
+    template <int JRows>
+    Eigen::VectorX<scalar_type> dogleg_step(
+        const Eigen::Matrix<scalar_type, 6, JRows>& J_b,
+        const Eigen::MatrixX<scalar_type>& H_free,
+        const Eigen::VectorX<scalar_type>& g_free,
+        const std::vector<int>& free_indices,
+        int n_free)
+    {
+        Eigen::VectorX<scalar_type> delta_sd = g_free;
+
+        Eigen::Matrix<scalar_type, 6, Eigen::Dynamic> J_b_free(6, n_free);
+        for (int i = 0; i < n_free; ++i)
+        {
+            J_b_free.col(i) = J_b.col(free_indices[static_cast<std::size_t>(i)]);
+        }
+
+        scalar_type g_sq = g_free.squaredNorm();
+        auto Jg = (J_b_free * g_free).eval();
+        scalar_type Jg_sq = Jg.squaredNorm();
+        scalar_type t = (Jg_sq > std::numeric_limits<scalar_type>::epsilon())
+            ? g_sq / Jg_sq
+            : scalar_type(1);
+
+        Eigen::MatrixX<scalar_type> H_reg = H_free;
+        for (int i = 0; i < n_free; ++i)
+        {
+            H_reg(i, i) += std::numeric_limits<scalar_type>::epsilon() * scalar_type(100);
+        }
+        Eigen::VectorX<scalar_type> delta_gn = H_reg.ldlt().solve(g_free);
+
+        scalar_type delta_gn_norm = delta_gn.norm();
+        scalar_type sd_scaled_norm = t * delta_sd.norm();
+
+        if (delta_gn_norm <= m_delta)
+        {
+            return delta_gn;
+        }
+
+        if (sd_scaled_norm >= m_delta)
+        {
+            return (m_delta / delta_sd.norm()) * delta_sd;
+        }
+
+        Eigen::VectorX<scalar_type> a = t * delta_sd;
+        Eigen::VectorX<scalar_type> b = delta_gn;
+        Eigen::VectorX<scalar_type> d = b - a;
+
+        scalar_type a_sq = a.squaredNorm();
+        scalar_type d_sq = d.squaredNorm();
+        scalar_type a_dot_d = a.dot(d);
+        scalar_type delta_sq = m_delta * m_delta;
+
+        scalar_type discriminant = a_dot_d * a_dot_d - d_sq * (a_sq - delta_sq);
+        scalar_type beta = (-a_dot_d + std::sqrt(std::max(scalar_type(0), discriminant))) / d_sq;
+        beta = std::clamp(beta, scalar_type(0), scalar_type(1));
+
+        return a + beta * d;
+    }
+
+    se3<scalar_type> m_target{se3<scalar_type>::identity()};
+    position_type m_q{};
+    position_type m_q_min{};
+    position_type m_q_max{};
+    vector6<scalar_type> m_V_b{vector6<scalar_type>::Zero()};
+    convergence_criteria<scalar_type> m_criteria{};
+    error_weight<scalar_type> m_weight{};
+    options m_options{};
+    std::optional<halton_seed_generator<Chain>> m_seed_gen{};
+    std::vector<scalar_type> m_error_history;
+    scalar_type m_initial_error{};
+    scalar_type m_error_norm{};
+    scalar_type m_lambda{};
+    scalar_type m_nu{scalar_type(2)};
+    scalar_type m_delta{scalar_type(1)};
+    scalar_type m_best_error{std::numeric_limits<scalar_type>::max()};
+    int m_iterations{};
+    int m_total_iterations{};
+    int m_restart_count{};
+    ik_status m_status{ik_status::running};
+    bool m_aborted{false};
+};
+
+}
+
+#endif

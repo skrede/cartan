@@ -1,6 +1,6 @@
 # lie
 
-Part of the `liepp::lie` module (`lib/liepp-lie/`). Link with `liepp::lie` (or the convenience target `liepp::liepp`). The umbrella header `<liepp/lie.h>` includes all Lie group types.
+Part of the `cartan::lie` module (`lib/cartan-lie/`). Link with `cartan::lie` (or the convenience target `cartan::cartan`). The umbrella header `<cartan/lie.h>` includes all Lie group types.
 
 Lie group classes for SO(2), SE(2), SO(3), SE(3) with exponential/logarithmic maps, composition, adjoints, and supporting utilities. All classes are parameterized by `Scalar` type and `Policy` (normalization behavior).
 
@@ -10,22 +10,22 @@ See [SO(2) Theory](../background/so2.md) | [SE(2) Theory](../background/se2.md) 
 
 | Form | Header |
 |------|--------|
-| `liepp::so2` | `#include <liepp/lie/so2.h>` |
-| `liepp::se2` | `#include <liepp/lie/se2.h>` |
-| `liepp::so3` | `#include <liepp/lie/so3.h>` |
-| `liepp::se3` | `#include <liepp/lie/se3.h>` |
-| `liepp::hat`, `liepp::vee` | `#include <liepp/lie/hat_vee.h>` |
-| `liepp::axis_angle`, `liepp::screw_params` | `#include <liepp/lie/axis_angle.h>` |
-| `liepp::quat_slerp`, `liepp::from_wxyz`, ... | `#include <liepp/lie/quaternion_utils.h>` |
-| `liepp::twist`, `liepp::screw_motion` | `#include <liepp/lie/twist.h>` |
-| `liepp::strict_policy`, `liepp::fast_policy` | `#include <liepp/lie/policy.h>` |
-| Forward declarations | `#include <liepp/lie/fwd.h>` |
-| Foundation types | `#include <liepp/types.h>` |
-| Epsilon constants | `#include <liepp/detail/epsilon.h>` |
+| `cartan::so2` | `#include <cartan/lie/so2.h>` |
+| `cartan::se2` | `#include <cartan/lie/se2.h>` |
+| `cartan::so3` | `#include <cartan/lie/so3.h>` |
+| `cartan::se3` | `#include <cartan/lie/se3.h>` |
+| `cartan::hat`, `cartan::vee` | `#include <cartan/lie/hat_vee.h>` |
+| `cartan::axis_angle`, `cartan::screw_params` | `#include <cartan/lie/axis_angle.h>` |
+| `cartan::quat_slerp`, `cartan::from_wxyz`, ... | `#include <cartan/lie/quaternion_utils.h>` |
+| `cartan::twist`, `cartan::screw_motion` | `#include <cartan/lie/twist.h>` |
+| `cartan::strict_policy`, `cartan::fast_policy` | `#include <cartan/lie/policy.h>` |
+| Forward declarations | `#include <cartan/lie/fwd.h>` |
+| Foundation types | `#include <cartan/types.h>` |
+| Epsilon constants | `#include <cartan/detail/epsilon.h>` |
 
 ## Foundation Types
 
-Defined in `types.h`. Thin aliases over Eigen types used throughout liepp.
+Defined in `types.h`. Thin aliases over Eigen types used throughout Cartan.
 
 ```cpp
 template <typename Scalar, std::size_t N>
@@ -61,7 +61,7 @@ using quaternion = Eigen::Quaternion<Scalar>;
 Defined in `detail/epsilon.h`. Compile-time numerical thresholds for Taylor branch switching.
 
 ```cpp
-namespace liepp::detail {
+namespace cartan::detail {
 
 template <typename Scalar>
 inline constexpr Scalar epsilon_v = std::numeric_limits<Scalar>::epsilon();

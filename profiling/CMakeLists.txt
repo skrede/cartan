@@ -14,17 +14,23 @@ endif()
 add_executable(ik_profiling ik_profiling.cpp)
 target_link_libraries(ik_profiling
     PRIVATE
-    liepp::kinematics
+    cartan::serial_chain
     benchmark::benchmark
     benchmark::benchmark_main
 )
-target_compile_options(ik_profiling PRIVATE ${LIEPP_WARNING_FLAGS})
+target_compile_options(ik_profiling PRIVATE ${CARTAN_WARNING_FLAGS})
+
+# Argmin (argmin) solvers are optional
+if (CARTAN_BUILD_ARGMIN)
+    target_compile_definitions(ik_profiling PRIVATE CARTAN_BUILD_ARGMIN)
+    target_link_libraries(ik_profiling PRIVATE argmin::argmin)
+endif()
 
 # NLopt solvers are optional
-if (LIEPP_BUILD_NLOPT)
+if (CARTAN_BUILD_NLOPT)
     if (NOT TARGET NLopt::nlopt)
         find_package(NLopt CONFIG REQUIRED)
     endif()
-    target_compile_definitions(ik_profiling PRIVATE LIEPP_HAS_NLOPT)
+    target_compile_definitions(ik_profiling PRIVATE CARTAN_HAS_NLOPT)
     target_link_libraries(ik_profiling PRIVATE NLopt::nlopt)
 endif()

@@ -35,8 +35,8 @@ jobs:
           cmake -B build
           -DCMAKE_C_COMPILER=clang
           -DCMAKE_CXX_COMPILER=clang++
-          -DLIEPP_BUILD_FUZZ_TESTS=ON
-          -DLIEPP_CMAKE_FETCH_DEPS=ON
+          -DCARTAN_BUILD_FUZZ_TESTS=ON
+          -DCARTAN_CMAKE_FETCH_DEPS=ON
 
       - name: Build fuzz targets
         run: cmake --build build -j$(nproc)

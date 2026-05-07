@@ -6,6 +6,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_executable(compile_fail_target ${TEST_SOURCE})
 target_include_directories(compile_fail_target SYSTEM PRIVATE
-    "${LIEPP_INCLUDE_DIR}"
+    "${CARTAN_INCLUDE_DIR}"
     "${EIGEN_INCLUDE_DIR}"
 )

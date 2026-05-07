@@ -1,6 +1,6 @@
 # frames
 
-Part of the `liepp::lie` module (`lib/liepp-lie/`). Link with `liepp::lie` (or the convenience target `liepp::liepp`).
+Part of the `cartan::lie` module (`lib/cartan-lie/`). Link with `cartan::lie` (or the convenience target `cartan::cartan`).
 
 Compile-time frame-tagged wrappers for rotations, transforms, twists, and wrenches. The `From` and `To` template parameters enforce correct frame composition at compile time. Zero runtime overhead: aggregate structs forwarding to their inner Lie group value.
 
@@ -10,11 +10,11 @@ See [Frame Tags Design](../background/frame-tags.md)
 
 | Form | Header |
 |------|--------|
-| All frame types | `#include <liepp/frames/frames.h>` |
-| `liepp::rotation<From, To>` | `#include <liepp/frames/rotation.h>` |
-| `liepp::transform<From, To>` | `#include <liepp/frames/transform.h>` |
-| `liepp::framed_twist<Frame>` | `#include <liepp/frames/framed_twist.h>` |
-| `liepp::framed_wrench<Frame>` | `#include <liepp/frames/framed_wrench.h>` |
+| All frame types | `#include <cartan/frames/frames.h>` |
+| `cartan::rotation<From, To>` | `#include <cartan/frames/rotation.h>` |
+| `cartan::transform<From, To>` | `#include <cartan/frames/transform.h>` |
+| `cartan::framed_twist<Frame>` | `#include <cartan/frames/framed_twist.h>` |
+| `cartan::framed_wrench<Frame>` | `#include <cartan/frames/framed_wrench.h>` |
 
 ## rotation
 

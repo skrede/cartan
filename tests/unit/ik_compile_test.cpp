@@ -1,9 +1,9 @@
-#include <liepp/ik/lm_solve_policy.h>
-#include <liepp/ik/dls_solve_policy.h>
+#include <cartan/serial/ik/solver/lm.h>
+#include <cartan/serial/ik/solver/dls.h>
 
 #include <catch2/catch_test_macros.hpp>
 
-namespace spp = liepp;
+namespace spp = cartan;
 
 TEST_CASE("IK types compile", "[ik][compile]")
 {

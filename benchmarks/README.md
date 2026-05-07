@@ -1,6 +1,6 @@
-# liepp benchmarks
+# Cartan benchmarks
 
-Standalone benchmark suite for liepp Lie group operations, forward kinematics, Jacobians, and inverse kinematics solvers. Includes direct comparison against TRAC-IK.
+Standalone benchmark suite for Cartan Lie group operations, forward kinematics, Jacobians, and inverse kinematics solvers. Includes direct comparison against TRAC-IK.
 
 ## Prerequisites
 
@@ -23,8 +23,8 @@ From the repository root:
 
 ```bash
 cmake --preset=dev \
-    -DLIEPP_BUILD_BENCHMARKS=ON \
-    -DLIEPP_CMAKE_FETCH_DEPS=ON
+    -DCARTAN_BUILD_BENCHMARKS=ON \
+    -DCARTAN_CMAKE_FETCH_DEPS=ON
 
 cmake --build --preset=dev
 ```
@@ -35,9 +35,9 @@ To also build SQP benchmarks (requires NLopt):
 
 ```bash
 cmake --preset=dev \
-    -DLIEPP_BUILD_BENCHMARKS=ON \
-    -DLIEPP_BUILD_NLOPT=ON \
-    -DLIEPP_CMAKE_FETCH_DEPS=ON
+    -DCARTAN_BUILD_BENCHMARKS=ON \
+    -DCARTAN_BUILD_NLOPT=ON \
+    -DCARTAN_CMAKE_FETCH_DEPS=ON
 ```
 
 ## Running
@@ -102,7 +102,7 @@ This runs the full 10,000-iteration benchmark 10 times and reports mean, median,
 | `ik_sqp_benchmarks.cpp` | SQP stepper IK for 3/6/7-DOF (NLopt) | 3R, UR3e, LBR Med 14 |
 | `ik_racing_benchmarks.cpp` | Racing scheduler IK for 6/7-DOF | UR3e, LBR Med 14 |
 | `ik_fallback_benchmarks.cpp` | Fallback scheduler IK for 6/7-DOF | UR3e, LBR Med 14 |
-| `ik_comparison_benchmarks.cpp` | liepp vs TRAC-IK head-to-head | UR3e, KR6, IRB120, Jaco2, LBR Med 14, Panda, Fetch, Baxter, LWR 4+ |
+| `ik_comparison_benchmarks.cpp` | Cartan vs TRAC-IK head-to-head | UR3e, KR6, IRB120, Jaco2, LBR Med 14, Panda, Fetch, Baxter, LWR 4+ |
 | `benchmark_utils.h` | Shared chain factories (~10 robots), target generation | All |
 
 ## Methodology

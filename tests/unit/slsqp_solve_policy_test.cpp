@@ -1,26 +1,26 @@
-#ifdef LIEPP_HAS_NLOPT
+#ifdef CARTAN_HAS_NLOPT
 
-#include <liepp/ik/nlopt_slsqp_solve_policy.h>
-#include <liepp/ik/restart_solve_policy.h>
+#include <cartan/serial/ik/solver/nlopt_slsqp.h>
+#include <cartan/serial/ik/wrapper/restart_wrapper.h>
 
-#include <liepp/types.h>
+#include <cartan/types.h>
 
-#include <liepp/ik/ik_types.h>
+#include <cartan/serial/ik/ik_status.h>
 
-#include <liepp/lie/se3.h>
-#include <liepp/lie/so3.h>
-#include <liepp/chain/screw_axis.h>
-#include <liepp/chain/joint_state.h>
-#include <liepp/chain/joint_limits.h>
-#include <liepp/chain/kinematic_chain.h>
-#include <liepp/kinematics/forward_kinematics.h>
+#include <cartan/lie/se3.h>
+#include <cartan/lie/so3.h>
+#include <cartan/serial/chain/screw_axis.h>
+#include <cartan/serial/chain/joint_state.h>
+#include <cartan/serial/chain/joint_limits.h>
+#include <cartan/serial/chain/kinematic_chain.h>
+#include <cartan/serial/fk/forward_kinematics.h>
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
 #include <numbers>
 
-namespace spp = liepp;
+namespace spp = cartan;
 
 static spp::kinematic_chain<double, 6> make_ur5_like_chain()
 {
@@ -56,7 +56,7 @@ spp::ik_status run_stepper(
 
 TEST_CASE("nlopt_slsqp_solve_policy satisfies ik_solve_policy concept", "[ik][slsqp]")
 {
-    static_assert(spp::ik_solve_policy<spp::nlopt_slsqp_solve_policy<double, 6>>);
+    static_assert(spp::ik::solve_policy<spp::ik::nlopt_slsqp<spp::kinematic_chain<double, 6>>>);
     SUCCEED();
 }
 
@@ -77,7 +77,7 @@ TEST_CASE("nlopt_slsqp_solve_policy converges on UR5-like chain", "[ik][slsqp]")
     criteria.position_tol = 1e-4;
     criteria.orientation_tol = 1e-4;
 
-    spp::nlopt_slsqp_solve_policy<double, 6> stepper;
+    spp::ik::nlopt_slsqp<spp::kinematic_chain<double, 6>> stepper;
     stepper.setup(chain, target, q_seed, criteria);
 
     run_stepper(stepper, chain, 50);
@@ -103,8 +103,8 @@ TEST_CASE("nlopt_slsqp_solve_policy composes with restart_solve_policy", "[ik][s
     criteria.position_tol = 1e-4;
     criteria.orientation_tol = 1e-4;
 
-    using inner_t = spp::nlopt_slsqp_solve_policy<double, 6>;
-    using restart_t = spp::restart_solve_policy<double, 6, inner_t>;
+    using inner_t = spp::ik::nlopt_slsqp<spp::kinematic_chain<double, 6>>;
+    using restart_t = spp::ik::restart_wrapper<spp::kinematic_chain<double, 6>, inner_t>;
 
     restart_t stepper({.max_restarts = 10});
     stepper.setup(chain, target, q_seed, criteria);

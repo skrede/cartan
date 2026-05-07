@@ -53,7 +53,7 @@ Checks: >
 
 WarningsAsErrors: ''
 
-HeaderFilterRegex: 'liepp/.*'
+HeaderFilterRegex: 'cartan/.*'
 
 CheckOptions:
   - key: readability-identifier-naming.ClassCase

@@ -1,5 +1,5 @@
-if (LIEPP_BUILD_TESTS)
-    if (LIEPP_CMAKE_FETCH_DEPS)
+if (CARTAN_BUILD_TESTS)
+    if (CARTAN_CMAKE_FETCH_DEPS)
         FetchContent_Declare(
             Catch2
             GIT_REPOSITORY https://github.com/catchorg/Catch2.git
@@ -12,7 +12,7 @@ if (LIEPP_BUILD_TESTS)
         find_package(Catch2 CONFIG REQUIRED)
     endif ()
 
-    if (LIEPP_BUILD_PROPERTY_TESTS)
+    if (CARTAN_BUILD_PROPERTY_TESTS)
         FetchContent_Declare(
             rapidcheck
             GIT_REPOSITORY https://github.com/emil-e/rapidcheck.git
@@ -24,19 +24,19 @@ if (LIEPP_BUILD_TESTS)
         add_subdirectory(${rapidcheck_SOURCE_DIR}/extras/catch ${rapidcheck_BINARY_DIR}/extras/catch)
     endif ()
 
-    if (LIEPP_BUILD_PROPERTY_TESTS)
+    if (CARTAN_BUILD_PROPERTY_TESTS)
         add_subdirectory(property)
     endif ()
 
     add_subdirectory(unit)
     add_subdirectory(compile)
 
-    if (NOT LIEPP_CMAKE_FETCH_DEPS)
+    if (NOT CARTAN_CMAKE_FETCH_DEPS)
         add_subdirectory(integration)
     endif ()
 endif ()
 
-if (LIEPP_BUILD_FUZZ_TESTS)
+if (CARTAN_BUILD_FUZZ_TESTS)
     if (NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
         message(FATAL_ERROR "Fuzz targets require Clang with libFuzzer support")
     endif ()

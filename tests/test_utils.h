@@ -10,18 +10,18 @@
 /// All numeric literals use Scalar(...) casts to avoid implicit narrowing.
 /// All geometries expressed as Product of Exponentials screw parameters.
 
-#include <liepp/types.h>
+#include <cartan/types.h>
 
-#include <liepp/lie/se3.h>
-#include <liepp/lie/so3.h>
-#include <liepp/chain/screw_axis.h>
-#include <liepp/chain/joint_limits.h>
-#include <liepp/chain/kinematic_chain.h>
+#include <cartan/lie/se3.h>
+#include <cartan/lie/so3.h>
+#include <cartan/serial/chain/screw_axis.h>
+#include <cartan/serial/chain/joint_limits.h>
+#include <cartan/serial/chain/kinematic_chain.h>
 
 #include <limits>
 #include <numbers>
 
-namespace liepp::test
+namespace cartan::test
 {
 
 // ---------------------------------------------------------------------------
@@ -43,39 +43,39 @@ inline constexpr Scalar test_eps = std::numeric_limits<Scalar>::epsilon();
 /// Joint axis pattern: alternating z/y for 7-DOF LBR.
 /// Reference: Lynch & Park, Modern Robotics, Ch. 4 (PoE form).
 template <typename Scalar>
-auto make_lbr_iiwa_chain() -> liepp::kinematic_chain<Scalar, 7>
+auto make_lbr_iiwa_chain() -> cartan::kinematic_chain<Scalar, 7>
 {
-    using vec3 = liepp::vector3<Scalar>;
+    using vec3 = cartan::vector3<Scalar>;
 
-    auto s1 = liepp::screw_axis<Scalar>::revolute(
+    auto s1 = cartan::screw_axis<Scalar>::revolute(
         vec3(Scalar(0), Scalar(0), Scalar(1)),
         vec3(Scalar(0), Scalar(0), Scalar(0)));
-    auto s2 = liepp::screw_axis<Scalar>::revolute(
+    auto s2 = cartan::screw_axis<Scalar>::revolute(
         vec3(Scalar(0), Scalar(1), Scalar(0)),
         vec3(Scalar(0), Scalar(0), Scalar(0.360)));
-    auto s3 = liepp::screw_axis<Scalar>::revolute(
+    auto s3 = cartan::screw_axis<Scalar>::revolute(
         vec3(Scalar(0), Scalar(0), Scalar(1)),
         vec3(Scalar(0), Scalar(0), Scalar(0.360)));
-    auto s4 = liepp::screw_axis<Scalar>::revolute(
+    auto s4 = cartan::screw_axis<Scalar>::revolute(
         vec3(Scalar(0), Scalar(-1), Scalar(0)),
         vec3(Scalar(0), Scalar(0), Scalar(0.780)));
-    auto s5 = liepp::screw_axis<Scalar>::revolute(
+    auto s5 = cartan::screw_axis<Scalar>::revolute(
         vec3(Scalar(0), Scalar(0), Scalar(1)),
         vec3(Scalar(0), Scalar(0), Scalar(0.780)));
-    auto s6 = liepp::screw_axis<Scalar>::revolute(
+    auto s6 = cartan::screw_axis<Scalar>::revolute(
         vec3(Scalar(0), Scalar(1), Scalar(0)),
         vec3(Scalar(0), Scalar(0), Scalar(1.180)));
-    auto s7 = liepp::screw_axis<Scalar>::revolute(
+    auto s7 = cartan::screw_axis<Scalar>::revolute(
         vec3(Scalar(0), Scalar(0), Scalar(1)),
         vec3(Scalar(0), Scalar(0), Scalar(1.180)));
 
     vec3 home_trans(Scalar(0), Scalar(0), Scalar(1.306));
-    auto home = liepp::se3<Scalar>(liepp::so3<Scalar>::identity(), home_trans);
+    auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::identity(), home_trans);
 
-    liepp::joint_limits<Scalar> lim{
+    cartan::joint_limits<Scalar> lim{
         -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
 
-    return liepp::kinematic_chain<Scalar, 7>(
+    return cartan::kinematic_chain<Scalar, 7>(
         home,
         {s1, s2, s3, s4, s5, s6, s7},
         {lim, lim, lim, lim, lim, lim, lim});
@@ -86,26 +86,26 @@ auto make_lbr_iiwa_chain() -> liepp::kinematic_chain<Scalar, 7>
 /// At zero config the arm is extended vertically.
 /// Reference: UR official DH parameters page.
 template <typename Scalar>
-auto make_ur3e_chain() -> liepp::kinematic_chain<Scalar, 6>
+auto make_ur3e_chain() -> cartan::kinematic_chain<Scalar, 6>
 {
-    using vec3 = liepp::vector3<Scalar>;
+    using vec3 = cartan::vector3<Scalar>;
 
-    auto s1 = liepp::screw_axis<Scalar>::revolute(
+    auto s1 = cartan::screw_axis<Scalar>::revolute(
         vec3(Scalar(0), Scalar(0), Scalar(1)),
         vec3(Scalar(0), Scalar(0), Scalar(0)));
-    auto s2 = liepp::screw_axis<Scalar>::revolute(
+    auto s2 = cartan::screw_axis<Scalar>::revolute(
         vec3(Scalar(0), Scalar(1), Scalar(0)),
         vec3(Scalar(0), Scalar(0), Scalar(0.15185)));
-    auto s3 = liepp::screw_axis<Scalar>::revolute(
+    auto s3 = cartan::screw_axis<Scalar>::revolute(
         vec3(Scalar(0), Scalar(1), Scalar(0)),
         vec3(Scalar(-0.24355), Scalar(0), Scalar(0.15185)));
-    auto s4 = liepp::screw_axis<Scalar>::revolute(
+    auto s4 = cartan::screw_axis<Scalar>::revolute(
         vec3(Scalar(0), Scalar(1), Scalar(0)),
         vec3(Scalar(-0.45675), Scalar(0), Scalar(0.15185)));
-    auto s5 = liepp::screw_axis<Scalar>::revolute(
+    auto s5 = cartan::screw_axis<Scalar>::revolute(
         vec3(Scalar(0), Scalar(0), Scalar(-1)),
         vec3(Scalar(-0.45675), Scalar(0.13105), Scalar(0)));
-    auto s6 = liepp::screw_axis<Scalar>::revolute(
+    auto s6 = cartan::screw_axis<Scalar>::revolute(
         vec3(Scalar(0), Scalar(1), Scalar(0)),
         vec3(Scalar(-0.45675), Scalar(0), Scalar(-0.08535)));
 
@@ -118,12 +118,12 @@ auto make_ur3e_chain() -> liepp::kinematic_chain<Scalar, 6>
     // accumulated alpha rotations: R = Rx(pi/2)*Rx(pi/2)*Rx(-pi/2) = Rx(pi/2)
     // For sweep testing purposes, we use identity rotation and the computed position.
     vec3 home_trans(Scalar(-0.45675), Scalar(0.22315), Scalar(0.0665));
-    auto home = liepp::se3<Scalar>(liepp::so3<Scalar>::identity(), home_trans);
+    auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::identity(), home_trans);
 
-    liepp::joint_limits<Scalar> lim{
+    cartan::joint_limits<Scalar> lim{
         -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
 
-    return liepp::kinematic_chain<Scalar, 6>(
+    return cartan::kinematic_chain<Scalar, 6>(
         home,
         {s1, s2, s3, s4, s5, s6},
         {lim, lim, lim, lim, lim, lim});
@@ -134,9 +134,9 @@ auto make_ur3e_chain() -> liepp::kinematic_chain<Scalar, 6>
 /// Zero configuration is forward-pointing (arm extended horizontally).
 /// Reference: KUKA KR 6 SIXX working envelope drawing.
 template <typename Scalar>
-auto make_kr6_sixx_chain() -> liepp::kinematic_chain<Scalar, 6>
+auto make_kr6_sixx_chain() -> cartan::kinematic_chain<Scalar, 6>
 {
-    using vec3 = liepp::vector3<Scalar>;
+    using vec3 = cartan::vector3<Scalar>;
 
     // At zero config (forward-pointing):
     // J1: base rotation about z
@@ -159,32 +159,32 @@ auto make_kr6_sixx_chain() -> liepp::kinematic_chain<Scalar, 6>
     //   J4-J5-J6 wrist center at (0.875, 0, 0.400)
     //   End-effector at (0.935, 0, 0.400)
 
-    auto s1 = liepp::screw_axis<Scalar>::revolute(
+    auto s1 = cartan::screw_axis<Scalar>::revolute(
         vec3(Scalar(0), Scalar(0), Scalar(1)),
         vec3(Scalar(0), Scalar(0), Scalar(0)));
-    auto s2 = liepp::screw_axis<Scalar>::revolute(
+    auto s2 = cartan::screw_axis<Scalar>::revolute(
         vec3(Scalar(0), Scalar(1), Scalar(0)),
         vec3(Scalar(0), Scalar(0), Scalar(0.400)));
-    auto s3 = liepp::screw_axis<Scalar>::revolute(
+    auto s3 = cartan::screw_axis<Scalar>::revolute(
         vec3(Scalar(0), Scalar(1), Scalar(0)),
         vec3(Scalar(0.455), Scalar(0), Scalar(0.400)));
-    auto s4 = liepp::screw_axis<Scalar>::revolute(
+    auto s4 = cartan::screw_axis<Scalar>::revolute(
         vec3(Scalar(1), Scalar(0), Scalar(0)),
         vec3(Scalar(0.875), Scalar(0), Scalar(0.400)));
-    auto s5 = liepp::screw_axis<Scalar>::revolute(
+    auto s5 = cartan::screw_axis<Scalar>::revolute(
         vec3(Scalar(0), Scalar(1), Scalar(0)),
         vec3(Scalar(0.875), Scalar(0), Scalar(0.400)));
-    auto s6 = liepp::screw_axis<Scalar>::revolute(
+    auto s6 = cartan::screw_axis<Scalar>::revolute(
         vec3(Scalar(1), Scalar(0), Scalar(0)),
         vec3(Scalar(0.935), Scalar(0), Scalar(0.400)));
 
     vec3 home_trans(Scalar(0.935), Scalar(0), Scalar(0.400));
-    auto home = liepp::se3<Scalar>(liepp::so3<Scalar>::identity(), home_trans);
+    auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::identity(), home_trans);
 
-    liepp::joint_limits<Scalar> lim{
+    cartan::joint_limits<Scalar> lim{
         -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
 
-    return liepp::kinematic_chain<Scalar, 6>(
+    return cartan::kinematic_chain<Scalar, 6>(
         home,
         {s1, s2, s3, s4, s5, s6},
         {lim, lim, lim, lim, lim, lim});
@@ -195,9 +195,9 @@ auto make_kr6_sixx_chain() -> liepp::kinematic_chain<Scalar, 6>
 /// Converted to PoE using Lynch & Park Ch. 4 methodology.
 /// Reference: Peter Corke, Robotics Toolbox; Lynch & Park, Modern Robotics.
 template <typename Scalar>
-auto make_puma560_5dof_chain() -> liepp::kinematic_chain<Scalar, 5>
+auto make_puma560_5dof_chain() -> cartan::kinematic_chain<Scalar, 5>
 {
-    using vec3 = liepp::vector3<Scalar>;
+    using vec3 = cartan::vector3<Scalar>;
 
     // PUMA 560 DH parameters (first 5 joints):
     //   J1: a=0,      d=0.6718, alpha=pi/2
@@ -216,30 +216,30 @@ auto make_puma560_5dof_chain() -> liepp::kinematic_chain<Scalar, 5>
     // J5: about y at (0.4521, 0.15005+0.4318, 0.6718) -- d4 along y
     //     = (0.4521, 0.58185, 0.6718)
 
-    auto s1 = liepp::screw_axis<Scalar>::revolute(
+    auto s1 = cartan::screw_axis<Scalar>::revolute(
         vec3(Scalar(0), Scalar(0), Scalar(1)),
         vec3(Scalar(0), Scalar(0), Scalar(0)));
-    auto s2 = liepp::screw_axis<Scalar>::revolute(
+    auto s2 = cartan::screw_axis<Scalar>::revolute(
         vec3(Scalar(0), Scalar(1), Scalar(0)),
         vec3(Scalar(0), Scalar(0), Scalar(0.6718)));
-    auto s3 = liepp::screw_axis<Scalar>::revolute(
+    auto s3 = cartan::screw_axis<Scalar>::revolute(
         vec3(Scalar(0), Scalar(1), Scalar(0)),
         vec3(Scalar(0.4318), Scalar(0), Scalar(0.6718)));
-    auto s4 = liepp::screw_axis<Scalar>::revolute(
+    auto s4 = cartan::screw_axis<Scalar>::revolute(
         vec3(Scalar(1), Scalar(0), Scalar(0)),
         vec3(Scalar(0.4521), Scalar(0.15005), Scalar(0.6718)));
-    auto s5 = liepp::screw_axis<Scalar>::revolute(
+    auto s5 = cartan::screw_axis<Scalar>::revolute(
         vec3(Scalar(0), Scalar(1), Scalar(0)),
         vec3(Scalar(0.4521), Scalar(0.58185), Scalar(0.6718)));
 
     // Home M at zero config: end-effector at accumulated position
     vec3 home_trans(Scalar(0.4521), Scalar(0.58185), Scalar(0.6718));
-    auto home = liepp::se3<Scalar>(liepp::so3<Scalar>::identity(), home_trans);
+    auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::identity(), home_trans);
 
-    liepp::joint_limits<Scalar> lim{
+    cartan::joint_limits<Scalar> lim{
         -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
 
-    return liepp::kinematic_chain<Scalar, 5>(
+    return cartan::kinematic_chain<Scalar, 5>(
         home,
         {s1, s2, s3, s4, s5},
         {lim, lim, lim, lim, lim});
@@ -248,30 +248,30 @@ auto make_puma560_5dof_chain() -> liepp::kinematic_chain<Scalar, 5>
 /// Spatial 4R chain (SCARA-like pattern, 4-DOF).
 /// Synthetic chain for DOF=4 sweep testing.
 template <typename Scalar>
-auto make_4r_spatial_chain() -> liepp::kinematic_chain<Scalar, 4>
+auto make_4r_spatial_chain() -> cartan::kinematic_chain<Scalar, 4>
 {
-    using vec3 = liepp::vector3<Scalar>;
+    using vec3 = cartan::vector3<Scalar>;
 
-    auto s1 = liepp::screw_axis<Scalar>::revolute(
+    auto s1 = cartan::screw_axis<Scalar>::revolute(
         vec3(Scalar(0), Scalar(0), Scalar(1)),
         vec3(Scalar(0), Scalar(0), Scalar(0)));
-    auto s2 = liepp::screw_axis<Scalar>::revolute(
+    auto s2 = cartan::screw_axis<Scalar>::revolute(
         vec3(Scalar(0), Scalar(1), Scalar(0)),
         vec3(Scalar(0), Scalar(0), Scalar(0.5)));
-    auto s3 = liepp::screw_axis<Scalar>::revolute(
+    auto s3 = cartan::screw_axis<Scalar>::revolute(
         vec3(Scalar(0), Scalar(1), Scalar(0)),
         vec3(Scalar(0.3), Scalar(0), Scalar(0.5)));
-    auto s4 = liepp::screw_axis<Scalar>::revolute(
+    auto s4 = cartan::screw_axis<Scalar>::revolute(
         vec3(Scalar(0), Scalar(0), Scalar(1)),
         vec3(Scalar(0.6), Scalar(0), Scalar(0.5)));
 
     vec3 home_trans(Scalar(0.8), Scalar(0), Scalar(0.5));
-    auto home = liepp::se3<Scalar>(liepp::so3<Scalar>::identity(), home_trans);
+    auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::identity(), home_trans);
 
-    liepp::joint_limits<Scalar> lim{
+    cartan::joint_limits<Scalar> lim{
         -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
 
-    return liepp::kinematic_chain<Scalar, 4>(
+    return cartan::kinematic_chain<Scalar, 4>(
         home,
         {s1, s2, s3, s4},
         {lim, lim, lim, lim});
@@ -281,27 +281,27 @@ auto make_4r_spatial_chain() -> liepp::kinematic_chain<Scalar, 4>
 /// Three revolute joints about z, unit link lengths.
 /// Classic textbook example.
 template <typename Scalar>
-auto make_3r_planar_chain() -> liepp::kinematic_chain<Scalar, 3>
+auto make_3r_planar_chain() -> cartan::kinematic_chain<Scalar, 3>
 {
-    using vec3 = liepp::vector3<Scalar>;
+    using vec3 = cartan::vector3<Scalar>;
 
-    auto s1 = liepp::screw_axis<Scalar>::revolute(
+    auto s1 = cartan::screw_axis<Scalar>::revolute(
         vec3(Scalar(0), Scalar(0), Scalar(1)),
         vec3(Scalar(0), Scalar(0), Scalar(0)));
-    auto s2 = liepp::screw_axis<Scalar>::revolute(
+    auto s2 = cartan::screw_axis<Scalar>::revolute(
         vec3(Scalar(0), Scalar(0), Scalar(1)),
         vec3(Scalar(1), Scalar(0), Scalar(0)));
-    auto s3 = liepp::screw_axis<Scalar>::revolute(
+    auto s3 = cartan::screw_axis<Scalar>::revolute(
         vec3(Scalar(0), Scalar(0), Scalar(1)),
         vec3(Scalar(2), Scalar(0), Scalar(0)));
 
     vec3 home_trans(Scalar(3), Scalar(0), Scalar(0));
-    auto home = liepp::se3<Scalar>(liepp::so3<Scalar>::identity(), home_trans);
+    auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::identity(), home_trans);
 
-    liepp::joint_limits<Scalar> lim{
+    cartan::joint_limits<Scalar> lim{
         -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
 
-    return liepp::kinematic_chain<Scalar, 3>(
+    return cartan::kinematic_chain<Scalar, 3>(
         home,
         {s1, s2, s3},
         {lim, lim, lim});
@@ -310,24 +310,24 @@ auto make_3r_planar_chain() -> liepp::kinematic_chain<Scalar, 3>
 /// Planar 2R chain (2-DOF).
 /// Two revolute joints about z, unit link lengths.
 template <typename Scalar>
-auto make_2r_planar_chain() -> liepp::kinematic_chain<Scalar, 2>
+auto make_2r_planar_chain() -> cartan::kinematic_chain<Scalar, 2>
 {
-    using vec3 = liepp::vector3<Scalar>;
+    using vec3 = cartan::vector3<Scalar>;
 
-    auto s1 = liepp::screw_axis<Scalar>::revolute(
+    auto s1 = cartan::screw_axis<Scalar>::revolute(
         vec3(Scalar(0), Scalar(0), Scalar(1)),
         vec3(Scalar(0), Scalar(0), Scalar(0)));
-    auto s2 = liepp::screw_axis<Scalar>::revolute(
+    auto s2 = cartan::screw_axis<Scalar>::revolute(
         vec3(Scalar(0), Scalar(0), Scalar(1)),
         vec3(Scalar(1), Scalar(0), Scalar(0)));
 
     vec3 home_trans(Scalar(2), Scalar(0), Scalar(0));
-    auto home = liepp::se3<Scalar>(liepp::so3<Scalar>::identity(), home_trans);
+    auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::identity(), home_trans);
 
-    liepp::joint_limits<Scalar> lim{
+    cartan::joint_limits<Scalar> lim{
         -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
 
-    return liepp::kinematic_chain<Scalar, 2>(
+    return cartan::kinematic_chain<Scalar, 2>(
         home,
         {s1, s2},
         {lim, lim});
@@ -336,24 +336,24 @@ auto make_2r_planar_chain() -> liepp::kinematic_chain<Scalar, 2>
 /// Single revolute joint (1-DOF).
 /// Revolute about z at origin, link along x.
 template <typename Scalar>
-auto make_1r_chain() -> liepp::kinematic_chain<Scalar, 1>
+auto make_1r_chain() -> cartan::kinematic_chain<Scalar, 1>
 {
-    using vec3 = liepp::vector3<Scalar>;
+    using vec3 = cartan::vector3<Scalar>;
 
-    auto s1 = liepp::screw_axis<Scalar>::revolute(
+    auto s1 = cartan::screw_axis<Scalar>::revolute(
         vec3(Scalar(0), Scalar(0), Scalar(1)),
         vec3(Scalar(0), Scalar(0), Scalar(0)));
 
     vec3 home_trans(Scalar(1), Scalar(0), Scalar(0));
-    auto home = liepp::se3<Scalar>(liepp::so3<Scalar>::identity(), home_trans);
+    auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::identity(), home_trans);
 
-    liepp::joint_limits<Scalar> lim{
+    cartan::joint_limits<Scalar> lim{
         -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
 
-    return liepp::kinematic_chain<Scalar, 1>(
+    return cartan::kinematic_chain<Scalar, 1>(
         home,
         {s1},
         {lim});
 }
 
-} // namespace liepp::test
+}

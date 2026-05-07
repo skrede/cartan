@@ -1,4 +1,4 @@
-#include <liepp/frames/rotation.h>
+#include <cartan/frames/rotation.h>
 
 struct A {};
 struct B {};
@@ -7,8 +7,8 @@ struct D {};
 
 int main()
 {
-    auto r1 = liepp::rotation<A, B, double>::identity();
-    auto r2 = liepp::rotation<C, D, double>::identity();
+    auto r1 = cartan::rotation<A, B, double>::identity();
+    auto r2 = cartan::rotation<C, D, double>::identity();
     auto r3 = r1 * r2;
     return 0;
 }

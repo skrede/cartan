@@ -9,8 +9,9 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-                "LIEPP_BUILD_TESTS": "ON",
-                "LIEPP_CMAKE_FETCH_DEPS": "ON"
+                "CARTAN_BUILD_TESTS": "ON",
+                "CARTAN_BUILD_ARGMIN": "ON",
+                "CARTAN_CMAKE_FETCH_DEPS": "ON"
             }
         },
         {
@@ -21,11 +22,12 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-                "LIEPP_BUILD_TESTS": "ON",
-                "LIEPP_BUILD_EXAMPLES": "ON",
-                "LIEPP_BUILD_FUZZ_TESTS": "ON",
-                "LIEPP_BUILD_PROPERTY_TESTS": "ON",
-                "LIEPP_CMAKE_FETCH_DEPS": "ON"
+                "CARTAN_BUILD_TESTS": "ON",
+                "CARTAN_BUILD_EXAMPLES": "ON",
+                "CARTAN_BUILD_FUZZ_TESTS": "ON",
+                "CARTAN_BUILD_PROPERTY_TESTS": "ON",
+                "CARTAN_BUILD_ARGMIN": "ON",
+                "CARTAN_CMAKE_FETCH_DEPS": "ON"
             }
         },
         {
@@ -35,7 +37,8 @@
             "binaryDir": "${sourceDir}/build/release",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
-                "LIEPP_CMAKE_FETCH_DEPS": "ON"
+                "CARTAN_BUILD_ARGMIN": "ON",
+                "CARTAN_CMAKE_FETCH_DEPS": "ON"
             }
         },
         {
@@ -46,8 +49,9 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
                 "CMAKE_CXX_FLAGS": "--coverage -fprofile-arcs -ftest-coverage",
-                "LIEPP_BUILD_TESTS": "ON",
-                "LIEPP_CMAKE_FETCH_DEPS": "ON"
+                "CARTAN_BUILD_TESTS": "ON",
+                "CARTAN_BUILD_ARGMIN": "ON",
+                "CARTAN_CMAKE_FETCH_DEPS": "ON"
             }
         },
         {
@@ -59,8 +63,9 @@
                 "CMAKE_BUILD_TYPE": "Debug",
                 "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer",
                 "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined",
-                "LIEPP_BUILD_TESTS": "ON",
-                "LIEPP_CMAKE_FETCH_DEPS": "ON"
+                "CARTAN_BUILD_TESTS": "ON",
+                "CARTAN_BUILD_ARGMIN": "ON",
+                "CARTAN_CMAKE_FETCH_DEPS": "ON"
             }
         },
         {
@@ -70,8 +75,26 @@
             "binaryDir": "${sourceDir}/build/bench",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
-                "LIEPP_BUILD_BENCHMARKS": "ON",
-                "LIEPP_CMAKE_FETCH_DEPS": "ON"
+                "CARTAN_BUILD_BENCHMARKS": "ON",
+                "CARTAN_BUILD_ARGMIN": "ON",
+                "CARTAN_CMAKE_FETCH_DEPS": "ON"
+            }
+        },
+        {
+            "name": "bench-profile",
+            "displayName": "Benchmarks (profiling-friendly: DWARF + frame pointers)",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/bench-profile",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_CXX_FLAGS": "-g -fno-omit-frame-pointer",
+                "CMAKE_C_FLAGS": "-g -fno-omit-frame-pointer",
+                "CARTAN_BUILD_BENCHMARKS": "ON",
+                "CARTAN_BUILD_TRAC_IK": "ON",
+                "CARTAN_BUILD_NLOPT": "ON",
+                "CARTAN_BUILD_PROFILING": "ON",
+                "CARTAN_BUILD_ARGMIN": "ON",
+                "CARTAN_CMAKE_FETCH_DEPS": "ON"
             }
         },
         {
@@ -81,8 +104,9 @@
             "binaryDir": "${sourceDir}/build/fuzz",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "LIEPP_BUILD_FUZZ_TESTS": "ON",
-                "LIEPP_CMAKE_FETCH_DEPS": "ON"
+                "CARTAN_BUILD_FUZZ_TESTS": "ON",
+                "CARTAN_BUILD_ARGMIN": "ON",
+                "CARTAN_CMAKE_FETCH_DEPS": "ON"
             }
         }
     ],
@@ -110,6 +134,10 @@
         {
             "name": "bench",
             "configurePreset": "bench"
+        },
+        {
+            "name": "bench-profile",
+            "configurePreset": "bench-profile"
         },
         {
             "name": "fuzz",

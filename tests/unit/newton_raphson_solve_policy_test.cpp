@@ -1,22 +1,22 @@
-#include <liepp/ik/newton_raphson_solve_policy.h>
-#include <liepp/ik/restart_solve_policy.h>
+#include <cartan/serial/ik/solver/newton_raphson.h>
+#include <cartan/serial/ik/wrapper/restart_wrapper.h>
 
-#include <liepp/types.h>
+#include <cartan/types.h>
 
-#include <liepp/lie/se3.h>
-#include <liepp/lie/so3.h>
-#include <liepp/chain/screw_axis.h>
-#include <liepp/chain/joint_state.h>
-#include <liepp/chain/joint_limits.h>
-#include <liepp/chain/kinematic_chain.h>
-#include <liepp/kinematics/forward_kinematics.h>
+#include <cartan/lie/se3.h>
+#include <cartan/lie/so3.h>
+#include <cartan/serial/chain/screw_axis.h>
+#include <cartan/serial/chain/joint_state.h>
+#include <cartan/serial/chain/joint_limits.h>
+#include <cartan/serial/chain/kinematic_chain.h>
+#include <cartan/serial/fk/forward_kinematics.h>
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
 #include <numbers>
 
-namespace spp = liepp;
+namespace spp = cartan;
 
 // ============================================================================
 // Helper: UR5-like 6R chain
@@ -64,7 +64,7 @@ spp::ik_status run_stepper(
 
 TEST_CASE("newton_raphson_solve_policy satisfies ik_solve_policy", "[ik][newton_raphson]")
 {
-    static_assert(spp::ik_solve_policy<spp::newton_raphson_solve_policy<double, 6>>);
+    static_assert(spp::ik::solve_policy<spp::ik::newton_raphson<spp::kinematic_chain<double, 6>>>);
 }
 
 // ============================================================================
@@ -81,7 +81,7 @@ TEST_CASE("newton_raphson_solve_policy converges on UR5", "[ik][newton_raphson]"
     auto fk_target = spp::forward_kinematics(chain, q_known);
     auto target = fk_target.end_effector;
 
-    spp::newton_raphson_solve_policy<double, 6> stepper;
+    spp::ik::newton_raphson<spp::kinematic_chain<double, 6>> stepper;
 
     // Seed nearby: perturb by 0.1 rad
     Eigen::Vector<double, 6> q0 = q_known;
@@ -116,8 +116,8 @@ TEST_CASE("newton_raphson_solve_policy composes with restart_solve_policy", "[ik
     auto fk_target = spp::forward_kinematics(chain, q_known);
     auto target = fk_target.end_effector;
 
-    using inner_type = spp::newton_raphson_solve_policy<double, 6>;
-    using restart_type = spp::restart_solve_policy<double, 6, inner_type>;
+    using inner_type = spp::ik::newton_raphson<spp::kinematic_chain<double, 6>>;
+    using restart_type = spp::ik::restart_wrapper<spp::kinematic_chain<double, 6>, inner_type>;
 
     restart_type::options opts;
     opts.max_restarts = 5;
@@ -150,11 +150,11 @@ TEST_CASE("newton_raphson_solve_policy handles singular configuration", "[ik][ne
     far_trans << 100.0, 100.0, 100.0;
     auto target = spp::se3<double>(spp::so3<double>::identity(), far_trans);
 
-    spp::newton_raphson_solve_policy<double, 6>::options opts;
+    spp::ik::newton_raphson<spp::kinematic_chain<double, 6>>::options opts;
     opts.divergence_factor = 2.0;
     opts.stall_window = 5;
     opts.stall_threshold = 1e-6;
-    spp::newton_raphson_solve_policy<double, 6> stepper(opts);
+    spp::ik::newton_raphson<spp::kinematic_chain<double, 6>> stepper(opts);
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;

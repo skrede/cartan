@@ -1,0 +1,211 @@
+#ifndef HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_ARGMIN_LM_H
+#define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_ARGMIN_LM_H
+
+/// @file argmin_lm.h
+/// @brief argmin-backed Levenberg-Marquardt IK solve policy (least-squares).
+///
+/// Wraps argmin's lm_policy using the least-squares problem adapter.
+/// The residual is the 6-element SE(3) body-frame error, and the Jacobian
+/// is the body Jacobian. LM is unconstrained; joint limits are enforced
+/// by clamping after each step (formulation A).
+///
+/// Reference: Nielsen (1999), Levenberg-Marquardt method.
+
+#include "cartan/serial/ik/ik_status.h"
+#include "cartan/serial/ik/policy/limits_policy.h"
+#include "cartan/serial/ik/concepts/solve_concept.h"
+#include "cartan/serial/ik/detail/convergence.h"
+#include "cartan/serial/ik/detail/stall_detection.h"
+#include "cartan/serial/ik/detail/limit_enforcement.h"
+#include "cartan/serial/ik/detail/argmin_least_squares_problem.h"
+
+#include "cartan/lie/se3.h"
+#include "cartan/serial/chain/joint_state.h"
+#include "cartan/serial/chain/chain_concept.h"
+#include "cartan/serial/fk/forward_kinematics.h"
+
+#include <argmin/solver/options.h>
+#include <argmin/solver/lm_policy.h>
+#include <argmin/solver/basic_solver.h>
+
+#include <Eigen/Core>
+
+#include <cmath>
+#include <limits>
+#include <optional>
+#include <vector>
+
+namespace cartan::ik
+{
+
+/// argmin-backed Levenberg-Marquardt solve policy for IK.
+///
+/// Uses argmin's LM solver with the least-squares adapter exposing
+/// the 6-element body-frame error as residuals and the body Jacobian.
+/// Joint limits are enforced via clamping after each step since LM
+/// is unconstrained.
+///
+/// This is the argmin-backed LM. The native cartan implementation
+/// is available as lm_solve_policy.
+template <chain Chain, typename LimitsPolicy = no_limits>
+class argmin_lm
+{
+public:
+    using chain_type = Chain;
+    using scalar_type = typename Chain::scalar_type;
+    static constexpr int joints = Chain::joints;
+    using limits_type = LimitsPolicy;
+
+    using position_type = typename joint_state<scalar_type, joints>::position_type;
+
+    static_assert(std::is_floating_point_v<scalar_type>, "argmin_lm requires a floating-point Scalar type");
+
+    struct options
+    {
+        int budget_per_step{50};
+        scalar_type stall_threshold{scalar_type(1e-10)};
+        scalar_type divergence_factor{scalar_type(10)};
+        int stall_window{5};
+    };
+
+    argmin_lm() = default;
+
+    explicit argmin_lm(const options& opts)
+        : m_options{opts}
+    {}
+
+    void setup(
+        const Chain& chain,
+        const se3<scalar_type>& target,
+        const position_type& q0,
+        const convergence_criteria<scalar_type>& criteria)
+    {
+        m_chain = &chain;
+        m_target = target;
+        m_criteria = criteria;
+        m_iterations = 0;
+        m_error_norm = std::numeric_limits<scalar_type>::max();
+        m_status = ik_status::running;
+        m_error_history.clear();
+
+        auto fk = forward_kinematics(chain, q0);
+        auto V_b = (target.inverse() * fk.end_effector).log();
+        m_initial_error = V_b.norm();
+
+        m_problem.emplace(chain, target);
+
+        int n = chain.num_joints();
+        Eigen::VectorXd x0(n);
+        for (int i = 0; i < n; ++i)
+        {
+            x0[i] = static_cast<double>(q0[i]);
+        }
+
+        argmin::solver_options<> nab_opts;
+        nab_opts.max_iterations = m_options.budget_per_step;
+        nab_opts.set_gradient_threshold(1e-14);
+        nab_opts.set_objective_threshold(1e-16);
+        nab_opts.set_step_threshold(1e-16);
+
+        m_solver.emplace(*m_problem, x0, nab_opts);
+    }
+
+    ik_status step(const Chain& chain)
+    {
+        if (m_status != ik_status::running)
+        {
+            return m_status;
+        }
+
+        m_chain = &chain;
+        ++m_iterations;
+
+        if (m_iterations >= m_criteria.max_iterations)
+        {
+            m_status = ik_status::iteration_limit;
+            return m_status;
+        }
+
+        auto result = m_solver->step_n(m_options.budget_per_step);
+
+        sync_solution_from_solver();
+
+        cartan::detail::enforce_limits<LimitsPolicy>(m_q, chain);
+
+        auto fk = forward_kinematics(chain, m_q);
+        auto V_b = (m_target.inverse() * fk.end_effector).log();
+        m_error_norm = V_b.norm();
+
+        if (cartan::detail::is_converged_unweighted(V_b, m_criteria))
+        {
+            m_status = ik_status::converged;
+            return m_status;
+        }
+
+        auto stall_result = cartan::detail::check_stall_divergence(
+            m_error_history, m_error_norm, m_initial_error,
+            m_options.stall_window, m_options.stall_threshold,
+            m_options.divergence_factor);
+        if (stall_result != ik_status::running)
+        {
+            m_status = stall_result;
+            return m_status;
+        }
+
+        if (result.status == argmin::solver_status::converged
+            || result.status == argmin::solver_status::ftol_reached
+            || result.status == argmin::solver_status::stalled
+            || result.status == argmin::solver_status::xtol_reached
+            || result.status == argmin::solver_status::roundoff_limited
+            || result.status == argmin::solver_status::objective_stalled
+            || result.status == argmin::solver_status::aborted)
+        {
+            m_status = ik_status::stalled;
+            return m_status;
+        }
+
+        return m_status;
+    }
+
+    [[nodiscard]] bool converged() const { return m_status == ik_status::converged; }
+    [[nodiscard]] const position_type& solution() const { return m_q; }
+    [[nodiscard]] scalar_type error_norm() const { return m_error_norm; }
+    [[nodiscard]] int iterations() const { return m_iterations; }
+    [[nodiscard]] ik_status status() const { return m_status; }
+    void abort() { m_status = ik_status::stalled; }
+
+private:
+    using argmin_solver = argmin::basic_solver<
+        argmin::lm_policy<joints>, joints, cartan::detail::argmin_ik_least_squares_problem<Chain>>;
+
+    void sync_solution_from_solver()
+    {
+        const auto& x = m_solver->state().x;
+        int n = m_chain->num_joints();
+        if constexpr (joints == dynamic)
+        {
+            m_q.resize(n);
+        }
+        for (int i = 0; i < n; ++i)
+        {
+            m_q[i] = static_cast<scalar_type>(x[i]);
+        }
+    }
+
+    const Chain* m_chain{nullptr};
+    se3<scalar_type> m_target{se3<scalar_type>::identity()};
+    convergence_criteria<scalar_type> m_criteria{};
+    options m_options{};
+    position_type m_q{};
+    std::vector<scalar_type> m_error_history;
+    scalar_type m_initial_error{};
+    scalar_type m_error_norm{std::numeric_limits<scalar_type>::max()};
+    int m_iterations{};
+    ik_status m_status{ik_status::running};
+    std::optional<cartan::detail::argmin_ik_least_squares_problem<Chain>> m_problem;
+    std::optional<argmin_solver> m_solver;
+};
+
+}
+
+#endif

@@ -8,7 +8,7 @@ application involving 3D orientation [1, Ch. 3, pp. 68--86].
 
 This page covers rotation representations, the Lie group structure, the
 exponential and logarithmic maps (including a full derivation of Rodrigues'
-formula), and the adjoint representation. All formulas match liepp's
+formula), and the adjoint representation. All formulas match Cartan's
 implementation.
 
 ## Rotation Matrices
@@ -62,7 +62,7 @@ This is a **minimal (3-parameter) representation**. Its norm encodes the angle
 **Singularity at identity:** When $\theta = 0$, the axis direction
 $\hat{\omega}$ is undefined (any axis gives the same identity rotation). This
 singularity is unavoidable for any 3-parameter rotation representation -- a
-topological consequence of SO(3) not being contractible. liepp handles the
+topological consequence of SO(3) not being contractible. Cartan handles the
 $\theta \approx 0$ case via Taylor series in both the exponential and
 logarithmic maps.
 
@@ -168,7 +168,7 @@ $$
 \exp([\phi]_\times) = I + \frac{\sin\theta}{\theta} [\phi]_\times + \frac{1 - \cos\theta}{\theta^2} [\phi]_\times^2
 $$
 
-This is the form implemented in liepp. The sinc-type coefficients
+This is the form implemented in Cartan. The sinc-type coefficients
 $\frac{\sin\theta}{\theta}$ and $\frac{1 - \cos\theta}{\theta^2}$ avoid the
 need to extract the unit axis explicitly.
 
@@ -186,12 +186,12 @@ $$
 \frac{1 - \cos\theta}{\theta^2} \approx \frac{1}{2} - \frac{\theta^2}{24} + \frac{\theta^4}{720}
 $$
 
-liepp switches to these Taylor branches when $\theta^2$ is below a
+Cartan switches to these Taylor branches when $\theta^2$ is below a
 scalar-dependent threshold (`detail::epsilon_v<Scalar>`).
 
 ### Quaternion Form
 
-liepp's SO(3) implementation uses unit quaternions internally. The exponential
+Cartan's SO(3) implementation uses unit quaternions internally. The exponential
 map in quaternion form is [2, Eq. 7.20, p. 230]:
 
 $$
@@ -222,16 +222,16 @@ $$
 **Singularities:**
 
 1. **$\theta = 0$ (identity):** The axis is undefined; $R - R^\top = 0$.
-   liepp returns $\phi = 0$ (the zero vector in the Lie algebra).
+   Cartan returns $\phi = 0$ (the zero vector in the Lie algebra).
 
 2. **$\theta = \pi$ (half-turn):** $\sin\theta = 0$, making the formula
    $\theta / (2\sin\theta)$ undefined. The axis must be recovered from the
    eigenvector of $R$ corresponding to eigenvalue $+1$. This is the most
    numerically delicate case.
 
-### Quaternion Form (liepp Implementation)
+### Quaternion Form (Cartan Implementation)
 
-liepp avoids the $\theta = \pi$ branch entirely by using the quaternion
+Cartan avoids the $\theta = \pi$ branch entirely by using the quaternion
 logarithm [2, Eq. 7.22, p. 231]:
 
 $$
@@ -247,7 +247,7 @@ $$
 The quaternion is first canonicalized to the $q_w \geq 0$ hemisphere (since
 $q$ and $-q$ represent the same rotation), and then the atan2-based formula
 handles all angles $\theta \in [0, \pi]$ without branching. This is the
-approach described in [2, Sec. 7.1.3, p. 284] and implemented in liepp's
+approach described in [2, Sec. 7.1.3, p. 284] and implemented in Cartan's
 `detail::so3_log_impl`.
 
 ## Adjoint Representation
@@ -332,7 +332,7 @@ These Jacobians appear in:
 
 ## Unit Quaternions
 
-liepp uses unit quaternions as the internal representation of SO(3) elements.
+Cartan uses unit quaternions as the internal representation of SO(3) elements.
 A unit quaternion $q = (q_w, q_x, q_y, q_z)$ with $\|q\| = 1$ provides a
 compact, singularity-free representation. Quaternions form a **double cover**
 of SO(3): both $q$ and $-q$ represent the same rotation
@@ -356,11 +356,11 @@ $$
 
 The inverse quaternion is the conjugate: $q^{-1} = (q_w, -q_{xyz})$.
 
-## liepp Mapping
+## Cartan Mapping
 
-| Math | liepp C++ | Notes |
+| Math | Cartan C++ | Notes |
 |------|-----------|-------|
-| $R \in \text{SO}(3)$ | `liepp::so3<Scalar>` | Internal: unit quaternion |
+| $R \in \text{SO}(3)$ | `cartan::so3<Scalar>` | Internal: unit quaternion |
 | $3 \times 3$ matrix | `so3<Scalar>::matrix()` | Returns `matrix3<Scalar>` |
 | Quaternion | `so3<Scalar>::quaternion_ref()` | Returns `const quaternion<Scalar>&` |
 | $\exp(\phi)$ | `so3<Scalar>::exp(phi)` | `vector3<Scalar>` $\to$ `so3` |

@@ -1,6 +1,6 @@
 # chain
 
-Part of the `liepp::kinematics` module (`lib/liepp-kinematics/`). Link with `liepp::kinematics` (or the convenience target `liepp::liepp`).
+Part of the `cartan::kinematics` module (`lib/cartan-kinematics/`). Link with `cartan::kinematics` (or the convenience target `cartan::cartan`).
 
 Kinematic chain representation using Product of Exponentials (PoE) formulation. Defines screw axes, joint limits, joint state, and the `kinematic_chain` container. Supports both compile-time fixed and runtime dynamic joint counts.
 
@@ -10,12 +10,12 @@ See [PoE Kinematics](../background/poe-kinematics.md)
 
 | Form | Header |
 |------|--------|
-| All chain types | `#include <liepp/chain/chain.h>` |
-| `liepp::kinematic_chain` | `#include <liepp/chain/kinematic_chain.h>` |
-| `liepp::screw_axis` | `#include <liepp/chain/screw_axis.h>` |
-| `liepp::joint_limits` | `#include <liepp/chain/joint_limits.h>` |
-| `liepp::joint_state` | `#include <liepp/chain/joint_state.h>` |
-| `liepp::dynamic`, `liepp::detail::storage_t` | `#include <liepp/chain/storage_trait.h>` |
+| All chain types | `#include <cartan/chain/chain.h>` |
+| `cartan::kinematic_chain` | `#include <cartan/chain/kinematic_chain.h>` |
+| `cartan::screw_axis` | `#include <cartan/chain/screw_axis.h>` |
+| `cartan::joint_limits` | `#include <cartan/chain/joint_limits.h>` |
+| `cartan::joint_state` | `#include <cartan/chain/joint_state.h>` |
+| `cartan::dynamic`, `cartan::detail::storage_t` | `#include <cartan/chain/storage_trait.h>` |
 
 ## screw_axis
 
@@ -106,7 +106,7 @@ Check whether a position value lies within `[position_min, position_max]`.
 
 ## joint_state
 
-Joint state holding position vector and optional velocity vector. Parameterized by scalar type and joint count `N` (fixed or `liepp::dynamic`).
+Joint state holding position vector and optional velocity vector. Parameterized by scalar type and joint count `N` (fixed or `cartan::dynamic`).
 
 ```cpp
 template <typename Scalar = double, int N = dynamic>
@@ -153,7 +153,7 @@ class kinematic_chain;
 | Parameter | Meaning |
 |-----------|---------|
 | `Scalar` | Floating-point type (`double` or `float`). |
-| `N` | Number of joints. Use a positive integer for compile-time fixed size, or `liepp::dynamic` (default) for runtime size. |
+| `N` | Number of joints. Use a positive integer for compile-time fixed size, or `cartan::dynamic` (default) for runtime size. |
 
 ### Constructor
 

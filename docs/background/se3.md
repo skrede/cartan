@@ -83,7 +83,7 @@ matrix and $v \in \mathbb{R}^3$.
 ### Twist Representation
 
 The Lie algebra element is compactly represented as a 6-vector called a
-**twist**. liepp uses **omega-first** ordering following Lynch and Park [1]:
+**twist**. Cartan uses **omega-first** ordering following Lynch and Park [1]:
 
 $$
 \mathcal{V} = \begin{pmatrix} \omega \\ v \end{pmatrix} \in \mathbb{R}^6
@@ -92,7 +92,7 @@ $$
 where $\omega \in \mathbb{R}^3$ is the angular velocity and
 $v \in \mathbb{R}^3$ is the linear velocity.
 
-> **Convention note:** liepp uses omega-first twist ordering
+> **Convention note:** Cartan uses omega-first twist ordering
 > $\mathcal{V} = (\omega, v)$. Barfoot [2] uses the opposite ordering
 > $\boldsymbol{\xi} = (\boldsymbol{\rho}, \boldsymbol{\phi})$ with
 > translation first. See [Notation Conventions](notation.md) for conversion
@@ -194,7 +194,7 @@ $$
 
 For an arbitrary twist $\mathcal{V} = (\omega, v)$ where $\phi = \omega$ is a
 general rotation vector with $\theta = \|\phi\|$, the formula generalizes.
-liepp's implementation uses the **left Jacobian** $J_l(\phi)$ of SO(3) as the
+Cartan's implementation uses the **left Jacobian** $J_l(\phi)$ of SO(3) as the
 coupling matrix [2, Eq. 8.33, p. 289]:
 
 $$
@@ -213,7 +213,7 @@ $$
 \exp\left(\begin{bmatrix} 0 & v \\ 0 & 0 \end{bmatrix}\right) = \begin{bmatrix} I & v \\ 0 & 1 \end{bmatrix}
 $$
 
-liepp handles this via the Taylor branch of $J_l$: $J_l(0) = I$.
+Cartan handles this via the Taylor branch of $J_l$: $J_l(0) = I$.
 
 ## Logarithmic Map
 
@@ -246,7 +246,7 @@ $$
 \boxed{\log(T) = \begin{pmatrix} \omega \\ J_l(\omega)^{-1} \, p \end{pmatrix}}
 $$
 
-This is precisely liepp's `se3::log()` implementation: compute $\omega$ from
+This is precisely Cartan's `se3::log()` implementation: compute $\omega$ from
 the rotation quaternion, then multiply $p$ by the inverse left Jacobian.
 
 ## Adjoint Representation
@@ -358,16 +358,16 @@ where $M$ is the end-effector pose at the home (zero-angle) configuration.
 Each factor $e^{[\mathcal{S}_i]\theta_i}$ is computed via the SE(3) exponential
 map derived above.
 
-This formula is the basis for liepp's `forward_kinematics()`, `space_jacobian()`,
+This formula is the basis for Cartan's `forward_kinematics()`, `space_jacobian()`,
 and `body_jacobian()` implementations. See the
 [Kinematics background page](../background/) and
 [API Reference](../api/kinematics.md) for details.
 
-## liepp Mapping
+## Cartan Mapping
 
-| Math | liepp C++ | Notes |
+| Math | Cartan C++ | Notes |
 |------|-----------|-------|
-| $T \in \text{SE}(3)$ | `liepp::se3<Scalar>` | Internal: `so3` + `vector3` |
+| $T \in \text{SE}(3)$ | `cartan::se3<Scalar>` | Internal: `so3` + `vector3` |
 | $4 \times 4$ matrix | `se3<Scalar>::matrix()` | Returns `matrix4<Scalar>` |
 | $\exp(\mathcal{V})$ | `se3<Scalar>::exp(V)` | `vector6<Scalar>` omega-first |
 | $\log(T)$ | `se3<Scalar>::log()` | Returns `vector6<Scalar>` |
@@ -377,8 +377,8 @@ and `body_jacobian()` implementations. See the
 | $[\text{Ad}_T]$ | `t.adjoint()` | Returns `matrix6<Scalar>` (6x6) |
 | $[\text{Ad}_T]^{-\top}$ | `t.coadjoint()` | Via `inverse().adjoint().transpose()` |
 | $T \cdot q$ | `t.act(q)` | Transforms `vector3<Scalar>` |
-| Hat map ($\mathbb{R}^6 \to 4\times4$) | `liepp::hat(V)` | `vector6` $\to$ `matrix4` |
-| Vee map ($4\times4 \to \mathbb{R}^6$) | `liepp::vee(M)` | `matrix4` $\to$ `vector6` |
+| Hat map ($\mathbb{R}^6 \to 4\times4$) | `cartan::hat(V)` | `vector6` $\to$ `matrix4` |
+| Vee map ($4\times4 \to \mathbb{R}^6$) | `cartan::vee(M)` | `matrix4` $\to$ `vector6` |
 | Screw params | `to_screw_params(omega, v)` | Returns `screw_params<Scalar>` |
 
 See [API Reference](../api/lie.md#se3) for complete method signatures and edge

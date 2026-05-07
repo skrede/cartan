@@ -7,7 +7,7 @@ secondary objectives (such as joint limit avoidance) to be optimized without
 affecting the primary IK task [1, Ch. 6, pp. 235--237].
 
 This page derives the null-space projector, the combined update step for
-joint limit avoidance, and maps to liepp's limits policies.
+joint limit avoidance, and maps to Cartan's limits policies.
 
 ## Null Space of the Jacobian
 
@@ -122,9 +122,9 @@ that only the component of $\nabla h$ that has zero effect on the end-effector
 is used. This is the fundamental insight: the null space decouples task-space
 control from configuration-space optimization.
 
-## liepp's Limits Policies
+## Cartan's Limits Policies
 
-liepp implements joint limit enforcement through **policy-based design**. Three
+Cartan implements joint limit enforcement through **policy-based design**. Three
 policies are provided, selectable at compile time:
 
 ### `no_limits`

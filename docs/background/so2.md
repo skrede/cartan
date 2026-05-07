@@ -162,14 +162,14 @@ $\text{Ad}_R = 1$ (the identity on the 1-dimensional Lie algebra). This
 reflects the commutativity of SO(2) -- conjugation by any rotation leaves
 angular velocities unchanged.
 
-## liepp Mapping
+## Cartan Mapping
 
-The following table maps the mathematical objects to their liepp C++
+The following table maps the mathematical objects to their Cartan C++
 implementations:
 
-| Math | liepp C++ | Notes |
+| Math | Cartan C++ | Notes |
 |------|-----------|-------|
-| $R \in \text{SO}(2)$ | `liepp::so2<Scalar>` | Internal: $(c, s)$ pair |
+| $R \in \text{SO}(2)$ | `cartan::so2<Scalar>` | Internal: $(c, s)$ pair |
 | $R(\theta)$ | `so2<Scalar>::matrix()` | Returns `matrix2<Scalar>` |
 | $\exp(\theta)$ | `so2<Scalar>::exp(theta)` | Scalar $\to$ `so2` |
 | $\log(R)$ | `so2<Scalar>::log()` | Returns `Scalar` |

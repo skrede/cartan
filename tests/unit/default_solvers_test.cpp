@@ -1,44 +1,32 @@
-#include <liepp/ik/ik_types.h>
-#include <liepp/ik/limits_policy.h>
-#include <liepp/ik/basic_ik_solver.h>
-#include <liepp/ik/ik_solve_policy.h>
-#include <liepp/ik/lbfgsb_solve_policy.h>
-#include <liepp/ik/restart_solve_policy.h>
-#include <liepp/ik/projected_lm_solve_policy.h>
+#include <cartan/serial/ik/ik_status.h>
+#include <cartan/serial/ik/policy/limits_policy.h>
+#include <cartan/serial/ik/basic_ik_runner.h>
+#include <cartan/serial/ik/solvers.h>
+#include <cartan/serial/ik/concepts/solve_concept.h>
+#include <cartan/serial/ik/solver/lbfgsb.h>
+#include <cartan/serial/ik/wrapper/restart_wrapper.h>
+#include <cartan/serial/ik/solver/projected_lm.h>
 
-#include <liepp/types.h>
+#include <cartan/types.h>
 
-#include <liepp/lie/se3.h>
-#include <liepp/lie/so3.h>
+#include <cartan/lie/se3.h>
+#include <cartan/lie/so3.h>
 
-#include <liepp/chain/screw_axis.h>
-#include <liepp/chain/joint_state.h>
-#include <liepp/chain/joint_limits.h>
-#include <liepp/chain/kinematic_chain.h>
+#include <cartan/serial/chain/screw_axis.h>
+#include <cartan/serial/chain/joint_state.h>
+#include <cartan/serial/chain/joint_limits.h>
+#include <cartan/serial/chain/kinematic_chain.h>
 
-#include <liepp/kinematics/forward_kinematics.h>
+#include <cartan/serial/fk/forward_kinematics.h>
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
 #include <numbers>
 
-namespace spp = liepp;
+namespace spp = cartan;
 
-// Local aliases matching default_solvers.h definitions. Once Plan 02 updates
-// default_solvers.h to remove dual_racing_scheduler, these can revert to
-// #include <liepp/ik/default_solvers.h> with spp:: prefixed aliases.
-template <typename Scalar = double, int N = spp::dynamic>
-using speed_solver = spp::restart_solve_policy<Scalar, N,
-    spp::projected_lm_solve_policy<Scalar, N, spp::no_limits>, spp::no_limits>;
-
-template <typename Scalar = double, int N = spp::dynamic>
-using convergence_solver = spp::restart_solve_policy<Scalar, N,
-    spp::lbfgsb_solve_policy<Scalar, N, spp::no_limits>, spp::no_limits>;
-
-template <typename Scalar = double, int N = spp::dynamic>
-using default_solver = spp::basic_ik_solver<
-    speed_solver<Scalar, N>, convergence_solver<Scalar, N>>;
+// Chain-parameterized aliases from default_solvers.h require using spp:: prefix directly.
 
 // ============================================================================
 // Helper: UR5-like 6R chain
@@ -85,7 +73,7 @@ TEST_CASE("speed_solver compiles and converges", "[ik][default_solvers]")
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
     auto target = reachable_target(chain, q_known);
 
-    spp::basic_ik_solver solver{speed_solver<double, 6>{}};
+    spp::basic_ik_runner solver{spp::speed_ik_runner<spp::kinematic_chain<double, 6>>{}};
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
@@ -113,7 +101,7 @@ TEST_CASE("convergence_solver compiles and converges", "[ik][default_solvers]")
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
     auto target = reachable_target(chain, q_known);
 
-    spp::basic_ik_solver solver{convergence_solver<double, 6>{}};
+    spp::basic_ik_runner solver{spp::robust_ik_runner<spp::kinematic_chain<double, 6>>{}};
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
@@ -141,7 +129,7 @@ TEST_CASE("default_solver compiles and converges", "[ik][default_solvers]")
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
     auto target = reachable_target(chain, q_known);
 
-    default_solver<double, 6> solver;
+    spp::dual_ik_runner<spp::kinematic_chain<double, 6>> solver;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations = 200;
@@ -162,12 +150,12 @@ TEST_CASE("default_solver compiles and converges", "[ik][default_solvers]")
 
 TEST_CASE("speed_solver satisfies ik_solve_policy concept", "[ik][default_solvers]")
 {
-    static_assert(spp::ik_solve_policy<speed_solver<double, 6>>);
+    static_assert(spp::ik::solve_policy<spp::speed_ik_runner<spp::kinematic_chain<double, 6>>>);
 }
 
 TEST_CASE("convergence_solver satisfies ik_solve_policy concept", "[ik][default_solvers]")
 {
-    static_assert(spp::ik_solve_policy<convergence_solver<double, 6>>);
+    static_assert(spp::ik::solve_policy<spp::robust_ik_runner<spp::kinematic_chain<double, 6>>>);
 }
 
 // ============================================================================
@@ -182,7 +170,7 @@ TEST_CASE("default_solver converges on harder target", "[ik][default_solvers]")
     q_known << 2.5, -1.8, 1.2, -2.0, 1.5, -1.0;
     auto target = reachable_target(chain, q_known);
 
-    default_solver<double, 6> solver;
+    spp::dual_ik_runner<spp::kinematic_chain<double, 6>> solver;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations = 300;

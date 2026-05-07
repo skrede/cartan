@@ -1,6 +1,6 @@
 # kinematics
 
-Part of the `liepp::kinematics` module (`lib/liepp-kinematics/`). Link with `liepp::kinematics` (or the convenience target `liepp::liepp`).
+Part of the `cartan::kinematics` module (`lib/cartan-kinematics/`). Link with `cartan::kinematics` (or the convenience target `cartan::cartan`).
 
 Forward kinematics and Jacobian computation using Product of Exponentials formulation. All functions accept a `kinematic_chain` and reuse cached intermediate products from `fk_result` to avoid redundant `exp()` calls.
 
@@ -10,11 +10,11 @@ See [PoE Kinematics](../background/poe-kinematics.md) | [Jacobians](../backgroun
 
 | Form | Header |
 |------|--------|
-| All kinematics | `#include <liepp/kinematics/kinematics.h>` |
-| `liepp::forward_kinematics` | `#include <liepp/kinematics/forward_kinematics.h>` |
-| `liepp::space_jacobian`, `liepp::body_jacobian` | `#include <liepp/kinematics/jacobian.h>` |
-| `liepp::end_effector_velocity` | `#include <liepp/kinematics/velocity.h>` |
-| `liepp::fk_result` | `#include <liepp/kinematics/fk_result.h>` |
+| All kinematics | `#include <cartan/kinematics/kinematics.h>` |
+| `cartan::forward_kinematics` | `#include <cartan/kinematics/forward_kinematics.h>` |
+| `cartan::space_jacobian`, `cartan::body_jacobian` | `#include <cartan/kinematics/jacobian.h>` |
+| `cartan::end_effector_velocity` | `#include <cartan/kinematics/velocity.h>` |
+| `cartan::fk_result` | `#include <cartan/kinematics/fk_result.h>` |
 
 ## fk_result
 

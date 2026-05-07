@@ -1,22 +1,22 @@
-#include <liepp/ik/ik_types.h>
-#include <liepp/ik/limits_policy.h>
-#include <liepp/ik/basic_ik_solver.h>
-#include <liepp/ik/default_solvers.h>
-#include <liepp/ik/lbfgsb_solve_policy.h>
-#include <liepp/ik/restart_solve_policy.h>
-#include <liepp/ik/projected_lm_solve_policy.h>
+#include <cartan/serial/ik/ik_status.h>
+#include <cartan/serial/ik/policy/limits_policy.h>
+#include <cartan/serial/ik/basic_ik_runner.h>
+#include <cartan/serial/ik/solvers.h>
+#include <cartan/serial/ik/solver/lbfgsb.h>
+#include <cartan/serial/ik/wrapper/restart_wrapper.h>
+#include <cartan/serial/ik/solver/projected_lm.h>
 
-#include <liepp/types.h>
+#include <cartan/types.h>
 
-#include <liepp/lie/se3.h>
-#include <liepp/lie/so3.h>
+#include <cartan/lie/se3.h>
+#include <cartan/lie/so3.h>
 
-#include <liepp/chain/screw_axis.h>
-#include <liepp/chain/joint_state.h>
-#include <liepp/chain/joint_limits.h>
-#include <liepp/chain/kinematic_chain.h>
+#include <cartan/serial/chain/screw_axis.h>
+#include <cartan/serial/chain/joint_state.h>
+#include <cartan/serial/chain/joint_limits.h>
+#include <cartan/serial/chain/kinematic_chain.h>
 
-#include <liepp/kinematics/forward_kinematics.h>
+#include <cartan/serial/fk/forward_kinematics.h>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -24,7 +24,7 @@
 #include <concepts>
 #include <numbers>
 
-namespace spp = liepp;
+namespace spp = cartan;
 
 // ============================================================================
 // Helper: UR5-like 6R chain
@@ -71,7 +71,7 @@ TEST_CASE("make_speed_solver().build() compiles and converges", "[ik][solver_fac
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
     auto target = reachable_target(chain, q_known);
 
-    auto solver = spp::make_speed_solver<double, 6>().build();
+    auto solver = spp::make_speed_ik_runner<spp::kinematic_chain<double, 6>>().build();
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria{1e-6, 1e-6, 200};
@@ -98,7 +98,7 @@ TEST_CASE("make_convergence_solver().build() compiles and converges", "[ik][solv
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
     auto target = reachable_target(chain, q_known);
 
-    auto solver = spp::make_convergence_solver<double, 6>().build();
+    auto solver = spp::make_robust_ik_runner<spp::kinematic_chain<double, 6>>().build();
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria{1e-6, 1e-6, 200};
@@ -125,7 +125,7 @@ TEST_CASE("make_default_solver().build() compiles and converges", "[ik][solver_f
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
     auto target = reachable_target(chain, q_known);
 
-    auto solver = spp::make_default_solver<double, 6>().build();
+    auto solver = spp::make_dual_ik_runner<spp::kinematic_chain<double, 6>>().build();
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria{1e-6, 1e-6, 200};
@@ -152,8 +152,8 @@ TEST_CASE("make_solver builder constructs single-policy solver", "[ik][solver_fa
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
     auto target = reachable_target(chain, q_known);
 
-    auto solver = spp::make_solver<double, 6>()
-        .policy(spp::speed_solver<double, 6>{})
+    auto solver = spp::make_solver<spp::kinematic_chain<double, 6>>()
+        .policy(spp::speed_ik_runner<spp::kinematic_chain<double, 6>>{})
         .build();
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
@@ -181,9 +181,9 @@ TEST_CASE("make_solver builder constructs two-policy solver", "[ik][solver_facto
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
     auto target = reachable_target(chain, q_known);
 
-    auto solver = spp::make_solver<double, 6>()
-        .policy(spp::speed_solver<double, 6>{})
-        .policy(spp::convergence_solver<double, 6>{})
+    auto solver = spp::make_solver<spp::kinematic_chain<double, 6>>()
+        .policy(spp::speed_ik_runner<spp::kinematic_chain<double, 6>>{})
+        .policy(spp::robust_ik_runner<spp::kinematic_chain<double, 6>>{})
         .build();
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
@@ -206,8 +206,8 @@ TEST_CASE("make_solver builder constructs two-policy solver", "[ik][solver_facto
 TEST_CASE("default_solver alias matches make_default_solver().build() type", "[ik][solver_factory]")
 {
     static_assert(std::same_as<
-        spp::default_solver<double, 6>,
-        decltype(spp::make_default_solver<double, 6>().build())>);
+        spp::dual_ik_runner<spp::kinematic_chain<double, 6>>,
+        decltype(spp::make_dual_ik_runner<spp::kinematic_chain<double, 6>>().build())>);
 }
 
 // ============================================================================
@@ -217,6 +217,6 @@ TEST_CASE("default_solver alias matches make_default_solver().build() type", "[i
 TEST_CASE("preset builders are not solvers -- .build() required", "[ik][solver_factory]")
 {
     static_assert(!std::same_as<
-        decltype(spp::make_speed_solver<double, 6>()),
-        spp::basic_ik_solver<spp::speed_solver<double, 6>>>);
+        decltype(spp::make_speed_ik_runner<spp::kinematic_chain<double, 6>>()),
+        spp::basic_ik_runner<spp::speed_ik_runner<spp::kinematic_chain<double, 6>>>>);
 }

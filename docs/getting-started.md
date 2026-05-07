@@ -13,23 +13,23 @@
 ```cmake
 include(FetchContent)
 FetchContent_Declare(
-    liepp
-    GIT_REPOSITORY https://github.com/skrede/liepp.git
+    cartan
+    GIT_REPOSITORY https://github.com/skrede/cartan.git
     GIT_TAG        main
 )
-FetchContent_MakeAvailable(liepp)
+FetchContent_MakeAvailable(cartan)
 
-target_link_libraries(my_app PRIVATE liepp::liepp)
+target_link_libraries(my_app PRIVATE cartan::cartan)
 ```
 
-This pulls liepp and its Eigen dependency automatically. No manual
+This pulls Cartan and its Eigen dependency automatically. No manual
 installation required.
 
 ### find_package
 
 ```cmake
-find_package(liepp CONFIG REQUIRED)
-target_link_libraries(my_app PRIVATE liepp::liepp)
+find_package(cartan CONFIG REQUIRED)
+target_link_libraries(my_app PRIVATE cartan::cartan)
 ```
 
 ## Your first Lie group operation
@@ -39,14 +39,14 @@ exponential map, then recovers it with the logarithmic map. The round-trip
 error should be near machine epsilon.
 
 ```cpp
-#include <liepp/lie/so3.h>
+#include <cartan/lie/so3.h>
 #include <iostream>
 #include <numbers>
 
 int main()
 {
-    using SO3 = liepp::so3<double>;
-    liepp::vector3<double> phi{0.1, 0.2, 0.3};
+    using SO3 = cartan::so3<double>;
+    cartan::vector3<double> phi{0.1, 0.2, 0.3};
 
     auto R = SO3::exp(phi);
     auto phi_back = R.log();
@@ -62,21 +62,21 @@ same directory:
 
 ```cmake
 cmake_minimum_required(VERSION 3.28)
-project(hello_liepp)
+project(hello_cartan)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(FetchContent)
 FetchContent_Declare(
-    liepp
-    GIT_REPOSITORY https://github.com/skrede/liepp.git
+    cartan
+    GIT_REPOSITORY https://github.com/skrede/cartan.git
     GIT_TAG        main
 )
-FetchContent_MakeAvailable(liepp)
+FetchContent_MakeAvailable(cartan)
 
-add_executable(hello_liepp main.cpp)
-target_link_libraries(hello_liepp PRIVATE liepp::liepp)
+add_executable(hello_cartan main.cpp)
+target_link_libraries(hello_cartan PRIVATE cartan::cartan)
 ```
 
 Build and run:
@@ -84,7 +84,7 @@ Build and run:
 ```bash
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
-./build/hello_liepp
+./build/hello_cartan
 ```
 
 Expected output:
@@ -103,25 +103,25 @@ z-axis, each with a unit link length, give an end-effector at (2, 0, 0)
 at the zero configuration.
 
 ```cpp
-#include <liepp/liepp.h>
+#include <cartan/lie.h>
 #include <iostream>
 
 int main()
 {
-    using vec3 = liepp::vector3<double>;
-    using SE3 = liepp::se3<double>;
-    using SO3 = liepp::so3<double>;
+    using vec3 = cartan::vector3<double>;
+    using SE3 = cartan::se3<double>;
+    using SO3 = cartan::so3<double>;
 
     // 2-link planar arm: two revolute joints about z, unit link lengths
-    auto s1 = liepp::screw_axis<double>::revolute(vec3(0, 0, 1), vec3(0, 0, 0));
-    auto s2 = liepp::screw_axis<double>::revolute(vec3(0, 0, 1), vec3(1, 0, 0));
+    auto s1 = cartan::screw_axis<double>::revolute(vec3(0, 0, 1), vec3(0, 0, 0));
+    auto s2 = cartan::screw_axis<double>::revolute(vec3(0, 0, 1), vec3(1, 0, 0));
     auto home = SE3(SO3::identity(), vec3(2, 0, 0));
 
-    liepp::joint_limits<double> lim{-M_PI, M_PI};
-    liepp::kinematic_chain<2, double> chain(home, {s1, s2}, {lim, lim});
+    cartan::joint_limits<double> lim{-M_PI, M_PI};
+    cartan::kinematic_chain<2, double> chain(home, {s1, s2}, {lim, lim});
 
     Eigen::Vector2d q(0.5, -0.3);
-    auto fk = liepp::forward_kinematics(chain, q);
+    auto fk = cartan::forward_kinematics(chain, q);
 
     std::cout << "End-effector:\n" << fk.end_effector.matrix() << "\n";
 }

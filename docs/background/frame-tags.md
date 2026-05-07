@@ -2,7 +2,7 @@
 
 Frame mismatches are among the most common and insidious bugs in robotics
 software. Multiplying transformations with incompatible frames compiles
-without errors but produces silently wrong results. liepp uses C++ template
+without errors but produces silently wrong results. Cartan uses C++ template
 parameters to encode reference frame information in the type system, catching
 frame composition errors at compile time with zero runtime overhead.
 
@@ -33,9 +33,9 @@ These frame mismatch bugs are:
 - **Common:** Any non-trivial robotics system juggles world, base, tool, camera,
   sensor, and workpiece frames
 
-## liepp's Solution
+## Cartan's Solution
 
-liepp wraps SO(3) and SE(3) in frame-tagged templates where the `From` and
+Cartan wraps SO(3) and SE(3) in frame-tagged templates where the `From` and
 `To` frames are type parameters:
 
 ```cpp
@@ -112,7 +112,7 @@ transform<Frame::world, Frame::base> T_wb;
 
 ## Composition Rules
 
-liepp enforces the standard rules of frame composition through template
+Cartan enforces the standard rules of frame composition through template
 constraints:
 
 ### Transform Composition
@@ -163,7 +163,7 @@ auto T_world_tool = T_wb * T_bs * T_se * T_ew * T_wt;
 
 ## Framed Twists and Wrenches
 
-liepp extends frame safety to twists and wrenches:
+Cartan extends frame safety to twists and wrenches:
 
 - **`framed_twist<Frame>`**: A spatial or body twist expressed in a specific
   reference frame. Prevents accidentally adding twists from different frames.
@@ -193,7 +193,7 @@ Frame tags add template parameter complexity. Plain `se3<Scalar>` /
 - Interfacing with external libraries that use raw matrices
 - Frame semantics are clear from context (e.g., internal FK computation)
 
-liepp's own kinematics engine uses plain `se3<Scalar>` internally -- the
+Cartan's own kinematics engine uses plain `se3<Scalar>` internally -- the
 chain model and FK produce untagged transformations. Frame tags are applied at
 the application boundary where multiple frames interact.
 

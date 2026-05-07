@@ -1,4 +1,4 @@
-# liepp Documentation
+# Cartan Documentation
 
 ## Getting Started
 
@@ -37,6 +37,6 @@ Task-oriented walkthroughs with worked examples.
 
 ## Examples
 
-Runnable programs demonstrating every feature area. Build with `LIEPP_BUILD_EXAMPLES=ON`.
+Runnable programs demonstrating every feature area. Build with `CARTAN_BUILD_EXAMPLES=ON`.
 
 - [examples/](../examples/) -- lie basics, frame safety, FK/Jacobians, basic IK, IK composition

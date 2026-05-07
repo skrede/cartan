@@ -1,11 +1,11 @@
-#include <liepp/ik/analytical_gradient.h>
+#include <cartan/serial/ik/solver/detail/analytical_gradient.h>
 
-#include <liepp/lie/se3.h>
-#include <liepp/lie/so3.h>
-#include <liepp/chain/screw_axis.h>
-#include <liepp/chain/joint_limits.h>
-#include <liepp/chain/kinematic_chain.h>
-#include <liepp/kinematics/forward_kinematics.h>
+#include <cartan/lie/se3.h>
+#include <cartan/lie/so3.h>
+#include <cartan/serial/chain/screw_axis.h>
+#include <cartan/serial/chain/joint_limits.h>
+#include <cartan/serial/chain/kinematic_chain.h>
+#include <cartan/serial/fk/forward_kinematics.h>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -13,7 +13,7 @@
 #include <cmath>
 #include <numbers>
 
-namespace spp = liepp;
+namespace spp = cartan;
 using Catch::Approx;
 
 // ============================================================================
@@ -52,7 +52,7 @@ TEST_CASE("ik_se3_objective at target", "[ik][analytical_gradient]")
     auto fk = spp::forward_kinematics(chain, q);
     auto target = fk.end_effector;
 
-    auto result = spp::ik_se3_objective<double, 6>::evaluate(chain, target, q);
+    auto result = spp::ik_se3_objective<spp::kinematic_chain<double, 6>>::evaluate(chain, target, q);
 
     REQUIRE(result.objective < 1e-20);
     REQUIRE(result.body_error.norm() < 1e-10);
@@ -76,7 +76,7 @@ TEST_CASE("ik_se3_objective gradient matches finite difference", "[ik][analytica
     auto fk_target = spp::forward_kinematics(chain, q_target);
     auto target = fk_target.end_effector;
 
-    auto [info, grad] = spp::ik_se3_objective<double, 6>::evaluate_with_gradient(chain, target, q);
+    auto [info, grad] = spp::ik_se3_objective<spp::kinematic_chain<double, 6>>::evaluate_with_gradient(chain, target, q);
 
     // Finite-difference gradient
     double eps = 1e-7;
@@ -89,8 +89,8 @@ TEST_CASE("ik_se3_objective gradient matches finite difference", "[ik][analytica
         q_plus(i) += eps;
         q_minus(i) -= eps;
 
-        auto r_plus = spp::ik_se3_objective<double, 6>::evaluate(chain, target, q_plus);
-        auto r_minus = spp::ik_se3_objective<double, 6>::evaluate(chain, target, q_minus);
+        auto r_plus = spp::ik_se3_objective<spp::kinematic_chain<double, 6>>::evaluate(chain, target, q_plus);
+        auto r_minus = spp::ik_se3_objective<spp::kinematic_chain<double, 6>>::evaluate(chain, target, q_minus);
 
         grad_fd(i) = (r_plus.objective - r_minus.objective) / (2.0 * eps);
     }
@@ -117,10 +117,10 @@ TEST_CASE("ik_se3_objective weighted gradient matches finite difference", "[ik][
     spp::error_weight<double> w;
     w.weights << 1.0, 1.0, 1.0, 10.0, 10.0, 10.0;
 
-    auto [info_w, grad_w] = spp::ik_se3_objective<double, 6>::evaluate_with_gradient(chain, target, q, w);
+    auto [info_w, grad_w] = spp::ik_se3_objective<spp::kinematic_chain<double, 6>>::evaluate_with_gradient(chain, target, q, w);
 
     // Weighted gradient should differ from unweighted
-    auto [info_u, grad_u] = spp::ik_se3_objective<double, 6>::evaluate_with_gradient(chain, target, q);
+    auto [info_u, grad_u] = spp::ik_se3_objective<spp::kinematic_chain<double, 6>>::evaluate_with_gradient(chain, target, q);
     REQUIRE((grad_w - grad_u).norm() > 1e-6);
 
     // Finite-difference gradient of the weighted objective
@@ -134,8 +134,8 @@ TEST_CASE("ik_se3_objective weighted gradient matches finite difference", "[ik][
         q_plus(i) += eps;
         q_minus(i) -= eps;
 
-        auto r_plus = spp::ik_se3_objective<double, 6>::evaluate(chain, target, q_plus, w);
-        auto r_minus = spp::ik_se3_objective<double, 6>::evaluate(chain, target, q_minus, w);
+        auto r_plus = spp::ik_se3_objective<spp::kinematic_chain<double, 6>>::evaluate(chain, target, q_plus, w);
+        auto r_minus = spp::ik_se3_objective<spp::kinematic_chain<double, 6>>::evaluate(chain, target, q_minus, w);
 
         grad_fd(i) = (r_plus.objective - r_minus.objective) / (2.0 * eps);
     }
