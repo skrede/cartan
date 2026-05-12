@@ -106,81 +106,80 @@ public:
         }
     }
 
-    ik_status step(const Chain& chain)
+    step_result<scalar_type> step(const Chain& chain, int N)
     {
-        if (m_status != ik_status::running)
+        int units = 0;
+        while (units < N && m_status == ik_status::running)
         {
-            return m_status;
-        }
+            auto fk = forward_kinematics(chain, m_q);
+            m_V_b = (fk.end_effector.inverse() * m_target).log();
 
-        auto fk = forward_kinematics(chain, m_q);
-        m_V_b = (fk.end_effector.inverse() * m_target).log();
-
-        if (cartan::detail::is_converged_unweighted(m_V_b, m_criteria))
-        {
-            m_error_norm = m_V_b.norm();
-            m_status = ik_status::converged;
-            return m_status;
-        }
-
-        ++m_iterations;
-        if (m_iterations >= m_criteria.max_iterations)
-        {
-            m_error_norm = m_V_b.norm();
-            m_status = ik_status::iteration_limit;
-            return m_status;
-        }
-
-        auto J_b = body_jacobian(chain, fk);
-        int n = static_cast<int>(J_b.cols());
-
-        auto H = (J_b.transpose() * J_b).eval();
-        auto g = (J_b.transpose() * m_V_b).eval();
-
-        using dq_matrix = std::conditional_t<
-            joints == dynamic,
-            Eigen::MatrixX<scalar_type>,
-            Eigen::Matrix<scalar_type, joints, joints>>;
-
-        dq_matrix A = H;
-        for (int i = 0; i < n; ++i)
-        {
-            A(i, i) += m_lambda;
-        }
-
-        position_type dq = A.ldlt().solve(g);
-
-        position_type q_trial = m_q + dq;
-        auto fk_trial = forward_kinematics(chain, q_trial);
-        auto V_b_trial = (fk_trial.end_effector.inverse() * m_target).log();
-        const bool accepted = evaluate_gain_and_update_damping(dq, g, q_trial, V_b_trial);
-
-        m_error_norm = m_V_b.norm();
-
-        // Stall/divergence detection runs only on accepted steps. Rejected
-        // LM steps are part of the normal damping calibration: a string of
-        // rejects leaves m_V_b (and therefore m_error_norm) untouched, which
-        // would otherwise trip the "no progress" rule deterministically and
-        // kill the solve before lambda has time to grow into a usable regime.
-        // m_initial_error gates divergence, so skipping the check on reject
-        // is safe -- m_error_norm is unchanged from the last accepted step,
-        // which already passed.
-        if (accepted)
-        {
-            auto stall_result = cartan::detail::check_stall_divergence(
-                m_error_history, m_error_norm, m_initial_error,
-                m_options.stall_window, m_options.stall_threshold,
-                m_options.divergence_factor);
-            if (stall_result != ik_status::running)
+            if (cartan::detail::is_converged_unweighted(m_V_b, m_criteria))
             {
-                m_status = stall_result;
-                return m_status;
+                m_error_norm = m_V_b.norm();
+                m_status = ik_status::converged;
+                break;
             }
+
+            ++m_iterations;
+            ++units;
+            if (m_iterations >= m_criteria.max_iterations_per_attempt)
+            {
+                m_error_norm = m_V_b.norm();
+                m_status = ik_status::iteration_limit;
+                break;
+            }
+
+            auto J_b = body_jacobian(chain, fk);
+            int n = static_cast<int>(J_b.cols());
+
+            auto H = (J_b.transpose() * J_b).eval();
+            auto g = (J_b.transpose() * m_V_b).eval();
+
+            using dq_matrix = std::conditional_t<
+                joints == dynamic,
+                Eigen::MatrixX<scalar_type>,
+                Eigen::Matrix<scalar_type, joints, joints>>;
+
+            dq_matrix A = H;
+            for (int i = 0; i < n; ++i)
+            {
+                A(i, i) += m_lambda;
+            }
+
+            position_type dq = A.ldlt().solve(g);
+
+            position_type q_trial = m_q + dq;
+            auto fk_trial = forward_kinematics(chain, q_trial);
+            auto V_b_trial = (fk_trial.end_effector.inverse() * m_target).log();
+            const bool accepted = evaluate_gain_and_update_damping(dq, g, q_trial, V_b_trial);
+
+            m_error_norm = m_V_b.norm();
+
+            // Stall/divergence detection runs only on accepted steps. Rejected
+            // LM steps are part of the normal damping calibration: a string of
+            // rejects leaves m_V_b (and therefore m_error_norm) untouched, which
+            // would otherwise trip the "no progress" rule deterministically and
+            // kill the solve before lambda has time to grow into a usable regime.
+            // m_initial_error gates divergence, so skipping the check on reject
+            // is safe -- m_error_norm is unchanged from the last accepted step,
+            // which already passed.
+            if (accepted)
+            {
+                auto stall_result = cartan::detail::check_stall_divergence(
+                    m_error_history, m_error_norm, m_initial_error,
+                    m_options.stall_window, m_options.stall_threshold,
+                    m_options.divergence_factor);
+                if (stall_result != ik_status::running)
+                {
+                    m_status = stall_result;
+                    break;
+                }
+            }
+
+            cartan::detail::enforce_limits<LimitsPolicy>(m_q, chain);
         }
-
-        cartan::detail::enforce_limits<LimitsPolicy>(m_q, chain);
-
-        return m_status;
+        return {m_status, {units, m_error_norm}};
     }
 
     [[nodiscard]] bool converged() const { return m_status == ik_status::converged; }

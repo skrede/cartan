@@ -72,7 +72,7 @@ spp::ik_status run_stepper(
     spp::ik_status status = spp::ik_status::running;
     for (int i = 0; i < max_steps && status == spp::ik_status::running; ++i)
     {
-        status = stepper.step(chain);
+        status = stepper.step(chain, 1).status;
     }
     return status;
 }
@@ -94,7 +94,7 @@ TEST_CASE("LM converges on reachable 6R target", "[ik][lm]")
     spp::ik::lm<spp::kinematic_chain<double, 6>> stepper;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
-    criteria.max_iterations = 200;
+    criteria.max_iterations_per_attempt = 200;
 
     stepper.setup(chain, target, q0, criteria);
     auto status = run_stepper(stepper, chain, 200);
@@ -125,7 +125,7 @@ TEST_CASE("LM converges on 3R planar target", "[ik][lm]")
     spp::ik::lm<spp::kinematic_chain<double, 3>> stepper;
     Eigen::Vector3d q0 = Eigen::Vector3d::Zero();
     spp::convergence_criteria<double> criteria;
-    criteria.max_iterations = 200;
+    criteria.max_iterations_per_attempt = 200;
 
     stepper.setup(chain, target, q0, criteria);
     auto status = run_stepper(stepper, chain, 200);
@@ -153,7 +153,7 @@ TEST_CASE("LM returns iteration_limit on unreachable target", "[ik][lm]")
     spp::ik::lm<spp::kinematic_chain<double, 6>> stepper;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
-    criteria.max_iterations = 50;
+    criteria.max_iterations_per_attempt = 50;
 
     stepper.setup(chain, target, q0, criteria);
     auto status = run_stepper(stepper, chain, 50);
@@ -176,7 +176,7 @@ TEST_CASE("LM lambda adapts during iteration", "[ik][lm]")
     spp::ik::lm<spp::kinematic_chain<double, 6>> stepper;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
-    criteria.max_iterations = 200;
+    criteria.max_iterations_per_attempt = 200;
 
     stepper.setup(chain, fk_target.end_effector, q0, criteria);
     double lambda_initial = stepper.lambda();
@@ -185,7 +185,7 @@ TEST_CASE("LM lambda adapts during iteration", "[ik][lm]")
     // Run a few steps
     for (int i = 0; i < 5; ++i)
     {
-        stepper.step(chain);
+        (void)stepper.step(chain, 1);
     }
 
     // Lambda should have changed from its initial value
@@ -208,13 +208,13 @@ TEST_CASE("LM iterations count", "[ik][lm]")
     spp::ik::lm<spp::kinematic_chain<double, 6>> stepper;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
-    criteria.max_iterations = 200;
+    criteria.max_iterations_per_attempt = 200;
 
     stepper.setup(chain, fk_target.end_effector, q0, criteria);
 
     for (int i = 0; i < 5; ++i)
     {
-        stepper.step(chain);
+        (void)stepper.step(chain, 1);
     }
     REQUIRE(stepper.iterations() == 5);
 }

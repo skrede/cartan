@@ -109,46 +109,48 @@ public:
         initialize_attempt(chain, target, q0, criteria, weight);
     }
 
-    ik_status step(const Chain& chain)
+    step_result<scalar_type> step(const Chain& chain, int N)
     {
+        int units = 0;
         if (m_aborted)
         {
-            return ik_status::stalled;
+            return {ik_status::stalled, {0, m_error_norm}};
         }
-        if (m_status == ik_status::converged)
+        while (units < N && m_status != ik_status::converged)
         {
-            return m_status;
+            auto inner_status = perform_lm_iteration(chain);
+            ++m_total_iterations;
+            ++units;
+
+            if (inner_status == ik_status::converged)
+            {
+                m_status = ik_status::converged;
+                break;
+            }
+            if (inner_status == ik_status::running)
+            {
+                continue;
+            }
+
+            if (m_error_norm < m_best_error)
+            {
+                m_best_error = m_error_norm;
+            }
+
+            if (m_restart_count >= m_options.max_restarts)
+            {
+                m_status = inner_status;
+                break;
+            }
+
+            auto q_new = (*m_seed_gen)(m_restart_count);
+            ++m_restart_count;
+
+            // Free restart event: re-initialize the attempt without billing
+            // additional units beyond the failing inner attempt's per-iter charge.
+            initialize_attempt(chain, m_target, q_new, m_criteria, m_weight);
         }
-
-        auto inner_status = perform_lm_iteration(chain);
-        ++m_total_iterations;
-
-        if (inner_status == ik_status::converged)
-        {
-            m_status = ik_status::converged;
-            return ik_status::converged;
-        }
-        if (inner_status == ik_status::running)
-        {
-            return ik_status::running;
-        }
-
-        if (m_error_norm < m_best_error)
-        {
-            m_best_error = m_error_norm;
-        }
-
-        if (m_restart_count >= m_options.max_restarts)
-        {
-            m_status = inner_status;
-            return inner_status;
-        }
-
-        auto q_new = (*m_seed_gen)(m_restart_count);
-        ++m_restart_count;
-
-        initialize_attempt(chain, m_target, q_new, m_criteria, m_weight);
-        return ik_status::running;
+        return {m_status, {units, m_error_norm}};
     }
 
     [[nodiscard]] bool converged() const { return m_status == ik_status::converged; }
@@ -263,7 +265,7 @@ private:
         }
 
         ++m_iterations;
-        if (m_iterations >= m_criteria.max_iterations)
+        if (m_iterations >= m_criteria.max_iterations_per_attempt)
         {
             m_error_norm = m_V_b.norm();
             m_status = ik_status::iteration_limit;

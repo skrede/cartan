@@ -155,7 +155,8 @@ public:
 
         if constexpr (sizeof...(Policies) == 1)
         {
-            return step_single();
+            // Single tick: drive the inner policy for one algorithmic work unit.
+            return step_single_metrics(1).status;
         }
         else
         {
@@ -180,10 +181,19 @@ public:
     {
         if constexpr (sizeof...(Policies) == 1)
         {
-            for (int i = 0; i < m_criteria.max_iterations * 2; ++i)
+            // Total-budget accumulator loop: ask the inner policy for as many
+            // algorithmic work units as the remaining runner budget allows;
+            // the policy returns the actual units consumed (which may be less
+            // than the request on convergence / stall / per-attempt cap hit).
+            int total_units = 0;
+            while (total_units < m_criteria.max_total_work_units
+                   && m_status == ik_status::running)
             {
-                auto s = step();
-                if (s != ik_status::running)
+                int remaining = m_criteria.max_total_work_units - total_units;
+                auto result = step_single_metrics(remaining);
+                total_units += result.metrics.units_consumed;
+                m_total_iterations = total_units;
+                if (result.status != ik_status::running)
                     break;
             }
         }
@@ -235,10 +245,10 @@ private:
         ik_termination_reason termination_reason{ik_termination_reason::unknown};
     };
 
-    ik_status step_single()
+    step_result<scalar_type> step_single_metrics(int N)
     {
-        ++m_total_iterations;
-        auto policy_status = std::get<0>(m_policies).step(*m_chain);
+        auto inner = std::get<0>(m_policies).step(*m_chain, N);
+        auto policy_status = inner.status;
         position_type q = std::get<0>(m_policies).solution();
 
         if (policy_status == ik_status::converged)
@@ -249,19 +259,20 @@ private:
             {
                 m_status = ik_status::converged;
                 m_best_q = q;
-                return m_status;
+                return inner;
             }
 
             update_best(q);
 
-            if (m_total_iterations >= m_criteria.max_iterations)
+            if (m_total_iterations + inner.metrics.units_consumed
+                    >= m_criteria.max_total_work_units)
             {
                 m_status = ik_status::converged;
-                return m_status;
+                return inner;
             }
 
             std::get<0>(m_policies).setup(*m_chain, m_target, q, m_criteria);
-            return ik_status::running;
+            return {ik_status::running, inner.metrics};
         }
 
         if (policy_status == ik_status::diverged ||
@@ -269,10 +280,10 @@ private:
             policy_status == ik_status::iteration_limit)
         {
             m_status = m_found_convergence ? ik_status::converged : policy_status;
-            return m_status;
+            return {m_status, inner.metrics};
         }
 
-        return ik_status::running;
+        return inner;
     }
 
     ik_status step_multi()
@@ -282,7 +293,7 @@ private:
 
         [&]<std::size_t... Is>(std::index_sequence<Is...>)
         {
-            (step_one<Is>(any_running), ...);
+            (tick_policy<Is>(any_running), ...);
         }(std::index_sequence_for<Policies...>{});
 
         ++m_total_iterations;
@@ -303,14 +314,14 @@ private:
     }
 
     template <std::size_t I>
-    void step_one(bool& any_running)
+    void tick_policy(bool& any_running)
         requires (sizeof...(Policies) > 1)
     {
         if (m_early_stop || m_parked[I])
             return;
 
         auto& policy = std::get<I>(m_policies);
-        auto status = policy.step(*m_chain);
+        auto status = policy.step(*m_chain, 1).status;
 
         if (status == ik_status::converged)
         {

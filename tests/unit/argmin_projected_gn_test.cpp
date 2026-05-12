@@ -52,7 +52,7 @@ TEST_CASE("argmin_projected_gn converges on reachable target", "[ik][argmin][pro
     solver.setup(chain, target, q_seed, criteria);
 
     while (solver.status() == cartan::ik_status::running)
-        solver.step(chain);
+        (void)solver.step(chain, 1);
 
     REQUIRE(solver.converged());
     REQUIRE(solver.restart_count() == 0);
@@ -74,7 +74,7 @@ TEST_CASE("argmin_projected_gn reports non-converged on unreachable target",
     solver.setup(chain, target, q_seed, criteria);
 
     while (solver.status() == cartan::ik_status::running)
-        solver.step(chain);
+        (void)solver.step(chain, 1);
 
     REQUIRE_FALSE(solver.converged());
     REQUIRE(solver.status() != cartan::ik_status::running);
@@ -96,7 +96,7 @@ TEST_CASE("argmin_projected_gn exhausts configured restarts on unreachable targe
     solver.setup(chain, target, q_seed, criteria);
 
     while (solver.status() == cartan::ik_status::running)
-        solver.step(chain);
+        (void)solver.step(chain, 1);
 
     REQUIRE_FALSE(solver.converged());
     REQUIRE(solver.restart_count() == 3);
@@ -117,7 +117,7 @@ TEST_CASE("argmin_projected_gn zero restarts on easy target", "[ik][argmin][proj
     solver.setup(chain, target, q_seed, criteria);
 
     while (solver.status() == cartan::ik_status::running)
-        solver.step(chain);
+        (void)solver.step(chain, 1);
 
     REQUIRE(solver.converged());
     REQUIRE(solver.restart_count() == 0);
@@ -141,7 +141,7 @@ TEST_CASE("argmin_projected_gn deterministic under fixed RNG seed", "[ik][argmin
         solver.setup(chain, target, q_seed, criteria);
 
         while (solver.status() == cartan::ik_status::running)
-            solver.step(chain);
+            (void)solver.step(chain, 1);
 
         return solver;
     };

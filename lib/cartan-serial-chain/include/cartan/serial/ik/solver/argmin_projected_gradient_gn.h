@@ -82,8 +82,6 @@ public:
 
     struct options
     {
-        int budget_per_step{50};
-
         double initial_lambda{0.0};
         double tau{1e-3};
         double diagonal_min_clamp{1e-8};
@@ -169,84 +167,90 @@ public:
         m_solver.emplace(*m_problem, x0, m_nab_opts, policy_opts);
     }
 
-    ik_status step(const Chain& chain)
+    step_result<scalar_type> step(const Chain& chain, int N)
     {
-        if (m_status != ik_status::running)
-        {
-            return m_status;
-        }
-
+        int units = 0;
         m_chain = &chain;
-        ++m_iterations;
-
-        if (m_iterations >= m_criteria.max_iterations)
+        while (units < N && m_status == ik_status::running)
         {
-            m_status = ik_status::iteration_limit;
-            m_termination_reason = ik_termination_reason::iteration_limit;
-            return m_status;
-        }
-
-        auto result = m_solver->step_n(
-            static_cast<std::uint32_t>(m_options.budget_per_step), m_nab_opts);
-
-        sync_solution_from_solver();
-
-        auto fk = forward_kinematics(chain, m_q);
-        auto V_b = (m_target.inverse() * fk.end_effector).log();
-        m_error_norm = V_b.norm();
-
-        if (cartan::detail::is_converged_unweighted(V_b, m_criteria))
-        {
-            m_status = ik_status::converged;
-            m_termination_reason = ik_termination_reason::converged;
-            return m_status;
-        }
-
-        auto stall_result = cartan::detail::check_stall_divergence(
-            m_error_history, m_error_norm, m_initial_error,
-            m_options.stall_window, m_options.stall_threshold,
-            m_options.divergence_factor);
-        if (stall_result != ik_status::running)
-        {
-            m_status = stall_result;
-            m_termination_reason = (stall_result == ik_status::diverged)
-                ? ik_termination_reason::divergence_detected
-                : ik_termination_reason::stall_detected;
-            return m_status;
-        }
-
-        if (is_inner_terminal(result.status))
-        {
-            if (m_restart_count < m_options.max_restarts)
+            // One algorithmic-work unit = one argmin-internal outer GN iteration.
+            auto prev_iter = m_solver->state().iteration;
+            auto result = m_solver->step_n(
+                static_cast<std::uint32_t>(1), m_nab_opts);
+            auto inner_units = static_cast<int>(m_solver->state().iteration - prev_iter);
+            if (inner_units <= 0)
             {
-                ++m_restart_count;
-                auto q_perturbed = perturb_solution(m_q, *m_chain);
+                inner_units = 1;
+            }
+            m_iterations += inner_units;
+            units += inner_units;
 
-                m_error_history.clear();
-                auto fk_new = forward_kinematics(*m_chain, q_perturbed);
-                auto V_b_new = (m_target.inverse() * fk_new.end_effector).log();
-                m_initial_error = V_b_new.norm();
+            sync_solution_from_solver();
 
-                int n = m_chain->num_joints();
-                Eigen::VectorXd x0(n);
-                for (int i = 0; i < n; ++i)
-                    x0[i] = static_cast<double>(q_perturbed[i]);
-                m_solver->reset_clear(x0);
+            auto fk = forward_kinematics(chain, m_q);
+            auto V_b = (m_target.inverse() * fk.end_effector).log();
+            m_error_norm = V_b.norm();
 
-                build_argmin_opts(m_nab_opts);
-
-                m_q = q_perturbed;
-                return ik_status::running;
+            if (cartan::detail::is_converged_unweighted(V_b, m_criteria))
+            {
+                m_status = ik_status::converged;
+                m_termination_reason = ik_termination_reason::converged;
+                break;
             }
 
-            m_status = ik_status::stalled;
-            m_termination_reason = map_argmin_status(result.status);
-            return m_status;
+            if (m_iterations >= m_criteria.max_iterations_per_attempt)
+            {
+                m_status = ik_status::iteration_limit;
+                m_termination_reason = ik_termination_reason::iteration_limit;
+                break;
+            }
+
+            auto stall_result = cartan::detail::check_stall_divergence(
+                m_error_history, m_error_norm, m_initial_error,
+                m_options.stall_window, m_options.stall_threshold,
+                m_options.divergence_factor);
+            if (stall_result != ik_status::running)
+            {
+                m_status = stall_result;
+                m_termination_reason = (stall_result == ik_status::diverged)
+                    ? ik_termination_reason::divergence_detected
+                    : ik_termination_reason::stall_detected;
+                break;
+            }
+
+            if (is_inner_terminal(result.status))
+            {
+                if (m_restart_count < m_options.max_restarts)
+                {
+                    ++m_restart_count;
+                    auto q_perturbed = perturb_solution(m_q, *m_chain);
+
+                    m_error_history.clear();
+                    auto fk_new = forward_kinematics(*m_chain, q_perturbed);
+                    auto V_b_new = (m_target.inverse() * fk_new.end_effector).log();
+                    m_initial_error = V_b_new.norm();
+
+                    int n = m_chain->num_joints();
+                    Eigen::VectorXd x0(n);
+                    for (int i = 0; i < n; ++i)
+                        x0[i] = static_cast<double>(q_perturbed[i]);
+                    m_solver->reset_clear(x0);
+
+                    build_argmin_opts(m_nab_opts);
+
+                    m_q = q_perturbed;
+                    // Cold-restart event itself charges 0 additional units.
+                    continue;
+                }
+
+                m_status = ik_status::stalled;
+                m_termination_reason = map_argmin_status(result.status);
+                break;
+            }
+
+            cartan::detail::enforce_limits<LimitsPolicy>(m_q, chain);
         }
-
-        cartan::detail::enforce_limits<LimitsPolicy>(m_q, chain);
-
-        return m_status;
+        return {m_status, {units, m_error_norm}};
     }
 
     [[nodiscard]] bool converged() const { return m_status == ik_status::converged; }
@@ -293,7 +297,9 @@ private:
 
     void build_argmin_opts(argmin_opts_type& opts) const
     {
-        opts.max_iterations = static_cast<std::uint32_t>(m_options.budget_per_step);
+        // Per-attempt cap; argmin's setup-time cap is generous because the
+        // per-call budget is now threaded through step_n(N) from the runner.
+        opts.max_iterations = static_cast<std::uint32_t>(m_criteria.max_iterations_per_attempt);
         if constexpr (std::is_same_v<Convergence, argmin::default_convergence>)
         {
             opts.set_gradient_threshold(m_options.gradient_threshold);

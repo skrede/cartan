@@ -130,52 +130,51 @@ public:
         m_rho_history.clear();
     }
 
-    ik_status step(const Chain& chain)
+    step_result<scalar_type> step(const Chain& chain, int N)
     {
-        if (m_status != ik_status::running)
+        int units = 0;
+        while (units < N && m_status == ik_status::running)
         {
-            return m_status;
-        }
+            if (cartan::detail::is_converged(m_body_error, m_weight, m_criteria))
+            {
+                m_status = ik_status::converged;
+                break;
+            }
 
-        if (cartan::detail::is_converged(m_body_error, m_weight, m_criteria))
-        {
-            m_status = ik_status::converged;
-            return m_status;
-        }
+            ++m_iterations;
+            ++units;
+            if (m_iterations >= m_criteria.max_iterations_per_attempt)
+            {
+                m_status = ik_status::iteration_limit;
+                break;
+            }
 
-        ++m_iterations;
-        if (m_iterations >= m_criteria.max_iterations)
-        {
-            m_status = ik_status::iteration_limit;
-            return m_status;
-        }
+            int n = static_cast<int>(m_q.size());
 
-        int n = static_cast<int>(m_q.size());
+            auto [direction, directional_derivative, max_alpha] = compute_descent_direction(n);
+            if (max_alpha < std::numeric_limits<scalar_type>::epsilon() ||
+                directional_derivative >= scalar_type(0))
+            {
+                update_stall_detection();
+                continue;
+            }
 
-        auto [direction, directional_derivative, max_alpha] = compute_descent_direction(n);
-        if (max_alpha < std::numeric_limits<scalar_type>::epsilon() ||
-            directional_derivative >= scalar_type(0))
-        {
+            position_type q_old = m_q;
+            position_type g_old = m_gradient;
+            scalar_type f_old = m_f;
+
+            if (!armijo_line_search(chain, direction, directional_derivative, max_alpha, f_old))
+            {
+                update_stall_detection();
+                continue;
+            }
+
+            update_lbfgs_history(q_old, g_old);
+
             update_stall_detection();
-            return m_status;
+            cartan::detail::enforce_limits<LimitsPolicy>(m_q, chain);
         }
-
-        position_type q_old = m_q;
-        position_type g_old = m_gradient;
-        scalar_type f_old = m_f;
-
-        if (!armijo_line_search(chain, direction, directional_derivative, max_alpha, f_old))
-        {
-            update_stall_detection();
-            return m_status;
-        }
-
-        update_lbfgs_history(q_old, g_old);
-
-        update_stall_detection();
-        cartan::detail::enforce_limits<LimitsPolicy>(m_q, chain);
-
-        return m_status;
+        return {m_status, {units, m_error_norm}};
     }
 
     [[nodiscard]] bool converged() const { return m_status == ik_status::converged; }

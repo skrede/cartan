@@ -149,31 +149,30 @@ public:
         }
     }
 
-    ik_status step(const Chain& chain)
+    step_result<scalar_type> step(const Chain& chain, int N)
     {
         if (m_aborted)
         {
-            return ik_status::stalled;
+            return {ik_status::stalled, {0, m_inner.error_norm()}};
         }
 
-        auto status = m_inner.step(chain);
-        ++m_total_iterations;
+        auto inner_result = m_inner.step(chain, N);
+        m_total_iterations += inner_result.metrics.units_consumed;
 
-        if (status == ik_status::converged)
+        if (inner_result.status == ik_status::converged
+            || inner_result.status == ik_status::running)
         {
-            return ik_status::converged;
+            return inner_result;
         }
 
-        if (status == ik_status::running)
-        {
-            return ik_status::running;
-        }
-
+        // Inner terminal-but-not-converged: try a fresh Halton seed restart.
+        // Restart events charge zero additional units beyond what the failing
+        // inner attempt already billed.
         track_best_lambda();
 
         if (m_restart_count >= m_options.max_restarts)
         {
-            return status;
+            return inner_result;
         }
 
         auto q_new = (*m_seed_gen)(m_restart_count);
@@ -197,7 +196,7 @@ public:
         apply_warm_start_lambda();
 
         ++m_restart_count;
-        return ik_status::running;
+        return {ik_status::running, {inner_result.metrics.units_consumed, m_inner.error_norm()}};
     }
 
     [[nodiscard]] bool converged() const { return m_inner.converged(); }

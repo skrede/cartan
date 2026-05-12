@@ -77,7 +77,7 @@ spp::ik_status run_stepper(
     spp::ik_status status = spp::ik_status::running;
     for (int i = 0; i < max_steps && status == spp::ik_status::running; ++i)
     {
-        status = stepper.step(chain);
+        status = stepper.step(chain, 1).status;
     }
     return status;
 }
@@ -108,7 +108,7 @@ TEST_CASE("projected_lm FK roundtrip", "[ik][projected_lm]")
     spp::ik::projected_lm<spp::kinematic_chain<double, 6>> stepper;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
-    criteria.max_iterations = 200;
+    criteria.max_iterations_per_attempt = 200;
 
     stepper.setup(chain, target, q0, criteria);
     auto status = run_stepper(stepper, chain, 200);
@@ -140,7 +140,7 @@ TEST_CASE("projected_lm respects tight limits", "[ik][projected_lm]")
     spp::ik::projected_lm<spp::kinematic_chain<double, 6>> stepper;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
-    criteria.max_iterations = 300;
+    criteria.max_iterations_per_attempt = 300;
 
     stepper.setup(chain, target, q0, criteria);
     auto status = run_stepper(stepper, chain, 300);
@@ -173,7 +173,7 @@ TEST_CASE("projected_lm active set holds joints at limits", "[ik][projected_lm]"
     q0 << 0.0, 0.0, 0.5, 0.0, 0.0, 0.0;  // joint 3 at upper limit
 
     spp::convergence_criteria<double> criteria;
-    criteria.max_iterations = 300;
+    criteria.max_iterations_per_attempt = 300;
 
     stepper.setup(chain, target, q0, criteria);
     run_stepper(stepper, chain, 300);
@@ -204,7 +204,7 @@ TEST_CASE("projected_lm dogleg converges", "[ik][projected_lm]")
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
-    criteria.max_iterations = 200;
+    criteria.max_iterations_per_attempt = 200;
 
     stepper.setup(chain, target, q0, criteria);
     auto status = run_stepper(stepper, chain, 200);
@@ -238,7 +238,7 @@ TEST_CASE("projected_lm with error weight", "[ik][projected_lm]")
     spp::ik::projected_lm<spp::kinematic_chain<double, 6>> stepper;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
-    criteria.max_iterations = 200;
+    criteria.max_iterations_per_attempt = 200;
 
     stepper.setup(chain, target, q0, criteria, weight);
     auto status = run_stepper(stepper, chain, 200);
@@ -271,7 +271,7 @@ TEST_CASE("projected_lm stall detection", "[ik][projected_lm]")
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
-    criteria.max_iterations = 500;
+    criteria.max_iterations_per_attempt = 500;
 
     stepper.setup(chain, target, q0, criteria);
     auto status = run_stepper(stepper, chain, 500);
@@ -301,7 +301,7 @@ TEST_CASE("projected_lm divergence detection", "[ik][projected_lm]")
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
-    criteria.max_iterations = 200;
+    criteria.max_iterations_per_attempt = 200;
 
     stepper.setup(chain, target, q0, criteria);
     auto status = run_stepper(stepper, chain, 200);

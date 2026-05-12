@@ -78,12 +78,12 @@ public:
             Policy policy{};
             policy.setup(chain, target, seed_q, criteria);
 
-            for (int i = 0; i < criteria.max_iterations; ++i)
+            for (int i = 0; i < criteria.max_iterations_per_attempt; ++i)
             {
-                auto status = policy.step(chain);
-                if (status != ik_status::running)
+                auto step_res = ik::step_one(policy, chain);
+                if (step_res.status != ik_status::running)
                 {
-                    if (status == ik_status::converged)
+                    if (step_res.status == ik_status::converged)
                     {
                         auto q = policy.solution();
                         if (verify_solution(chain, target, q, criteria))

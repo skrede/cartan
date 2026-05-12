@@ -111,89 +111,88 @@ public:
         m_initial_error = m_error_norm;
     }
 
-    ik_status step(const Chain& chain)
+    step_result<scalar_type> step(const Chain& chain, int N)
     {
-        if (m_status != ik_status::running)
+        int units = 0;
+        while (units < N && m_status == ik_status::running)
         {
-            return m_status;
-        }
+            auto result = ObjectivePolicy::evaluate_with_gradient(
+                chain, m_target, m_q, m_weight);
+            scalar_type f_current = result.info.objective;
+            auto& grad = result.gradient;
+            auto& body_error = result.info.body_error;
 
-        auto result = ObjectivePolicy::evaluate_with_gradient(
-            chain, m_target, m_q, m_weight);
-        scalar_type f_current = result.info.objective;
-        auto& grad = result.gradient;
-        auto& body_error = result.info.body_error;
-
-        if (cartan::detail::is_converged(body_error, m_weight, m_criteria))
-        {
-            m_error_norm = body_error.norm();
-            m_status = ik_status::converged;
-            return m_status;
-        }
-
-        ++m_iterations;
-        if (m_iterations >= m_criteria.max_iterations)
-        {
-            m_error_norm = body_error.norm();
-            m_status = ik_status::iteration_limit;
-            return m_status;
-        }
-
-        auto fk = forward_kinematics(chain, m_q);
-        auto J_b = body_jacobian(chain, fk);
-        int n = static_cast<int>(J_b.cols());
-
-        auto H = (J_b.transpose() * J_b).eval();
-        for (int i = 0; i < n; ++i)
-        {
-            H(i, i) += m_options.epsilon;
-        }
-
-        position_type dq = -H.ldlt().solve(grad);
-
-        scalar_type directional_derivative = grad.dot(dq);
-        scalar_type alpha = scalar_type(1);
-        bool step_accepted = false;
-        position_type q_trial = m_q;
-
-        for (int ls = 0; ls < m_options.max_line_search_steps; ++ls)
-        {
-            q_trial = (m_q + alpha * dq).cwiseMax(m_lower).cwiseMin(m_upper);
-
-            auto trial = ObjectivePolicy::evaluate(chain, m_target, q_trial, m_weight);
-            scalar_type f_trial = trial.objective;
-
-            if (f_trial <= f_current + m_options.line_search_c * alpha * directional_derivative)
+            if (cartan::detail::is_converged(body_error, m_weight, m_criteria))
             {
-                m_q = q_trial;
-                m_error_norm = trial.body_error.norm();
-                step_accepted = true;
+                m_error_norm = body_error.norm();
+                m_status = ik_status::converged;
                 break;
             }
 
-            alpha *= m_options.line_search_shrink;
+            ++m_iterations;
+            ++units;
+            if (m_iterations >= m_criteria.max_iterations_per_attempt)
+            {
+                m_error_norm = body_error.norm();
+                m_status = ik_status::iteration_limit;
+                break;
+            }
+
+            auto fk = forward_kinematics(chain, m_q);
+            auto J_b = body_jacobian(chain, fk);
+            int n = static_cast<int>(J_b.cols());
+
+            auto H = (J_b.transpose() * J_b).eval();
+            for (int i = 0; i < n; ++i)
+            {
+                H(i, i) += m_options.epsilon;
+            }
+
+            position_type dq = -H.ldlt().solve(grad);
+
+            scalar_type directional_derivative = grad.dot(dq);
+            scalar_type alpha = scalar_type(1);
+            bool step_accepted = false;
+            position_type q_trial = m_q;
+
+            for (int ls = 0; ls < m_options.max_line_search_steps; ++ls)
+            {
+                q_trial = (m_q + alpha * dq).cwiseMax(m_lower).cwiseMin(m_upper);
+
+                auto trial = ObjectivePolicy::evaluate(chain, m_target, q_trial, m_weight);
+                scalar_type f_trial = trial.objective;
+
+                if (f_trial <= f_current + m_options.line_search_c * alpha * directional_derivative)
+                {
+                    m_q = q_trial;
+                    m_error_norm = trial.body_error.norm();
+                    step_accepted = true;
+                    break;
+                }
+
+                alpha *= m_options.line_search_shrink;
+            }
+
+            if (!step_accepted)
+            {
+                m_q = q_trial;
+                m_error_norm = ObjectivePolicy::evaluate(chain, m_target, m_q, m_weight)
+                    .body_error.norm();
+            }
+
+            auto stall_result = cartan::detail::check_stall_divergence(
+                m_error_history, m_error_norm, m_initial_error,
+                m_options.stall_window, m_options.stall_threshold,
+                m_options.divergence_factor);
+            if (stall_result != ik_status::running)
+            {
+                m_status = stall_result;
+                break;
+            }
+
+            cartan::detail::enforce_limits<LimitsPolicy>(m_q, chain);
         }
-
-        if (!step_accepted)
-        {
-            m_q = q_trial;
-            m_error_norm = ObjectivePolicy::evaluate(chain, m_target, m_q, m_weight)
-                .body_error.norm();
-        }
-
-        auto stall_result = cartan::detail::check_stall_divergence(
-            m_error_history, m_error_norm, m_initial_error,
-            m_options.stall_window, m_options.stall_threshold,
-            m_options.divergence_factor);
-        if (stall_result != ik_status::running)
-        {
-            m_status = stall_result;
-            return m_status;
-        }
-
-        cartan::detail::enforce_limits<LimitsPolicy>(m_q, chain);
-
-        return m_status;
+        return {m_status, {units, m_error_norm}};
     }
 
     [[nodiscard]] bool converged() const { return m_status == ik_status::converged; }

@@ -56,7 +56,7 @@ spp::ik_status run_stepper(
     spp::ik_status status = spp::ik_status::running;
     for (int i = 0; i < max_steps && status == spp::ik_status::running; ++i)
     {
-        status = stepper.step(chain);
+        status = stepper.step(chain, 1).status;
     }
     return status;
 }
@@ -88,7 +88,7 @@ TEST_CASE("restart_wrapper trivial convergence", "[ik][restart]")
     spp::ik::restart_wrapper<spp::kinematic_chain<double, 6>, spp::ik::lm<spp::kinematic_chain<double, 6>>> stepper;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
-    criteria.max_iterations = 200;
+    criteria.max_iterations_per_attempt = 200;
 
     stepper.setup(chain, target, q0, criteria);
     auto status = run_stepper(stepper, chain, 2000);
@@ -132,13 +132,13 @@ TEST_CASE("restart_wrapper re-seeds after stall", "[ik][restart]")
     Eigen::Vector<double, 6> q0;
     q0 << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
     spp::convergence_criteria<double> criteria;
-    criteria.max_iterations = 15;  // very few -- will stall/hit limit quickly
+    criteria.max_iterations_per_attempt = 15;  // very few -- will stall/hit limit quickly
 
     stepper.setup(chain, target, q0, criteria);
     auto status = run_stepper(stepper, chain, 5000);
 
     // Should converge eventually via restart, or at least show cumulative iterations
-    // The key property: iterations() > criteria.max_iterations means restarts happened
+    // The key property: iterations() > criteria.max_iterations_per_attempt means restarts happened
     REQUIRE(stepper.iterations() > 0);
 
     // If it converged, great. If not, it at least tried multiple restarts.
@@ -173,7 +173,7 @@ TEST_CASE("restart_wrapper warm-start lambda", "[ik][restart]")
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
-    criteria.max_iterations = 20;
+    criteria.max_iterations_per_attempt = 20;
 
     stepper.setup(chain, target, q0, criteria);
     run_stepper(stepper, chain, 10000);
@@ -203,7 +203,7 @@ TEST_CASE("restart_wrapper max_restarts exhaustion", "[ik][restart]")
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
-    criteria.max_iterations = 50;
+    criteria.max_iterations_per_attempt = 50;
 
     stepper.setup(chain, target, q0, criteria);
     auto status = run_stepper(stepper, chain, 200);
@@ -241,13 +241,13 @@ TEST_CASE("restart_wrapper iterations is cumulative", "[ik][restart]")
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
-    criteria.max_iterations = 10;  // very few to force restarts
+    criteria.max_iterations_per_attempt = 10;  // very few to force restarts
 
     stepper.setup(chain, target, q0, criteria);
     run_stepper(stepper, chain, 5000);
 
     // If restarts happened, total iterations should exceed single-start max
-    // (criteria.max_iterations is per-restart, not global)
+    // (criteria.max_iterations_per_attempt is per-restart, not global)
     REQUIRE(stepper.iterations() > 0);
 }
 

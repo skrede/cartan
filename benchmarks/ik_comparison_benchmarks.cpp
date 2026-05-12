@@ -1078,7 +1078,7 @@ static void bm_comparison_ur3e_argmin_slsqp_phi_ls_calls_impl(benchmark::State& 
 
         while (solver.status() == cartan::ik_status::running)
         {
-            solver.step(chain);
+            (void)solver.step(chain, 1);
         }
 
         total_ls += solver.line_search_calls();
@@ -1166,7 +1166,7 @@ static void bm_comparison_ur3e_argmin_slsqp_last_check_results(benchmark::State&
 
         while (solver.status() == cartan::ik_status::running)
         {
-            solver.step(chain);
+            (void)solver.step(chain, 1);
         }
 
         const auto results = solver.last_check_results();
@@ -1240,7 +1240,7 @@ static void bm_comparison_ur3e_argmin_slsqp_grad_sweep(benchmark::State& state)
 
         while (solver.status() == cartan::ik_status::running)
         {
-            solver.step(chain);
+            (void)solver.step(chain, 1);
         }
 
         const auto results = solver.last_check_results();
@@ -1336,7 +1336,7 @@ static void bm_comparison_ur3e_argmin_slsqp_budget_sweep(benchmark::State& state
 
         while (solver.status() == cartan::ik_status::running)
         {
-            solver.step(chain);
+            (void)solver.step(chain, 1);
         }
 
         const auto results = solver.last_check_results();
@@ -1420,7 +1420,7 @@ static void bm_comparison_ur3e_argmin_slsqp_retry(benchmark::State& state)
 
         while (solver.status() == cartan::ik_status::running)
         {
-            solver.step(chain);
+            (void)solver.step(chain, 1);
         }
 
         total_restarts += static_cast<std::uint64_t>(solver.restart_count());
@@ -1490,7 +1490,7 @@ static void bm_comparison_ur3e_argmin_slsqp_last_check_results_alias(benchmark::
 
         while (solver.status() == cartan::ik_status::running)
         {
-            solver.step(chain);
+            (void)solver.step(chain, 1);
         }
 
         const auto results = solver.last_check_results();
@@ -1569,7 +1569,7 @@ static void bm_comparison_ur3e_nlopt_slsqp_inner_iter_count(benchmark::State& st
 
         while (solver.status() == cartan::ik_status::running)
         {
-            solver.step(chain);
+            (void)solver.step(chain, 1);
         }
 
         total_calls += solver.nlopt_objective_calls();
@@ -1644,7 +1644,7 @@ static void bm_comparison_ur3e_nlopt_slsqp_restart_count(benchmark::State& state
 
         while (solver.status() == cartan::ik_status::running)
         {
-            solver.step(chain);
+            (void)solver.step(chain, 1);
         }
 
         const int rc = solver.nlopt_restart_count();
@@ -1801,7 +1801,7 @@ static void bm_comparison_ur3e_argmin_slsqp_phi_ls_calls_dynamicN(benchmark::Sta
 
         while (solver.status() == cartan::ik_status::running)
         {
-            solver.step(chain);
+            (void)solver.step(chain, 1);
         }
 
         total_ls += solver.line_search_calls();

@@ -124,7 +124,7 @@ TEST_CASE("exhaustive_ik_runner finds multiple solutions", "[ik][exhaustive]")
     spp::convergence_criteria<double> criteria;
     criteria.position_tol = 1e-4;
     criteria.orientation_tol = 1e-4;
-    criteria.max_iterations = 200;
+    criteria.max_iterations_per_attempt = 200;
 
     spp::exhaustive_options<double> options;
     options.max_restarts = 50;
@@ -163,7 +163,7 @@ TEST_CASE("exhaustive_ik_runner returns empty for unreachable target", "[ik][exh
     spp::convergence_criteria<double> criteria;
     criteria.position_tol = 1e-4;
     criteria.orientation_tol = 1e-4;
-    criteria.max_iterations = 100;
+    criteria.max_iterations_per_attempt = 100;
 
     spp::exhaustive_options<double> options;
     options.max_restarts = 20;
@@ -189,7 +189,7 @@ TEST_CASE("exhaustive_ik_runner dedup removes near-identical solutions", "[ik][e
     spp::convergence_criteria<double> criteria;
     criteria.position_tol = 1e-4;
     criteria.orientation_tol = 1e-4;
-    criteria.max_iterations = 200;
+    criteria.max_iterations_per_attempt = 200;
 
     Eigen::Vector<double, 6> seed = Eigen::Vector<double, 6>::Zero();
     spp::exhaustive_ik_runner<ur5_chain, ur5_plm> runner;
@@ -220,7 +220,7 @@ TEST_CASE("exhaustive_ik_runner ranking strategies", "[ik][exhaustive]")
     spp::convergence_criteria<double> criteria;
     criteria.position_tol = 1e-4;
     criteria.orientation_tol = 1e-4;
-    criteria.max_iterations = 200;
+    criteria.max_iterations_per_attempt = 200;
 
     Eigen::Vector<double, 6> seed = Eigen::Vector<double, 6>::Zero();
     spp::exhaustive_ik_runner<ur5_chain, ur5_plm> runner;
@@ -292,7 +292,7 @@ TEST_CASE("exhaustive_ik_runner<argmin_slsqp> concept satisfaction and solve", "
     spp::convergence_criteria<double> criteria;
     criteria.position_tol = 1e-4;
     criteria.orientation_tol = 1e-4;
-    criteria.max_iterations = 200;
+    criteria.max_iterations_per_attempt = 200;
 
     spp::exhaustive_options<double> options;
     options.max_restarts = 20;

@@ -49,7 +49,7 @@ spp::ik_status run_stepper(
     spp::ik_status status = spp::ik_status::running;
     for (int i = 0; i < max_steps && status == spp::ik_status::running; ++i)
     {
-        status = stepper.step(chain);
+        status = stepper.step(chain, 1).status;
     }
     return status;
 }

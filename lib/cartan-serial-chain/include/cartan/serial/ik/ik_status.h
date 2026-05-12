@@ -78,12 +78,46 @@ enum class ik_termination_reason
 
 /// Runtime convergence criteria for IK solvers.
 /// Separate position and orientation tolerances per Lynch & Park Ch. 6.2.
+///
+/// `max_iterations_per_attempt` bounds a single solver attempt (the per-attempt
+/// cap consulted by every solver's internal iteration counter, and by
+/// self-restarting solvers as their per-attempt budget before triggering a
+/// restart). `max_total_work_units` bounds the runner-level total budget,
+/// measured in algorithmic work units (1 unit = one major iteration of the
+/// solver's design); the runner accumulates `step_result::metrics.units_consumed`
+/// against this cap.
 template <typename Scalar = double>
 struct convergence_criteria
 {
     Scalar position_tol{Scalar(1e-6)};
     Scalar orientation_tol{Scalar(1e-6)};
-    int max_iterations{100};
+    int max_iterations_per_attempt{100};
+    int max_total_work_units{200};
+};
+
+/// Accounting/observability metrics returned by `solve_policy::step(chain, N)`.
+///
+/// `units_consumed` is the number of algorithmic work units charged by the
+/// `step()` call (1 unit = one major iteration of the solver's design;
+/// internal-restart events charge zero). `error_norm` is the most recent task
+/// error magnitude maintained by the solver.
+template <typename Scalar = double>
+struct step_metrics
+{
+    int units_consumed{};
+    Scalar error_norm{};
+};
+
+/// Result of a single `solve_policy::step(chain, N)` invocation.
+///
+/// Splits the control-flow signal (`status`) from accounting/observability
+/// (`metrics`). Future metric fields extend `step_metrics` without changing
+/// the outer return shape.
+template <typename Scalar = double>
+struct step_result
+{
+    ik_status status{ik_status::running};
+    step_metrics<Scalar> metrics{};
 };
 
 /// Options controlling multi-policy solver racing behavior.

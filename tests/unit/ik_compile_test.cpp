@@ -34,7 +34,7 @@ TEST_CASE("IK types compile", "[ik][compile]")
     spp::convergence_criteria<double> cc;
     REQUIRE(cc.position_tol > 0);
     REQUIRE(cc.orientation_tol > 0);
-    REQUIRE(cc.max_iterations > 0);
+    REQUIRE(cc.max_iterations_per_attempt > 0);
 
     // static_asserts in dls_solve_policy.h and lm_solve_policy.h verify concept satisfaction
     REQUIRE(true);

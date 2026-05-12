@@ -66,7 +66,6 @@ public:
 
     struct options
     {
-        int budget_per_step{50};
         scalar_type stall_threshold{scalar_type(1e-10)};
         scalar_type divergence_factor{scalar_type(10)};
         int stall_window{5};
@@ -113,9 +112,12 @@ public:
 
         // See mma.h for why max_iterations must be a large upper bound:
         // argmin's iterations_ counter is cumulative across step_n calls.
+        // The cartan-side per-attempt counter (m_iterations) drives termination
+        // against max_iterations_per_attempt; argmin's setup-time cap is held
+        // generously above the per-attempt cap so it never fires preemptively.
         argmin::solver_options<> nab_opts;
         nab_opts.max_iterations = static_cast<std::uint32_t>(
-            std::max<int>(m_options.budget_per_step * m_criteria.max_iterations, 100000));
+            std::max<int>(m_criteria.max_iterations_per_attempt, 100000));
         nab_opts.set_gradient_threshold(m_options.gradient_threshold);
         nab_opts.set_objective_threshold(m_options.objective_threshold);
         nab_opts.set_step_threshold(m_options.step_threshold);
@@ -123,62 +125,68 @@ public:
         m_solver.emplace(*m_problem, x0, nab_opts, m_options.policy_options);
     }
 
-    ik_status step(const Chain& chain)
+    step_result<scalar_type> step(const Chain& chain, int N)
     {
-        if (m_status != ik_status::running)
-        {
-            return m_status;
-        }
-
+        int units = 0;
         m_chain = &chain;
-        ++m_iterations;
-
-        if (m_iterations >= m_criteria.max_iterations)
+        while (units < N && m_status == ik_status::running)
         {
-            m_status = ik_status::iteration_limit;
-            return m_status;
+            // One algorithmic-work unit = one argmin-internal GCMMA outer iteration.
+            auto prev_iter = m_solver->state().iteration;
+            auto result = m_solver->step_n(1);
+            auto inner_units = static_cast<int>(m_solver->state().iteration - prev_iter);
+            if (inner_units <= 0)
+            {
+                m_status = ik_status::stalled;
+                break;
+            }
+            m_iterations += inner_units;
+            units += inner_units;
+
+            // argmin step_n returns best-seen iterate in result.x; see mma.h.
+            sync_solution_from_result(result.x);
+
+            auto fk = forward_kinematics(chain, m_q);
+            auto V_b = (m_target.inverse() * fk.end_effector).log();
+            m_error_norm = V_b.norm();
+
+            if (cartan::detail::is_converged_unweighted(V_b, m_criteria))
+            {
+                m_status = ik_status::converged;
+                break;
+            }
+
+            if (m_iterations >= m_criteria.max_iterations_per_attempt)
+            {
+                m_status = ik_status::iteration_limit;
+                break;
+            }
+
+            auto stall_result = cartan::detail::check_stall_divergence(
+                m_error_history, m_error_norm, m_initial_error,
+                m_options.stall_window, m_options.stall_threshold,
+                m_options.divergence_factor);
+            if (stall_result != ik_status::running)
+            {
+                m_status = stall_result;
+                break;
+            }
+
+            if (result.status == argmin::solver_status::converged
+                || result.status == argmin::solver_status::ftol_reached
+                || result.status == argmin::solver_status::stalled
+                || result.status == argmin::solver_status::xtol_reached
+                || result.status == argmin::solver_status::roundoff_limited
+                || result.status == argmin::solver_status::objective_stalled
+                || result.status == argmin::solver_status::aborted)
+            {
+                m_status = ik_status::stalled;
+                break;
+            }
+
+            cartan::detail::enforce_limits<LimitsPolicy>(m_q, chain);
         }
-
-        auto result = m_solver->step_n(m_options.budget_per_step);
-
-        // argmin step_n returns best-seen iterate in result.x; see mma.h.
-        sync_solution_from_result(result.x);
-
-        auto fk = forward_kinematics(chain, m_q);
-        auto V_b = (m_target.inverse() * fk.end_effector).log();
-        m_error_norm = V_b.norm();
-
-        if (cartan::detail::is_converged_unweighted(V_b, m_criteria))
-        {
-            m_status = ik_status::converged;
-            return m_status;
-        }
-
-        auto stall_result = cartan::detail::check_stall_divergence(
-            m_error_history, m_error_norm, m_initial_error,
-            m_options.stall_window, m_options.stall_threshold,
-            m_options.divergence_factor);
-        if (stall_result != ik_status::running)
-        {
-            m_status = stall_result;
-            return m_status;
-        }
-
-        if (result.status == argmin::solver_status::converged
-            || result.status == argmin::solver_status::ftol_reached
-            || result.status == argmin::solver_status::stalled
-            || result.status == argmin::solver_status::xtol_reached
-            || result.status == argmin::solver_status::roundoff_limited
-            || result.status == argmin::solver_status::objective_stalled
-            || result.status == argmin::solver_status::aborted)
-        {
-            m_status = ik_status::stalled;
-            return m_status;
-        }
-
-        cartan::detail::enforce_limits<LimitsPolicy>(m_q, chain);
-
-        return m_status;
+        return {m_status, {units, m_error_norm}};
     }
 
     [[nodiscard]] bool converged() const { return m_status == ik_status::converged; }

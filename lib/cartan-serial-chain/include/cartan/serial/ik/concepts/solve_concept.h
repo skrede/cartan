@@ -43,7 +43,7 @@ concept solve_policy = requires
     const convergence_criteria<typename S::scalar_type>& criteria)
 {
     { s.setup(chain, target, q0, criteria) };
-    { s.step(chain) } -> std::same_as<ik_status>;
+    { s.step(chain, int{}) } -> std::same_as<step_result<typename S::scalar_type>>;
     { s.converged() } -> std::convertible_to<bool>;
     { s.solution() } -> std::convertible_to<
         typename joint_state<typename S::scalar_type, S::joints>::position_type>;
@@ -51,6 +51,17 @@ concept solve_policy = requires
     { s.iterations() } -> std::convertible_to<int>;
     { s.abort() };
 };
+
+/// Ergonomic single-unit helper. Drives the solver for one algorithmic-work
+/// unit. Primary callers are enumeration drivers (e.g.,
+/// `exhaustive_ik_runner`), tests, and debug observers that want
+/// step-by-step visibility into solver progress.
+template <typename S>
+    requires solve_policy<S>
+inline auto step_one(S& s, const typename S::chain_type& chain)
+{
+    return s.step(chain, 1);
+}
 
 }
 

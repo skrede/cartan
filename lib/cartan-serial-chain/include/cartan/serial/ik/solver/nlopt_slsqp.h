@@ -103,66 +103,73 @@ public:
         m_opt.set_maxeval(m_eval_count);
     }
 
-    /// Execute one SLSQP optimization round with budget_per_step evaluations.
-    ik_status step(const chain_type& chain)
+    /// Execute up to N SLSQP optimization rounds.
+    ///
+    /// One algorithmic-work unit = one NLopt SLSQP optimize() call (each
+    /// internally bounded by budget_per_step NLopt evaluations).
+    step_result<scalar_type> step(const chain_type& chain, int N)
     {
-        if (m_status != ik_status::running)
-        {
-            return m_status;
-        }
-
+        int units = 0;
         m_chain = &chain;
-
-        m_eval_count += m_options.budget_per_step;
-        m_opt.set_maxeval(m_eval_count);
-
-        double min_val = 0.0;
-        nlopt::result result = cartan::detail::run_nlopt_optimize(m_opt, m_q_vec, min_val);
-
-        // Handle exception-sourced results immediately
-        if (result == nlopt::FAILURE)
+        while (units < N && m_status == ik_status::running)
         {
-            m_status = ik_status::diverged;
-            return m_status;
-        }
-        if (result == nlopt::ROUNDOFF_LIMITED)
-        {
+            m_eval_count += m_options.budget_per_step;
+            m_opt.set_maxeval(m_eval_count);
+
+            double min_val = 0.0;
+            nlopt::result result = cartan::detail::run_nlopt_optimize(m_opt, m_q_vec, min_val);
+            ++units;
+
+            // Handle exception-sourced results immediately
+            if (result == nlopt::FAILURE)
+            {
+                m_status = ik_status::diverged;
+                break;
+            }
+            if (result == nlopt::ROUNDOFF_LIMITED)
+            {
+                m_error_norm = cartan::detail::compute_body_error_norm<scalar_type, joints>(*m_chain, m_target, m_q_vec);
+                bool conv = cartan::detail::check_nlopt_convergence<scalar_type, joints>(*m_chain, m_target, m_criteria, m_q_vec);
+                m_status = conv ? ik_status::converged : ik_status::stalled;
+                break;
+            }
+
+            ++m_iterations;
+
+            m_prev_error = m_error_norm;
             m_error_norm = cartan::detail::compute_body_error_norm<scalar_type, joints>(*m_chain, m_target, m_q_vec);
+
             bool conv = cartan::detail::check_nlopt_convergence<scalar_type, joints>(*m_chain, m_target, m_criteria, m_q_vec);
-            m_status = conv ? ik_status::converged : ik_status::stalled;
-            return m_status;
+            bool error_stalled = std::abs(m_error_norm - m_prev_error) <
+                scalar_type(1e-10) * (scalar_type(1) + m_error_norm);
+            bool can_restart = m_restart_count < m_options.max_restarts;
+
+            if (cartan::detail::needs_restart(result, conv, error_stalled))
+            {
+                ++m_restart_count;
+                can_restart = m_restart_count < m_options.max_restarts;
+            }
+
+            m_status = cartan::detail::map_nlopt_result(result, conv, error_stalled, can_restart);
+
+            if (m_status == ik_status::running && cartan::detail::needs_restart(result, conv, error_stalled))
+            {
+                cartan::detail::perturb_nlopt_solution<scalar_type, joints>(m_q_vec, *m_chain, m_options.restart_scale, m_rng);
+                cartan::detail::reset_nlopt_optimizer<scalar_type, joints>(
+                    m_opt, nlopt::LD_SLSQP, *m_chain, objective_func, this,
+                    static_cast<double>(m_options.xtol_rel), m_options.budget_per_step, m_eval_count);
+                m_opt.set_ftol_rel(static_cast<double>(m_options.ftol_rel));
+            }
+
+            if (m_iterations >= m_criteria.max_iterations_per_attempt)
+            {
+                m_status = ik_status::iteration_limit;
+                break;
+            }
+
+            cartan::detail::enforce_and_sync_limits<LimitsPolicy, scalar_type, joints>(m_q_vec, chain);
         }
-
-        ++m_iterations;
-
-        m_prev_error = m_error_norm;
-        m_error_norm = cartan::detail::compute_body_error_norm<scalar_type, joints>(*m_chain, m_target, m_q_vec);
-
-        bool conv = cartan::detail::check_nlopt_convergence<scalar_type, joints>(*m_chain, m_target, m_criteria, m_q_vec);
-        bool error_stalled = std::abs(m_error_norm - m_prev_error) <
-            scalar_type(1e-10) * (scalar_type(1) + m_error_norm);
-        bool can_restart = m_restart_count < m_options.max_restarts;
-
-        if (cartan::detail::needs_restart(result, conv, error_stalled))
-        {
-            ++m_restart_count;
-            can_restart = m_restart_count < m_options.max_restarts;
-        }
-
-        m_status = cartan::detail::map_nlopt_result(result, conv, error_stalled, can_restart);
-
-        if (m_status == ik_status::running && cartan::detail::needs_restart(result, conv, error_stalled))
-        {
-            cartan::detail::perturb_nlopt_solution<scalar_type, joints>(m_q_vec, *m_chain, m_options.restart_scale, m_rng);
-            cartan::detail::reset_nlopt_optimizer<scalar_type, joints>(
-                m_opt, nlopt::LD_SLSQP, *m_chain, objective_func, this,
-                static_cast<double>(m_options.xtol_rel), m_options.budget_per_step, m_eval_count);
-            m_opt.set_ftol_rel(static_cast<double>(m_options.ftol_rel));
-        }
-
-        cartan::detail::enforce_and_sync_limits<LimitsPolicy, scalar_type, joints>(m_q_vec, chain);
-
-        return m_status;
+        return {m_status, {units, m_error_norm}};
     }
 
     [[nodiscard]] bool converged() const { return m_status == ik_status::converged; }

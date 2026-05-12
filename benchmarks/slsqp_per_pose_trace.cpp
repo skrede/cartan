@@ -116,7 +116,7 @@ void trace_pose(
     while (true)
     {
         auto t0 = std::chrono::steady_clock::now();
-        auto status = solver.step(chain);
+        auto status = solver.step(chain, 1).status;
         auto t1 = std::chrono::steady_clock::now();
         ++outer;
 
@@ -167,7 +167,7 @@ void trace_pose(
             lsc_prev = 0;
         }
 
-        if (outer >= criteria.max_iterations) break;
+        if (outer >= criteria.max_iterations_per_attempt) break;
     }
 }
 

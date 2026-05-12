@@ -111,7 +111,6 @@ TEST_CASE("cmaes_solve_policy converges on UR5-like chain", "[ik][argmin][cmaes]
     cartan::convergence_criteria<double> criteria{1e-2, 1e-2, 10000};
 
     cartan::ik::cmaes<chain_t>::options opts;
-    opts.budget_per_step = 500;
     opts.initial_sigma = 0.05;
     opts.stall_window = 200;
     opts.stall_threshold = 1e-14;

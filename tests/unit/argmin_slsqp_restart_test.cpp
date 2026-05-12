@@ -47,7 +47,7 @@ TEST_CASE("argmin_slsqp restart_count reaches max_restarts on hard target", "[ik
     solver.setup(chain, target, q_seed, criteria);
 
     while (solver.status() == cartan::ik_status::running)
-        solver.step(chain);
+        (void)solver.step(chain, 1);
 
     REQUIRE(solver.status() == cartan::ik_status::stalled);
     REQUIRE(solver.restart_count() == 2);
@@ -67,7 +67,7 @@ TEST_CASE("argmin_slsqp zero restarts on easy target", "[ik][argmin][slsqp][rest
     solver.setup(chain, target, q_seed, criteria);
 
     while (solver.status() == cartan::ik_status::running)
-        solver.step(chain);
+        (void)solver.step(chain, 1);
 
     REQUIRE(solver.converged());
     REQUIRE(solver.restart_count() == 0);
@@ -91,7 +91,7 @@ TEST_CASE("argmin_slsqp deterministic under fixed RNG seed", "[ik][argmin][slsqp
         solver.setup(chain, target, q_seed, criteria);
 
         while (solver.status() == cartan::ik_status::running)
-            solver.step(chain);
+            (void)solver.step(chain, 1);
 
         return solver;
     };
