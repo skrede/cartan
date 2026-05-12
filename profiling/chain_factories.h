@@ -12,7 +12,9 @@
 #include <cartan/types.h>
 #include <cartan/lie/se3.h>
 #include <cartan/lie/so3.h>
+#include <cartan/serial/chain/joint_tags.h>
 #include <cartan/serial/chain/screw_axis.h>
+#include <cartan/serial/chain/static_chain.h>
 #include <cartan/serial/chain/joint_limits.h>
 #include <cartan/serial/chain/kinematic_chain.h>
 #include <cartan/serial/chain/storage_trait.h>
@@ -487,6 +489,256 @@ auto make_kuka_lwr4_chain() -> cartan::kinematic_chain<Scalar, 7>
         home,
         {s1, s2, s3, s4, s5, s6, s7},
         {lim, lim, lim, lim, lim, lim, lim});
+}
+
+// ===========================================================================
+// Additive static_chain / paired kinematic_chain factories
+//
+// Each fixture exposes a `_geometry` helper in `detail::` that returns the
+// screw axes, home pose, and joint limits for a single chain; the public
+// `_chain` factory wraps them into a `kinematic_chain` and the `_static`
+// factory wraps them into a `static_chain<Scalar, Joints...>` whose joint-tag
+// pack matches the omega direction of each screw axis. The pair keeps
+// downstream consumers (FK, random_reachable_target, analytical solvers) from
+// having to synthesize geometry inline.
+// ===========================================================================
+
+namespace detail
+{
+
+// --- Synthetic planar 2R fixture (analytical_solver_2r geometry) ---
+template <typename Scalar>
+struct planar_2r_geometry
+{
+    static constexpr Scalar l1 = Scalar(0.5);
+    static constexpr Scalar l2 = Scalar(0.4);
+
+    [[nodiscard]] static std::array<cartan::screw_axis<Scalar>, 2> axes()
+    {
+        using vec3 = cartan::vector3<Scalar>;
+        return {
+            cartan::screw_axis<Scalar>::revolute(
+                vec3(Scalar(0), Scalar(1), Scalar(0)),
+                vec3(Scalar(0), Scalar(0), Scalar(0))),
+            cartan::screw_axis<Scalar>::revolute(
+                vec3(Scalar(0), Scalar(1), Scalar(0)),
+                vec3(l1, Scalar(0), Scalar(0)))};
+    }
+
+    [[nodiscard]] static cartan::se3<Scalar> home()
+    {
+        return cartan::se3<Scalar>(
+            cartan::so3<Scalar>::identity(),
+            cartan::vector3<Scalar>(l1 + l2, Scalar(0), Scalar(0)));
+    }
+
+    [[nodiscard]] static std::array<cartan::joint_limits<Scalar>, 2> limits()
+    {
+        cartan::joint_limits<Scalar> lim{
+            -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
+        return {lim, lim};
+    }
+};
+
+// --- Synthetic spatial 3R fixture (analytical_solver_3r ZYZ geometry) ---
+template <typename Scalar>
+struct spatial_3r_geometry
+{
+    static constexpr Scalar link_offset = Scalar(0.5);
+    static constexpr Scalar ee_offset = Scalar(0.3);
+
+    [[nodiscard]] static std::array<cartan::screw_axis<Scalar>, 3> axes()
+    {
+        using vec3 = cartan::vector3<Scalar>;
+        return {
+            cartan::screw_axis<Scalar>::revolute(
+                vec3(Scalar(0), Scalar(0), Scalar(1)),
+                vec3(Scalar(0), Scalar(0), Scalar(0))),
+            cartan::screw_axis<Scalar>::revolute(
+                vec3(Scalar(0), Scalar(1), Scalar(0)),
+                vec3(Scalar(0), Scalar(0), Scalar(0))),
+            cartan::screw_axis<Scalar>::revolute(
+                vec3(Scalar(0), Scalar(0), Scalar(1)),
+                vec3(link_offset, Scalar(0), Scalar(0)))};
+    }
+
+    [[nodiscard]] static cartan::se3<Scalar> home()
+    {
+        return cartan::se3<Scalar>(
+            cartan::so3<Scalar>::identity(),
+            cartan::vector3<Scalar>(link_offset + ee_offset, Scalar(0), Scalar(0)));
+    }
+
+    [[nodiscard]] static std::array<cartan::joint_limits<Scalar>, 3> limits()
+    {
+        cartan::joint_limits<Scalar> lim{
+            -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
+        return {lim, lim, lim};
+    }
+};
+
+// --- ABB IRB 120 (matches make_abb_irb120_chain screw axes) ---
+template <typename Scalar>
+struct abb_irb120_geometry
+{
+    [[nodiscard]] static std::array<cartan::screw_axis<Scalar>, 6> axes()
+    {
+        using vec3 = cartan::vector3<Scalar>;
+        return {
+            cartan::screw_axis<Scalar>::revolute(
+                vec3(Scalar(0), Scalar(0), Scalar(1)),
+                vec3(Scalar(0), Scalar(0), Scalar(0))),
+            cartan::screw_axis<Scalar>::revolute(
+                vec3(Scalar(0), Scalar(1), Scalar(0)),
+                vec3(Scalar(0), Scalar(0), Scalar(0.290))),
+            cartan::screw_axis<Scalar>::revolute(
+                vec3(Scalar(0), Scalar(1), Scalar(0)),
+                vec3(Scalar(0), Scalar(0), Scalar(0.560))),
+            cartan::screw_axis<Scalar>::revolute(
+                vec3(Scalar(1), Scalar(0), Scalar(0)),
+                vec3(Scalar(0), Scalar(0), Scalar(0.560))),
+            cartan::screw_axis<Scalar>::revolute(
+                vec3(Scalar(0), Scalar(1), Scalar(0)),
+                vec3(Scalar(0), Scalar(0), Scalar(0.862))),
+            cartan::screw_axis<Scalar>::revolute(
+                vec3(Scalar(1), Scalar(0), Scalar(0)),
+                vec3(Scalar(0), Scalar(0), Scalar(0.862)))};
+    }
+
+    [[nodiscard]] static cartan::se3<Scalar> home()
+    {
+        return cartan::se3<Scalar>(
+            cartan::so3<Scalar>::identity(),
+            cartan::vector3<Scalar>(Scalar(0), Scalar(0), Scalar(0.934)));
+    }
+
+    [[nodiscard]] static std::array<cartan::joint_limits<Scalar>, 6> limits()
+    {
+        cartan::joint_limits<Scalar> lim{
+            -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
+        return {lim, lim, lim, lim, lim, lim};
+    }
+};
+
+// --- KUKA KR 6 R900 SIXX (matches make_kr6_sixx_chain screw axes) ---
+template <typename Scalar>
+struct kr6_sixx_geometry
+{
+    [[nodiscard]] static std::array<cartan::screw_axis<Scalar>, 6> axes()
+    {
+        using vec3 = cartan::vector3<Scalar>;
+        return {
+            cartan::screw_axis<Scalar>::revolute(
+                vec3(Scalar(0), Scalar(0), Scalar(1)),
+                vec3(Scalar(0), Scalar(0), Scalar(0))),
+            cartan::screw_axis<Scalar>::revolute(
+                vec3(Scalar(0), Scalar(1), Scalar(0)),
+                vec3(Scalar(0), Scalar(0), Scalar(0.400))),
+            cartan::screw_axis<Scalar>::revolute(
+                vec3(Scalar(0), Scalar(1), Scalar(0)),
+                vec3(Scalar(0.455), Scalar(0), Scalar(0.400))),
+            cartan::screw_axis<Scalar>::revolute(
+                vec3(Scalar(1), Scalar(0), Scalar(0)),
+                vec3(Scalar(0.875), Scalar(0), Scalar(0.400))),
+            cartan::screw_axis<Scalar>::revolute(
+                vec3(Scalar(0), Scalar(1), Scalar(0)),
+                vec3(Scalar(0.875), Scalar(0), Scalar(0.400))),
+            cartan::screw_axis<Scalar>::revolute(
+                vec3(Scalar(1), Scalar(0), Scalar(0)),
+                vec3(Scalar(0.935), Scalar(0), Scalar(0.400)))};
+    }
+
+    [[nodiscard]] static cartan::se3<Scalar> home()
+    {
+        return cartan::se3<Scalar>(
+            cartan::so3<Scalar>::identity(),
+            cartan::vector3<Scalar>(Scalar(0.935), Scalar(0), Scalar(0.400)));
+    }
+
+    [[nodiscard]] static std::array<cartan::joint_limits<Scalar>, 6> limits()
+    {
+        cartan::joint_limits<Scalar> lim{
+            -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
+        return {lim, lim, lim, lim, lim, lim};
+    }
+};
+
+}
+
+// --- Synthetic planar 2R factory pair ---
+template <typename Scalar>
+auto make_planar_2r_chain() -> cartan::kinematic_chain<Scalar, 2>
+{
+    auto axes = detail::planar_2r_geometry<Scalar>::axes();
+    auto limits = detail::planar_2r_geometry<Scalar>::limits();
+    return cartan::kinematic_chain<Scalar, 2>(
+        detail::planar_2r_geometry<Scalar>::home(),
+        {axes[0], axes[1]},
+        {limits[0], limits[1]});
+}
+
+template <typename Scalar>
+auto make_planar_2r_static()
+    -> cartan::static_chain<Scalar, cartan::revolute_y, cartan::revolute_y>
+{
+    return cartan::static_chain<Scalar, cartan::revolute_y, cartan::revolute_y>(
+        detail::planar_2r_geometry<Scalar>::home(),
+        detail::planar_2r_geometry<Scalar>::axes(),
+        detail::planar_2r_geometry<Scalar>::limits());
+}
+
+// --- Synthetic spatial 3R factory pair ---
+template <typename Scalar>
+auto make_spatial_3r_chain() -> cartan::kinematic_chain<Scalar, 3>
+{
+    auto axes = detail::spatial_3r_geometry<Scalar>::axes();
+    auto limits = detail::spatial_3r_geometry<Scalar>::limits();
+    return cartan::kinematic_chain<Scalar, 3>(
+        detail::spatial_3r_geometry<Scalar>::home(),
+        {axes[0], axes[1], axes[2]},
+        {limits[0], limits[1], limits[2]});
+}
+
+template <typename Scalar>
+auto make_spatial_3r_static()
+    -> cartan::static_chain<Scalar,
+        cartan::revolute_z, cartan::revolute_y, cartan::revolute_z>
+{
+    return cartan::static_chain<Scalar,
+        cartan::revolute_z, cartan::revolute_y, cartan::revolute_z>(
+        detail::spatial_3r_geometry<Scalar>::home(),
+        detail::spatial_3r_geometry<Scalar>::axes(),
+        detail::spatial_3r_geometry<Scalar>::limits());
+}
+
+// --- ABB IRB 120 static_chain factory (paired with make_abb_irb120_chain) ---
+template <typename Scalar>
+auto make_abb_irb120_static()
+    -> cartan::static_chain<Scalar,
+        cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
+        cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>
+{
+    return cartan::static_chain<Scalar,
+        cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
+        cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>(
+        detail::abb_irb120_geometry<Scalar>::home(),
+        detail::abb_irb120_geometry<Scalar>::axes(),
+        detail::abb_irb120_geometry<Scalar>::limits());
+}
+
+// --- KUKA KR 6 R900 SIXX static_chain factory (paired with make_kr6_sixx_chain) ---
+template <typename Scalar>
+auto make_kr6_sixx_static()
+    -> cartan::static_chain<Scalar,
+        cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
+        cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>
+{
+    return cartan::static_chain<Scalar,
+        cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
+        cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>(
+        detail::kr6_sixx_geometry<Scalar>::home(),
+        detail::kr6_sixx_geometry<Scalar>::axes(),
+        detail::kr6_sixx_geometry<Scalar>::limits());
 }
 
 // ===========================================================================
