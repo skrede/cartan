@@ -577,7 +577,20 @@ struct spatial_3r_geometry
     }
 };
 
-// --- ABB IRB 120 (matches make_abb_irb120_chain screw axes) ---
+// --- ABB IRB 120 (Pieper-anchored variant of make_abb_irb120_chain) ---
+//
+// Wrist-decoupling note: this static_chain geometry deliberately diverges from
+// the paired kinematic_chain `make_abb_irb120_chain` factory. The kinematic
+// variant keeps the original IRB120 link offsets (wrist axes 4-5 anchored at
+// z = 0.560, axis 6 at z = 0.862). The static variant below anchors all three
+// wrist axes (4, 5, 6) at the axis-6 wrist-center point (0, 0, 0.862) so that
+// pieper_6r_solver::find_wrist_intersection succeeds. The home pose is
+// preserved (end-effector at (0, 0, 0.934)) and joint axis directions match
+// the kinematic chain, so the two factories agree on FK at the home
+// configuration; they diverge for non-zero joint angles. This asymmetry is
+// what permits closed-form Pieper-decoupled solves on the static side while
+// keeping FK-walked target generation and matched iterative cells running on
+// the unmodified source geometry.
 template <typename Scalar>
 struct abb_irb120_geometry
 {
@@ -596,7 +609,7 @@ struct abb_irb120_geometry
                 vec3(Scalar(0), Scalar(0), Scalar(0.560))),
             cartan::screw_axis<Scalar>::revolute(
                 vec3(Scalar(1), Scalar(0), Scalar(0)),
-                vec3(Scalar(0), Scalar(0), Scalar(0.560))),
+                vec3(Scalar(0), Scalar(0), Scalar(0.862))),
             cartan::screw_axis<Scalar>::revolute(
                 vec3(Scalar(0), Scalar(1), Scalar(0)),
                 vec3(Scalar(0), Scalar(0), Scalar(0.862))),
