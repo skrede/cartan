@@ -29,6 +29,7 @@
 #include <argmin/solver/convergence.h>
 #include <argmin/solver/basic_solver.h>
 #include <argmin/solver/kraft_slsqp_policy.h>
+#include <argmin/solver/sqp_mode.h>
 
 #include <Eigen/Core>
 
@@ -64,7 +65,8 @@ namespace cartan::ik
 /// when the alternative policy is used.
 template <chain Chain,
           typename LimitsPolicy = clamp_limits,
-          typename Convergence = argmin::default_convergence>
+          typename Convergence = argmin::default_convergence,
+          argmin::sqp_mode Mode = argmin::sqp_mode::accurate>
 class argmin_slsqp
 {
 public:
@@ -150,7 +152,7 @@ public:
 
         build_argmin_opts(m_nab_opts);
 
-        typename argmin::kraft_slsqp_policy<joints>::options_type policy_opts{};
+        typename argmin::kraft_slsqp_policy<joints, Mode>::options_type policy_opts{};
         policy_opts.line_search.c1 = m_options.line_search_c1;
 
         m_solver.emplace(*m_problem, x0, m_nab_opts, policy_opts);
@@ -308,7 +310,7 @@ public:
 
 private:
     using argmin_solver = argmin::basic_solver<
-        argmin::kraft_slsqp_policy<joints>, joints, cartan::detail::argmin_ik_problem<Chain>>;
+        argmin::kraft_slsqp_policy<joints, Mode>, joints, cartan::detail::argmin_ik_problem<Chain>>;
     using argmin_opts_type = argmin::solver_options<Convergence>;
 
     position_type perturb_solution(const position_type& q, const Chain& chain)
@@ -434,6 +436,19 @@ private:
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 using argmin_slsqp_nlopt_compat =
     argmin_slsqp<Chain, LimitsPolicy, argmin::slsqp_compatible_convergence>;
+
+/// Fast-mode variant of argmin_slsqp.
+///
+/// Threads argmin::sqp_mode::fast into kraft_slsqp_policy's NTTP slot.
+/// Fast mode selects looser per-knob tolerances + dead-branch-stripped
+/// per-knob defaults sized to a per-call NMPC-style budget (SOC retry
+/// short-circuited, shorter line-search budget, LS-exhaustion retry
+/// disabled). See argmin/solver/sqp_mode.h for the precedent and
+/// rationale, and kraft_slsqp_policy's per-Mode tolerance scaling for
+/// the exact constants.
+template <chain Chain, typename LimitsPolicy = clamp_limits>
+using argmin_slsqp_fast =
+    argmin_slsqp<Chain, LimitsPolicy, argmin::default_convergence, argmin::sqp_mode::fast>;
 
 }
 

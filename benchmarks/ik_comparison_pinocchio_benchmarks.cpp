@@ -764,6 +764,18 @@ IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, argmin_bobyqa,   
 IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, argmin_lbfgsb,               cartan::ik::argmin_lbfgsb);
 IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, argmin_projected_gn,         cartan::ik::argmin_projected_gn);
 IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, argmin_projected_gradient_gn, cartan::ik::argmin_projected_gradient_gn);
+
+// Fast-mode SQP cells — argmin sqp_mode::fast NTTP threaded through kraft_slsqp_policy.
+// Bench reply to argmin-cartan_00-83 (accurate vs fast-mode wall + SR verdict).
+IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, argmin_slsqp_fast,           cartan::ik::argmin_slsqp_fast);
+IK_BENCH_SOLVER_VARIANTS(kr6_sixx,   make_kr6_sixx_chain,   6, argmin_slsqp_fast,           cartan::ik::argmin_slsqp_fast);
+IK_BENCH_SOLVER_VARIANTS(abb_irb120, make_abb_irb120_chain, 6, argmin_slsqp_fast,           cartan::ik::argmin_slsqp_fast);
+IK_BENCH_SOLVER_VARIANTS(jaco2,      make_jaco2_chain,      6, argmin_slsqp_fast,           cartan::ik::argmin_slsqp_fast);
+IK_BENCH_SOLVER_VARIANTS(lbr_med14,  make_lbr_med14_chain,  7, argmin_slsqp_fast,           cartan::ik::argmin_slsqp_fast);
+IK_BENCH_SOLVER_VARIANTS(panda,      make_panda_chain,      7, argmin_slsqp_fast,           cartan::ik::argmin_slsqp_fast);
+IK_BENCH_SOLVER_VARIANTS(fetch,      make_fetch_chain,      7, argmin_slsqp_fast,           cartan::ik::argmin_slsqp_fast);
+IK_BENCH_SOLVER_VARIANTS(baxter,     make_baxter_chain,     7, argmin_slsqp_fast,           cartan::ik::argmin_slsqp_fast);
+IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, argmin_slsqp_fast,           cartan::ik::argmin_slsqp_fast);
 #endif
 
 
