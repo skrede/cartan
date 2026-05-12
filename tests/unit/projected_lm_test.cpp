@@ -109,6 +109,7 @@ TEST_CASE("projected_lm FK roundtrip", "[ik][projected_lm]")
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 200;
+    criteria.max_total_work_units = 400;
 
     stepper.setup(chain, target, q0, criteria);
     auto status = run_stepper(stepper, chain, 200);
@@ -141,6 +142,7 @@ TEST_CASE("projected_lm respects tight limits", "[ik][projected_lm]")
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 300;
+    criteria.max_total_work_units = 600;
 
     stepper.setup(chain, target, q0, criteria);
     auto status = run_stepper(stepper, chain, 300);
@@ -174,6 +176,7 @@ TEST_CASE("projected_lm active set holds joints at limits", "[ik][projected_lm]"
 
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 300;
+    criteria.max_total_work_units = 600;
 
     stepper.setup(chain, target, q0, criteria);
     run_stepper(stepper, chain, 300);
@@ -205,6 +208,7 @@ TEST_CASE("projected_lm dogleg converges", "[ik][projected_lm]")
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 200;
+    criteria.max_total_work_units = 400;
 
     stepper.setup(chain, target, q0, criteria);
     auto status = run_stepper(stepper, chain, 200);
@@ -239,6 +243,7 @@ TEST_CASE("projected_lm with error weight", "[ik][projected_lm]")
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 200;
+    criteria.max_total_work_units = 400;
 
     stepper.setup(chain, target, q0, criteria, weight);
     auto status = run_stepper(stepper, chain, 200);
@@ -272,6 +277,7 @@ TEST_CASE("projected_lm stall detection", "[ik][projected_lm]")
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 500;
+    criteria.max_total_work_units = 1000;
 
     stepper.setup(chain, target, q0, criteria);
     auto status = run_stepper(stepper, chain, 500);
@@ -302,6 +308,7 @@ TEST_CASE("projected_lm divergence detection", "[ik][projected_lm]")
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 200;
+    criteria.max_total_work_units = 400;
 
     stepper.setup(chain, target, q0, criteria);
     auto status = run_stepper(stepper, chain, 200);

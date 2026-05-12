@@ -89,6 +89,7 @@ TEST_CASE("restart_wrapper trivial convergence", "[ik][restart]")
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 200;
+    criteria.max_total_work_units = 2000;  // matches run_stepper outer bound; allow multiple restart attempts
 
     stepper.setup(chain, target, q0, criteria);
     auto status = run_stepper(stepper, chain, 2000);
@@ -132,14 +133,17 @@ TEST_CASE("restart_wrapper re-seeds after stall", "[ik][restart]")
     Eigen::Vector<double, 6> q0;
     q0 << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
     spp::convergence_criteria<double> criteria;
-    criteria.max_iterations_per_attempt = 15;  // very few -- will stall/hit limit quickly
+    criteria.max_iterations_per_attempt = 15;          // per-attempt cap forces stall + restart
+    criteria.max_total_work_units = 5000;              // matches run_stepper max_steps; permits many restart attempts
 
     stepper.setup(chain, target, q0, criteria);
     auto status = run_stepper(stepper, chain, 5000);
 
-    // Should converge eventually via restart, or at least show cumulative iterations
-    // The key property: iterations() > criteria.max_iterations_per_attempt means restarts happened
-    REQUIRE(stepper.iterations() > 0);
+    // Post-refactor invariant: stepper.iterations() returns cumulative inner units
+    // across all restart attempts. Exceeding max_iterations_per_attempt indicates
+    // that the wrapper triggered at least one restart and the second attempt
+    // billed additional inner units.
+    REQUIRE(stepper.iterations() > criteria.max_iterations_per_attempt);
 
     // If it converged, great. If not, it at least tried multiple restarts.
     if (status == spp::ik_status::converged)
@@ -174,6 +178,7 @@ TEST_CASE("restart_wrapper warm-start lambda", "[ik][restart]")
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 20;
+    criteria.max_total_work_units = 10000;  // matches run_stepper outer bound; allow many warm-restart attempts
 
     stepper.setup(chain, target, q0, criteria);
     run_stepper(stepper, chain, 10000);
@@ -204,6 +209,7 @@ TEST_CASE("restart_wrapper max_restarts exhaustion", "[ik][restart]")
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 50;
+    criteria.max_total_work_units = 100;
 
     stepper.setup(chain, target, q0, criteria);
     auto status = run_stepper(stepper, chain, 200);
@@ -242,13 +248,16 @@ TEST_CASE("restart_wrapper iterations is cumulative", "[ik][restart]")
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 10;  // very few to force restarts
+    criteria.max_total_work_units = 5000;       // matches run_stepper outer bound; permits cumulative billing across many restarts
 
     stepper.setup(chain, target, q0, criteria);
     run_stepper(stepper, chain, 5000);
 
-    // If restarts happened, total iterations should exceed single-start max
-    // (criteria.max_iterations_per_attempt is per-restart, not global)
-    REQUIRE(stepper.iterations() > 0);
+    // Cumulative billing: iterations() aggregates inner units across all restart
+    // attempts (D-13). When the wrapper triggered at least one restart and the
+    // second attempt billed additional inner units, the total exceeds the
+    // per-attempt cap. criteria.max_iterations_per_attempt is per-attempt, not global.
+    REQUIRE(stepper.iterations() > criteria.max_iterations_per_attempt);
 }
 
 // ============================================================================

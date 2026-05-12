@@ -125,6 +125,7 @@ TEST_CASE("exhaustive_ik_runner finds multiple solutions", "[ik][exhaustive]")
     criteria.position_tol = 1e-4;
     criteria.orientation_tol = 1e-4;
     criteria.max_iterations_per_attempt = 200;
+    criteria.max_total_work_units = 400;
 
     spp::exhaustive_options<double> options;
     options.max_restarts = 50;
@@ -164,6 +165,7 @@ TEST_CASE("exhaustive_ik_runner returns empty for unreachable target", "[ik][exh
     criteria.position_tol = 1e-4;
     criteria.orientation_tol = 1e-4;
     criteria.max_iterations_per_attempt = 100;
+    criteria.max_total_work_units = 200;
 
     spp::exhaustive_options<double> options;
     options.max_restarts = 20;
@@ -190,6 +192,7 @@ TEST_CASE("exhaustive_ik_runner dedup removes near-identical solutions", "[ik][e
     criteria.position_tol = 1e-4;
     criteria.orientation_tol = 1e-4;
     criteria.max_iterations_per_attempt = 200;
+    criteria.max_total_work_units = 400;
 
     Eigen::Vector<double, 6> seed = Eigen::Vector<double, 6>::Zero();
     spp::exhaustive_ik_runner<ur5_chain, ur5_plm> runner;
@@ -221,6 +224,7 @@ TEST_CASE("exhaustive_ik_runner ranking strategies", "[ik][exhaustive]")
     criteria.position_tol = 1e-4;
     criteria.orientation_tol = 1e-4;
     criteria.max_iterations_per_attempt = 200;
+    criteria.max_total_work_units = 400;
 
     Eigen::Vector<double, 6> seed = Eigen::Vector<double, 6>::Zero();
     spp::exhaustive_ik_runner<ur5_chain, ur5_plm> runner;
@@ -293,6 +297,7 @@ TEST_CASE("exhaustive_ik_runner<argmin_slsqp> concept satisfaction and solve", "
     criteria.position_tol = 1e-4;
     criteria.orientation_tol = 1e-4;
     criteria.max_iterations_per_attempt = 200;
+    criteria.max_total_work_units = 400;
 
     spp::exhaustive_options<double> options;
     options.max_restarts = 20;

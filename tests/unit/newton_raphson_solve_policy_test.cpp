@@ -89,6 +89,7 @@ TEST_CASE("newton_raphson_solve_policy converges on UR5", "[ik][newton_raphson]"
 
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 200;
+    criteria.max_total_work_units = 400;
 
     stepper.setup(chain, target, q0, criteria);
     auto status = run_stepper(stepper, chain, 200);
@@ -126,6 +127,7 @@ TEST_CASE("newton_raphson_solve_policy composes with restart_solve_policy", "[ik
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 200;
+    criteria.max_total_work_units = 1000;  // matches run_stepper outer bound; allow multiple restart attempts under the wrapper
 
     stepper.setup(chain, target, q0, criteria);
     auto status = run_stepper(stepper, chain, 1000);
@@ -159,6 +161,7 @@ TEST_CASE("newton_raphson_solve_policy handles singular configuration", "[ik][ne
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 100;
+    criteria.max_total_work_units = 200;
 
     stepper.setup(chain, target, q0, criteria);
     auto status = run_stepper(stepper, chain, 100);

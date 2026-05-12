@@ -110,6 +110,7 @@ TEST_CASE("IkSolver with DLS converges via solve()", "[ik][solver]")
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 200;
+    criteria.max_total_work_units = 400;
 
     solver.setup(chain, target, q0, criteria);
     auto result = solver.solve();
@@ -141,6 +142,7 @@ TEST_CASE("IkSolver with LM converges via solve()", "[ik][solver]")
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 200;
+    criteria.max_total_work_units = 400;
 
     solver.setup(chain, target, q0, criteria);
     auto result = solver.solve();
@@ -170,6 +172,7 @@ TEST_CASE("IkSolver step-by-step matches solve()", "[ik][solver]")
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 200;
+    criteria.max_total_work_units = 400;
 
     solver.setup(chain, target, q0, criteria);
 
@@ -203,6 +206,7 @@ TEST_CASE("IkSolver with clamp_limits enforces bounds", "[ik][solver][limits]")
     q0 << 1.0, -1.0, 1.5, -1.5, 2.0, -2.0;
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 200;
+    criteria.max_total_work_units = 400;
 
     solver.setup(chain, target, q0, criteria);
     solver.step();
@@ -247,6 +251,7 @@ TEST_CASE("IkSolver returns ik_error on unreachable target", "[ik][solver]")
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 50;
+    criteria.max_total_work_units = 100;
 
     solver.setup(chain, target, q0, criteria);
     auto result = solver.solve();
@@ -275,6 +280,7 @@ TEST_CASE("IkSolver min_distance objective continues past first convergence", "[
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 200;
+    criteria.max_total_work_units = 400;
 
     spp::solver_options<double> opts{.objective = spp::ik_objective::min_distance};
     solver.setup(chain, target, q0, criteria, opts);
@@ -300,6 +306,7 @@ TEST_CASE("IkSolver ik_result contains correct fields", "[ik][solver]")
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 200;
+    criteria.max_total_work_units = 400;
 
     solver.setup(chain, fk_target.end_effector, q0, criteria);
     auto result = solver.solve();
@@ -328,6 +335,7 @@ TEST_CASE("IkSolver with LM and null_space_limits on 7-DOF chain", "[ik][solver]
     Eigen::Vector<double, 7> q0 = Eigen::Vector<double, 7>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 300;
+    criteria.max_total_work_units = 600;
     criteria.position_tol = 1e-4;
     criteria.orientation_tol = 1e-4;
 

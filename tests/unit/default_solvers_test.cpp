@@ -78,6 +78,7 @@ TEST_CASE("speed_solver compiles and converges", "[ik][default_solvers]")
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 200;
+    criteria.max_total_work_units = 400;
 
     solver.setup(chain, target, q0, criteria);
     auto result = solver.solve();
@@ -106,6 +107,7 @@ TEST_CASE("convergence_solver compiles and converges", "[ik][default_solvers]")
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 200;
+    criteria.max_total_work_units = 400;
 
     solver.setup(chain, target, q0, criteria);
     auto result = solver.solve();
@@ -133,6 +135,7 @@ TEST_CASE("default_solver compiles and converges", "[ik][default_solvers]")
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 200;
+    criteria.max_total_work_units = 400;
 
     solver.setup(chain, target, q0, criteria);
     auto result = solver.solve();
@@ -174,6 +177,7 @@ TEST_CASE("default_solver converges on harder target", "[ik][default_solvers]")
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 300;
+    criteria.max_total_work_units = 600;
 
     spp::solver_options<double> opts;
     opts.max_total_iterations = 600;

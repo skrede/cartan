@@ -79,7 +79,7 @@ TEST_CASE("two-policy solver compiles and converges", "[ik][variadic_solver]")
     };
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
-    spp::convergence_criteria<double> criteria{1e-6, 1e-6, 200};
+    spp::convergence_criteria<double> criteria{1e-6, 1e-6, 200, 400};
 
     solver.setup(chain, target, q0, criteria);
     auto result = solver.solve();
@@ -106,7 +106,7 @@ TEST_CASE("single-policy solver still works", "[ik][variadic_solver]")
     spp::basic_ik_runner solver{spp::speed_ik_runner<spp::kinematic_chain<double, 6>>{}};
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
-    spp::convergence_criteria<double> criteria{1e-6, 1e-6, 200};
+    spp::convergence_criteria<double> criteria{1e-6, 1e-6, 200, 400};
 
     solver.setup(chain, target, q0, criteria);
     auto result = solver.solve();
@@ -136,7 +136,7 @@ TEST_CASE("step() returns running then converged", "[ik][variadic_solver]")
     };
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
-    spp::convergence_criteria<double> criteria{1e-6, 1e-6, 200};
+    spp::convergence_criteria<double> criteria{1e-6, 1e-6, 200, 400};
     solver.setup(chain, target, q0, criteria);
 
     bool saw_running = false;
@@ -178,7 +178,7 @@ TEST_CASE("step_n runs multiple rounds", "[ik][variadic_solver]")
     };
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
-    spp::convergence_criteria<double> criteria{1e-6, 1e-6, 200};
+    spp::convergence_criteria<double> criteria{1e-6, 1e-6, 200, 400};
     solver.setup(chain, target, q0, criteria);
 
     solver.step_n(5);
@@ -203,7 +203,7 @@ TEST_CASE("speed objective stops on first convergence", "[ik][variadic_solver]")
     };
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
-    spp::convergence_criteria<double> criteria{1e-6, 1e-6, 200};
+    spp::convergence_criteria<double> criteria{1e-6, 1e-6, 200, 400};
     spp::solver_options<double> opts{.objective = spp::ik_objective::speed};
     solver.setup(chain, target, q0, criteria, opts);
 
@@ -225,7 +225,7 @@ TEST_CASE("solver_options halton_seed affects results", "[ik][variadic_solver]")
     auto target = reachable_target(chain, q_known);
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
-    spp::convergence_criteria<double> criteria{1e-6, 1e-6, 200};
+    spp::convergence_criteria<double> criteria{1e-6, 1e-6, 200, 400};
 
     // Run with halton_seed = 42
     spp::basic_ik_runner solver_a{
@@ -282,7 +282,7 @@ TEST_CASE("harder target benefits from racing", "[ik][variadic_solver]")
     };
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
-    spp::convergence_criteria<double> criteria{1e-6, 1e-6, 200};
+    spp::convergence_criteria<double> criteria{1e-6, 1e-6, 200, 400};
     spp::solver_options<double> opts{.max_total_iterations = 600};
     solver.setup(chain, target, q0, criteria, opts);
 

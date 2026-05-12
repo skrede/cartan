@@ -88,6 +88,7 @@ TEST_CASE("lbfgsb FK roundtrip", "[ik][lbfgsb]")
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 200;
+    criteria.max_total_work_units = 400;
 
     stepper.setup(chain, target, q0, criteria);
     auto status = run_stepper(stepper, chain, 200);
@@ -135,6 +136,7 @@ TEST_CASE("lbfgsb with tight limits", "[ik][lbfgsb]")
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 300;
+    criteria.max_total_work_units = 600;
 
     stepper.setup(chain, target, q0, criteria);
     auto status = run_stepper(stepper, chain, 300);
@@ -163,6 +165,7 @@ TEST_CASE("lbfgsb iterations count", "[ik][lbfgsb]")
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 200;
+    criteria.max_total_work_units = 400;
 
     stepper.setup(chain, fk_target.end_effector, q0, criteria);
 
@@ -207,6 +210,7 @@ TEST_CASE("lbfgsb with error weight", "[ik][lbfgsb]")
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 200;
+    criteria.max_total_work_units = 400;
 
     stepper.setup(chain, target, q0, criteria, weight);
     auto status = run_stepper(stepper, chain, 200);
@@ -247,6 +251,7 @@ TEST_CASE("lbfgsb stall detection", "[ik][lbfgsb]")
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 200;
+    criteria.max_total_work_units = 400;
 
     stepper.setup(chain, target, q0, criteria);
     auto status = run_stepper(stepper, chain, 200);

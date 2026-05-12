@@ -95,6 +95,7 @@ TEST_CASE("LM converges on reachable 6R target", "[ik][lm]")
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 200;
+    criteria.max_total_work_units = 400;
 
     stepper.setup(chain, target, q0, criteria);
     auto status = run_stepper(stepper, chain, 200);
@@ -126,6 +127,7 @@ TEST_CASE("LM converges on 3R planar target", "[ik][lm]")
     Eigen::Vector3d q0 = Eigen::Vector3d::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 200;
+    criteria.max_total_work_units = 400;
 
     stepper.setup(chain, target, q0, criteria);
     auto status = run_stepper(stepper, chain, 200);
@@ -154,6 +156,7 @@ TEST_CASE("LM returns iteration_limit on unreachable target", "[ik][lm]")
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 50;
+    criteria.max_total_work_units = 100;
 
     stepper.setup(chain, target, q0, criteria);
     auto status = run_stepper(stepper, chain, 50);
@@ -177,6 +180,7 @@ TEST_CASE("LM lambda adapts during iteration", "[ik][lm]")
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 200;
+    criteria.max_total_work_units = 400;
 
     stepper.setup(chain, fk_target.end_effector, q0, criteria);
     double lambda_initial = stepper.lambda();
@@ -209,6 +213,7 @@ TEST_CASE("LM iterations count", "[ik][lm]")
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 200;
+    criteria.max_total_work_units = 400;
 
     stepper.setup(chain, fk_target.end_effector, q0, criteria);
 

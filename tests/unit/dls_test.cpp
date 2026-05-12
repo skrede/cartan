@@ -97,6 +97,7 @@ TEST_CASE("DLS converges on reachable 6R target", "[ik][dls]")
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 200;
+    criteria.max_total_work_units = 400;
 
     stepper.setup(chain, target, q0, criteria);
     auto status = run_stepper(stepper, chain, 200);
@@ -128,6 +129,7 @@ TEST_CASE("DLS converges on 3R planar target", "[ik][dls]")
     Eigen::Vector3d q0 = Eigen::Vector3d::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 200;
+    criteria.max_total_work_units = 400;
 
     stepper.setup(chain, target, q0, criteria);
     auto status = run_stepper(stepper, chain, 200);
@@ -157,6 +159,7 @@ TEST_CASE("DLS returns iteration_limit on unreachable target", "[ik][dls]")
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 50;
+    criteria.max_total_work_units = 100;
 
     stepper.setup(chain, target, q0, criteria);
     auto status = run_stepper(stepper, chain, 50);
@@ -184,6 +187,7 @@ TEST_CASE("DLS near-singular convergence", "[ik][dls]")
     q0 << 0.1, 0.1, 0.1, 0.1, 0.1, 0.1;
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 300;
+    criteria.max_total_work_units = 600;
 
     stepper.setup(chain, target, q0, criteria);
     auto status = run_stepper(stepper, chain, 300);
@@ -213,6 +217,7 @@ TEST_CASE("DLS separate angular/linear convergence", "[ik][dls]")
     criteria.position_tol = 1.0;
     criteria.orientation_tol = 1e-8;
     criteria.max_iterations_per_attempt = 200;
+    criteria.max_total_work_units = 400;
 
     stepper.setup(chain, target, q0, criteria);
     auto status = run_stepper(stepper, chain, 200);
@@ -259,6 +264,7 @@ TEST_CASE("DLS iterations count", "[ik][dls]")
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 200;
+    criteria.max_total_work_units = 400;
 
     stepper.setup(chain, fk_target.end_effector, q0, criteria);
 

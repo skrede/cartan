@@ -43,7 +43,9 @@ TEST_CASE("argmin_slsqp restart_count reaches max_restarts on hard target", "[ik
 
     cartan::ik::argmin_slsqp<chain_t> solver{opts};
     Eigen::Vector<double, 6> q_seed = Eigen::Vector<double, 6>::Zero();
-    cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 500};
+    // 4th literal: budget large enough for all max_restarts+1 attempts to fire
+    // (per_attempt=500 * (max_restarts+1)=3 = 1500); pre-refactor effective envelope was 2*500=1000
+    cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 500, 1500};
     solver.setup(chain, target, q_seed, criteria);
 
     while (solver.status() == cartan::ik_status::running)
@@ -63,7 +65,7 @@ TEST_CASE("argmin_slsqp zero restarts on easy target", "[ik][argmin][slsqp][rest
 
     cartan::ik::argmin_slsqp<chain_t> solver{};
     Eigen::Vector<double, 6> q_seed = Eigen::Vector<double, 6>::Zero();
-    cartan::convergence_criteria<double> criteria{1e-4, 1e-4, 500};
+    cartan::convergence_criteria<double> criteria{1e-4, 1e-4, 500, 1000};
     solver.setup(chain, target, q_seed, criteria);
 
     while (solver.status() == cartan::ik_status::running)
@@ -79,7 +81,8 @@ TEST_CASE("argmin_slsqp deterministic under fixed RNG seed", "[ik][argmin][slsqp
     auto target = cartan::se3<double>(cartan::so3<double>::identity(), {10.0, 10.0, 10.0});
 
     Eigen::Vector<double, 6> q_seed = Eigen::Vector<double, 6>::Zero();
-    cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 500};
+    // budget = (max_restarts+1) * per_attempt = 4 * 500 = 2000; allows all 3 restarts to fire
+    cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 500, 2000};
 
     auto run_solver = [&](unsigned seed)
     {

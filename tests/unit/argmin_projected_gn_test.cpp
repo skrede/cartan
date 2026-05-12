@@ -48,7 +48,7 @@ TEST_CASE("argmin_projected_gn converges on reachable target", "[ik][argmin][pro
 
     cartan::ik::argmin_projected_gn<chain_t> solver{};
     Eigen::Vector<double, 6> q_seed = Eigen::Vector<double, 6>::Zero();
-    cartan::convergence_criteria<double> criteria{1e-4, 1e-4, 500};
+    cartan::convergence_criteria<double> criteria{1e-4, 1e-4, 500, 1000};
     solver.setup(chain, target, q_seed, criteria);
 
     while (solver.status() == cartan::ik_status::running)
@@ -70,7 +70,7 @@ TEST_CASE("argmin_projected_gn reports non-converged on unreachable target",
 
     cartan::ik::argmin_projected_gn<chain_t> solver{opts};
     Eigen::Vector<double, 6> q_seed = Eigen::Vector<double, 6>::Zero();
-    cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 500};
+    cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 500, 1000};
     solver.setup(chain, target, q_seed, criteria);
 
     while (solver.status() == cartan::ik_status::running)
@@ -92,7 +92,8 @@ TEST_CASE("argmin_projected_gn exhausts configured restarts on unreachable targe
 
     cartan::ik::argmin_projected_gn<chain_t> solver{opts};
     Eigen::Vector<double, 6> q_seed = Eigen::Vector<double, 6>::Zero();
-    cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 500};
+    // 4th literal: 4 * per_attempt allows max_restarts=3 (initial + 3 restarts = 4 attempts) to fire
+    cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 500, 2000};
     solver.setup(chain, target, q_seed, criteria);
 
     while (solver.status() == cartan::ik_status::running)
@@ -113,7 +114,7 @@ TEST_CASE("argmin_projected_gn zero restarts on easy target", "[ik][argmin][proj
     cartan::ik::argmin_projected_gn<chain_t> solver{};
     Eigen::Vector<double, 6> q_seed;
     q_seed << 0.05, -0.1, 0.2, -0.05, 0.15, -0.02;
-    cartan::convergence_criteria<double> criteria{1e-4, 1e-4, 500};
+    cartan::convergence_criteria<double> criteria{1e-4, 1e-4, 500, 1000};
     solver.setup(chain, target, q_seed, criteria);
 
     while (solver.status() == cartan::ik_status::running)
@@ -129,7 +130,8 @@ TEST_CASE("argmin_projected_gn deterministic under fixed RNG seed", "[ik][argmin
     auto target = cartan::se3<double>(cartan::so3<double>::identity(), {10.0, 10.0, 10.0});
 
     Eigen::Vector<double, 6> q_seed = Eigen::Vector<double, 6>::Zero();
-    cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 500};
+    // 4th literal: 3 * per_attempt allows max_restarts=2 (3 attempts total) to fire
+    cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 500, 1500};
 
     auto run_solver = [&](unsigned seed)
     {
@@ -164,7 +166,7 @@ TEST_CASE("argmin_projected_gn abort from running state transitions to stalled",
 
     cartan::ik::argmin_projected_gn<chain_t> solver{};
     Eigen::Vector<double, 6> q_seed = Eigen::Vector<double, 6>::Zero();
-    cartan::convergence_criteria<double> criteria{1e-4, 1e-4, 500};
+    cartan::convergence_criteria<double> criteria{1e-4, 1e-4, 500, 1000};
     solver.setup(chain, target, q_seed, criteria);
 
     REQUIRE(solver.status() == cartan::ik_status::running);
