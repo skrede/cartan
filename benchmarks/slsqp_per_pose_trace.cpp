@@ -16,7 +16,8 @@
 ///   step_us
 ///
 /// Stack matches slsqp_per_pose_capture.cpp exactly:
-///   convergence_criteria{1e-5, 1e-5, 500}, target_set seed 42, 1000 poses
+///   convergence_criteria{1e-5, 1e-5, max_iterations_per_attempt = 500,
+///   max_total_work_units = 500}, target_set seed 42, 1000 poses
 ///
 /// Usage:
 ///   slsqp_per_pose_trace <output.csv> <robot:pose> [<robot:pose>...]
@@ -232,7 +233,12 @@ int main(int argc, char** argv)
            "argmin_iter_total,argmin_iter_delta,"
            "ls_calls_total,ls_calls_delta,inner_restart_count,wrapper_restart_count,step_us\n";
 
-    const cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 500};
+    const cartan::convergence_criteria<double> criteria{
+        .position_tol               = 1e-5,
+        .orientation_tol            = 1e-5,
+        .max_iterations_per_attempt = 500,
+        .max_total_work_units       = 500
+    };
 
     if (!ur3e_poses.empty())
     {

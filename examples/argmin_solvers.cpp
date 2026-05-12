@@ -34,7 +34,12 @@ int main()
     auto target = cartan::forward_kinematics(chain, q_known).end_effector;
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
-    cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 500};
+    cartan::convergence_criteria<double> criteria{
+        .position_tol               = 1e-5,
+        .orientation_tol            = 1e-5,
+        .max_iterations_per_attempt = 500,
+        .max_total_work_units       = 1000
+    };
 
     // --- Section 1: argmin SLSQP with restart wrapping ---
 

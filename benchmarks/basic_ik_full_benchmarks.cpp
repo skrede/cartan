@@ -172,7 +172,12 @@ void bm_racing_solver(
     const target_set<double, N>& ts,
     int max_total_iterations)
 {
-    cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 500};
+    cartan::convergence_criteria<double> criteria{
+        .position_tol               = 1e-5,
+        .orientation_tol            = 1e-5,
+        .max_iterations_per_attempt = 500,
+        .max_total_work_units       = 500
+    };
     std::mt19937 rng(42);
 
     std::size_t idx = 0;
@@ -375,7 +380,12 @@ void bm_lbfgsb_aggressive(
     typename cartan::ik::restart_wrapper<chain_t, cartan::ik::builtin_lbfgsb<chain_t>>::options restart_opts{
         .max_restarts = 5
     };
-    cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 1000};
+    cartan::convergence_criteria<double> criteria{
+        .position_tol               = 1e-5,
+        .orientation_tol            = 1e-5,
+        .max_iterations_per_attempt = 1000,
+        .max_total_work_units       = 1000
+    };
 
     std::size_t idx = 0;
     int successes = 0;
@@ -457,7 +467,12 @@ void bm_gauss_newton(
         .initial_lambda_factor = 0.0,
         .max_restarts = 20
     };
-    cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 200};
+    cartan::convergence_criteria<double> criteria{
+        .position_tol               = 1e-5,
+        .orientation_tol            = 1e-5,
+        .max_iterations_per_attempt = 200,
+        .max_total_work_units       = 200
+    };
 
     std::size_t idx = 0;
     int successes = 0;
@@ -648,26 +663,49 @@ using racing_solver = cartan::dual_ik_runner<chain_t<N>>;
 // Convergence criteria per solver type
 // ============================================================================
 
-inline cartan::convergence_criteria<double> dls_criteria()      { return {1e-5, 1e-5, 100}; }
-inline cartan::convergence_criteria<double> lm_criteria()       { return {1e-5, 1e-5, 100}; }
-inline cartan::convergence_criteria<double> plm_criteria()      { return {1e-5, 1e-5, 200}; }
-inline cartan::convergence_criteria<double> lbfgsb_criteria()   { return {1e-5, 1e-5, 500}; }
-inline cartan::convergence_criteria<double> speed_criteria()    { return {1e-5, 1e-5, 200}; }
-inline cartan::convergence_criteria<double> convergence_criteria_tuned() { return {1e-5, 1e-5, 500}; }
-inline cartan::convergence_criteria<double> restart_lm_criteria() { return {1e-5, 1e-5, 200}; }
-inline cartan::convergence_criteria<double> nr_criteria()       { return {1e-5, 1e-5, 200}; }
-inline cartan::convergence_criteria<double> bobyqa_criteria()   { return {1e-5, 1e-5, 500}; }
-inline cartan::convergence_criteria<double> slsqp_criteria()    { return {1e-5, 1e-5, 500}; }
+// Per-cell budget rule: max_total_work_units == max_iterations_per_attempt (direct
+// copy of the legacy positional third arg into the new work-unit budget field).
+// This bench file is not in the LM-family non-regression gate; the bench-correct
+// rule here is per-cell preservation, not the test-side conservative 2*N rule.
+inline cartan::convergence_criteria<double> dls_criteria()
+    { return {.position_tol = 1e-5, .orientation_tol = 1e-5, .max_iterations_per_attempt = 100, .max_total_work_units = 100}; }
+inline cartan::convergence_criteria<double> lm_criteria()
+    { return {.position_tol = 1e-5, .orientation_tol = 1e-5, .max_iterations_per_attempt = 100, .max_total_work_units = 100}; }
+inline cartan::convergence_criteria<double> plm_criteria()
+    { return {.position_tol = 1e-5, .orientation_tol = 1e-5, .max_iterations_per_attempt = 200, .max_total_work_units = 200}; }
+inline cartan::convergence_criteria<double> lbfgsb_criteria()
+    { return {.position_tol = 1e-5, .orientation_tol = 1e-5, .max_iterations_per_attempt = 500, .max_total_work_units = 500}; }
+inline cartan::convergence_criteria<double> speed_criteria()
+    { return {.position_tol = 1e-5, .orientation_tol = 1e-5, .max_iterations_per_attempt = 200, .max_total_work_units = 200}; }
+inline cartan::convergence_criteria<double> convergence_criteria_tuned()
+    { return {.position_tol = 1e-5, .orientation_tol = 1e-5, .max_iterations_per_attempt = 500, .max_total_work_units = 500}; }
+inline cartan::convergence_criteria<double> restart_lm_criteria()
+    { return {.position_tol = 1e-5, .orientation_tol = 1e-5, .max_iterations_per_attempt = 200, .max_total_work_units = 200}; }
+inline cartan::convergence_criteria<double> nr_criteria()
+    { return {.position_tol = 1e-5, .orientation_tol = 1e-5, .max_iterations_per_attempt = 200, .max_total_work_units = 200}; }
+inline cartan::convergence_criteria<double> bobyqa_criteria()
+    { return {.position_tol = 1e-5, .orientation_tol = 1e-5, .max_iterations_per_attempt = 500, .max_total_work_units = 500}; }
+inline cartan::convergence_criteria<double> slsqp_criteria()
+    { return {.position_tol = 1e-5, .orientation_tol = 1e-5, .max_iterations_per_attempt = 500, .max_total_work_units = 500}; }
 #ifdef CARTAN_BUILD_ARGMIN
-inline cartan::convergence_criteria<double> argmin_slsqp_criteria()  { return {1e-5, 1e-5, 500}; }
-inline cartan::convergence_criteria<double> argmin_lbfgsb_criteria() { return {1e-5, 1e-5, 500}; }
-inline cartan::convergence_criteria<double> nw_sqp_criteria()         { return {1e-5, 1e-5, 500}; }
-inline cartan::convergence_criteria<double> argmin_lm_criteria()     { return {1e-5, 1e-5, 200}; }
-inline cartan::convergence_criteria<double> auglag_criteria()         { return {1e-5, 1e-5, 500}; }
-inline cartan::convergence_criteria<double> filter_slsqp_criteria()  { return {1e-5, 1e-5, 500}; }
-inline cartan::convergence_criteria<double> filter_nw_sqp_criteria() { return {1e-5, 1e-5, 500}; }
-inline cartan::convergence_criteria<double> argmin_projected_gn_criteria()          { return {1e-5, 1e-5, 500}; }
-inline cartan::convergence_criteria<double> argmin_projected_gradient_gn_criteria() { return {1e-5, 1e-5, 500}; }
+inline cartan::convergence_criteria<double> argmin_slsqp_criteria()
+    { return {.position_tol = 1e-5, .orientation_tol = 1e-5, .max_iterations_per_attempt = 500, .max_total_work_units = 500}; }
+inline cartan::convergence_criteria<double> argmin_lbfgsb_criteria()
+    { return {.position_tol = 1e-5, .orientation_tol = 1e-5, .max_iterations_per_attempt = 500, .max_total_work_units = 500}; }
+inline cartan::convergence_criteria<double> nw_sqp_criteria()
+    { return {.position_tol = 1e-5, .orientation_tol = 1e-5, .max_iterations_per_attempt = 500, .max_total_work_units = 500}; }
+inline cartan::convergence_criteria<double> argmin_lm_criteria()
+    { return {.position_tol = 1e-5, .orientation_tol = 1e-5, .max_iterations_per_attempt = 200, .max_total_work_units = 200}; }
+inline cartan::convergence_criteria<double> auglag_criteria()
+    { return {.position_tol = 1e-5, .orientation_tol = 1e-5, .max_iterations_per_attempt = 500, .max_total_work_units = 500}; }
+inline cartan::convergence_criteria<double> filter_slsqp_criteria()
+    { return {.position_tol = 1e-5, .orientation_tol = 1e-5, .max_iterations_per_attempt = 500, .max_total_work_units = 500}; }
+inline cartan::convergence_criteria<double> filter_nw_sqp_criteria()
+    { return {.position_tol = 1e-5, .orientation_tol = 1e-5, .max_iterations_per_attempt = 500, .max_total_work_units = 500}; }
+inline cartan::convergence_criteria<double> argmin_projected_gn_criteria()
+    { return {.position_tol = 1e-5, .orientation_tol = 1e-5, .max_iterations_per_attempt = 500, .max_total_work_units = 500}; }
+inline cartan::convergence_criteria<double> argmin_projected_gradient_gn_criteria()
+    { return {.position_tol = 1e-5, .orientation_tol = 1e-5, .max_iterations_per_attempt = 500, .max_total_work_units = 500}; }
 #endif
 
 // ============================================================================

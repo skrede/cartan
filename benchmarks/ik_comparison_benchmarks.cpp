@@ -88,7 +88,12 @@ void bm_cartan_comparison(
     const cartan::kinematic_chain<double, N>& chain,
     const target_set<double, N>& ts)
 {
-    cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 100};
+    cartan::convergence_criteria<double> criteria{
+        .position_tol               = 1e-5,
+        .orientation_tol            = 1e-5,
+        .max_iterations_per_attempt = 100,
+        .max_total_work_units       = 100
+    };
 
     std::size_t idx = 0;
     int successes = 0;
@@ -144,7 +149,12 @@ void bm_cartan_restart_lm_comparison(
     using restart_lm = cartan::ik::restart_wrapper<
         chain_t, cartan::ik::lm<chain_t, LimitsPolicy>>;
 
-    cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 200};
+    cartan::convergence_criteria<double> criteria{
+        .position_tol               = 1e-5,
+        .orientation_tol            = 1e-5,
+        .max_iterations_per_attempt = 200,
+        .max_total_work_units       = 200
+    };
 
     std::size_t idx = 0;
     int successes = 0;
@@ -198,7 +208,12 @@ void bm_cartan_speed_comparison(
 {
     using chain_t = cartan::kinematic_chain<double, N>;
 
-    cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 200};
+    cartan::convergence_criteria<double> criteria{
+        .position_tol               = 1e-5,
+        .orientation_tol            = 1e-5,
+        .max_iterations_per_attempt = 200,
+        .max_total_work_units       = 200
+    };
 
     std::size_t idx = 0;
     int successes = 0;
@@ -252,7 +267,12 @@ void bm_cartan_racing_comparison(
 {
     using chain_t = cartan::kinematic_chain<double, N>;
 
-    cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 500};
+    cartan::convergence_criteria<double> criteria{
+        .position_tol               = 1e-5,
+        .orientation_tol            = 1e-5,
+        .max_iterations_per_attempt = 500,
+        .max_total_work_units       = 500
+    };
 
     std::size_t idx = 0;
     int successes = 0;
@@ -949,8 +969,19 @@ using nlopt_bobyqa_solver = cartan::basic_ik_runner<
     cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::nlopt_bobyqa<chain_t<N>>>>;
 #endif
 
-// Convergence criteria shared across comparison benchmarks
-inline cartan::convergence_criteria<double> argmin_comparison_criteria() { return {1e-5, 1e-5, 500}; }
+// Convergence criteria shared across comparison benchmarks.
+// Per-cell budget rule: max_total_work_units == max_iterations_per_attempt (direct
+// copy of the legacy positional third arg). This file is not in the LM-family
+// non-regression gate; bench-cell preservation is by direct copy, not by 2*N.
+inline cartan::convergence_criteria<double> argmin_comparison_criteria()
+{
+    return {
+        .position_tol               = 1e-5,
+        .orientation_tol            = 1e-5,
+        .max_iterations_per_attempt = 500,
+        .max_total_work_units       = 500
+    };
+}
 
 // ============================================================================
 // Axis 1: Formulation comparison (bound-constrained vs inequality-constrained)
@@ -1059,7 +1090,13 @@ static void bm_comparison_ur3e_argmin_slsqp_phi_ls_calls_impl(benchmark::State& 
     const auto criteria = argmin_comparison_criteria();
 
     cartan::ik::argmin_slsqp<chain_t<6>>::options slsqp_opts{};
-    slsqp_opts.budget_per_step = BudgetPerStep;
+    // budget_per_step removed from argmin_slsqp::options under the work-unit
+    // refactor; the per-step inner budget is now driven by step(chain, N) from
+    // the runner. BudgetPerStep is retained as a non-type template parameter
+    // so the bench cell name (_budget50 vs _budget500) and metric emission keep
+    // their existing shape; with the field gone, both cells share the same
+    // solver-side configuration.
+    (void)BudgetPerStep;
 
     std::size_t idx = 0;
     std::uint64_t total_ls = 0;
@@ -1149,7 +1186,8 @@ static void bm_comparison_ur3e_argmin_slsqp_last_check_results(benchmark::State&
     const auto criteria = argmin_comparison_criteria();
 
     cartan::ik::argmin_slsqp<chain_t<6>>::options slsqp_opts{};
-    slsqp_opts.budget_per_step = 500;
+    // budget_per_step removed from argmin_slsqp::options; per-step inner
+    // budget is now runner-driven via step(chain, N).
 
     std::size_t idx = 0;
     std::array<std::uint64_t, 4> criterion_fire_count{};
@@ -1220,7 +1258,8 @@ static void bm_comparison_ur3e_argmin_slsqp_grad_sweep(benchmark::State& state)
     const auto criteria = argmin_comparison_criteria();
 
     cartan::ik::argmin_slsqp<chain_t<6>>::options slsqp_opts{};
-    slsqp_opts.budget_per_step = 500;
+    // budget_per_step removed from argmin_slsqp::options; per-step inner
+    // budget is now runner-driven via step(chain, N).
     slsqp_opts.gradient_threshold = gradient_threshold;
 
     std::size_t idx = 0;
@@ -1315,7 +1354,13 @@ static void bm_comparison_ur3e_argmin_slsqp_budget_sweep(benchmark::State& state
     const auto criteria = argmin_comparison_criteria();
 
     cartan::ik::argmin_slsqp<chain_t<6>>::options slsqp_opts{};
-    slsqp_opts.budget_per_step = budget_per_step;
+    // budget_per_step removed from argmin_slsqp::options. The state.range(0)
+    // sweep parameter is preserved as a local for state.counters output, but
+    // no longer flows into the solver — the per-step inner budget is now
+    // runner-driven via step(chain, N). Effectively, this cell now measures
+    // direct-drive convergence under the cartan-tight thresholds only; the
+    // budget sweep dimension is structurally inert under the work-unit
+    // contract.
     slsqp_opts.gradient_threshold = 1e-12;
 
     std::size_t idx = 0;
@@ -1472,7 +1517,9 @@ static void bm_comparison_ur3e_argmin_slsqp_last_check_results_alias(benchmark::
     const auto criteria = argmin_comparison_criteria();
 
     cartan::ik::argmin_slsqp_nlopt_compat<chain_t<6>>::options slsqp_opts{};
-    slsqp_opts.budget_per_step = 500;
+    // budget_per_step removed from argmin_slsqp::options (and therefore from
+    // the alias); per-step inner budget is now runner-driven via
+    // step(chain, N).
 
     std::size_t idx = 0;
     std::array<std::uint64_t, 3> criterion_fire_count{};
@@ -1782,7 +1829,8 @@ static void bm_comparison_ur3e_argmin_slsqp_phi_ls_calls_dynamicN(benchmark::Sta
     const auto criteria = argmin_comparison_criteria();
 
     cartan::ik::argmin_slsqp<dynamic_chain>::options slsqp_opts{};
-    slsqp_opts.budget_per_step = 500;
+    // budget_per_step removed from argmin_slsqp::options; per-step inner
+    // budget is now runner-driven via step(chain, N).
 
     std::size_t idx = 0;
     std::uint64_t total_ls = 0;
