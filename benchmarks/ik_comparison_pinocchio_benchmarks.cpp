@@ -497,6 +497,76 @@ void bm_cartan_solver(
         total_ori / std::max(successes, 1));
 }
 
+#ifdef CARTAN_BUILD_ARGMIN
+// k-sweep driver: same shape as bm_cartan_solver but constructs the inner
+// argmin_slsqp solver with options.multiplier_reest_every_k = K so the
+// post-step active-set Lagrange multiplier re-estimation stride is forced
+// to the swept value (overriding kraft_slsqp_policy's per-Mode default).
+//
+// The Solver type is expected to be argmin_slsqp<Chain, LimitsPolicy, Conv, Mode>
+// (or one of its aliases like argmin_slsqp_fast) — any solver whose options
+// struct carries a multiplier_reest_every_k field. The driver wraps the
+// solver in a basic_ik_runner the same way bm_cartan_solver does, so the
+// per-pose / per-attempt / total-budget semantics match the existing
+// argmin_slsqp cells exactly.
+template <int N, typename Solver>
+void bm_cartan_argmin_slsqp_kreest(
+    benchmark::State& state,
+    const cartan::kinematic_chain<double, N>& chain,
+    const target_set<double, N>& ts,
+    int per_attempt,
+    int total_units,
+    std::size_t k_value)
+{
+    cartan::convergence_criteria<double> criteria{
+        .position_tol = 1e-5,
+        .orientation_tol = 1e-5,
+        .max_iterations_per_attempt = per_attempt,
+        .max_total_work_units = total_units};
+
+    typename Solver::options slsqp_opts{};
+    slsqp_opts.multiplier_reest_every_k = k_value;
+
+    std::size_t idx = 0;
+    int successes = 0;
+    int total_iter = 0;
+    double total_pos = 0.0, total_ori = 0.0;
+
+    for (auto _ : state)
+    {
+        auto& target = ts.targets[idx % static_cast<std::size_t>(num_targets)];
+        auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
+        ++idx;
+
+        cartan::basic_ik_runner<Solver> solver{Solver{slsqp_opts}};
+        solver.setup(chain, target, q_seed, criteria);
+        auto result = solver.solve();
+
+        if (result.has_value())
+        {
+            ++successes;
+            total_iter += result->iterations;
+            auto [pos_err, ori_err] = cartan::benchmarks::compute_pose_errors(
+                chain, result->solution.position, target);
+            total_pos += pos_err;
+            total_ori += ori_err;
+        }
+        benchmark::DoNotOptimize(result);
+    }
+
+    auto total = static_cast<int>(idx);
+    state.counters["Success_pct"] = benchmark::Counter(
+        100.0 * static_cast<double>(successes) / std::max(total, 1));
+    state.counters["avg_iter"] = benchmark::Counter(
+        static_cast<double>(total_iter) / std::max(successes, 1));
+    state.counters["pos_err"] = benchmark::Counter(
+        total_pos / std::max(successes, 1));
+    state.counters["ori_err"] = benchmark::Counter(
+        total_ori / std::max(successes, 1));
+    state.counters["k_reest"] = benchmark::Counter(static_cast<double>(k_value));
+}
+#endif
+
 template <int N>
 void bm_pinocchio_lm(
     benchmark::State& state,
@@ -730,6 +800,92 @@ static void bm_ik_##ROBOT##_##SOLVER_NAME##_restart(benchmark::State& state)    
 }                                                                                        \
 BENCHMARK(bm_ik_##ROBOT##_##SOLVER_NAME##_restart)->Iterations(2000)->Unit(benchmark::kMicrosecond)
 
+// argmin_slsqp k-sweep macro: emits three cells per (ROBOT, K_VALUE) pair —
+//   bm_ik_<robot>_argmin_slsqp_fast_kreest_k<K_VALUE>           (default LimitsPolicy)
+//   bm_ik_<robot>_argmin_slsqp_fast_kreest_k<K_VALUE>_no_limits (audit cell)
+//   bm_ik_<robot>_argmin_slsqp_fast_kreest_k<K_VALUE>_restart   (restart-wrapped)
+//
+// Same {default, no_limits, restart} variant axis as IK_BENCH_SOLVER_VARIANTS, but
+// the underlying solver is constructed with options.multiplier_reest_every_k = K_VALUE
+// (overriding kraft_slsqp_policy's per-Mode default of 5 on sqp_mode::fast).
+// SOLVER_TPL is expected to be cartan::ik::argmin_slsqp_fast (the alias resolving
+// argmin::sqp_mode::fast through kraft_slsqp_policy).
+//
+// Cell names encode the k axis in the cell-name suffix so --benchmark_filter
+// regex selection (`kreest_k`) picks up the whole sweep.
+#define IK_BENCH_ARGMIN_SLSQP_KREEST_VARIANTS(ROBOT, FACTORY, N_DOF, SOLVER_NAME, SOLVER_TPL, FAMILY_TOTAL_UNITS, K_VALUE) \
+static void bm_ik_##ROBOT##_##SOLVER_NAME##_kreest_k##K_VALUE(benchmark::State& state)              \
+{                                                                                                   \
+    using chain_t = cartan::kinematic_chain<double, N_DOF>;                                         \
+    static auto chain = cartan::benchmarks::FACTORY<double>();                                      \
+    static target_set<double, N_DOF> ts(chain, num_targets);                                        \
+    bm_cartan_argmin_slsqp_kreest<N_DOF, SOLVER_TPL<chain_t>>(                                      \
+        state, chain, ts,                                                                           \
+        cartan::ik::bench::per_family_per_attempt,                                                  \
+        (FAMILY_TOTAL_UNITS),                                                                       \
+        static_cast<std::size_t>(K_VALUE));                                                         \
+}                                                                                                   \
+BENCHMARK(bm_ik_##ROBOT##_##SOLVER_NAME##_kreest_k##K_VALUE)->Iterations(2000)->Unit(benchmark::kMicrosecond); \
+static void bm_ik_##ROBOT##_##SOLVER_NAME##_kreest_k##K_VALUE##_no_limits(benchmark::State& state)  \
+{                                                                                                   \
+    using chain_t = cartan::kinematic_chain<double, N_DOF>;                                         \
+    static auto chain = cartan::benchmarks::FACTORY<double>();                                      \
+    static target_set<double, N_DOF> ts(chain, num_targets);                                        \
+    bm_cartan_argmin_slsqp_kreest<N_DOF, SOLVER_TPL<chain_t, cartan::no_limits>>(                   \
+        state, chain, ts,                                                                           \
+        cartan::ik::bench::per_family_per_attempt,                                                  \
+        (FAMILY_TOTAL_UNITS),                                                                       \
+        static_cast<std::size_t>(K_VALUE));                                                         \
+}                                                                                                   \
+BENCHMARK(bm_ik_##ROBOT##_##SOLVER_NAME##_kreest_k##K_VALUE##_no_limits)->Iterations(2000)->Unit(benchmark::kMicrosecond); \
+static void bm_ik_##ROBOT##_##SOLVER_NAME##_kreest_k##K_VALUE##_restart(benchmark::State& state)    \
+{                                                                                                   \
+    using chain_t = cartan::kinematic_chain<double, N_DOF>;                                         \
+    using inner_t = SOLVER_TPL<chain_t>;                                                            \
+    using wrapped_t = cartan::ik::restart_wrapper<chain_t, inner_t>;                                \
+    static auto chain = cartan::benchmarks::FACTORY<double>();                                      \
+    static target_set<double, N_DOF> ts(chain, num_targets);                                        \
+    /* Restart-wrapped variant: construct the inner solver explicitly with k-override, */          \
+    /* then wrap it. Same shape as bm_cartan_argmin_slsqp_kreest but Solver=wrapped_t. */           \
+    cartan::convergence_criteria<double> criteria{                                                  \
+        .position_tol = 1e-5,                                                                       \
+        .orientation_tol = 1e-5,                                                                    \
+        .max_iterations_per_attempt = cartan::ik::bench::per_family_per_attempt,                    \
+        .max_total_work_units = (FAMILY_TOTAL_UNITS)};                                              \
+    typename inner_t::options slsqp_opts{};                                                         \
+    slsqp_opts.multiplier_reest_every_k = static_cast<std::size_t>(K_VALUE);                        \
+    std::size_t idx = 0;                                                                            \
+    int successes = 0;                                                                              \
+    int total_iter = 0;                                                                             \
+    double total_pos = 0.0, total_ori = 0.0;                                                        \
+    for (auto _ : state) {                                                                          \
+        auto& target = ts.targets[idx % static_cast<std::size_t>(num_targets)];                     \
+        auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];                       \
+        ++idx;                                                                                      \
+        cartan::basic_ik_runner<wrapped_t> solver{wrapped_t{inner_t{slsqp_opts}}};                  \
+        solver.setup(chain, target, q_seed, criteria);                                              \
+        auto result = solver.solve();                                                               \
+        if (result.has_value()) {                                                                   \
+            ++successes;                                                                            \
+            total_iter += result->iterations;                                                       \
+            auto [pos_err, ori_err] = cartan::benchmarks::compute_pose_errors(                      \
+                chain, result->solution.position, target);                                          \
+            total_pos += pos_err;                                                                   \
+            total_ori += ori_err;                                                                   \
+        }                                                                                           \
+        benchmark::DoNotOptimize(result);                                                           \
+    }                                                                                               \
+    auto total = static_cast<int>(idx);                                                             \
+    state.counters["Success_pct"] = benchmark::Counter(                                             \
+        100.0 * static_cast<double>(successes) / std::max(total, 1));                               \
+    state.counters["avg_iter"] = benchmark::Counter(                                                \
+        static_cast<double>(total_iter) / std::max(successes, 1));                                  \
+    state.counters["pos_err"] = benchmark::Counter(total_pos / std::max(successes, 1));             \
+    state.counters["ori_err"] = benchmark::Counter(total_ori / std::max(successes, 1));             \
+    state.counters["k_reest"] = benchmark::Counter(static_cast<double>(K_VALUE));                   \
+}                                                                                                   \
+BENCHMARK(bm_ik_##ROBOT##_##SOLVER_NAME##_kreest_k##K_VALUE##_restart)->Iterations(2000)->Unit(benchmark::kMicrosecond)
+
 // Single-cell variant for solvers whose public template already encapsulates restart logic
 // (e.g. projected_lm self-restarts on stall via Halton re-seed). Adding _no_limits and
 // _restart variants for such solvers would emit a redundant duplicate of the default cell
@@ -868,6 +1024,60 @@ IK_BENCH_SOLVER_VARIANTS(panda,      make_panda_chain,      7, argmin_slsqp_fast
 IK_BENCH_SOLVER_VARIANTS(fetch,      make_fetch_chain,      7, argmin_slsqp_fast,            cartan::ik::argmin_slsqp_fast,            cartan::ik::bench::sqp_family_total_units);
 IK_BENCH_SOLVER_VARIANTS(baxter,     make_baxter_chain,     7, argmin_slsqp_fast,            cartan::ik::argmin_slsqp_fast,            cartan::ik::bench::sqp_family_total_units);
 IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, argmin_slsqp_fast,            cartan::ik::argmin_slsqp_fast,            cartan::ik::bench::sqp_family_total_units);
+
+// multiplier_reest_every_k sweep cells — fast-mode argmin_slsqp at K ∈ {1, 2, 5, 10}.
+// 9 robots × 3 variants × 4 K values = 108 cells. Filter regex: `kreest_k`.
+// Cell semantics: identical to the argmin_slsqp_fast cells above, but with
+// options.multiplier_reest_every_k explicitly set per cell (overriding the
+// per-Mode default of 5 on sqp_mode::fast). Designed to empirically verify
+// argmin's "kraft KKT-leg is a behavioral no-op across k" prediction on the
+// cartan IK pose-batch corpus.
+#define CARTAN_KREEST_SWEEP_ROW(ROBOT, FACTORY, N_DOF, K_VALUE)                              \
+    IK_BENCH_ARGMIN_SLSQP_KREEST_VARIANTS(ROBOT, FACTORY, N_DOF, argmin_slsqp_fast,          \
+        cartan::ik::argmin_slsqp_fast, cartan::ik::bench::sqp_family_total_units, K_VALUE)
+
+CARTAN_KREEST_SWEEP_ROW(ur3e,       make_ur3e_chain,       6, 1);
+CARTAN_KREEST_SWEEP_ROW(ur3e,       make_ur3e_chain,       6, 2);
+CARTAN_KREEST_SWEEP_ROW(ur3e,       make_ur3e_chain,       6, 5);
+CARTAN_KREEST_SWEEP_ROW(ur3e,       make_ur3e_chain,       6, 10);
+CARTAN_KREEST_SWEEP_ROW(kr6_sixx,   make_kr6_sixx_chain,   6, 1);
+CARTAN_KREEST_SWEEP_ROW(kr6_sixx,   make_kr6_sixx_chain,   6, 2);
+CARTAN_KREEST_SWEEP_ROW(kr6_sixx,   make_kr6_sixx_chain,   6, 5);
+CARTAN_KREEST_SWEEP_ROW(kr6_sixx,   make_kr6_sixx_chain,   6, 10);
+CARTAN_KREEST_SWEEP_ROW(abb_irb120, make_abb_irb120_chain, 6, 1);
+CARTAN_KREEST_SWEEP_ROW(abb_irb120, make_abb_irb120_chain, 6, 2);
+CARTAN_KREEST_SWEEP_ROW(abb_irb120, make_abb_irb120_chain, 6, 5);
+CARTAN_KREEST_SWEEP_ROW(abb_irb120, make_abb_irb120_chain, 6, 10);
+CARTAN_KREEST_SWEEP_ROW(jaco2,      make_jaco2_chain,      6, 1);
+CARTAN_KREEST_SWEEP_ROW(jaco2,      make_jaco2_chain,      6, 2);
+CARTAN_KREEST_SWEEP_ROW(jaco2,      make_jaco2_chain,      6, 5);
+CARTAN_KREEST_SWEEP_ROW(jaco2,      make_jaco2_chain,      6, 10);
+CARTAN_KREEST_SWEEP_ROW(lbr_med14,  make_lbr_med14_chain,  7, 1);
+CARTAN_KREEST_SWEEP_ROW(lbr_med14,  make_lbr_med14_chain,  7, 2);
+CARTAN_KREEST_SWEEP_ROW(lbr_med14,  make_lbr_med14_chain,  7, 5);
+CARTAN_KREEST_SWEEP_ROW(lbr_med14,  make_lbr_med14_chain,  7, 10);
+CARTAN_KREEST_SWEEP_ROW(panda,      make_panda_chain,      7, 1);
+CARTAN_KREEST_SWEEP_ROW(panda,      make_panda_chain,      7, 2);
+CARTAN_KREEST_SWEEP_ROW(panda,      make_panda_chain,      7, 5);
+CARTAN_KREEST_SWEEP_ROW(panda,      make_panda_chain,      7, 10);
+CARTAN_KREEST_SWEEP_ROW(fetch,      make_fetch_chain,      7, 1);
+CARTAN_KREEST_SWEEP_ROW(fetch,      make_fetch_chain,      7, 2);
+CARTAN_KREEST_SWEEP_ROW(fetch,      make_fetch_chain,      7, 5);
+CARTAN_KREEST_SWEEP_ROW(fetch,      make_fetch_chain,      7, 10);
+CARTAN_KREEST_SWEEP_ROW(baxter,     make_baxter_chain,     7, 1);
+CARTAN_KREEST_SWEEP_ROW(baxter,     make_baxter_chain,     7, 2);
+CARTAN_KREEST_SWEEP_ROW(baxter,     make_baxter_chain,     7, 5);
+CARTAN_KREEST_SWEEP_ROW(baxter,     make_baxter_chain,     7, 10);
+CARTAN_KREEST_SWEEP_ROW(kuka_lwr4,  make_kuka_lwr4_chain,  7, 1);
+CARTAN_KREEST_SWEEP_ROW(kuka_lwr4,  make_kuka_lwr4_chain,  7, 2);
+CARTAN_KREEST_SWEEP_ROW(kuka_lwr4,  make_kuka_lwr4_chain,  7, 5);
+CARTAN_KREEST_SWEEP_ROW(kuka_lwr4,  make_kuka_lwr4_chain,  7, 10);
+
+// Spot-check accurate-mode at k=1 on a single robot (UR3e) — confirms the
+// pre-Phase-41 baseline path on the wrapper's other Mode. Not part of the
+// k-sweep aggregate; reported in the cross-repo reply as a sanity probe.
+IK_BENCH_ARGMIN_SLSQP_KREEST_VARIANTS(ur3e, make_ur3e_chain, 6, argmin_slsqp,
+    cartan::ik::argmin_slsqp, cartan::ik::bench::sqp_family_total_units, 1);
 #endif
 
 

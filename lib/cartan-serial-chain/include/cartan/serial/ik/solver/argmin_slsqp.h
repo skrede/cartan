@@ -110,6 +110,30 @@ public:
         /// Ignored when Convergence is `argmin::default_convergence`.
         double objective_threshold_rel{1e-10};
         double step_threshold_rel{1e-10};
+
+        /// Stride that gates the post-step active-set Lagrange multiplier
+        /// re-estimation call on argmin's line-search SQP policies. `k = 1`
+        /// re-estimates the multipliers on every SQP iteration (the
+        /// pre-Phase-41 behavior on argmin's N&W lineage); `k > 1` reuses
+        /// stale multipliers on (k-1)/k of steps and only refreshes the
+        /// active-set estimate every k-th step. Reference: Bertsekas 1996
+        /// §4.2 (stale-multiplier reuse).
+        ///
+        /// For `argmin::kraft_slsqp_policy` (the underlying policy of this
+        /// wrapper across both Mode values), this field is wired for API
+        /// uniformity but the KKT-leg uses the QP-native multipliers
+        /// (`qp_res.lambda` / `qp_res.mu`) on every step regardless of k —
+        /// argmin documents this as a behavioral no-op. The wiring exists
+        /// so cartan benchmarks can directly empirical-verify the no-op
+        /// prediction on the cartan IK pose-batch corpus, and so callers
+        /// can experiment with k > 1 should kraft_slsqp's KKT-leg behavior
+        /// change in a future argmin revision.
+        ///
+        /// Default tracks argmin's per-Mode constexpr:
+        /// `kraft_slsqp_policy<joints, Mode>::default_multiplier_reest_every_k`,
+        /// which is `1` for `sqp_mode::accurate` and `5` for `sqp_mode::fast`.
+        std::size_t multiplier_reest_every_k{
+            argmin::kraft_slsqp_policy<joints, Mode>::default_multiplier_reest_every_k};
     };
 
     argmin_slsqp() = default;
@@ -153,6 +177,7 @@ public:
 
         typename argmin::kraft_slsqp_policy<joints, Mode>::options_type policy_opts{};
         policy_opts.line_search.c1 = m_options.line_search_c1;
+        policy_opts.multiplier_reest_every_k = m_options.multiplier_reest_every_k;
 
         m_solver.emplace(*m_problem, x0, m_nab_opts, policy_opts);
     }
