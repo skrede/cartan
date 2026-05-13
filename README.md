@@ -1,7 +1,7 @@
 # Cartan
 
 ![CI](https://github.com/skrede/cartan/actions/workflows/ci.yml/badge.svg)
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![License](https://img.shields.io/badge/license-Apache_2.0-blue.svg)
 ![C++23](https://img.shields.io/badge/C%2B%2B-23-blue.svg)
 
 C++ Lie group and kinematics library for robotics.
@@ -52,6 +52,12 @@ target_link_libraries(my_app PRIVATE cartan::cartan)
 - [Documentation Index](docs/README.md) -- API reference, background theory, guides
 - [Examples](examples/) -- runnable programs for every feature area
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution workflow, coding conventions, and commit message format. By participating in this project you agree to abide by its [Code of Conduct](CODE_OF_CONDUCT.md).
+
 ## License
 
-MIT
+Apache License 2.0 -- see [LICENSE](LICENSE) for the full text.
+
+Copyright 2026 Aleksander Skrede.
