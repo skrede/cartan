@@ -54,7 +54,7 @@ target_link_libraries(my_app PRIVATE cartan::cartan)
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution workflow, coding conventions, and commit message format. By participating in this project you agree to abide by its [Code of Conduct](CODE_OF_CONDUCT.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution workflow, coding conventions, and commit message format.
 
 ## License
 

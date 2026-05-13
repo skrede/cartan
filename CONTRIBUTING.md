@@ -5,9 +5,6 @@ library aimed at robotics teaching and research; contributions of all
 sizes -- documentation fixes, bug reports, code improvements, new
 features -- are welcome.
 
-By participating in this project you agree to abide by its
-[Code of Conduct](CODE_OF_CONDUCT.md).
-
 ## Quick Links
 
 - [Filing an Issue](#filing-an-issue)
