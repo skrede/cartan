@@ -84,10 +84,13 @@ namespace cartan::ik::bench
 
 // LM family: 1 unit = one LM iteration (form normal eqs + LDLT solve +
 // accept/reject step). Pre-refactor used max_iter=100 for default cells and
-// max_iter=200 for the _restart cell. Effective compute envelope was max_iter*2.
-// Honest uniform per-family total = max envelope across the default+restart
-// pair = 400 units.
-constexpr int lm_family_total_units = 400;
+// max_iter=200 for the _restart cell. Honest uniform per-family total is
+// empirically sized at 800: a ladder walk (400/800/1600/3200) showed every
+// LM cell reaches its natural convergence ceiling by 800 and is bit-identical
+// at higher values, so 800 is the smallest value that does not truncate any
+// cell. Wall time is insensitive to the cap past 800 because saturated cells
+// terminate on convergence, not on budget.
+constexpr int lm_family_total_units = 800;
 
 // L-BFGS-B family: 1 unit = one Armijo line search (cartan) or one argmin-internal
 // L-BFGS-B iteration (argmin shim). Same pre-refactor sizing as LM.
