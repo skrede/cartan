@@ -31,16 +31,28 @@ else ()
     )
 endif ()
 
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/version.h.in
+    ${CMAKE_CURRENT_BINARY_DIR}/include/cartan/version.h
+    @ONLY
+)
+
 add_library(cartan_lie INTERFACE)
 add_library(cartan::lie ALIAS cartan_lie)
 
 target_include_directories(cartan_lie
     INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
 target_link_libraries(cartan_lie
     INTERFACE
     Eigen3::Eigen
+)
+
+install(
+    FILES ${CMAKE_CURRENT_BINARY_DIR}/include/cartan/version.h
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/cartan
 )

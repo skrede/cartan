@@ -12,6 +12,7 @@ function(cartan_add_test TEST_NAME TEST_SOURCE)
     add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
 endfunction()
 
+cartan_add_test(version_test version_test.cpp)
 cartan_add_test(types_test types_test.cpp)
 cartan_add_test(hat_vee_test hat_vee_test.cpp)
 cartan_add_test(so2_test so2_test.cpp)

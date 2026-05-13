@@ -1,0 +1,36 @@
+#ifndef HPP_GUARD_CARTAN_LIE_VERSION_H
+#define HPP_GUARD_CARTAN_LIE_VERSION_H
+
+#include <string_view>
+
+#define CARTAN_VERSION_MAJOR @cartan_VERSION_MAJOR@
+#define CARTAN_VERSION_MINOR @cartan_VERSION_MINOR@
+#define CARTAN_VERSION_PATCH @cartan_VERSION_PATCH@
+#define CARTAN_VERSION_STRING "@cartan_VERSION@"
+
+namespace cartan
+{
+
+[[nodiscard]] constexpr std::string_view version() noexcept
+{
+    return CARTAN_VERSION_STRING;
+}
+
+[[nodiscard]] constexpr int version_major() noexcept
+{
+    return CARTAN_VERSION_MAJOR;
+}
+
+[[nodiscard]] constexpr int version_minor() noexcept
+{
+    return CARTAN_VERSION_MINOR;
+}
+
+[[nodiscard]] constexpr int version_patch() noexcept
+{
+    return CARTAN_VERSION_PATCH;
+}
+
+}
+
+#endif
