@@ -62,6 +62,66 @@
 #include <stdexcept>
 #include <string>
 
+// ============================================================================
+// Per-family algorithmic-work-unit budgets
+// ============================================================================
+//
+// One algorithmic-work unit = one major iteration of the solver's design. The
+// runner caps total work at `max_total_work_units` (literally, no slack); each
+// solver's internal per-attempt counter caps a single attempt at
+// `max_iterations_per_attempt`.
+//
+// Initial values match the pre-refactor effective compute envelope
+// (`max_iter * 2`, where the historic runner slack factor 2x was dropped at the
+// runner cap). Each cell's restart variant shares the per-family total because
+// restart_wrapper's pass-through unit aggregation means a single per-family
+// number applies to both the default and the restart-wrapped variant. These are
+// initial values — to be validated empirically against the cross-solver bench
+// baseline in a follow-up.
+
+namespace cartan::ik::bench
+{
+
+// LM family: 1 unit = one LM iteration (form normal eqs + LDLT solve +
+// accept/reject step). Pre-refactor used max_iter=100 for default cells and
+// max_iter=200 for the _restart cell. Effective compute envelope was max_iter*2.
+// Honest uniform per-family total = max envelope across the default+restart
+// pair = 400 units.
+constexpr int lm_family_total_units = 400;
+
+// L-BFGS-B family: 1 unit = one Armijo line search (cartan) or one argmin-internal
+// L-BFGS-B iteration (argmin shim). Same pre-refactor sizing as LM.
+constexpr int lbfgsb_family_total_units = 400;
+
+// SQP / SLSQP family: 1 unit = one argmin-internal SLSQP outer iteration.
+// Per-iter cost is significantly higher than LM (each iter is a full QP).
+// Pre-refactor used max_iter=50/100 for default/restart. Effective = 100/200.
+// Honest uniform per-family total = 200 units.
+constexpr int sqp_family_total_units = 200;
+
+// BOBYQA family: 1 unit = one argmin-internal BOBYQA iteration. Derivative-free,
+// comparable cost to SLSQP per iter. Honest uniform per-family total = 200.
+constexpr int bobyqa_family_total_units = 200;
+
+// Projected GN family: 1 unit = one argmin-internal outer GN iteration.
+// Pre-refactor max_iter=100/200. Honest uniform per-family total = 400.
+constexpr int projected_gn_family_total_units = 400;
+
+// Newton-Raphson family: 1 unit = one Newton iteration. Pre-refactor max_iter=100.
+// Honest uniform per-family total = 200.
+constexpr int newton_family_total_units = 200;
+
+// Projected LM (self-restarting): 1 unit = one outer projected-LM iteration.
+// Pre-refactor max_iter=100/200. Halton-reseed restart events charge 0 units;
+// the budget is the inner iteration count across all internal restarts.
+constexpr int projected_lm_total_units = 400;
+
+// Per-attempt cap is uniform across families. Matches pre-refactor default
+// max_iter; each solver's internal m_iterations counter checks against this.
+constexpr int per_family_per_attempt = 100;
+
+}  // namespace cartan::ik::bench
+
 namespace
 {
 
@@ -282,7 +342,11 @@ void bm_cartan_lm(
     const cartan::kinematic_chain<double, N>& chain,
     const target_set<double, N>& ts)
 {
-    cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 100};
+    cartan::convergence_criteria<double> criteria{
+        .position_tol = 1e-5,
+        .orientation_tol = 1e-5,
+        .max_iterations_per_attempt = 100,
+        .max_total_work_units = 200};
 
     std::size_t idx = 0;
     int successes = 0;
@@ -330,7 +394,11 @@ void bm_cartan_restart_lm(
 {
     using chain_t = cartan::kinematic_chain<double, N>;
     using restart_lm = cartan::ik::restart_wrapper<chain_t, cartan::ik::lm<chain_t>>;
-    cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 200};
+    cartan::convergence_criteria<double> criteria{
+        .position_tol = 1e-5,
+        .orientation_tol = 1e-5,
+        .max_iterations_per_attempt = 200,
+        .max_total_work_units = 200};
 
     std::size_t idx = 0;
     int successes = 0;
@@ -372,15 +440,24 @@ void bm_cartan_restart_lm(
 
 // Generalized driver: any Solver type satisfying the cartan::ik::solve_policy concept.
 // Used by IK_BENCH_SOLVER_VARIANTS to emit {default, _no_limits, _restart} cells per
-// base solver per robot.
+// base solver per robot. The driver takes two int parameters: `per_attempt` caps a
+// single solver attempt (consulted by every solver's internal iteration counter and
+// by self-restarting solvers as their per-attempt budget before triggering a restart);
+// `total_units` is the runner-level total budget measured in algorithmic work units
+// (1 unit = one major iteration of the solver's design).
 template <int N, typename Solver>
 void bm_cartan_solver(
     benchmark::State& state,
     const cartan::kinematic_chain<double, N>& chain,
     const target_set<double, N>& ts,
-    int max_iter = 100)
+    int per_attempt,
+    int total_units)
 {
-    cartan::convergence_criteria<double> criteria{1e-5, 1e-5, max_iter};
+    cartan::convergence_criteria<double> criteria{
+        .position_tol = 1e-5,
+        .orientation_tol = 1e-5,
+        .max_iterations_per_attempt = per_attempt,
+        .max_total_work_units = total_units};
 
     std::size_t idx = 0;
     int successes = 0;
@@ -611,14 +688,22 @@ IK_BENCH_ROBOT_TRAC_IK(ROBOT, FACTORY, KDL_FACTORY, KDL_LIMITS_FACTORY, N_DOF)
 //
 // SOLVER_NAME is the bare identifier used in the cell name (e.g. dls).
 // SOLVER_TPL is the qualified solver template (e.g. cartan::ik::dls).
+// FAMILY_TOTAL_UNITS names the per-family `constexpr int` budget constant
+// defined in the `cartan::ik::bench` namespace above; the same constant is
+// threaded into both the default-flavored cell and the restart-wrapped cell
+// because restart_wrapper's pass-through unit aggregation means no per-cell
+// wrapper-specific tuning is required.
 // The macro relies on bm_cartan_solver<N, Solver> being defined in the same TU.
-#define IK_BENCH_SOLVER_VARIANTS(ROBOT, FACTORY, N_DOF, SOLVER_NAME, SOLVER_TPL)         \
+#define IK_BENCH_SOLVER_VARIANTS(ROBOT, FACTORY, N_DOF, SOLVER_NAME, SOLVER_TPL, FAMILY_TOTAL_UNITS) \
 static void bm_ik_##ROBOT##_##SOLVER_NAME(benchmark::State& state)                       \
 {                                                                                        \
     using chain_t = cartan::kinematic_chain<double, N_DOF>;                              \
     static auto chain = cartan::benchmarks::FACTORY<double>();                           \
     static target_set<double, N_DOF> ts(chain, num_targets);                             \
-    bm_cartan_solver<N_DOF, SOLVER_TPL<chain_t>>(state, chain, ts);                      \
+    bm_cartan_solver<N_DOF, SOLVER_TPL<chain_t>>(                                        \
+        state, chain, ts,                                                                \
+        cartan::ik::bench::per_family_per_attempt,                                       \
+        (FAMILY_TOTAL_UNITS));                                                           \
 }                                                                                        \
 BENCHMARK(bm_ik_##ROBOT##_##SOLVER_NAME)->Iterations(2000)->Unit(benchmark::kMicrosecond); \
 static void bm_ik_##ROBOT##_##SOLVER_NAME##_no_limits(benchmark::State& state)           \
@@ -626,7 +711,10 @@ static void bm_ik_##ROBOT##_##SOLVER_NAME##_no_limits(benchmark::State& state)  
     using chain_t = cartan::kinematic_chain<double, N_DOF>;                              \
     static auto chain = cartan::benchmarks::FACTORY<double>();                           \
     static target_set<double, N_DOF> ts(chain, num_targets);                             \
-    bm_cartan_solver<N_DOF, SOLVER_TPL<chain_t, cartan::no_limits>>(state, chain, ts);   \
+    bm_cartan_solver<N_DOF, SOLVER_TPL<chain_t, cartan::no_limits>>(                     \
+        state, chain, ts,                                                                \
+        cartan::ik::bench::per_family_per_attempt,                                       \
+        (FAMILY_TOTAL_UNITS));                                                           \
 }                                                                                        \
 BENCHMARK(bm_ik_##ROBOT##_##SOLVER_NAME##_no_limits)->Iterations(2000)->Unit(benchmark::kMicrosecond); \
 static void bm_ik_##ROBOT##_##SOLVER_NAME##_restart(benchmark::State& state)             \
@@ -636,7 +724,9 @@ static void bm_ik_##ROBOT##_##SOLVER_NAME##_restart(benchmark::State& state)    
     static target_set<double, N_DOF> ts(chain, num_targets);                             \
     bm_cartan_solver<N_DOF,                                                              \
         cartan::ik::restart_wrapper<chain_t, SOLVER_TPL<chain_t>>>(                      \
-        state, chain, ts, /*max_iter=*/200);                                             \
+        state, chain, ts,                                                                \
+        cartan::ik::bench::per_family_per_attempt,                                       \
+        (FAMILY_TOTAL_UNITS));                                                           \
 }                                                                                        \
 BENCHMARK(bm_ik_##ROBOT##_##SOLVER_NAME##_restart)->Iterations(2000)->Unit(benchmark::kMicrosecond)
 
@@ -644,138 +734,140 @@ BENCHMARK(bm_ik_##ROBOT##_##SOLVER_NAME##_restart)->Iterations(2000)->Unit(bench
 // (e.g. projected_lm self-restarts on stall via Halton re-seed). Adding _no_limits and
 // _restart variants for such solvers would emit a redundant duplicate of the default cell
 // and a pathological double-restart cell respectively, so only the default is registered.
-#define IK_BENCH_DEFAULT_ONLY(ROBOT, FACTORY, N_DOF, SOLVER_NAME, SOLVER_TPL)            \
+#define IK_BENCH_DEFAULT_ONLY(ROBOT, FACTORY, N_DOF, SOLVER_NAME, SOLVER_TPL, FAMILY_TOTAL_UNITS) \
 static void bm_ik_##ROBOT##_##SOLVER_NAME(benchmark::State& state)                       \
 {                                                                                        \
     using chain_t = cartan::kinematic_chain<double, N_DOF>;                              \
     static auto chain = cartan::benchmarks::FACTORY<double>();                           \
     static target_set<double, N_DOF> ts(chain, num_targets);                             \
-    bm_cartan_solver<N_DOF, SOLVER_TPL<chain_t>>(state, chain, ts);                      \
+    bm_cartan_solver<N_DOF, SOLVER_TPL<chain_t>>(                                        \
+        state, chain, ts,                                                                \
+        cartan::ik::bench::per_family_per_attempt,                                       \
+        (FAMILY_TOTAL_UNITS));                                                           \
 }                                                                                        \
 BENCHMARK(bm_ik_##ROBOT##_##SOLVER_NAME)->Iterations(2000)->Unit(benchmark::kMicrosecond)
 
 IK_BENCH_ROBOT(ur3e,       make_ur3e_chain,       make_ur3e_kdl_chain,       make_ur3e_kdl_limits,       6);
-IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, dls,            cartan::ik::dls);
-IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, builtin_lm,     cartan::ik::builtin_lm);
-IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, builtin_lbfgsb, cartan::ik::builtin_lbfgsb);
-IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, newton_raphson, cartan::ik::newton_raphson);
-IK_BENCH_DEFAULT_ONLY(ur3e,       make_ur3e_chain,       6, projected_lm,   cartan::ik::projected_lm);
+IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, dls,            cartan::ik::dls,            cartan::ik::bench::lm_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, builtin_lm,     cartan::ik::builtin_lm,     cartan::ik::bench::lm_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, builtin_lbfgsb, cartan::ik::builtin_lbfgsb, cartan::ik::bench::lbfgsb_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, newton_raphson, cartan::ik::newton_raphson, cartan::ik::bench::newton_family_total_units);
+IK_BENCH_DEFAULT_ONLY(ur3e,       make_ur3e_chain,       6, projected_lm,   cartan::ik::projected_lm,   cartan::ik::bench::projected_lm_total_units);
 IK_BENCH_ROBOT(kr6_sixx,   make_kr6_sixx_chain,   make_kr6_sixx_kdl_chain,   make_kr6_sixx_kdl_limits,   6);
-IK_BENCH_SOLVER_VARIANTS(kr6_sixx,   make_kr6_sixx_chain,   6, dls,            cartan::ik::dls);
-IK_BENCH_SOLVER_VARIANTS(kr6_sixx,   make_kr6_sixx_chain,   6, builtin_lm,     cartan::ik::builtin_lm);
-IK_BENCH_SOLVER_VARIANTS(kr6_sixx,   make_kr6_sixx_chain,   6, builtin_lbfgsb, cartan::ik::builtin_lbfgsb);
-IK_BENCH_SOLVER_VARIANTS(kr6_sixx,   make_kr6_sixx_chain,   6, newton_raphson, cartan::ik::newton_raphson);
-IK_BENCH_DEFAULT_ONLY(kr6_sixx,   make_kr6_sixx_chain,   6, projected_lm,   cartan::ik::projected_lm);
+IK_BENCH_SOLVER_VARIANTS(kr6_sixx,   make_kr6_sixx_chain,   6, dls,            cartan::ik::dls,            cartan::ik::bench::lm_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(kr6_sixx,   make_kr6_sixx_chain,   6, builtin_lm,     cartan::ik::builtin_lm,     cartan::ik::bench::lm_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(kr6_sixx,   make_kr6_sixx_chain,   6, builtin_lbfgsb, cartan::ik::builtin_lbfgsb, cartan::ik::bench::lbfgsb_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(kr6_sixx,   make_kr6_sixx_chain,   6, newton_raphson, cartan::ik::newton_raphson, cartan::ik::bench::newton_family_total_units);
+IK_BENCH_DEFAULT_ONLY(kr6_sixx,   make_kr6_sixx_chain,   6, projected_lm,   cartan::ik::projected_lm,   cartan::ik::bench::projected_lm_total_units);
 IK_BENCH_ROBOT(abb_irb120, make_abb_irb120_chain, make_abb_irb120_kdl_chain, make_abb_irb120_kdl_limits, 6);
-IK_BENCH_SOLVER_VARIANTS(abb_irb120, make_abb_irb120_chain, 6, dls,            cartan::ik::dls);
-IK_BENCH_SOLVER_VARIANTS(abb_irb120, make_abb_irb120_chain, 6, builtin_lm,     cartan::ik::builtin_lm);
-IK_BENCH_SOLVER_VARIANTS(abb_irb120, make_abb_irb120_chain, 6, builtin_lbfgsb, cartan::ik::builtin_lbfgsb);
-IK_BENCH_SOLVER_VARIANTS(abb_irb120, make_abb_irb120_chain, 6, newton_raphson, cartan::ik::newton_raphson);
-IK_BENCH_DEFAULT_ONLY(abb_irb120, make_abb_irb120_chain, 6, projected_lm,   cartan::ik::projected_lm);
+IK_BENCH_SOLVER_VARIANTS(abb_irb120, make_abb_irb120_chain, 6, dls,            cartan::ik::dls,            cartan::ik::bench::lm_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(abb_irb120, make_abb_irb120_chain, 6, builtin_lm,     cartan::ik::builtin_lm,     cartan::ik::bench::lm_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(abb_irb120, make_abb_irb120_chain, 6, builtin_lbfgsb, cartan::ik::builtin_lbfgsb, cartan::ik::bench::lbfgsb_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(abb_irb120, make_abb_irb120_chain, 6, newton_raphson, cartan::ik::newton_raphson, cartan::ik::bench::newton_family_total_units);
+IK_BENCH_DEFAULT_ONLY(abb_irb120, make_abb_irb120_chain, 6, projected_lm,   cartan::ik::projected_lm,   cartan::ik::bench::projected_lm_total_units);
 IK_BENCH_ROBOT(jaco2,      make_jaco2_chain,      make_jaco2_kdl_chain,      make_jaco2_kdl_limits,      6);
-IK_BENCH_SOLVER_VARIANTS(jaco2,      make_jaco2_chain,      6, dls,            cartan::ik::dls);
-IK_BENCH_SOLVER_VARIANTS(jaco2,      make_jaco2_chain,      6, builtin_lm,     cartan::ik::builtin_lm);
-IK_BENCH_SOLVER_VARIANTS(jaco2,      make_jaco2_chain,      6, builtin_lbfgsb, cartan::ik::builtin_lbfgsb);
-IK_BENCH_SOLVER_VARIANTS(jaco2,      make_jaco2_chain,      6, newton_raphson, cartan::ik::newton_raphson);
-IK_BENCH_DEFAULT_ONLY(jaco2,      make_jaco2_chain,      6, projected_lm,   cartan::ik::projected_lm);
+IK_BENCH_SOLVER_VARIANTS(jaco2,      make_jaco2_chain,      6, dls,            cartan::ik::dls,            cartan::ik::bench::lm_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(jaco2,      make_jaco2_chain,      6, builtin_lm,     cartan::ik::builtin_lm,     cartan::ik::bench::lm_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(jaco2,      make_jaco2_chain,      6, builtin_lbfgsb, cartan::ik::builtin_lbfgsb, cartan::ik::bench::lbfgsb_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(jaco2,      make_jaco2_chain,      6, newton_raphson, cartan::ik::newton_raphson, cartan::ik::bench::newton_family_total_units);
+IK_BENCH_DEFAULT_ONLY(jaco2,      make_jaco2_chain,      6, projected_lm,   cartan::ik::projected_lm,   cartan::ik::bench::projected_lm_total_units);
 IK_BENCH_ROBOT(lbr_med14,  make_lbr_med14_chain,  make_lbr_med14_kdl_chain,  make_lbr_med14_kdl_limits,  7);
-IK_BENCH_SOLVER_VARIANTS(lbr_med14,  make_lbr_med14_chain,  7, dls,            cartan::ik::dls);
-IK_BENCH_SOLVER_VARIANTS(lbr_med14,  make_lbr_med14_chain,  7, builtin_lm,     cartan::ik::builtin_lm);
-IK_BENCH_SOLVER_VARIANTS(lbr_med14,  make_lbr_med14_chain,  7, builtin_lbfgsb, cartan::ik::builtin_lbfgsb);
-IK_BENCH_SOLVER_VARIANTS(lbr_med14,  make_lbr_med14_chain,  7, newton_raphson, cartan::ik::newton_raphson);
-IK_BENCH_DEFAULT_ONLY(lbr_med14,  make_lbr_med14_chain,  7, projected_lm,   cartan::ik::projected_lm);
+IK_BENCH_SOLVER_VARIANTS(lbr_med14,  make_lbr_med14_chain,  7, dls,            cartan::ik::dls,            cartan::ik::bench::lm_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(lbr_med14,  make_lbr_med14_chain,  7, builtin_lm,     cartan::ik::builtin_lm,     cartan::ik::bench::lm_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(lbr_med14,  make_lbr_med14_chain,  7, builtin_lbfgsb, cartan::ik::builtin_lbfgsb, cartan::ik::bench::lbfgsb_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(lbr_med14,  make_lbr_med14_chain,  7, newton_raphson, cartan::ik::newton_raphson, cartan::ik::bench::newton_family_total_units);
+IK_BENCH_DEFAULT_ONLY(lbr_med14,  make_lbr_med14_chain,  7, projected_lm,   cartan::ik::projected_lm,   cartan::ik::bench::projected_lm_total_units);
 IK_BENCH_ROBOT(panda,      make_panda_chain,      make_panda_kdl_chain,      make_panda_kdl_limits,      7);
-IK_BENCH_SOLVER_VARIANTS(panda,      make_panda_chain,      7, dls,            cartan::ik::dls);
-IK_BENCH_SOLVER_VARIANTS(panda,      make_panda_chain,      7, builtin_lm,     cartan::ik::builtin_lm);
-IK_BENCH_SOLVER_VARIANTS(panda,      make_panda_chain,      7, builtin_lbfgsb, cartan::ik::builtin_lbfgsb);
-IK_BENCH_SOLVER_VARIANTS(panda,      make_panda_chain,      7, newton_raphson, cartan::ik::newton_raphson);
-IK_BENCH_DEFAULT_ONLY(panda,      make_panda_chain,      7, projected_lm,   cartan::ik::projected_lm);
+IK_BENCH_SOLVER_VARIANTS(panda,      make_panda_chain,      7, dls,            cartan::ik::dls,            cartan::ik::bench::lm_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(panda,      make_panda_chain,      7, builtin_lm,     cartan::ik::builtin_lm,     cartan::ik::bench::lm_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(panda,      make_panda_chain,      7, builtin_lbfgsb, cartan::ik::builtin_lbfgsb, cartan::ik::bench::lbfgsb_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(panda,      make_panda_chain,      7, newton_raphson, cartan::ik::newton_raphson, cartan::ik::bench::newton_family_total_units);
+IK_BENCH_DEFAULT_ONLY(panda,      make_panda_chain,      7, projected_lm,   cartan::ik::projected_lm,   cartan::ik::bench::projected_lm_total_units);
 IK_BENCH_ROBOT(fetch,      make_fetch_chain,      make_fetch_kdl_chain,      make_fetch_kdl_limits,      7);
-IK_BENCH_SOLVER_VARIANTS(fetch,      make_fetch_chain,      7, dls,            cartan::ik::dls);
-IK_BENCH_SOLVER_VARIANTS(fetch,      make_fetch_chain,      7, builtin_lm,     cartan::ik::builtin_lm);
-IK_BENCH_SOLVER_VARIANTS(fetch,      make_fetch_chain,      7, builtin_lbfgsb, cartan::ik::builtin_lbfgsb);
-IK_BENCH_SOLVER_VARIANTS(fetch,      make_fetch_chain,      7, newton_raphson, cartan::ik::newton_raphson);
-IK_BENCH_DEFAULT_ONLY(fetch,      make_fetch_chain,      7, projected_lm,   cartan::ik::projected_lm);
+IK_BENCH_SOLVER_VARIANTS(fetch,      make_fetch_chain,      7, dls,            cartan::ik::dls,            cartan::ik::bench::lm_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(fetch,      make_fetch_chain,      7, builtin_lm,     cartan::ik::builtin_lm,     cartan::ik::bench::lm_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(fetch,      make_fetch_chain,      7, builtin_lbfgsb, cartan::ik::builtin_lbfgsb, cartan::ik::bench::lbfgsb_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(fetch,      make_fetch_chain,      7, newton_raphson, cartan::ik::newton_raphson, cartan::ik::bench::newton_family_total_units);
+IK_BENCH_DEFAULT_ONLY(fetch,      make_fetch_chain,      7, projected_lm,   cartan::ik::projected_lm,   cartan::ik::bench::projected_lm_total_units);
 IK_BENCH_ROBOT(baxter,     make_baxter_chain,     make_baxter_kdl_chain,     make_baxter_kdl_limits,     7);
-IK_BENCH_SOLVER_VARIANTS(baxter,     make_baxter_chain,     7, dls,            cartan::ik::dls);
-IK_BENCH_SOLVER_VARIANTS(baxter,     make_baxter_chain,     7, builtin_lm,     cartan::ik::builtin_lm);
-IK_BENCH_SOLVER_VARIANTS(baxter,     make_baxter_chain,     7, builtin_lbfgsb, cartan::ik::builtin_lbfgsb);
-IK_BENCH_SOLVER_VARIANTS(baxter,     make_baxter_chain,     7, newton_raphson, cartan::ik::newton_raphson);
-IK_BENCH_DEFAULT_ONLY(baxter,     make_baxter_chain,     7, projected_lm,   cartan::ik::projected_lm);
+IK_BENCH_SOLVER_VARIANTS(baxter,     make_baxter_chain,     7, dls,            cartan::ik::dls,            cartan::ik::bench::lm_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(baxter,     make_baxter_chain,     7, builtin_lm,     cartan::ik::builtin_lm,     cartan::ik::bench::lm_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(baxter,     make_baxter_chain,     7, builtin_lbfgsb, cartan::ik::builtin_lbfgsb, cartan::ik::bench::lbfgsb_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(baxter,     make_baxter_chain,     7, newton_raphson, cartan::ik::newton_raphson, cartan::ik::bench::newton_family_total_units);
+IK_BENCH_DEFAULT_ONLY(baxter,     make_baxter_chain,     7, projected_lm,   cartan::ik::projected_lm,   cartan::ik::bench::projected_lm_total_units);
 IK_BENCH_ROBOT(kuka_lwr4,  make_kuka_lwr4_chain,  make_kuka_lwr4_kdl_chain,  make_kuka_lwr4_kdl_limits,  7);
-IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, dls,            cartan::ik::dls);
-IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, builtin_lm,     cartan::ik::builtin_lm);
-IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, builtin_lbfgsb, cartan::ik::builtin_lbfgsb);
-IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, newton_raphson, cartan::ik::newton_raphson);
-IK_BENCH_DEFAULT_ONLY(kuka_lwr4,  make_kuka_lwr4_chain,  7, projected_lm,   cartan::ik::projected_lm);
+IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, dls,            cartan::ik::dls,            cartan::ik::bench::lm_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, builtin_lm,     cartan::ik::builtin_lm,     cartan::ik::bench::lm_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, builtin_lbfgsb, cartan::ik::builtin_lbfgsb, cartan::ik::bench::lbfgsb_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, newton_raphson, cartan::ik::newton_raphson, cartan::ik::bench::newton_family_total_units);
+IK_BENCH_DEFAULT_ONLY(kuka_lwr4,  make_kuka_lwr4_chain,  7, projected_lm,   cartan::ik::projected_lm,   cartan::ik::bench::projected_lm_total_units);
 
 #ifdef CARTAN_BUILD_ARGMIN
-IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, argmin_lm,                   cartan::ik::argmin_lm);
-IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, argmin_slsqp,                cartan::ik::argmin_slsqp);
-IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, argmin_bobyqa,               cartan::ik::argmin_bobyqa);
-IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, argmin_lbfgsb,               cartan::ik::argmin_lbfgsb);
-IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, argmin_projected_gn,         cartan::ik::argmin_projected_gn);
-IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, argmin_projected_gradient_gn, cartan::ik::argmin_projected_gradient_gn);
-IK_BENCH_SOLVER_VARIANTS(kr6_sixx,   make_kr6_sixx_chain,   6, argmin_lm,                   cartan::ik::argmin_lm);
-IK_BENCH_SOLVER_VARIANTS(kr6_sixx,   make_kr6_sixx_chain,   6, argmin_slsqp,                cartan::ik::argmin_slsqp);
-IK_BENCH_SOLVER_VARIANTS(kr6_sixx,   make_kr6_sixx_chain,   6, argmin_bobyqa,               cartan::ik::argmin_bobyqa);
-IK_BENCH_SOLVER_VARIANTS(kr6_sixx,   make_kr6_sixx_chain,   6, argmin_lbfgsb,               cartan::ik::argmin_lbfgsb);
-IK_BENCH_SOLVER_VARIANTS(kr6_sixx,   make_kr6_sixx_chain,   6, argmin_projected_gn,         cartan::ik::argmin_projected_gn);
-IK_BENCH_SOLVER_VARIANTS(kr6_sixx,   make_kr6_sixx_chain,   6, argmin_projected_gradient_gn, cartan::ik::argmin_projected_gradient_gn);
-IK_BENCH_SOLVER_VARIANTS(abb_irb120, make_abb_irb120_chain, 6, argmin_lm,                   cartan::ik::argmin_lm);
-IK_BENCH_SOLVER_VARIANTS(abb_irb120, make_abb_irb120_chain, 6, argmin_slsqp,                cartan::ik::argmin_slsqp);
-IK_BENCH_SOLVER_VARIANTS(abb_irb120, make_abb_irb120_chain, 6, argmin_bobyqa,               cartan::ik::argmin_bobyqa);
-IK_BENCH_SOLVER_VARIANTS(abb_irb120, make_abb_irb120_chain, 6, argmin_lbfgsb,               cartan::ik::argmin_lbfgsb);
-IK_BENCH_SOLVER_VARIANTS(abb_irb120, make_abb_irb120_chain, 6, argmin_projected_gn,         cartan::ik::argmin_projected_gn);
-IK_BENCH_SOLVER_VARIANTS(abb_irb120, make_abb_irb120_chain, 6, argmin_projected_gradient_gn, cartan::ik::argmin_projected_gradient_gn);
-IK_BENCH_SOLVER_VARIANTS(jaco2,      make_jaco2_chain,      6, argmin_lm,                   cartan::ik::argmin_lm);
-IK_BENCH_SOLVER_VARIANTS(jaco2,      make_jaco2_chain,      6, argmin_slsqp,                cartan::ik::argmin_slsqp);
-IK_BENCH_SOLVER_VARIANTS(jaco2,      make_jaco2_chain,      6, argmin_bobyqa,               cartan::ik::argmin_bobyqa);
-IK_BENCH_SOLVER_VARIANTS(jaco2,      make_jaco2_chain,      6, argmin_lbfgsb,               cartan::ik::argmin_lbfgsb);
-IK_BENCH_SOLVER_VARIANTS(jaco2,      make_jaco2_chain,      6, argmin_projected_gn,         cartan::ik::argmin_projected_gn);
-IK_BENCH_SOLVER_VARIANTS(jaco2,      make_jaco2_chain,      6, argmin_projected_gradient_gn, cartan::ik::argmin_projected_gradient_gn);
-IK_BENCH_SOLVER_VARIANTS(lbr_med14,  make_lbr_med14_chain,  7, argmin_lm,                   cartan::ik::argmin_lm);
-IK_BENCH_SOLVER_VARIANTS(lbr_med14,  make_lbr_med14_chain,  7, argmin_slsqp,                cartan::ik::argmin_slsqp);
-IK_BENCH_SOLVER_VARIANTS(lbr_med14,  make_lbr_med14_chain,  7, argmin_bobyqa,               cartan::ik::argmin_bobyqa);
-IK_BENCH_SOLVER_VARIANTS(lbr_med14,  make_lbr_med14_chain,  7, argmin_lbfgsb,               cartan::ik::argmin_lbfgsb);
-IK_BENCH_SOLVER_VARIANTS(lbr_med14,  make_lbr_med14_chain,  7, argmin_projected_gn,         cartan::ik::argmin_projected_gn);
-IK_BENCH_SOLVER_VARIANTS(lbr_med14,  make_lbr_med14_chain,  7, argmin_projected_gradient_gn, cartan::ik::argmin_projected_gradient_gn);
-IK_BENCH_SOLVER_VARIANTS(panda,      make_panda_chain,      7, argmin_lm,                   cartan::ik::argmin_lm);
-IK_BENCH_SOLVER_VARIANTS(panda,      make_panda_chain,      7, argmin_slsqp,                cartan::ik::argmin_slsqp);
-IK_BENCH_SOLVER_VARIANTS(panda,      make_panda_chain,      7, argmin_bobyqa,               cartan::ik::argmin_bobyqa);
-IK_BENCH_SOLVER_VARIANTS(panda,      make_panda_chain,      7, argmin_lbfgsb,               cartan::ik::argmin_lbfgsb);
-IK_BENCH_SOLVER_VARIANTS(panda,      make_panda_chain,      7, argmin_projected_gn,         cartan::ik::argmin_projected_gn);
-IK_BENCH_SOLVER_VARIANTS(panda,      make_panda_chain,      7, argmin_projected_gradient_gn, cartan::ik::argmin_projected_gradient_gn);
-IK_BENCH_SOLVER_VARIANTS(fetch,      make_fetch_chain,      7, argmin_lm,                   cartan::ik::argmin_lm);
-IK_BENCH_SOLVER_VARIANTS(fetch,      make_fetch_chain,      7, argmin_slsqp,                cartan::ik::argmin_slsqp);
-IK_BENCH_SOLVER_VARIANTS(fetch,      make_fetch_chain,      7, argmin_bobyqa,               cartan::ik::argmin_bobyqa);
-IK_BENCH_SOLVER_VARIANTS(fetch,      make_fetch_chain,      7, argmin_lbfgsb,               cartan::ik::argmin_lbfgsb);
-IK_BENCH_SOLVER_VARIANTS(fetch,      make_fetch_chain,      7, argmin_projected_gn,         cartan::ik::argmin_projected_gn);
-IK_BENCH_SOLVER_VARIANTS(fetch,      make_fetch_chain,      7, argmin_projected_gradient_gn, cartan::ik::argmin_projected_gradient_gn);
-IK_BENCH_SOLVER_VARIANTS(baxter,     make_baxter_chain,     7, argmin_lm,                   cartan::ik::argmin_lm);
-IK_BENCH_SOLVER_VARIANTS(baxter,     make_baxter_chain,     7, argmin_slsqp,                cartan::ik::argmin_slsqp);
-IK_BENCH_SOLVER_VARIANTS(baxter,     make_baxter_chain,     7, argmin_bobyqa,               cartan::ik::argmin_bobyqa);
-IK_BENCH_SOLVER_VARIANTS(baxter,     make_baxter_chain,     7, argmin_lbfgsb,               cartan::ik::argmin_lbfgsb);
-IK_BENCH_SOLVER_VARIANTS(baxter,     make_baxter_chain,     7, argmin_projected_gn,         cartan::ik::argmin_projected_gn);
-IK_BENCH_SOLVER_VARIANTS(baxter,     make_baxter_chain,     7, argmin_projected_gradient_gn, cartan::ik::argmin_projected_gradient_gn);
-IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, argmin_lm,                   cartan::ik::argmin_lm);
-IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, argmin_slsqp,                cartan::ik::argmin_slsqp);
-IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, argmin_bobyqa,               cartan::ik::argmin_bobyqa);
-IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, argmin_lbfgsb,               cartan::ik::argmin_lbfgsb);
-IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, argmin_projected_gn,         cartan::ik::argmin_projected_gn);
-IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, argmin_projected_gradient_gn, cartan::ik::argmin_projected_gradient_gn);
+IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, argmin_lm,                    cartan::ik::argmin_lm,                    cartan::ik::bench::lm_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, argmin_slsqp,                 cartan::ik::argmin_slsqp,                 cartan::ik::bench::sqp_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, argmin_bobyqa,                cartan::ik::argmin_bobyqa,                cartan::ik::bench::bobyqa_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, argmin_lbfgsb,                cartan::ik::argmin_lbfgsb,                cartan::ik::bench::lbfgsb_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, argmin_projected_gn,          cartan::ik::argmin_projected_gn,          cartan::ik::bench::projected_gn_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, argmin_projected_gradient_gn, cartan::ik::argmin_projected_gradient_gn, cartan::ik::bench::projected_gn_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(kr6_sixx,   make_kr6_sixx_chain,   6, argmin_lm,                    cartan::ik::argmin_lm,                    cartan::ik::bench::lm_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(kr6_sixx,   make_kr6_sixx_chain,   6, argmin_slsqp,                 cartan::ik::argmin_slsqp,                 cartan::ik::bench::sqp_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(kr6_sixx,   make_kr6_sixx_chain,   6, argmin_bobyqa,                cartan::ik::argmin_bobyqa,                cartan::ik::bench::bobyqa_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(kr6_sixx,   make_kr6_sixx_chain,   6, argmin_lbfgsb,                cartan::ik::argmin_lbfgsb,                cartan::ik::bench::lbfgsb_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(kr6_sixx,   make_kr6_sixx_chain,   6, argmin_projected_gn,          cartan::ik::argmin_projected_gn,          cartan::ik::bench::projected_gn_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(kr6_sixx,   make_kr6_sixx_chain,   6, argmin_projected_gradient_gn, cartan::ik::argmin_projected_gradient_gn, cartan::ik::bench::projected_gn_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(abb_irb120, make_abb_irb120_chain, 6, argmin_lm,                    cartan::ik::argmin_lm,                    cartan::ik::bench::lm_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(abb_irb120, make_abb_irb120_chain, 6, argmin_slsqp,                 cartan::ik::argmin_slsqp,                 cartan::ik::bench::sqp_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(abb_irb120, make_abb_irb120_chain, 6, argmin_bobyqa,                cartan::ik::argmin_bobyqa,                cartan::ik::bench::bobyqa_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(abb_irb120, make_abb_irb120_chain, 6, argmin_lbfgsb,                cartan::ik::argmin_lbfgsb,                cartan::ik::bench::lbfgsb_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(abb_irb120, make_abb_irb120_chain, 6, argmin_projected_gn,          cartan::ik::argmin_projected_gn,          cartan::ik::bench::projected_gn_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(abb_irb120, make_abb_irb120_chain, 6, argmin_projected_gradient_gn, cartan::ik::argmin_projected_gradient_gn, cartan::ik::bench::projected_gn_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(jaco2,      make_jaco2_chain,      6, argmin_lm,                    cartan::ik::argmin_lm,                    cartan::ik::bench::lm_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(jaco2,      make_jaco2_chain,      6, argmin_slsqp,                 cartan::ik::argmin_slsqp,                 cartan::ik::bench::sqp_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(jaco2,      make_jaco2_chain,      6, argmin_bobyqa,                cartan::ik::argmin_bobyqa,                cartan::ik::bench::bobyqa_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(jaco2,      make_jaco2_chain,      6, argmin_lbfgsb,                cartan::ik::argmin_lbfgsb,                cartan::ik::bench::lbfgsb_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(jaco2,      make_jaco2_chain,      6, argmin_projected_gn,          cartan::ik::argmin_projected_gn,          cartan::ik::bench::projected_gn_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(jaco2,      make_jaco2_chain,      6, argmin_projected_gradient_gn, cartan::ik::argmin_projected_gradient_gn, cartan::ik::bench::projected_gn_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(lbr_med14,  make_lbr_med14_chain,  7, argmin_lm,                    cartan::ik::argmin_lm,                    cartan::ik::bench::lm_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(lbr_med14,  make_lbr_med14_chain,  7, argmin_slsqp,                 cartan::ik::argmin_slsqp,                 cartan::ik::bench::sqp_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(lbr_med14,  make_lbr_med14_chain,  7, argmin_bobyqa,                cartan::ik::argmin_bobyqa,                cartan::ik::bench::bobyqa_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(lbr_med14,  make_lbr_med14_chain,  7, argmin_lbfgsb,                cartan::ik::argmin_lbfgsb,                cartan::ik::bench::lbfgsb_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(lbr_med14,  make_lbr_med14_chain,  7, argmin_projected_gn,          cartan::ik::argmin_projected_gn,          cartan::ik::bench::projected_gn_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(lbr_med14,  make_lbr_med14_chain,  7, argmin_projected_gradient_gn, cartan::ik::argmin_projected_gradient_gn, cartan::ik::bench::projected_gn_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(panda,      make_panda_chain,      7, argmin_lm,                    cartan::ik::argmin_lm,                    cartan::ik::bench::lm_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(panda,      make_panda_chain,      7, argmin_slsqp,                 cartan::ik::argmin_slsqp,                 cartan::ik::bench::sqp_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(panda,      make_panda_chain,      7, argmin_bobyqa,                cartan::ik::argmin_bobyqa,                cartan::ik::bench::bobyqa_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(panda,      make_panda_chain,      7, argmin_lbfgsb,                cartan::ik::argmin_lbfgsb,                cartan::ik::bench::lbfgsb_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(panda,      make_panda_chain,      7, argmin_projected_gn,          cartan::ik::argmin_projected_gn,          cartan::ik::bench::projected_gn_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(panda,      make_panda_chain,      7, argmin_projected_gradient_gn, cartan::ik::argmin_projected_gradient_gn, cartan::ik::bench::projected_gn_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(fetch,      make_fetch_chain,      7, argmin_lm,                    cartan::ik::argmin_lm,                    cartan::ik::bench::lm_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(fetch,      make_fetch_chain,      7, argmin_slsqp,                 cartan::ik::argmin_slsqp,                 cartan::ik::bench::sqp_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(fetch,      make_fetch_chain,      7, argmin_bobyqa,                cartan::ik::argmin_bobyqa,                cartan::ik::bench::bobyqa_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(fetch,      make_fetch_chain,      7, argmin_lbfgsb,                cartan::ik::argmin_lbfgsb,                cartan::ik::bench::lbfgsb_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(fetch,      make_fetch_chain,      7, argmin_projected_gn,          cartan::ik::argmin_projected_gn,          cartan::ik::bench::projected_gn_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(fetch,      make_fetch_chain,      7, argmin_projected_gradient_gn, cartan::ik::argmin_projected_gradient_gn, cartan::ik::bench::projected_gn_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(baxter,     make_baxter_chain,     7, argmin_lm,                    cartan::ik::argmin_lm,                    cartan::ik::bench::lm_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(baxter,     make_baxter_chain,     7, argmin_slsqp,                 cartan::ik::argmin_slsqp,                 cartan::ik::bench::sqp_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(baxter,     make_baxter_chain,     7, argmin_bobyqa,                cartan::ik::argmin_bobyqa,                cartan::ik::bench::bobyqa_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(baxter,     make_baxter_chain,     7, argmin_lbfgsb,                cartan::ik::argmin_lbfgsb,                cartan::ik::bench::lbfgsb_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(baxter,     make_baxter_chain,     7, argmin_projected_gn,          cartan::ik::argmin_projected_gn,          cartan::ik::bench::projected_gn_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(baxter,     make_baxter_chain,     7, argmin_projected_gradient_gn, cartan::ik::argmin_projected_gradient_gn, cartan::ik::bench::projected_gn_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, argmin_lm,                    cartan::ik::argmin_lm,                    cartan::ik::bench::lm_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, argmin_slsqp,                 cartan::ik::argmin_slsqp,                 cartan::ik::bench::sqp_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, argmin_bobyqa,                cartan::ik::argmin_bobyqa,                cartan::ik::bench::bobyqa_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, argmin_lbfgsb,                cartan::ik::argmin_lbfgsb,                cartan::ik::bench::lbfgsb_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, argmin_projected_gn,          cartan::ik::argmin_projected_gn,          cartan::ik::bench::projected_gn_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, argmin_projected_gradient_gn, cartan::ik::argmin_projected_gradient_gn, cartan::ik::bench::projected_gn_family_total_units);
 
 // Fast-mode SQP cells — argmin sqp_mode::fast NTTP threaded through kraft_slsqp_policy.
-// Bench reply to argmin-cartan_00-83 (accurate vs fast-mode wall + SR verdict).
-IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, argmin_slsqp_fast,           cartan::ik::argmin_slsqp_fast);
-IK_BENCH_SOLVER_VARIANTS(kr6_sixx,   make_kr6_sixx_chain,   6, argmin_slsqp_fast,           cartan::ik::argmin_slsqp_fast);
-IK_BENCH_SOLVER_VARIANTS(abb_irb120, make_abb_irb120_chain, 6, argmin_slsqp_fast,           cartan::ik::argmin_slsqp_fast);
-IK_BENCH_SOLVER_VARIANTS(jaco2,      make_jaco2_chain,      6, argmin_slsqp_fast,           cartan::ik::argmin_slsqp_fast);
-IK_BENCH_SOLVER_VARIANTS(lbr_med14,  make_lbr_med14_chain,  7, argmin_slsqp_fast,           cartan::ik::argmin_slsqp_fast);
-IK_BENCH_SOLVER_VARIANTS(panda,      make_panda_chain,      7, argmin_slsqp_fast,           cartan::ik::argmin_slsqp_fast);
-IK_BENCH_SOLVER_VARIANTS(fetch,      make_fetch_chain,      7, argmin_slsqp_fast,           cartan::ik::argmin_slsqp_fast);
-IK_BENCH_SOLVER_VARIANTS(baxter,     make_baxter_chain,     7, argmin_slsqp_fast,           cartan::ik::argmin_slsqp_fast);
-IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, argmin_slsqp_fast,           cartan::ik::argmin_slsqp_fast);
+IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, argmin_slsqp_fast,            cartan::ik::argmin_slsqp_fast,            cartan::ik::bench::sqp_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(kr6_sixx,   make_kr6_sixx_chain,   6, argmin_slsqp_fast,            cartan::ik::argmin_slsqp_fast,            cartan::ik::bench::sqp_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(abb_irb120, make_abb_irb120_chain, 6, argmin_slsqp_fast,            cartan::ik::argmin_slsqp_fast,            cartan::ik::bench::sqp_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(jaco2,      make_jaco2_chain,      6, argmin_slsqp_fast,            cartan::ik::argmin_slsqp_fast,            cartan::ik::bench::sqp_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(lbr_med14,  make_lbr_med14_chain,  7, argmin_slsqp_fast,            cartan::ik::argmin_slsqp_fast,            cartan::ik::bench::sqp_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(panda,      make_panda_chain,      7, argmin_slsqp_fast,            cartan::ik::argmin_slsqp_fast,            cartan::ik::bench::sqp_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(fetch,      make_fetch_chain,      7, argmin_slsqp_fast,            cartan::ik::argmin_slsqp_fast,            cartan::ik::bench::sqp_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(baxter,     make_baxter_chain,     7, argmin_slsqp_fast,            cartan::ik::argmin_slsqp_fast,            cartan::ik::bench::sqp_family_total_units);
+IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, argmin_slsqp_fast,            cartan::ik::argmin_slsqp_fast,            cartan::ik::bench::sqp_family_total_units);
 #endif
 
 
