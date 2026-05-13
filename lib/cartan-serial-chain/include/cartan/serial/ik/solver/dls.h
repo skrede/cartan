@@ -107,6 +107,15 @@ public:
             {
                 m_error_norm = V_b.norm();
                 m_status = ik_status::converged;
+                // Pre-step convergence check is itself one algorithmic-work
+                // unit: the FK + body-twist + tolerance test that just fired
+                // is the work performed this iteration. Billing zero here
+                // breaks the runner's min_units_per_step contract on entry-
+                // is-converged paths (basic_ik_runner.solve() would loop
+                // forever under min_distance objective with no forward
+                // progress on units).
+                ++m_iterations;
+                ++units;
                 break;
             }
 

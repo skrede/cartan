@@ -108,7 +108,11 @@ TEST_CASE("cmaes_solve_policy converges on UR5-like chain", "[ik][argmin][cmaes]
     // CMA-ES needs a close starting point for 6-DOF IK
     Eigen::Vector<double, 6> q_seed;
     q_seed << 0.25, -0.45, 0.75, -0.25, 0.55, -0.15;
-    cartan::convergence_criteria<double> criteria{1e-2, 1e-2, 10000};
+    // 4th literal carries forward the pre-split single-counter envelope:
+    // per_attempt = total_work_units = the old max_iterations. CMA-ES needs
+    // the full 10000-iteration headroom to clear the 1e-2 precision gate
+    // robustly against RNG-induced sigma-collapse variance.
+    cartan::convergence_criteria<double> criteria{1e-2, 1e-2, 10000, 10000};
 
     cartan::ik::cmaes<chain_t>::options opts;
     opts.initial_sigma = 0.05;

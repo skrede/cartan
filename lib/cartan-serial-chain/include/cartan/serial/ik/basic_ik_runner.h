@@ -195,6 +195,20 @@ public:
                 m_total_iterations = total_units;
                 if (result.status != ik_status::running)
                     break;
+                // min_units_per_step contract: a step that returns
+                // ik_status::running must bill at least one work unit.
+                // A `{running, units=0}` return signals a solver that
+                // cannot make forward progress (e.g. inner converged at
+                // entry q with no work, then runner restarted inner at
+                // the same q under a non-speed objective). Without this
+                // guard the accumulator loop runs forever.
+                if (result.metrics.units_consumed == 0)
+                {
+                    m_status = m_found_convergence
+                        ? ik_status::converged
+                        : ik_status::iteration_limit;
+                    break;
+                }
             }
         }
         else

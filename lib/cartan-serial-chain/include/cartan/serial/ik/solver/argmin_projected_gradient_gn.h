@@ -126,6 +126,7 @@ public:
         m_target = target;
         m_criteria = criteria;
         m_iterations = 0;
+        m_attempt_iterations = 0;
         m_error_norm = std::numeric_limits<scalar_type>::max();
         m_status = ik_status::running;
         m_termination_reason = ik_termination_reason::unknown;
@@ -183,6 +184,7 @@ public:
                 inner_units = 1;
             }
             m_iterations += inner_units;
+            m_attempt_iterations += inner_units;
             units += inner_units;
 
             sync_solution_from_solver();
@@ -198,27 +200,20 @@ public:
                 break;
             }
 
-            if (m_iterations >= m_criteria.max_iterations_per_attempt)
-            {
-                m_status = ik_status::iteration_limit;
-                m_termination_reason = ik_termination_reason::iteration_limit;
-                break;
-            }
-
+            // Three reasons to end an attempt and consider a cold-restart:
+            // inner-solver terminal status, per-attempt cap exhausted, or
+            // cartan-side stall/divergence. All three signal "this attempt
+            // cannot make further progress." With restart budget remaining,
+            // perturb and re-seed the inner.
             auto stall_result = cartan::detail::check_stall_divergence(
                 m_error_history, m_error_norm, m_initial_error,
                 m_options.stall_window, m_options.stall_threshold,
                 m_options.divergence_factor);
-            if (stall_result != ik_status::running)
-            {
-                m_status = stall_result;
-                m_termination_reason = (stall_result == ik_status::diverged)
-                    ? ik_termination_reason::divergence_detected
-                    : ik_termination_reason::stall_detected;
-                break;
-            }
-
-            if (is_inner_terminal(result.status))
+            const bool attempt_capped =
+                m_attempt_iterations >= m_criteria.max_iterations_per_attempt;
+            const bool inner_terminal = is_inner_terminal(result.status);
+            const bool cartan_stall = (stall_result != ik_status::running);
+            if (inner_terminal || attempt_capped || cartan_stall)
             {
                 if (m_restart_count < m_options.max_restarts)
                 {
@@ -238,13 +233,29 @@ public:
 
                     build_argmin_opts(m_nab_opts);
 
+                    m_attempt_iterations = 0;
                     m_q = q_perturbed;
                     // Cold-restart event itself charges 0 additional units.
                     continue;
                 }
 
-                m_status = ik_status::stalled;
-                m_termination_reason = map_argmin_status(result.status);
+                if (cartan_stall)
+                {
+                    m_status = stall_result;
+                    m_termination_reason = (stall_result == ik_status::diverged)
+                        ? ik_termination_reason::divergence_detected
+                        : ik_termination_reason::stall_detected;
+                }
+                else if (inner_terminal)
+                {
+                    m_status = ik_status::stalled;
+                    m_termination_reason = map_argmin_status(result.status);
+                }
+                else
+                {
+                    m_status = ik_status::iteration_limit;
+                    m_termination_reason = ik_termination_reason::iteration_limit;
+                }
                 break;
             }
 
@@ -368,6 +379,7 @@ private:
     scalar_type m_initial_error{};
     scalar_type m_error_norm{std::numeric_limits<scalar_type>::max()};
     int m_iterations{};
+    int m_attempt_iterations{};
     ik_status m_status{ik_status::running};
     ik_termination_reason m_termination_reason{ik_termination_reason::unknown};
     std::optional<cartan::detail::argmin_ik_least_squares_problem<Chain>> m_problem;
