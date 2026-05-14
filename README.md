@@ -1,6 +1,9 @@
 # Cartan
 
-![CI](https://github.com/skrede/cartan/actions/workflows/ci.yml/badge.svg)
+![Linux](https://github.com/skrede/cartan/actions/workflows/linux.yml/badge.svg)
+![macOS](https://github.com/skrede/cartan/actions/workflows/macos.yml/badge.svg)
+![Windows](https://github.com/skrede/cartan/actions/workflows/windows.yml/badge.svg)
+[![codecov](https://codecov.io/gh/skrede/cartan/branch/master/graph/badge.svg)](https://codecov.io/gh/skrede/cartan)
 ![License](https://img.shields.io/badge/license-Apache_2.0-blue.svg)
 ![C++23](https://img.shields.io/badge/C%2B%2B-23-blue.svg)
 

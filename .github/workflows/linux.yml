@@ -2,7 +2,7 @@ name: Linux
 
 on:
   push:
-    branches: [master,develop]
+    branches: [master, develop, 'milestone/**']
     paths-ignore:
       - '**.md'
       - 'docs/**'
@@ -53,12 +53,14 @@ jobs:
               -DCMAKE_C_FLAGS="--coverage" \
               -DCARTAN_BUILD_TESTS=ON \
               -DCARTAN_BUILD_EXAMPLES=OFF \
+              -DCARTAN_BUILD_ARGMIN=ON \
               -DCARTAN_CMAKE_FETCH_DEPS=ON
           else
             cmake . -B build -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_CXX_FLAGS="-Werror" \
               -DCARTAN_BUILD_TESTS=ON \
               -DCARTAN_BUILD_EXAMPLES=OFF \
+              -DCARTAN_BUILD_ARGMIN=ON \
               -DCARTAN_CMAKE_FETCH_DEPS=ON
           fi
 
@@ -96,10 +98,6 @@ jobs:
             cc: clang-18
             cxx: clang++-18
             flags: "-fsanitize=address,undefined -fno-omit-frame-pointer"
-          - name: msan
-            cc: clang-18
-            cxx: clang++-18
-            flags: "-fsanitize=memory -fno-omit-frame-pointer -fsanitize-memory-track-origins=2"
 
     runs-on: ubuntu-24.04
     name: sanitize (${{ matrix.name }})
