@@ -1,11 +1,9 @@
 #ifndef HPP_GUARD_CARTAN_LIE_AXIS_ANGLE_H
 #define HPP_GUARD_CARTAN_LIE_AXIS_ANGLE_H
 
-/// @file axis_angle.h
-/// @brief Axis-angle representation and screw parameters for SO(3).
-///
-/// Provides conversion between axis-angle and SO(3) via exp/log maps,
-/// and screw parameter extraction from twist (omega, v) pairs.
+/// Axis-angle representation and screw parameters for SO(3). Provides
+/// conversion between axis-angle and SO(3) via exp/log maps, and screw
+/// parameter extraction from twist (omega, v) pairs.
 ///
 /// Reference: Lynch & Park, Modern Robotics, Section 3.2.3, p. 77-86 (axis-angle).
 ///            Lynch & Park, Modern Robotics, Def. 3.24, p. 102 (screw axis).

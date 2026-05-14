@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_NEWTON_RAPHSON_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_NEWTON_RAPHSON_H
 
-/// @file newton_raphson.h
-/// @brief Newton-Raphson IK solve policy with undamped Gauss-Newton Hessian
+/// Newton-Raphson IK solve policy with undamped Gauss-Newton Hessian
 ///        and backtracking Armijo line search for globalization.
 ///
 /// Reference: Nocedal & Wright, Numerical Optimization, Ch. 3 (line search),

@@ -1,11 +1,9 @@
 #ifndef HPP_GUARD_CARTAN_LIE_TWIST_H
 #define HPP_GUARD_CARTAN_LIE_TWIST_H
 
-/// @file twist.h
-/// @brief Twist (spatial velocity) representation and screw motion parameters.
-///
+/// Twist (spatial velocity) representation and screw motion parameters.
 /// A twist V = (omega, v) is a 6-vector in se(3) using omega-first convention
-/// (D-11, per Lynch & Park). The omega part is the angular velocity, v is the
+/// (per Lynch & Park). The omega part is the angular velocity, v is the
 /// linear velocity. This module provides the twist struct, SE(3) conversions,
 /// and screw motion parameter decomposition.
 ///

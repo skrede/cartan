@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_CHAIN_JOINT_KIND_H
 #define HPP_GUARD_CARTAN_SERIAL_CHAIN_JOINT_KIND_H
 
-/// @file joint_kind.h
-/// @brief Runtime axis classification for kinematic_chain fast-path dispatch.
+/// Runtime axis classification for kinematic_chain fast-path dispatch.
 ///
 /// joint_kind labels a screw_axis according to whether it is axis-aligned
 /// with one of {±e_x, ±e_y, ±e_z}. kinematic_chain caches the detected kind

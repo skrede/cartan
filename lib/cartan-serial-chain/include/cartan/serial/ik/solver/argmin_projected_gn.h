@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_ARGMIN_PROJECTED_GN_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_ARGMIN_PROJECTED_GN_H
 
-/// @file argmin_projected_gn.h
-/// @brief argmin-backed projected Gauss-Newton IK solve policy with active-set bounds.
+/// argmin-backed projected Gauss-Newton IK solve policy with active-set bounds.
 ///
 /// Wraps argmin's projected_gn_policy for bound-constrained nonlinear
 /// least-squares IK. Identifies free/active variables at each iteration

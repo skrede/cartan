@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_NLOPT_SLSQP_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_NLOPT_SLSQP_H
 
-/// @file nlopt_slsqp.h
-/// @brief NLopt SLSQP gradient-based IK solve policy with box constraints.
+/// NLopt SLSQP gradient-based IK solve policy with box constraints.
 ///
 /// Wraps NLopt's LD_SLSQP algorithm for constrained IK, using joint
 /// limits as box constraints and the analytical gradient from

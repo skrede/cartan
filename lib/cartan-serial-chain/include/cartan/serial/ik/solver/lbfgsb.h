@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_LBFGSB_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_LBFGSB_H
 
-/// @file lbfgsb.h
-/// @brief L-BFGS-B IK solve policy with generalized Cauchy point and subspace minimization.
+/// L-BFGS-B IK solve policy with generalized Cauchy point and subspace minimization.
 ///
 /// Convergence-optimized IK solver using the analytical gradient (SE(3) log
 /// Jacobian) for box-constrained optimization. Joint limits are enforced via

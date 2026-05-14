@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_LM_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_LM_H
 
-/// @file lm.h
-/// @brief Levenberg-Marquardt IK solve policy with Nielsen-style lambda update.
+/// Levenberg-Marquardt IK solve policy with Nielsen-style lambda update.
 ///
 /// Body-frame Newton-Raphson with trust-region damping. The gain ratio
 /// controls whether a step is accepted and how the damping parameter

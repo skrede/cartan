@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_ARGMIN_LEAST_SQUARES_PROBLEM_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_ARGMIN_LEAST_SQUARES_PROBLEM_H
 
-/// @file detail/argmin_least_squares_problem.h
-/// @brief Least-squares adapter for argmin LM solver.
+/// Least-squares adapter for argmin LM solver.
 ///
 /// Satisfies argmin::objective and argmin::least_squares concepts.
 /// Exposes the 6-element SE(3) body-frame error as the residual vector

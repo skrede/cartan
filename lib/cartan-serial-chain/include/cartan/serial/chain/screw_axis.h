@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_CHAIN_SCREW_AXIS_H
 #define HPP_GUARD_CARTAN_SERIAL_CHAIN_SCREW_AXIS_H
 
-/// @file screw_axis.h
-/// @brief Screw axis representation for kinematic chain joints.
+/// Screw axis representation for kinematic chain joints.
 ///
 /// A screw axis S = (omega, v) where ||omega|| = 1 for revolute joints
 /// or omega = 0 and ||v|| = 1 for prismatic joints. Used in the Product
@@ -29,9 +28,6 @@ class screw_axis
 {
 public:
     /// Construct a revolute joint screw axis.
-    /// @param axis  Rotation axis direction (will be normalized).
-    /// @param point A point on the rotation axis.
-    /// @return Screw axis with omega = normalized(axis), v = -omega x point.
     [[nodiscard]] static screw_axis revolute(
         const vector3<Scalar>& axis,
         const vector3<Scalar>& point)
@@ -42,8 +38,6 @@ public:
     }
 
     /// Construct a prismatic joint screw axis.
-    /// @param direction Translation direction (will be normalized).
-    /// @return Screw axis with omega = 0, v = normalized(direction).
     [[nodiscard]] static screw_axis prismatic(const vector3<Scalar>& direction)
     {
         return screw_axis(vector3<Scalar>::Zero(), direction.normalized());
@@ -52,7 +46,6 @@ public:
     /// Construct from a 6-vector (omega, v) with unit constraint validation.
     /// Revolute (||omega|| > 0): requires ||omega|| = 1.
     /// Prismatic (omega = 0): requires ||v|| = 1.
-    /// @return Valid screw_axis or error string.
     [[nodiscard]] static std::expected<screw_axis, std::string> from_vector(
         const vector6<Scalar>& vec)
     {

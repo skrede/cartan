@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_FK_FK_RESULT_H
 #define HPP_GUARD_CARTAN_SERIAL_FK_FK_RESULT_H
 
-/// @file fk_result.h
-/// @brief Forward kinematics result with intermediate product caching.
+/// Forward kinematics result with intermediate product caching.
 ///
 /// Stores the end-effector pose and all intermediate products T_i from
 /// the Product of Exponentials computation. Intermediate products are
@@ -48,8 +47,6 @@ auto make_intermediate_storage()
 } // namespace detail
 
 /// Result of forward kinematics via Product of Exponentials.
-/// @tparam N      Number of joints (compile-time), or cartan::dynamic.
-/// @tparam Scalar Floating-point type.
 ///
 /// intermediates[i] holds the partial product exp([S1]q1) * ... * exp([S_{i+1}]q_{i+1}).
 /// end_effector = intermediates[n-1] * M (home configuration).

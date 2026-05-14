@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_CHAIN_STORAGE_TRAIT_H
 #define HPP_GUARD_CARTAN_SERIAL_CHAIN_STORAGE_TRAIT_H
 
-/// @file storage_trait.h
-/// @brief Fixed/dynamic storage selector for kinematic chain containers.
+/// Fixed/dynamic storage selector for kinematic chain containers.
 ///
 /// Provides a compile-time selector between std::array (fixed N) and
 /// std::vector (dynamic) storage, controlled by the cartan::dynamic sentinel.

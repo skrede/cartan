@@ -1,13 +1,10 @@
 #ifndef HPP_GUARD_CARTAN_LIE_QUATERNION_UTILS_H
 #define HPP_GUARD_CARTAN_LIE_QUATERNION_UTILS_H
 
-/// @file quaternion_utils.h
-/// @brief Quaternion utility functions supplementing Eigen's quaternion type.
-///
+/// Quaternion utility functions supplementing Eigen's quaternion type.
 /// These functions delegate to Eigen where possible, following the
-/// "Don't Hand-Roll" principle from the cartan design research (D-12).
-/// Named constructors from_wxyz / from_xyzw / to_wxyz provide explicit
-/// serialization order per ctrlpp convention (w-first external API).
+/// "don't hand-roll" principle. Named constructors from_wxyz / from_xyzw /
+/// to_wxyz provide explicit serialization order (w-first external API).
 ///
 /// Reference: Eigen quaternion documentation; Barfoot, State Estimation
 ///            for Robotics, Section 8.1, p. 280-282.
@@ -17,13 +14,12 @@
 namespace cartan
 {
 
-/// Spherical linear interpolation between two unit quaternions.
-/// Delegates to Eigen's slerp implementation which handles antipodal quaternions.
-/// @param q1 Start quaternion (unit)
-/// @param q2 End quaternion (unit)
-/// @param t  Interpolation parameter in [0, 1]
-/// @return Interpolated unit quaternion
-/// Reference: Shoemake, "Animating rotation with quaternion curves", SIGGRAPH 1985.
+/// Spherical linear interpolation between two unit quaternions q1 and q2,
+/// at interpolation parameter t in [0, 1]. Delegates to Eigen's slerp
+/// implementation which handles antipodal quaternions.
+///
+/// Reference: Shoemake, "Animating rotation with quaternion curves",
+///            SIGGRAPH 1985.
 template <typename Scalar>
 [[nodiscard]] quaternion<Scalar> quat_slerp(
     const quaternion<Scalar>& q1,

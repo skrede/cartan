@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_ARGMIN_SLSQP_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_ARGMIN_SLSQP_H
 
-/// @file argmin_slsqp.h
-/// @brief argmin-backed SLSQP gradient-based IK solve policy with box constraints.
+/// argmin-backed SLSQP gradient-based IK solve policy with box constraints.
 ///
 /// Wraps argmin's kraft_slsqp_policy for constrained IK, using joint
 /// limits as box constraints and the analytical gradient from
@@ -51,10 +50,10 @@ namespace cartan::ik
 /// Uses Kraft's Sequential Least Squares Programming algorithm via argmin,
 /// with analytical gradient through the SE(3) log Jacobian. Each step()
 /// call runs a budget of argmin iterations, allowing cooperative scheduling
-/// with other policies in basic_ik_solver.
+/// with other policies in basic_ik_runner.
 ///
 /// This is the default (unprefixed) SLSQP policy. The NLopt-backed variant
-/// is available as nlopt_slsqp_solve_policy behind CARTAN_HAS_NLOPT.
+/// is available as cartan::ik::nlopt_slsqp behind CARTAN_HAS_NLOPT.
 ///
 /// The Convergence template parameter lets consumers opt out of argmin's
 /// default four-criterion convergence policy in favor of alternatives like

@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_CMAES_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_CMAES_H
 
-/// @file cmaes.h
-/// @brief argmin-backed CMA-ES derivative-free IK solve policy.
+/// argmin-backed CMA-ES derivative-free IK solve policy.
 ///
 /// Wraps argmin's cmaes_policy for bound-constrained IK using
 /// Covariance Matrix Adaptation Evolution Strategy. Derivative-free:

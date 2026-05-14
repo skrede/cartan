@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_WRAPPER_RESTART_WRAPPER_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_WRAPPER_RESTART_WRAPPER_H
 
-/// @file restart_wrapper.h
-/// @brief Restart wrapper solve policy that re-seeds from Halton sequences on
+/// Restart wrapper solve policy that re-seeds from Halton sequences on
 ///        stall or diverge, with warm-start lambda preservation.
 ///
 /// Wraps any inner policy satisfying solve_policy. When the inner policy
@@ -57,10 +56,6 @@ concept has_lambda = requires(const S& s)
 /// status (stalled, diverged, iteration_limit), the wrapper re-seeds from
 /// Halton sequences. The best lambda from near-miss attempts is carried
 /// forward to accelerate convergence on subsequent restarts.
-///
-/// @tparam Chain        Chain type satisfying the chain concept.
-/// @tparam InnerPolicy  Policy type satisfying solve_policy concept.
-/// @tparam LimitsPolicy Limit enforcement policy (defaults to inner policy's limits_type).
 template <chain Chain,
           typename InnerPolicy = projected_lm<Chain>,
           typename LimitsPolicy = typename InnerPolicy::limits_type>

@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_NLOPT_BOBYQA_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_NLOPT_BOBYQA_H
 
-/// @file nlopt_bobyqa.h
-/// @brief NLopt BOBYQA derivative-free IK solve policy with box constraints.
+/// NLopt BOBYQA derivative-free IK solve policy with box constraints.
 ///
 /// Wraps NLopt's BOBYQA derivative-free algorithm for constrained IK,
 /// using joint limits as box constraints. The objective minimizes

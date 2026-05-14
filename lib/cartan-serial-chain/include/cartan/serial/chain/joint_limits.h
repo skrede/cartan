@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_CHAIN_JOINT_LIMITS_H
 #define HPP_GUARD_CARTAN_SERIAL_CHAIN_JOINT_LIMITS_H
 
-/// @file joint_limits.h
-/// @brief Joint limits for kinematic chain joints.
+/// Joint limits for kinematic chain joints.
 ///
 /// Stores required position bounds and optional velocity, effort,
 /// and acceleration limits. Aggregate-initializable.

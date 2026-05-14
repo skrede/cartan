@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_POLICY_LIMITS_POLICY_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_POLICY_LIMITS_POLICY_H
 
-/// @file limits_policy.h
-/// @brief Joint limit enforcement policies for IK solvers.
+/// Joint limit enforcement policies for IK solvers.
 ///
 /// Three stateless policy structs controlling how joint limits are enforced
 /// on the hot path: no enforcement, hard clamping, or null-space projection

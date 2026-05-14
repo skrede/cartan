@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_NW_SQP_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_NW_SQP_H
 
-/// @file nw_sqp.h
-/// @brief argmin-backed N&W SQP IK solve policy with inequality constraints.
+/// argmin-backed N&W SQP IK solve policy with inequality constraints.
 ///
 /// Wraps argmin's nw_sqp_policy for constrained IK using formulation B
 /// (inequality constraints encoding joint limits as g_i(q) >= 0).

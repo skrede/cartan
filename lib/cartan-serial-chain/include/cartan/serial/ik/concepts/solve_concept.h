@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_CONCEPTS_SOLVE_CONCEPT_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_CONCEPTS_SOLVE_CONCEPT_H
 
-/// @file solve_concept.h
-/// @brief Single-parameter concept for IK solve policies.
+/// Single-parameter concept for IK solve policies.
 ///
 /// The solve_policy concept extracts S::chain_type to determine the chain
 /// type the policy operates on, along with S::scalar_type, S::joints, and

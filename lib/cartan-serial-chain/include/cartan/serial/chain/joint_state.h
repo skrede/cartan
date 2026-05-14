@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_CHAIN_JOINT_STATE_H
 #define HPP_GUARD_CARTAN_SERIAL_CHAIN_JOINT_STATE_H
 
-/// @file joint_state.h
-/// @brief Joint state (position and optional velocity) for kinematic chains.
+/// Joint state (position and optional velocity) for kinematic chains.
 ///
 /// Parameterized by joint count N (fixed or cartan::dynamic) and scalar type.
 

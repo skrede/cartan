@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_LIMIT_ENFORCEMENT_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_LIMIT_ENFORCEMENT_H
 
-/// @file detail/limit_enforcement.h
-/// @brief Shared limit enforcement utility for IK solve policies.
+/// Shared limit enforcement utility for IK solve policies.
 ///
 /// Extracts the limit enforcement logic from ik_solver into a reusable
 /// free function template. Policies call this in their step() method
@@ -30,11 +29,6 @@ namespace detail
 /// If LimitsPolicy satisfies has_extended_enforce, computes FK, body Jacobian, and
 /// SVD for null-space projection before calling enforce_extended.
 /// Otherwise, calls the simple enforce method.
-///
-/// @tparam LimitsPolicy  Limit enforcement policy type.
-/// @tparam Chain         A type satisfying the chain concept.
-/// @param q              Joint configuration to enforce limits on (modified in place).
-/// @param chain          Chain providing joint limits.
 template <typename LimitsPolicy, chain Chain>
 void enforce_limits(
     typename joint_state<typename Chain::scalar_type, Chain::joints>::position_type& q,

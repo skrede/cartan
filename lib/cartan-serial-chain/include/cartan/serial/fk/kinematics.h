@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_FK_KINEMATICS_H
 #define HPP_GUARD_CARTAN_SERIAL_FK_KINEMATICS_H
 
-/// @file kinematics.h
-/// @brief Convenience include-all for the kinematics module.
+/// Convenience include-all for the kinematics module.
 ///
 /// Reference: Lynch & Park, Modern Robotics, Ch. 4-5.
 

@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_CHAIN_H
 #define HPP_GUARD_CARTAN_SERIAL_CHAIN_H
 
-/// @file serial_chain.h
-/// @brief Umbrella header for the cartan serial chain module.
+/// Umbrella header for the cartan serial chain module.
 ///
 /// Includes chain, forward kinematics, Jacobian, velocity, and IK modules.
 

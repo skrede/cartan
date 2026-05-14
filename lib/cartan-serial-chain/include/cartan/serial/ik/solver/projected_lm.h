@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_PROJECTED_LM_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_PROJECTED_LM_H
 
-/// @file projected_lm.h
-/// @brief Projected Levenberg-Marquardt IK solve policy with active-set box
+/// Projected Levenberg-Marquardt IK solve policy with active-set box
 ///        projection, optional dogleg trust-region step, and built-in
 ///        Halton-seed re-seed on stall.
 ///

@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_EXHAUSTIVE_IK_RUNNER_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_EXHAUSTIVE_IK_RUNNER_H
 
-/// @file exhaustive_ik_runner.h
-/// @brief Exhaustive IK solver that collects all valid solutions via multi-start.
+/// Exhaustive IK solver that collects all valid solutions via multi-start.
 
 #include "cartan/serial/ik/ik_result.h"
 #include "cartan/serial/ik/ik_status.h"

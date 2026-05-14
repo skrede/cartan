@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_MMA_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_MMA_H
 
-/// @file mma.h
-/// @brief argmin-backed Method of Moving Asymptotes IK solve policy.
+/// argmin-backed Method of Moving Asymptotes IK solve policy.
 ///
 /// Wraps argmin's mma_policy over a bound-constrained IK problem.
 /// Joint limits are passed through as box bounds and MMA builds

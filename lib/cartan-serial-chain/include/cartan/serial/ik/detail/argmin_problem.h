@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_ARGMIN_PROBLEM_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_ARGMIN_PROBLEM_H
 
-/// @file detail/argmin_problem.h
-/// @brief Adapter wrapping cartan IK problem as argmin problem formulation.
+/// Adapter wrapping cartan IK problem as argmin problem formulation.
 ///
 /// Satisfies argmin::objective, argmin::differentiable, and
 /// argmin::bound_constrained concepts so that argmin solvers

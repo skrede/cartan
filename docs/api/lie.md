@@ -18,7 +18,8 @@ See [SO(2) Theory](../background/so2.md) | [SE(2) Theory](../background/se2.md) 
 | `cartan::axis_angle`, `cartan::screw_params` | `#include <cartan/lie/axis_angle.h>` |
 | `cartan::quat_slerp`, `cartan::from_wxyz`, ... | `#include <cartan/lie/quaternion_utils.h>` |
 | `cartan::twist`, `cartan::screw_motion` | `#include <cartan/lie/twist.h>` |
-| `cartan::strict_policy`, `cartan::fast_policy` | `#include <cartan/lie/policy.h>` |
+| `cartan::se3_left_jacobian`, `cartan::se3_left_jacobian_inv`, `cartan::se3_Q_matrix` | `#include <cartan/lie/se3_left_jacobian.h>` |
+| `cartan::strict_policy`, `cartan::fast_policy`, `cartan::trusted_unit_t`, `cartan::trusted_unit`, `cartan::lie_group_policy` concept | `#include <cartan/lie/policy.h>` |
 | Forward declarations | `#include <cartan/lie/fwd.h>` |
 | Foundation types | `#include <cartan/types.h>` |
 | Epsilon constants | `#include <cartan/detail/epsilon.h>` |
@@ -104,6 +105,77 @@ concept lie_group_policy = requires {
 ```
 
 `strict_policy` (default) normalizes group elements on construction and asserts validity. Use for safety-critical paths. `fast_policy` skips all checks -- use on hot paths where inputs are known-valid. When composing elements with different policies, `stricter_policy` selects the stricter of the two.
+
+### lie_group_policy concept
+
+```cpp
+template <typename P>
+concept lie_group_policy = requires {
+    { P::normalize_on_construct } -> std::convertible_to<bool>;
+    { P::assert_valid } -> std::convertible_to<bool>;
+};
+```
+
+Concept constraining valid Lie group policy types. A conforming type
+exposes `normalize_on_construct` and `assert_valid` as `static constexpr
+bool` members. The frames module (`rotation<From, To, Scalar, Policy>`,
+`transform<From, To, Scalar, Policy>`) constrains its `Policy` template
+parameter against this concept; `strict_policy` and `fast_policy`
+both satisfy it.
+
+### trusted_unit_t and trusted_unit
+
+```cpp
+struct trusted_unit_t {};
+inline constexpr trusted_unit_t trusted_unit{};
+```
+
+Tag type for the unchecked "trusted unit" construction path on `so3` and
+`se3`. Use when the caller can prove the input quaternion is already
+unit-length (e.g. exact axis-angle output from `exp`, conjugate of a
+unit, identity construction, or an FK accumulator's per-step output).
+Construction with the tag skips the normalize step unconditionally;
+debug builds still validate via `assert()`. The canonical hot-path use
+sites are inside FK accumulators where `so3` / `se3` products of unit
+quaternions accumulate `O(N * eps)` deviation that is cheaper to absorb
+into a single final renormalize than to spend at every per-step
+construction.
+
+## se3_left_jacobian
+
+Defined in `se3_left_jacobian.h`. SE(3) left Jacobian and its inverse,
+plus the `Q` matrix used in the SE(3) left-Jacobian decomposition. Uses
+cartan's omega-first twist convention throughout.
+
+```cpp
+template <typename Scalar>
+matrix3<Scalar> se3_Q_matrix(const vector3<Scalar>& omega, const vector3<Scalar>& rho);
+```
+
+`Q` matrix appearing in the bottom-left 3x3 block of the SE(3) left
+Jacobian decomposition. Adapted from Barfoot to omega-first ordering.
+
+```cpp
+template <typename Scalar>
+matrix6<Scalar> se3_left_jacobian(const vector6<Scalar>& xi);
+```
+
+SE(3) left Jacobian for the twist `xi = (omega, rho)` (omega-first).
+Block structure: top-left `J_so3(omega)`, top-right zero, bottom-left
+`Q(omega, rho)`, bottom-right `J_so3(omega)`.
+
+```cpp
+template <typename Scalar>
+matrix6<Scalar> se3_left_jacobian_inv(const vector6<Scalar>& xi);
+```
+
+Inverse SE(3) left Jacobian. Block structure: top-left
+`J_so3^{-1}(omega)`, top-right zero, bottom-left `-J^{-1} Q J^{-1}`,
+bottom-right `J_so3^{-1}(omega)`.
+
+Reference: Barfoot, *State Estimation for Robotics*, Eq. 8.91 (left
+           Jacobian), Eq. 8.100b (inverse), adapted to omega-first
+           convention.
 
 ## so2
 

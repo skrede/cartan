@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_DLS_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_DLS_H
 
-/// @file dls.h
-/// @brief Damped least squares IK solve policy with SVD-based adaptive damping.
+/// Damped least squares IK solve policy with SVD-based adaptive damping.
 ///
 /// Body-frame Newton-Raphson iteration with Nakamura's adaptive damping
 /// to handle near-singular configurations gracefully. The damping factor

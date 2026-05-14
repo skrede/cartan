@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_IK_VALIDATION_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_IK_VALIDATION_H
 
-/// @file ik_validation.h
-/// @brief FK-based validation free functions for IK results.
+/// FK-based validation free functions for IK results.
 
 #include "cartan/serial/ik/ik_result.h"
 #include "cartan/serial/ik/ik_status.h"

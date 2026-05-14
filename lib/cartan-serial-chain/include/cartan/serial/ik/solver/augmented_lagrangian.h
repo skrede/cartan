@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_AUGMENTED_LAGRANGIAN_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_AUGMENTED_LAGRANGIAN_H
 
-/// @file augmented_lagrangian.h
-/// @brief argmin-backed augmented Lagrangian IK solve policy.
+/// argmin-backed augmented Lagrangian IK solve policy.
 ///
 /// Wraps argmin's augmented_lagrangian_policy with lbfgsb_policy as
 /// the inner solver. Uses formulation B (inequality constraints encoding

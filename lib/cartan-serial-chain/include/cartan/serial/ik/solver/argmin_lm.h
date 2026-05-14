@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_ARGMIN_LM_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_ARGMIN_LM_H
 
-/// @file argmin_lm.h
-/// @brief argmin-backed Levenberg-Marquardt IK solve policy (least-squares).
+/// argmin-backed Levenberg-Marquardt IK solve policy (least-squares).
 ///
 /// Wraps argmin's lm_policy using the least-squares problem adapter.
 /// The residual is the 6-element SE(3) body-frame error, and the Jacobian
@@ -46,7 +45,7 @@ namespace cartan::ik
 /// is unconstrained.
 ///
 /// This is the argmin-backed LM. The native cartan implementation
-/// is available as lm_solve_policy.
+/// is available as cartan::ik::lm.
 template <chain Chain, typename LimitsPolicy = no_limits>
 class argmin_lm
 {

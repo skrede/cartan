@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_ARGMIN_PROJECTED_GRADIENT_GN_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_ARGMIN_PROJECTED_GRADIENT_GN_H
 
-/// @file argmin_projected_gradient_gn.h
-/// @brief argmin-backed projected-gradient Gauss-Newton IK solve policy with Armijo backtracking.
+/// argmin-backed projected-gradient Gauss-Newton IK solve policy with Armijo backtracking.
 ///
 /// Wraps argmin's projected_gradient_gn_policy for bound-constrained
 /// nonlinear least-squares IK. Solves the full damped Gauss-Newton

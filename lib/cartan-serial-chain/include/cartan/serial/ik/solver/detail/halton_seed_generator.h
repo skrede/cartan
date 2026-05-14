@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_DETAIL_HALTON_SEED_GENERATOR_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_DETAIL_HALTON_SEED_GENERATOR_H
 
-/// @file halton_seed_generator.h
-/// @brief Halton sequence seed generator with Beeson-Ames joint wrapping.
+/// Halton sequence seed generator with Beeson-Ames joint wrapping.
 ///
 /// Produces deterministic low-discrepancy seed configurations for multi-start
 /// IK by mapping Halton sequences from [0,1]^N to joint limit ranges. Uses
@@ -24,9 +23,6 @@ namespace cartan
 {
 
 /// Compute a single element of the Halton (van der Corput) sequence.
-/// @param index  1-based sequence index (index 0 always returns 0).
-/// @param base   Prime base for the sequence (2, 3, 5, 7, ...).
-/// @return Value in (0, 1) for index > 0.
 template <typename Scalar>
 [[nodiscard]] constexpr Scalar halton_element(int index, int base)
 {
@@ -47,11 +43,6 @@ template <typename Scalar>
 /// If q is outside [q_min, q_max], wraps modulo 2pi towards the violated
 /// limit. Falls back to clamping when the wrapped value lands outside the
 /// opposite limit (occurs when the joint range is less than 2pi).
-///
-/// @param q      Joint angle to wrap.
-/// @param q_min  Lower joint limit.
-/// @param q_max  Upper joint limit.
-/// @return Wrapped (or clamped) joint angle in [q_min, q_max].
 template <typename Scalar>
 [[nodiscard]] Scalar wrap_joint_angle(Scalar q, Scalar q_min, Scalar q_max)
 {
@@ -79,8 +70,6 @@ template <typename Scalar>
 /// prime base) to generate seed configurations that uniformly cover the
 /// joint space. The first `skip_count` entries are dropped to reduce
 /// initial correlation between dimensions.
-///
-/// @tparam Chain  A type satisfying the chain concept.
 template <chain Chain>
 class halton_seed_generator
 {
@@ -105,8 +94,6 @@ public:
     /// Generate seed configuration for the given restart index (0-based).
     ///
     /// Maps Halton [0,1]^N to joint limits via linear scaling.
-    /// @param index  0-based restart index.
-    /// @return Joint position vector within the chain's joint limits.
     [[nodiscard]] position_type operator()(int index) const
     {
         int n = m_chain->num_joints();

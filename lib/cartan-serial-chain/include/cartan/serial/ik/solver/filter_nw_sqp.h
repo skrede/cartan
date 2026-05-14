@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_FILTER_NW_SQP_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_FILTER_NW_SQP_H
 
-/// @file filter_nw_sqp.h
-/// @brief argmin-backed filter Nocedal-Wright SQP IK solve policy.
+/// argmin-backed filter Nocedal-Wright SQP IK solve policy.
 ///
 /// Wraps argmin's filter_nw_sqp_policy for constrained IK. Uses
 /// Fletcher-Leyffer 2002 filter acceptance with dense BFGS Hessian and

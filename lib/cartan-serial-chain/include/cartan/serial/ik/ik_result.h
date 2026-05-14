@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_IK_RESULT_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_IK_RESULT_H
 
-/// @file ik_result.h
-/// @brief IK result and error types for inverse kinematics solve outcomes.
+/// IK result and error types for inverse kinematics solve outcomes.
 ///
 /// Reference: Lynch & Park, Modern Robotics, Ch. 6.2, p. 227-233.
 

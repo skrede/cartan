@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_BASIC_IK_RUNNER_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_BASIC_IK_RUNNER_H
 
-/// @file basic_ik_runner.h
-/// @brief Variadic policy-based IK solver with cooperative interleaved racing.
+/// Variadic policy-based IK solver with cooperative interleaved racing.
 ///
 /// basic_ik_runner<Policies...> provides direct solve for a single policy and
 /// cooperative round-robin racing for two or more policies. The single-policy
@@ -79,8 +78,6 @@ constexpr ik_termination_reason policy_termination_reason(const Policy& p) noexc
 /// Thread safety: Different solver instances may safely operate concurrently
 /// on the same const chain. A single solver instance must not be
 /// used from multiple threads without synchronization.
-///
-/// @tparam Policies  One or more IK solve policies satisfying ik::solve_policy.
 template <typename... Policies>
     requires (sizeof...(Policies) >= 1) && (ik::solve_policy<Policies> && ...)
 class basic_ik_runner

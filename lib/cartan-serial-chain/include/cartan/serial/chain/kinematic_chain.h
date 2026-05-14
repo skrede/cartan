@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_CHAIN_KINEMATIC_CHAIN_H
 #define HPP_GUARD_CARTAN_SERIAL_CHAIN_KINEMATIC_CHAIN_H
 
-/// @file kinematic_chain.h
-/// @brief Product of Exponentials (PoE) kinematic chain model.
+/// Product of Exponentials (PoE) kinematic chain model.
 ///
 /// Stores screw axes, home configuration (M matrix), and joint limits
 /// for an N-joint serial chain. Supports both fixed (compile-time N)
@@ -29,9 +28,9 @@
 namespace cartan
 {
 
-/// Kinematic chain in Product of Exponentials form.
-/// @tparam N  Number of joints (compile-time), or cartan::dynamic for runtime.
-/// @tparam Scalar  Floating-point type.
+/// Kinematic chain in Product of Exponentials form. N is the joint count
+/// at compile time (or cartan::dynamic for runtime). Scalar is the
+/// floating-point type used throughout the chain.
 ///
 /// Lynch & Park, Modern Robotics, Eq. 4.10, p. 138:
 ///   T(q) = exp([S1]q1) ... exp([Sn]qn) * M
@@ -48,9 +47,6 @@ public:
     using kind_storage = detail::storage_t<N, joint_kind>;
 
     /// Construct a kinematic chain from home configuration, screw axes, and limits.
-    /// @param home   End-effector pose at zero configuration (the M matrix).
-    /// @param axes   Space-frame screw axes S1..Sn.
-    /// @param limits Joint position/velocity limits.
     kinematic_chain(
         const se3<Scalar>& home,
         screw_storage axes,

@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_GCMMA_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_GCMMA_H
 
-/// @file gcmma.h
-/// @brief argmin-backed Globally Convergent MMA IK solve policy.
+/// argmin-backed Globally Convergent MMA IK solve policy.
 ///
 /// Wraps argmin's gcmma_policy over a bound-constrained IK problem.
 /// GCMMA extends MMA with per-component conservativity coefficients

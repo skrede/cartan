@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_IK_STATUS_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_IK_STATUS_H
 
-/// @file ik_status.h
-/// @brief Status, objective, failure enums, convergence criteria, and solver
+/// Status, objective, failure enums, convergence criteria, and solver
 ///        options for inverse kinematics.
 ///
 /// Reference: Lynch & Park, Modern Robotics, Ch. 6.2, p. 227-233.

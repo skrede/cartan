@@ -20,6 +20,13 @@
 namespace cartan
 {
 
+/// Closed-form IK solver for planar 2R mechanisms (two revolute joints whose
+/// axes are parallel and define a common mechanism plane). Returns up to 2
+/// solutions ("elbow up" / "elbow down") using the planar law-of-cosines.
+/// All candidates are FK-verified; only verified solutions are returned.
+///
+/// Reference: Lynch & Park, Modern Robotics, Section 6.1.2 (planar
+///            two-link inverse kinematics).
 template <typename Scalar, joint_tag... Joints>
 class planar_2r_solver
 {
@@ -176,6 +183,8 @@ planar_2r_solver(const static_chain<Scalar, Joints...>&)
 static_assert(analytical_solver<planar_2r_solver<double, revolute_z, revolute_z>>,
     "planar_2r_solver must satisfy analytical_solver concept");
 
+/// Convenience wrapper around planar_2r_solver: constructs a solver from the
+/// given static_chain and immediately solves for the target pose.
 template <typename Scalar, joint_tag... Joints>
 [[nodiscard]] auto solve_2r(
     const static_chain<Scalar, Joints...>& chain,

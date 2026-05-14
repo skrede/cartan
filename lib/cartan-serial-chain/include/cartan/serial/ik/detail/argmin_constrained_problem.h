@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_ARGMIN_CONSTRAINED_PROBLEM_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_ARGMIN_CONSTRAINED_PROBLEM_H
 
-/// @file detail/argmin_constrained_problem.h
-/// @brief Inequality-constrained adapter (formulation B) for argmin solvers.
+/// Inequality-constrained adapter (formulation B) for argmin solvers.
 ///
 /// Satisfies argmin::objective, argmin::differentiable, and
 /// argmin::constrained. Joint limits are expressed as 2n inequality

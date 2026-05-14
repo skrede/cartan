@@ -1,12 +1,11 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_NLOPT_COMMON_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_NLOPT_COMMON_H
 
-/// @file detail/nlopt_common.h
-/// @brief Shared NLopt wrapper helpers for NLopt-backed IK solve policies.
+/// Shared NLopt wrapper helpers for NLopt-backed IK solve policies.
 ///
 /// Extracts conversion, bounds setup, optimization dispatch, result mapping,
 /// convergence checking, perturbation, and limit enforcement utilities shared
-/// between nlopt_slsqp_solve_policy and nlopt_bobyqa_solve_policy.
+/// between cartan::ik::nlopt_slsqp and cartan::ik::nlopt_bobyqa.
 ///
 /// All functions live in cartan::detail and are guarded by CARTAN_HAS_NLOPT.
 ///
@@ -116,12 +115,6 @@ inline nlopt::result run_nlopt_optimize(
 /// Map NLopt result code and convergence state to ik_status.
 ///
 /// Handles the common result-mapping switch shared by both NLopt policies.
-/// @param result       NLopt result code from optimize().
-/// @param converged    Whether IK convergence criteria are met.
-/// @param error_stalled Whether the error is not improving (for MAXEVAL case).
-/// @param can_restart  Whether restarts are still available.
-/// @param was_exception Whether the result came from exception handling
-///                      (ROUNDOFF_LIMITED from catch, or FAILURE from catch).
 inline ik_status map_nlopt_result(
     nlopt::result result,
     bool converged,

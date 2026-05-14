@@ -10,6 +10,15 @@
 namespace cartan
 {
 
+/// Concept for closed-form IK solvers. A conforming type S exposes
+/// `S::chain_type` (the chain type it solves over), `S::scalar_type`
+/// (floating-point), `S::joints` (compile-time joint count), and
+/// `S::max_solutions` (the per-solver upper bound on the number of
+/// solutions). The single `solve(target)` method returns
+/// `analytical_result<scalar, joints, max_solutions>` on success or
+/// `analytical_error<scalar>` on failure. All returned solutions are
+/// FK-verified by the solver internally; only verified solutions are
+/// reported to the caller.
 template <typename S>
 concept analytical_solver = requires
 {

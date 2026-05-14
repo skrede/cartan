@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_FILTER_SLSQP_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_FILTER_SLSQP_H
 
-/// @file filter_slsqp.h
-/// @brief argmin-backed filter SLSQP IK solve policy with box constraints.
+/// argmin-backed filter SLSQP IK solve policy with box constraints.
 ///
 /// Wraps argmin's filter_slsqp_policy for constrained IK. Uses
 /// Fletcher-Leyffer 2002 filter acceptance instead of an L1 merit function,

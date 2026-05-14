@@ -1,10 +1,10 @@
 #ifndef HPP_GUARD_CARTAN_LIE_H
 #define HPP_GUARD_CARTAN_LIE_H
 
-/// @file lie.h
-/// @brief Umbrella header for the cartan Lie group module.
-///
-/// Includes all Lie group types, frame wrappers, and utilities.
+/// Umbrella header for the cartan Lie group module. Includes the foundation
+/// types, Lie group classes (so2, se2, so3, se3), and supporting utilities
+/// (axis-angle, hat/vee, quaternion helpers, twist, SE(3) left Jacobian)
+/// alongside the frame-tagged wrappers in cartan/frames/.
 
 #include "cartan/types.h"
 #include "cartan/detail/epsilon.h"

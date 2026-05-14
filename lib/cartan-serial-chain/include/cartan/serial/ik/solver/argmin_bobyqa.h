@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_ARGMIN_BOBYQA_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_ARGMIN_BOBYQA_H
 
-/// @file argmin_bobyqa.h
-/// @brief argmin-backed BOBYQA derivative-free IK solve policy with box constraints.
+/// argmin-backed BOBYQA derivative-free IK solve policy with box constraints.
 ///
 /// Wraps argmin's bobyqa_policy for constrained IK, using joint limits
 /// as box constraints. Derivative-free -- uses only objective evaluations.
@@ -43,10 +42,10 @@ namespace cartan::ik
 /// Uses Powell's Bound Optimization BY Quadratic Approximation via argmin.
 /// Derivative-free: builds a quadratic interpolation model of the objective
 /// and uses trust-region steps. Each step() call runs a budget of argmin
-/// iterations for cooperative scheduling in basic_ik_solver.
+/// iterations for cooperative scheduling in basic_ik_runner.
 ///
 /// This is the default (unprefixed) BOBYQA policy. The NLopt-backed variant
-/// is available as nlopt_bobyqa_solve_policy behind CARTAN_HAS_NLOPT.
+/// is available as cartan::ik::nlopt_bobyqa behind CARTAN_HAS_NLOPT.
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 class argmin_bobyqa
 {

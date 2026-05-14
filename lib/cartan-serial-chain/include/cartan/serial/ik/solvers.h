@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_SOLVERS_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_SOLVERS_H
 
-/// @file solvers.h
-/// @brief Factory functions, builders, and type aliases for common IK solver configurations.
+/// Factory functions, builders, and type aliases for common IK solver configurations.
 ///
 /// Provides three layers of solver construction:
 ///   1. Type aliases (speed_ik_runner, robust_ik_runner, dual_ik_runner) for direct use.

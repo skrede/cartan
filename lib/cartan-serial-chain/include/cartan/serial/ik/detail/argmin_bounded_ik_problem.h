@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_ARGMIN_BOUNDED_IK_PROBLEM_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_ARGMIN_BOUNDED_IK_PROBLEM_H
 
-/// @file detail/argmin_bounded_ik_problem.h
-/// @brief Bound-constrained adapter for argmin solvers that treat joint
+/// Bound-constrained adapter for argmin solvers that treat joint
 ///        limits as box constraints (no inequality constraints).
 ///
 /// Satisfies argmin::objective, argmin::differentiable, and

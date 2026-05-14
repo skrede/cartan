@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_CHAIN_STATIC_CHAIN_H
 #define HPP_GUARD_CARTAN_SERIAL_CHAIN_STATIC_CHAIN_H
 
-/// @file static_chain.h
-/// @brief Compile-time parameterized serial chain with joint type tags.
+/// Compile-time parameterized serial chain with joint type tags.
 ///
 /// static_chain encodes joint types (revolute/prismatic and axis direction)
 /// as template parameters while storing runtime link data (home pose, screw
@@ -30,9 +29,6 @@ namespace cartan
 /// revolute_y, revolute_z, prismatic_x, prismatic_y, prismatic_z). Runtime
 /// link data (home pose, screw axes, joint limits) is stored in fixed-size
 /// std::array containers sized by the parameter pack.
-///
-/// @tparam Scalar   Floating-point type for all geometric quantities.
-/// @tparam Joints   Pack of joint_tag types encoding each joint's type and axis.
 template <typename Scalar, joint_tag... Joints>
 class static_chain
 {
@@ -48,9 +44,6 @@ public:
     using axes_storage = std::array<screw_axis<Scalar>, sizeof...(Joints)>;
 
     /// Construct a static chain from home configuration, screw axes, and limits.
-    /// @param home   End-effector pose at zero configuration (the M matrix).
-    /// @param axes   Space-frame screw axes S1..Sn.
-    /// @param limits Joint position/velocity limits.
     static_chain(
         const se3<Scalar>& home,
         axes_storage axes,

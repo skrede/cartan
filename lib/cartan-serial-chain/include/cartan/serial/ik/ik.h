@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_IK_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_IK_H
 
-/// @file ik.h
-/// @brief Convenience header for the inverse kinematics module.
+/// Convenience header for the inverse kinematics module.
 ///
 /// Includes all IK types, solve policies, solver, and factory functions.
 

@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_CHAIN_CHAIN_CONCEPT_H
 #define HPP_GUARD_CARTAN_SERIAL_CHAIN_CHAIN_CONCEPT_H
 
-/// @file chain_concept.h
-/// @brief Concept constraining serial chain types for FK/Jacobian/IK consumers.
+/// Concept constraining serial chain types for FK/Jacobian/IK consumers.
 ///
 /// The chain concept captures the minimal surface needed by forward kinematics,
 /// Jacobian computation, and IK solvers. Designed top-down from consumer needs:

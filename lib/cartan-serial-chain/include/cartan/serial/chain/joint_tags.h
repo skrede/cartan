@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_CHAIN_JOINT_TAGS_H
 #define HPP_GUARD_CARTAN_SERIAL_CHAIN_JOINT_TAGS_H
 
-/// @file joint_tags.h
-/// @brief Joint type tags for compile-time chain descriptions.
+/// Joint type tags for compile-time chain descriptions.
 ///
 /// Six tag types representing the principal revolute and prismatic joints.
 /// Used as template parameter packs in static_chain to enable compile-time

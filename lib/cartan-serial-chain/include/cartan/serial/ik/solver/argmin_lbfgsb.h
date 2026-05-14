@@ -1,12 +1,11 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_ARGMIN_LBFGSB_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_ARGMIN_LBFGSB_H
 
-/// @file argmin_lbfgsb.h
-/// @brief argmin-backed L-BFGS-B IK solve policy with box constraints.
+/// argmin-backed L-BFGS-B IK solve policy with box constraints.
 ///
 /// Wraps argmin's lbfgsb_policy for bound-constrained IK using
 /// analytical gradient via the SE(3) log Jacobian. Distinct from the
-/// native lbfgsb_solve_policy which implements L-BFGS-B directly.
+/// native cartan::ik::lbfgsb which implements L-BFGS-B directly.
 ///
 /// Reference: Byrd, Lu, Nocedal, Zhu (1995), L-BFGS-B algorithm.
 
@@ -43,10 +42,10 @@ namespace cartan::ik
 /// Uses the Limited-memory BFGS for Bound-constrained optimization via
 /// argmin, with analytical gradient through the SE(3) log Jacobian.
 /// Each step() call runs a budget of argmin iterations for cooperative
-/// scheduling in basic_ik_solver.
+/// scheduling in basic_ik_runner.
 ///
 /// This is the argmin-backed L-BFGS-B. The native cartan implementation
-/// is available as lbfgsb_solve_policy.
+/// is available as cartan::ik::lbfgsb.
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 class argmin_lbfgsb
 {

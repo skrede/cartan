@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_ARGMIN_UNCONSTRAINED_PROBLEM_H
 #define HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_ARGMIN_UNCONSTRAINED_PROBLEM_H
 
-/// @file detail/argmin_unconstrained_problem.h
-/// @brief Unconstrained adapter (formulation A) for argmin solvers.
+/// Unconstrained adapter (formulation A) for argmin solvers.
 ///
 /// Satisfies argmin::objective and argmin::differentiable without
 /// bounds. Joint limits are enforced externally by the solve policy

@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_FK_FORWARD_KINEMATICS_H
 #define HPP_GUARD_CARTAN_SERIAL_FK_FORWARD_KINEMATICS_H
 
-/// @file forward_kinematics.h
-/// @brief Forward kinematics via Product of Exponentials (PoE).
+/// Forward kinematics via Product of Exponentials (PoE).
 ///
 /// Computes T(q) = exp([S1]q1) * ... * exp([Sn]qn) * M with intermediate
 /// product caching for Jacobian reuse. Fixed-size chains (N=1-7) use
@@ -127,12 +126,6 @@ fk_result<Scalar, N> fk_unrolled(
 ///
 /// Lynch & Park, Modern Robotics, Eq. 4.10, p. 138:
 ///   T(q) = exp([S1]q1) * ... * exp([Sn]qn) * M
-///
-/// @tparam N      Number of joints (compile-time), or cartan::dynamic.
-/// @tparam Scalar Floating-point type.
-/// @param chain   Kinematic chain with screw axes and home configuration.
-/// @param q       Joint position vector.
-/// @return        fk_result containing end_effector pose and intermediates.
 template <typename Scalar, int N>
 fk_result<Scalar, N> forward_kinematics(
     const kinematic_chain<Scalar, N>& chain,

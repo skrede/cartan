@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_FK_JACOBIAN_H
 #define HPP_GUARD_CARTAN_SERIAL_FK_JACOBIAN_H
 
-/// @file jacobian.h
-/// @brief Space and body Jacobian computation for kinematic chains.
+/// Space and body Jacobian computation for kinematic chains.
 ///
 /// The space Jacobian J_s maps joint velocities to the end-effector
 /// spatial twist. The body Jacobian J_b maps to the body-frame twist.
@@ -123,12 +122,6 @@ jacobian_matrix<Scalar, N> space_jacobian_unrolled(
 /// unrolled fold expression. For dynamic or larger chains, uses a runtime loop.
 ///
 /// Reference: Lynch & Park, Modern Robotics, Eq. 5.11, p. 178.
-///
-/// @tparam N      Number of joints (compile-time), or cartan::dynamic.
-/// @tparam Scalar Floating-point type.
-/// @param chain   Kinematic chain with screw axes.
-/// @param fk      Forward kinematics result with cached intermediates.
-/// @return        6xN space Jacobian matrix.
 template <typename Scalar, int N>
 jacobian_matrix<Scalar, N> space_jacobian(
     const kinematic_chain<Scalar, N>& chain,
@@ -149,12 +142,6 @@ jacobian_matrix<Scalar, N> space_jacobian(
 /// Maps joint velocities to end-effector body-frame twist: V_b = J_b(q) * dq.
 ///
 /// Reference: Lynch & Park, Modern Robotics, Eq. 5.22, p. 185.
-///
-/// @tparam N      Number of joints (compile-time), or cartan::dynamic.
-/// @tparam Scalar Floating-point type.
-/// @param chain   Kinematic chain with screw axes.
-/// @param fk      Forward kinematics result with cached intermediates.
-/// @return        6xN body Jacobian matrix.
 template <typename Scalar, int N>
 jacobian_matrix<Scalar, N> body_jacobian(
     const kinematic_chain<Scalar, N>& chain,

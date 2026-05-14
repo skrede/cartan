@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_FK_FORWARD_KINEMATICS_MATRIX_H
 #define HPP_GUARD_CARTAN_SERIAL_FK_FORWARD_KINEMATICS_MATRIX_H
 
-/// @file forward_kinematics_matrix.h
-/// @brief Matrix-form Product of Exponentials FK.
+/// Matrix-form Product of Exponentials FK.
 ///
 /// Stores rotation as a 3x3 matrix in the per-joint cumulative intermediates,
 /// avoiding the quaternion product in compose and the quaternion->matrix

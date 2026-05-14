@@ -1,8 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_FK_JACOBIAN_MATRIX_H
 #define HPP_GUARD_CARTAN_SERIAL_FK_JACOBIAN_MATRIX_H
 
-/// @file jacobian_matrix.h
-/// @brief Space Jacobian computed from matrix-form FK intermediates.
+/// Space Jacobian computed from matrix-form FK intermediates.
 ///
 /// `space_jacobian(chain, fk_matrix_result)` consumes Matrix3-form
 /// intermediates and skips the per-column quaternion->matrix conversion
