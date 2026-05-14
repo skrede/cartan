@@ -306,6 +306,17 @@ specialized FK and Jacobian implementations that exploit per-joint axis
 knowledge for measurable speed wins over the generic
 `kinematic_chain` path.
 
+### Preconditions
+
+- `Scalar` must be a floating-point type. Violation triggers
+  `static_assert("static_chain requires a floating-point Scalar type")`.
+- `sizeof...(Joints) > 0` — an empty joint parameter pack is rejected at
+  compile time. Instantiating `static_chain<double>` (no joint tags)
+  triggers `static_assert("static_chain requires at least one joint")`.
+  Use `kinematic_chain<Scalar, dynamic>` for chains whose joint count
+  is not known until runtime, or `kinematic_chain<Scalar, N>` for
+  fixed-`N` chains constructed via runtime data.
+
 ### Type Aliases
 
 ```cpp

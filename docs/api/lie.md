@@ -141,6 +141,10 @@ quaternions accumulate `O(N * eps)` deviation that is cheaper to absorb
 into a single final renormalize than to spend at every per-step
 construction.
 
+Pass as the second argument to `so3(quaternion, trusted_unit_t)`,
+`se3(se3<P2>, trusted_unit_t)`, or any other constructor / method that
+documents a `trusted_unit_t` overload.
+
 ## se3_left_jacobian
 
 Defined in `se3_left_jacobian.h`. SE(3) left Jacobian and its inverse,
@@ -336,6 +340,26 @@ template <typename Scalar, typename Policy = strict_policy>
 class so3;
 ```
 
+### Constructors
+
+```cpp
+explicit so3(const quaternion<Scalar>& q);
+```
+
+Construct from a quaternion. Under `strict_policy` the input is normalized
+to unit length on construction; under `fast_policy` the input is taken
+as-is.
+
+```cpp
+so3(const quaternion<Scalar>& q, trusted_unit_t);
+```
+
+Construct from a known-unit quaternion, bypassing normalization. Caller
+must guarantee `||q|| ~= 1`; debug builds validate via `assert`. See
+[`trusted_unit_t`](#trusted_unit_t-and-trusted_unit) for the canonical
+hot-path use cases (FK accumulator boundary, conjugate of a unit,
+axis-aligned `exp`).
+
 ### Static Methods
 
 ```cpp
@@ -452,6 +476,25 @@ template <typename Scalar, typename Policy = strict_policy>
 class se3;
 ```
 
+### Constructors
+
+```cpp
+se3(const so3<Scalar, Policy>& rot, const vector3<Scalar>& trans);
+```
+
+Construct from rotation and translation components.
+
+```cpp
+template <typename P2>
+se3(const se3<Scalar, P2>& other, trusted_unit_t);
+```
+
+Construct from an `se3` with a different `Policy` parameter, transferring
+the rotation as a known-unit quaternion (skipping renormalize). Caller
+must guarantee the source rotation is unit; debug builds validate. See
+[`trusted_unit_t`](#trusted_unit_t-and-trusted_unit) — the typical use
+is rebinding the policy on the boundary of an FK accumulator.
+
 ### Static Methods
 
 ```cpp
@@ -492,6 +535,17 @@ auto operator*(const se3<Scalar, P2>& rhs) const -> se3<Scalar, stricter_policy<
 ```
 
 Group composition.
+
+```cpp
+template <typename P2>
+se3<Scalar, fast_policy> compose_trusted(const se3<Scalar, P2>& rhs) const;
+```
+
+Group composition without renormalizing the result rotation. Returns
+`fast_policy` `se3`; caller takes responsibility for accumulated drift.
+Designed for FK chain accumulators where `N` successive unit-quaternion
+products keep `||q||^2 - 1` bounded by `O(N * eps)`, making per-step
+renormalization wasted work.
 
 ```cpp
 matrix6<Scalar> adjoint() const;
@@ -618,7 +672,11 @@ template <typename Scalar>
 screw_params<Scalar> to_screw_params(const vector3<Scalar>& omega, const vector3<Scalar>& v);
 ```
 
-Extract screw parameters from twist components. For rotation (`||omega|| ~ 1`): `s_hat = omega`, `q = omega x v`, `h = omega . v`. For pure translation (`||omega|| ~ 0`): `s_hat = v/||v||`, `h = infinity`.
+Extract screw parameters from twist components `(omega, v)`. For any
+non-zero `omega`, let `omega_hat = omega / ||omega||` (the unit rotation
+axis). Then `s_hat = omega_hat`, `q = omega_hat x v`, `h = omega_hat . v`.
+For pure translation (`||omega|| ~ 0`): `s_hat = v / ||v||`, `q = 0`,
+`h = infinity`.
 
 ## quaternion_utils
 

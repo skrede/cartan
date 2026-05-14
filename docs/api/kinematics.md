@@ -17,7 +17,7 @@ See [PoE Kinematics](../background/poe-kinematics.md) | [Jacobians](../backgroun
 
 | Form | Header |
 |------|--------|
-| All kinematics | `#include <cartan/serial/fk.h>` |
+| All kinematics | `#include <cartan/serial_chain.h>` |
 | `cartan::forward_kinematics` | `#include <cartan/serial/fk/forward_kinematics.h>` |
 | `cartan::forward_kinematics_matrix`, `cartan::fk_matrix_result`, `cartan::pose_matrix` | `#include <cartan/serial/fk/forward_kinematics_matrix.h>` |
 | `cartan::space_jacobian`, `cartan::body_jacobian` | `#include <cartan/serial/fk/jacobian.h>` |
@@ -137,19 +137,25 @@ struct fk_matrix_result
 ```
 
 Same shape as `fk_result`, but `end_effector` and each intermediate are
-stored as `pose_matrix<Scalar>` (a 4x4 homogeneous matrix) rather than
-`se3<Scalar>`.
+stored as `pose_matrix<Scalar>` (a rotation-matrix + translation pair;
+see below) rather than `se3<Scalar>`.
 
 ### pose_matrix
 
 ```cpp
 template <typename Scalar>
-using pose_matrix = Eigen::Matrix<Scalar, 4, 4>;
+struct pose_matrix
+{
+    matrix3<Scalar> R{matrix3<Scalar>::Identity()};
+    vector3<Scalar> p{vector3<Scalar>::Zero()};
+};
 ```
 
-Alias for 4x4 homogeneous transformation matrix. Used by
-`fk_matrix_result` and by Jacobian computations that consume the matrix
-form.
+Per-joint cumulative pose stored as a rotation matrix `R` (3x3) and a
+translation `p` (3-vector). This is the matrix-form analog of `se3`
+used inside `fk_matrix_result` and `forward_kinematics_matrix` to avoid
+the quaternion-to-matrix conversion that downstream Jacobian
+computations would otherwise pay on every column.
 
 ## space_jacobian
 

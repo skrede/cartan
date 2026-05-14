@@ -21,8 +21,8 @@ See [IK Methods](../background/ik-methods.md) | [PoE Kinematics](../background/p
 | Form | Header |
 |------|--------|
 | All analytical | `#include <cartan/analytical.h>` |
-| `cartan::pieper_6r_solver` | `#include <cartan/analytical/solver_6r.h>` |
-| `cartan::spatial_3r_solver` | `#include <cartan/analytical/solver_3r.h>` |
+| `cartan::pieper_6r_solver`, `cartan::solve_6r` | `#include <cartan/analytical/solver_6r.h>` |
+| `cartan::spatial_3r_solver`, `cartan::solve_3r` | `#include <cartan/analytical/solver_3r.h>` |
 | `cartan::planar_2r_solver`, `cartan::solve_2r` | `#include <cartan/analytical/solver_2r.h>` |
 | `cartan::paden_kahan_1`, `paden_kahan_2`, `paden_kahan_3` | `#include <cartan/analytical/paden_kahan.h>` |
 | `cartan::paden_kahan_2_result`, `paden_kahan_3_result` | `#include <cartan/analytical/paden_kahan.h>` |
@@ -319,6 +319,18 @@ solve(const se3<Scalar>& target) const;
 Returns up to 4 verified joint configurations achieving the target pose
 (position component only; orientation is set by the chain's mechanism).
 
+### Free function
+
+```cpp
+template <typename Scalar, joint_tag... Joints>
+auto solve_3r(
+    const static_chain<Scalar, Joints...>& chain,
+    const se3<Scalar>& target);
+```
+
+Convenience wrapper: constructs a `spatial_3r_solver` from the given
+chain and immediately invokes `solve(target)`.
+
 Reference: Murray, Li and Sastry, *A Mathematical Introduction to Robotic
 Manipulation* (1994), Section 3.3.
 
@@ -371,6 +383,18 @@ solve(const se3<Scalar>& target) const;
 
 Returns up to 8 verified joint configurations achieving the target SE(3)
 pose (both position and orientation).
+
+### Free function
+
+```cpp
+template <typename Scalar, joint_tag... Joints>
+auto solve_6r(
+    const static_chain<Scalar, Joints...>& chain,
+    const se3<Scalar>& target);
+```
+
+Convenience wrapper: constructs a `pieper_6r_solver` from the given
+chain and immediately invokes `solve(target)`.
 
 Reference: Lynch & Park, Modern Robotics, Section 6.1.1.
            Murray, Li and Sastry (1994), Section 3.3.

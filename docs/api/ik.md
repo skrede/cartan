@@ -38,6 +38,7 @@ See [IK Methods](../background/ik-methods.md) | [IK Composition Guide](../guides
 | MMA / GCMMA / CMA-ES / aug. Lagrangian: `cartan::ik::mma`, `gcmma`, `cmaes`, `augmented_lagrangian` | `#include <cartan/serial/ik/solver/{mma,gcmma,cmaes,augmented_lagrangian}.h>` |
 | `cartan::ik::restart_wrapper` | `#include <cartan/serial/ik/wrapper/restart_wrapper.h>` |
 | `cartan::exhaustive_ik_runner`, `cartan::exhaustive_options`, `cartan::exhaustive_result`, `cartan::ranking_strategy` | `#include <cartan/serial/ik/solver/exhaustive_ik_runner.h>` |
+| `cartan::verify_solution`, `cartan::filter_valid_solutions` | `#include <cartan/serial/ik/ik_validation.h>` |
 | Type aliases + builders: `speed_ik_runner`, `robust_ik_runner`, `dual_ik_runner`, `make_solver`, `make_speed_ik_runner`, `make_robust_ik_runner`, `make_dual_ik_runner` | `#include <cartan/serial/ik/solvers.h>` |
 
 ## Quick Start
@@ -460,8 +461,9 @@ struct no_limits;
 
 No-op: applies no enforcement. Use when the policy handles constraints
 internally (e.g., `projected_lm`, NLopt/argmin policies with box
-constraints). Default for `cartan::ik::lm`, `cartan::ik::projected_lm`,
-`cartan::ik::lbfgsb`-family policies that are LM-trust-region-based.
+constraints). Default for `cartan::ik::lm` and `cartan::ik::projected_lm`
+— the LM trust-region family for which post-step clamping would
+invalidate the trust-region step.
 **Critical**: post-step `clamp_limits` invalidates LM trust-region
 semantics; `no_limits` is the correct default for the LM family.
 
@@ -833,6 +835,45 @@ Sorts the deduplicated `solutions`:
 - `distance_to_seed` — nearest-first by joint-space distance to the seed.
 - `min_error` — lowest residual error first.
 - `mid_range` — distance from joint-limit midpoints first.
+
+## Validation
+
+FK-based validation free functions for IK results. Both live in
+`namespace cartan` and are reachable transitively via
+`<cartan/serial/ik.h>` and `<cartan/serial_chain.h>`.
+
+### verify_solution
+
+```cpp
+template <chain Chain>
+bool verify_solution(
+    const Chain& chain,
+    const se3<typename Chain::scalar_type>& target,
+    const typename joint_state<typename Chain::scalar_type, Chain::joints>::position_type& q,
+    const convergence_criteria<typename Chain::scalar_type>& criteria);
+```
+
+Recomputes forward kinematics at `q`, takes the body-frame log of
+`fk.end_effector.inverse() * target`, and returns `true` iff the
+orientation and position components are both below the corresponding
+tolerances in `criteria`. Used by `exhaustive_ik_runner` and by callers
+building custom multi-start drivers that need an explicit FK back-check.
+
+### filter_valid_solutions
+
+```cpp
+template <chain Chain, typename Scalar, int N>
+std::vector<ik_result<Scalar, N>> filter_valid_solutions(
+    const Chain& chain,
+    const se3<Scalar>& target,
+    std::vector<ik_result<Scalar, N>> solutions,
+    const convergence_criteria<Scalar>& criteria);
+```
+
+Drops every `ik_result` whose `solution.position` fails `verify_solution`
+against the same `criteria`. Useful as a final pass over the output of
+`exhaustive_ik_runner` or any other multi-solution driver that collected
+candidates without an inline FK back-check.
 
 ## See also
 
