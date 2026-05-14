@@ -9,6 +9,122 @@
 
 C++ Lie group and kinematics library for robotics.
 
+### Rotations on SO(3)
+
+Map an axis-angle vector into SO(3) via the exponential map and recover it via the logarithmic map; the round-trip error is near machine epsilon.
+
+```cpp
+#include <cartan/lie/so3.h>
+#include <iostream>
+
+int main()
+{
+    using SO3 = cartan::so3<double>;
+    cartan::vector3<double> phi{0.1, 0.2, 0.3};
+
+    auto R = SO3::exp(phi);
+    auto phi_back = R.log();
+
+    std::cout << "Round-trip error: " << (phi - phi_back).norm() << "\n";
+}
+```
+
+### Transformations on SE(3)
+
+Compose a rigid-body transform from a 6-vector twist via the SE(3) exponential map, then recover the twist via the logarithm.
+
+```cpp
+#include <cartan/lie/se3.h>
+#include <iostream>
+
+int main()
+{
+    using SE3 = cartan::se3<double>;
+    cartan::vector6<double> twist;
+    twist << 0.0, 0.0, 0.3, 0.1, 0.2, 0.0;  // (omega, rho) -- angular part then linear part
+
+    auto T = SE3::exp(twist);
+    auto twist_back = T.log();
+
+    std::cout << "Round-trip error: " << (twist - twist_back).norm() << "\n";
+}
+```
+
+### Forward kinematics on a 2-link planar arm
+
+Build a 2-link planar arm programmatically from screw axes and compute the end-effector pose at a joint configuration.
+
+<details>
+<summary>FK on a 2-link planar arm</summary>
+
+```cpp
+#include <cartan/serial_chain.h>
+#include <iostream>
+#include <numbers>
+
+int main()
+{
+    using vec3 = cartan::vector3<double>;
+    using SE3 = cartan::se3<double>;
+    using SO3 = cartan::so3<double>;
+
+    auto s1 = cartan::screw_axis<double>::revolute(vec3(0, 0, 1), vec3(0, 0, 0));
+    auto s2 = cartan::screw_axis<double>::revolute(vec3(0, 0, 1), vec3(1, 0, 0));
+    auto home = SE3(SO3::identity(), vec3(2, 0, 0));
+
+    cartan::joint_limits<double> lim{-std::numbers::pi, std::numbers::pi};
+    cartan::kinematic_chain<double, 2> chain(home, {s1, s2}, {lim, lim});
+
+    Eigen::Vector2d q(0.5, -0.3);
+    auto fk = cartan::forward_kinematics(chain, q);
+
+    std::cout << "End-effector:\n" << fk.end_effector.matrix() << "\n";
+}
+```
+
+</details>
+
+### Inverse kinematics on the same arm
+
+Pick a known joint configuration on the same 2-link arm, FK-walk it to a target pose, then back-solve for the joints from a different seed using Levenberg-Marquardt.
+
+<details>
+<summary>IK on the same 2-link planar arm</summary>
+
+```cpp
+#include <cartan/serial_chain.h>
+#include <iostream>
+#include <numbers>
+
+int main()
+{
+    using vec3 = cartan::vector3<double>;
+
+    auto s1 = cartan::screw_axis<double>::revolute(vec3(0, 0, 1), vec3(0, 0, 0));
+    auto s2 = cartan::screw_axis<double>::revolute(vec3(0, 0, 1), vec3(1, 0, 0));
+    auto home = cartan::se3<double>(cartan::so3<double>::identity(), vec3(2, 0, 0));
+    cartan::joint_limits<double> lim{-std::numbers::pi, std::numbers::pi};
+    cartan::kinematic_chain<double, 2> chain(home, {s1, s2}, {lim, lim});
+
+    Eigen::Vector2d q_known{0.3, -0.5};
+    auto target = cartan::forward_kinematics(chain, q_known).end_effector;
+
+    Eigen::Vector2d q0{0.0, 0.0};
+    cartan::convergence_criteria<double> criteria{1e-6, 1e-6, 100, 200};
+
+    cartan::basic_ik_runner<cartan::ik::lm<cartan::kinematic_chain<double, 2>>> solver;
+    solver.setup(chain, target, q0, criteria);
+    auto result = solver.solve();
+
+    if (result.has_value())
+        std::cout << "Solution: " << result.value().solution.position.transpose() << "\n";
+}
+```
+
+</details>
+
+Save any of these snippets as `main.cpp` alongside a `CMakeLists.txt` that pulls cartan via FetchContent (see the Quick Install section below). The same four snippets appear in `docs/getting-started.md` with full build instructions.
+
 ## Features
 
 - **Lie groups:** SO(2), SE(2), SO(3), SE(3) with exp/log, adjoint, coadjoint, left/right Jacobians
