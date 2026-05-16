@@ -4,11 +4,39 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from hypothesis import assume, given, settings
+from hypothesis.extra.numpy import arrays
+from hypothesis.strategies import floats
 
 import cartan
 
 
 TOL = 1e-12
+
+# Hypothesis strategies for randomized SO(3)/SE(3) coverage.
+# Per-element bounds in [-pi, pi] do NOT prevent norm growth up to pi*sqrt(N);
+# tests that need to avoid the antipodal singularity guard with hypothesis.assume.
+rotation_vectors = arrays(
+    dtype=np.float64,
+    shape=(3,),
+    elements=floats(
+        min_value=-np.pi,
+        max_value=np.pi,
+        allow_nan=False,
+        allow_infinity=False,
+    ),
+)
+
+twists = arrays(
+    dtype=np.float64,
+    shape=(6,),
+    elements=floats(
+        min_value=-np.pi,
+        max_value=np.pi,
+        allow_nan=False,
+        allow_infinity=False,
+    ),
+)
 
 
 def test_so3_identity_log_is_zero() -> None:
@@ -84,3 +112,53 @@ def test_so3_composition_associative() -> None:
     a = ((R1 * R2) * R3).matrix()
     b = (R1 * (R2 * R3)).matrix()
     assert np.allclose(a, b, atol=1e-13)
+
+
+# ---------------------------------------------------------------------------
+# Hypothesis-driven property tests (bulk coverage of identity invariants).
+# ---------------------------------------------------------------------------
+
+
+@given(omega=rotation_vectors)
+@settings(max_examples=100, deadline=None)
+def test_so3_exp_log_roundtrip_property(omega: np.ndarray) -> None:
+    # The SO(3) log map is antipodal-ambiguous near ||omega|| = pi: both +omega
+    # and -omega exponentiate to the same rotation, so log can legitimately
+    # return the opposite branch. Skip those examples; the near-pi behavior is
+    # covered separately by test_so3_exp_log_near_pi_antipodal.
+    assume(np.linalg.norm(omega) < np.pi - 1e-3)
+    R = cartan.SO3.exp(omega)
+    omega_back = R.log()
+    np.testing.assert_allclose(omega_back, omega, atol=1e-6)
+
+
+@given(omega=rotation_vectors)
+@settings(max_examples=100, deadline=None)
+def test_so3_inverse_identity_property(omega: np.ndarray) -> None:
+    R = cartan.SO3.exp(omega)
+    identity = R * R.inverse()
+    np.testing.assert_allclose(identity.matrix(), np.eye(3), atol=1e-12)
+
+
+@given(twist=twists)
+@settings(max_examples=100, deadline=None)
+def test_se3_exp_log_roundtrip_property(twist: np.ndarray) -> None:
+    # SE(3) carries the same antipodal-singularity behavior in its rotational
+    # sub-component; guard analogously to the SO(3) property test.
+    assume(np.linalg.norm(twist[:3]) < np.pi - 1e-3)
+    T = cartan.SE3.exp(twist)
+    twist_back = T.log()
+    np.testing.assert_allclose(twist_back, twist, atol=1e-6)
+
+
+def test_so3_exp_log_near_pi_antipodal() -> None:
+    # Regression sentinel for the antipodal singularity. At ||omega|| -> pi
+    # the log map can return either +omega or -omega; both map back to the
+    # same SO(3) under exp. We assert the SO(3) round-trip exp(log(R)) == R
+    # at machine precision, which is unambiguous even when the log branch
+    # disagrees with the input rotation vector.
+    omega = np.array([np.pi - 1e-7, 0.0, 0.0])
+    R = cartan.SO3.exp(omega)
+    omega_back = R.log()
+    R_back = cartan.SO3.exp(omega_back)
+    assert np.allclose(R_back.matrix(), R.matrix(), atol=1e-12)

@@ -20,7 +20,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-test = ["pytest>=7.0"]
+test = ["pytest>=7.0", "hypothesis>=6.0"]
 
 [project.urls]
 Homepage = "https://github.com/skrede/cartan"
@@ -35,3 +35,8 @@ wheel.packages = ["python/cartan"]
 [tool.scikit-build.cmake.define]
 CARTAN_BUILD_PYTHON = "ON"
 CARTAN_BUILD_URDF = "ON"
+
+[tool.pytest.ini_options]
+markers = [
+    "slow: marks tests as slow (e.g. invoke external static analysis tools); excluded from the default suite by passing -m 'not slow'.",
+]
