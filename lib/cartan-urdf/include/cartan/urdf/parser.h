@@ -1,0 +1,414 @@
+#ifndef HPP_GUARD_CARTAN_URDF_PARSER_H
+#define HPP_GUARD_CARTAN_URDF_PARSER_H
+
+/// Top-level URDF parser entry point.
+///
+/// parse_urdf_file reads a URDF document from disk, validates well-formedness
+/// of every link and joint it encounters, and produces a parsed_model that
+/// preserves the full link and joint tree. Connectivity (root and leaf
+/// detection, fixed-joint merging, chain extraction) is performed by a
+/// separate step downstream; the parser's responsibility ends at structurally
+/// valid per-element parsing. The parser is a one-shot startup path; cost of
+/// the std::expected return channel and the diagnostic strings is acceptable
+/// because URDF loading is not on any hot path.
+
+#include "cartan/urdf/error.h"
+#include "cartan/urdf/schema.h"
+
+#include "cartan/lie/se3.h"
+#include "cartan/lie/so3.h"
+
+#include "cartan/types.h"
+
+#include <pugixml.hpp>
+
+#include <cmath>
+#include <string>
+#include <vector>
+#include <sstream>
+#include <expected>
+#include <filesystem>
+#include <string_view>
+#include <system_error>
+#include <unordered_set>
+
+namespace cartan::urdf
+{
+
+namespace detail
+{
+
+/// Convert a zero-based byte offset within the file text to a one-based line
+/// number. Used to translate pugixml's xml_parse_result::offset into the
+/// urdf_source_location reported on parse failures.
+[[nodiscard]] inline int offset_to_line(const std::string& text, std::ptrdiff_t offset)
+{
+    int line = 1;
+    const auto cap = static_cast<std::ptrdiff_t>(text.size());
+    const auto stop = offset < cap ? offset : cap;
+    for (std::ptrdiff_t i = 0; i < stop; ++i)
+    {
+        if (text[static_cast<std::size_t>(i)] == '\n')
+        {
+            ++line;
+        }
+    }
+    return line;
+}
+
+/// Read the entire file into a string. Returns an empty string on failure;
+/// callers should not rely on this value being meaningful beyond line-number
+/// tracking on a separate pugixml load_file call.
+[[nodiscard]] inline std::string slurp_file(const std::filesystem::path& path)
+{
+    std::error_code ec;
+    auto size = std::filesystem::file_size(path, ec);
+    if (ec)
+    {
+        return {};
+    }
+    std::string text;
+    text.resize(static_cast<std::size_t>(size));
+    FILE* fp = std::fopen(path.c_str(), "rb");
+    if (!fp)
+    {
+        return {};
+    }
+    const auto read = std::fread(text.data(), 1, text.size(), fp);
+    std::fclose(fp);
+    text.resize(read);
+    return text;
+}
+
+/// Parse a whitespace-separated triple ("x y z") into a vector3. Returns
+/// false on parse failure; the caller is responsible for raising the
+/// appropriate urdf_failure.
+template <typename Scalar>
+[[nodiscard]] bool parse_triple(std::string_view s, vector3<Scalar>& out)
+{
+    std::stringstream ss{std::string(s)};
+    Scalar x{}, y{}, z{};
+    if (!(ss >> x >> y >> z))
+    {
+        return false;
+    }
+    out << x, y, z;
+    return true;
+}
+
+/// Build an SO(3) rotation from URDF roll-pitch-yaw angles. URDF convention:
+/// R = Rz(yaw) * Ry(pitch) * Rx(roll). Each axis rotation is built via
+/// so3::exp so the implementation reuses the validated cartan exponential map.
+template <typename Scalar>
+[[nodiscard]] so3<Scalar> rotation_from_rpy(Scalar roll, Scalar pitch, Scalar yaw)
+{
+    auto rx = so3<Scalar>::exp(vector3<Scalar>(roll, Scalar(0), Scalar(0)));
+    auto ry = so3<Scalar>::exp(vector3<Scalar>(Scalar(0), pitch, Scalar(0)));
+    auto rz = so3<Scalar>::exp(vector3<Scalar>(Scalar(0), Scalar(0), yaw));
+    return rz * ry * rx;
+}
+
+/// Parse a URDF <origin xyz="..." rpy="..."/> sub-element into an se3 pose.
+/// Missing attributes default to zero (URDF spec). Returns std::nullopt only
+/// on malformed numeric content; absence of the <origin> element entirely is
+/// the caller's concern.
+template <typename Scalar>
+[[nodiscard]] std::optional<se3<Scalar>> parse_origin(const pugi::xml_node& origin)
+{
+    vector3<Scalar> xyz = vector3<Scalar>::Zero();
+    vector3<Scalar> rpy = vector3<Scalar>::Zero();
+    if (auto attr = origin.attribute("xyz"); attr)
+    {
+        if (!parse_triple<Scalar>(attr.value(), xyz))
+        {
+            return std::nullopt;
+        }
+    }
+    if (auto attr = origin.attribute("rpy"); attr)
+    {
+        if (!parse_triple<Scalar>(attr.value(), rpy))
+        {
+            return std::nullopt;
+        }
+    }
+    return se3<Scalar>(rotation_from_rpy<Scalar>(rpy(0), rpy(1), rpy(2)), xyz);
+}
+
+/// Map a URDF joint type token to the parser's enumeration. Returns
+/// std::nullopt when the token is not one of the supported kinds; callers
+/// translate that into urdf_failure::unsupported_joint_type.
+[[nodiscard]] inline std::optional<parsed_joint_kind> joint_kind_from_token(std::string_view token)
+{
+    if (token == "fixed") { return parsed_joint_kind::fixed; }
+    if (token == "revolute") { return parsed_joint_kind::revolute; }
+    if (token == "continuous") { return parsed_joint_kind::continuous; }
+    if (token == "prismatic") { return parsed_joint_kind::prismatic; }
+    return std::nullopt;
+}
+
+/// Parse an <inertial> sub-element into a parsed_inertial. Rejects
+/// non-positive mass and negative diagonal entries in the inertia matrix
+/// (cheap necessary condition for positive semidefiniteness).
+template <typename Scalar>
+[[nodiscard]] std::expected<parsed_inertial<Scalar>, urdf_error>
+parse_inertial(const pugi::xml_node& inertial_node,
+               const std::string& link_name,
+               const std::string& file_path)
+{
+    parsed_inertial<Scalar> out{};
+    out.mass = Scalar(0);
+    out.com = vector3<Scalar>::Zero();
+    out.inertia = matrix3<Scalar>::Zero();
+
+    auto mass_node = inertial_node.child("mass");
+    if (!mass_node)
+    {
+        return std::unexpected(urdf_error{
+            .kind = urdf_failure::inertial_singular,
+            .detail = "link '" + link_name + "': <inertial> missing <mass> child",
+            .location = urdf_source_location{file_path, 0, "inertial"}});
+    }
+    out.mass = mass_node.attribute("value").as_double(0.0);
+    if (!(out.mass > Scalar(0)))
+    {
+        return std::unexpected(urdf_error{
+            .kind = urdf_failure::inertial_singular,
+            .detail = "link '" + link_name + "': inertial mass must be positive, got "
+                + std::to_string(static_cast<double>(out.mass)),
+            .location = urdf_source_location{file_path, 0, "inertial"}});
+    }
+
+    if (auto origin = inertial_node.child("origin"); origin)
+    {
+        if (auto attr = origin.attribute("xyz"); attr)
+        {
+            if (!parse_triple<Scalar>(attr.value(), out.com))
+            {
+                return std::unexpected(urdf_error{
+                    .kind = urdf_failure::inertial_singular,
+                    .detail = "link '" + link_name + "': malformed inertial origin xyz",
+                    .location = urdf_source_location{file_path, 0, "inertial"}});
+            }
+        }
+    }
+
+    auto inertia = inertial_node.child("inertia");
+    if (!inertia)
+    {
+        return std::unexpected(urdf_error{
+            .kind = urdf_failure::inertial_singular,
+            .detail = "link '" + link_name + "': <inertial> missing <inertia> child",
+            .location = urdf_source_location{file_path, 0, "inertial"}});
+    }
+    const Scalar ixx = static_cast<Scalar>(inertia.attribute("ixx").as_double(0.0));
+    const Scalar ixy = static_cast<Scalar>(inertia.attribute("ixy").as_double(0.0));
+    const Scalar ixz = static_cast<Scalar>(inertia.attribute("ixz").as_double(0.0));
+    const Scalar iyy = static_cast<Scalar>(inertia.attribute("iyy").as_double(0.0));
+    const Scalar iyz = static_cast<Scalar>(inertia.attribute("iyz").as_double(0.0));
+    const Scalar izz = static_cast<Scalar>(inertia.attribute("izz").as_double(0.0));
+    if (ixx < Scalar(0) || iyy < Scalar(0) || izz < Scalar(0))
+    {
+        return std::unexpected(urdf_error{
+            .kind = urdf_failure::inertial_singular,
+            .detail = "link '" + link_name + "': inertia diagonal must be non-negative",
+            .location = urdf_source_location{file_path, 0, "inertial"}});
+    }
+    out.inertia(0, 0) = ixx;
+    out.inertia(0, 1) = ixy;
+    out.inertia(0, 2) = ixz;
+    out.inertia(1, 0) = ixy;
+    out.inertia(1, 1) = iyy;
+    out.inertia(1, 2) = iyz;
+    out.inertia(2, 0) = ixz;
+    out.inertia(2, 1) = iyz;
+    out.inertia(2, 2) = izz;
+    return out;
+}
+
+}
+
+/// Parse a URDF document from disk into a parsed_model. The model is the
+/// intermediate representation the chain extractor walks; this entry point
+/// does not enforce connectivity or single-leaf invariants. Failure modes:
+///   - urdf_failure::malformed_xml when pugixml rejects the document or the
+///     <robot> root is missing;
+///   - urdf_failure::unsupported_joint_type when a joint's type attribute is
+///     not one of fixed, revolute, continuous, prismatic;
+///   - urdf_failure::unknown_parent_link when a joint's parent link is not in
+///     the link set;
+///   - urdf_failure::mimic_joint_unsupported when a joint declares <mimic>;
+///   - urdf_failure::inertial_singular when an <inertial> element declares a
+///     non-positive mass or a negative diagonal inertia entry.
+template <typename Scalar = double>
+[[nodiscard]] std::expected<parsed_model<Scalar>, urdf_error>
+parse_urdf_file(const std::filesystem::path& path)
+{
+    const std::string path_str = path.string();
+    const std::string file_text = detail::slurp_file(path);
+
+    pugi::xml_document doc;
+    pugi::xml_parse_result result = doc.load_file(path.c_str(), pugi::parse_default, pugi::encoding_auto);
+    if (!result)
+    {
+        return std::unexpected(urdf_error{
+            .kind = urdf_failure::malformed_xml,
+            .detail = std::string{result.description()},
+            .location = urdf_source_location{
+                path_str,
+                detail::offset_to_line(file_text, static_cast<std::ptrdiff_t>(result.offset)),
+                "robot"}});
+    }
+
+    pugi::xml_node robot = doc.child("robot");
+    if (!robot)
+    {
+        return std::unexpected(urdf_error{
+            .kind = urdf_failure::malformed_xml,
+            .detail = "missing <robot> element",
+            .location = urdf_source_location{path_str, 1, "robot"}});
+    }
+
+    parsed_model<Scalar> model{};
+    model.robot_name = robot.attribute("name").as_string();
+
+    // Pass 1: links (and inertials).
+    std::unordered_set<std::string> link_names;
+    for (pugi::xml_node link_node : robot.children("link"))
+    {
+        parsed_link<Scalar> link{};
+        link.name = link_node.attribute("name").as_string();
+        if (link.name.empty())
+        {
+            return std::unexpected(urdf_error{
+                .kind = urdf_failure::malformed_xml,
+                .detail = "<link> missing required name attribute",
+                .location = urdf_source_location{path_str, 0, "link"}});
+        }
+        if (auto inertial = link_node.child("inertial"); inertial)
+        {
+            auto parsed = detail::parse_inertial<Scalar>(inertial, link.name, path_str);
+            if (!parsed.has_value())
+            {
+                return std::unexpected(std::move(parsed.error()));
+            }
+            link.inertial = std::move(parsed.value());
+        }
+        link_names.insert(link.name);
+        model.links.push_back(std::move(link));
+    }
+
+    // Pass 2: joints. Cross-references against link_names collected in pass 1.
+    for (pugi::xml_node joint_node : robot.children("joint"))
+    {
+        parsed_joint<Scalar> joint{};
+        joint.name = joint_node.attribute("name").as_string();
+        if (joint.name.empty())
+        {
+            return std::unexpected(urdf_error{
+                .kind = urdf_failure::malformed_xml,
+                .detail = "<joint> missing required name attribute",
+                .location = urdf_source_location{path_str, 0, "joint"}});
+        }
+        const std::string type_token = joint_node.attribute("type").as_string();
+        auto kind_opt = detail::joint_kind_from_token(type_token);
+        if (!kind_opt.has_value())
+        {
+            return std::unexpected(urdf_error{
+                .kind = urdf_failure::unsupported_joint_type,
+                .detail = "joint '" + joint.name + "' has unsupported type '" + type_token + "'",
+                .location = urdf_source_location{path_str, 0, "joint"}});
+        }
+        joint.kind = *kind_opt;
+
+        if (joint_node.child("mimic"))
+        {
+            return std::unexpected(urdf_error{
+                .kind = urdf_failure::mimic_joint_unsupported,
+                .detail = "joint '" + joint.name + "' declares <mimic>; coupled-joint kinematics is not supported",
+                .location = urdf_source_location{path_str, 0, "joint"}});
+        }
+
+        pugi::xml_node parent = joint_node.child("parent");
+        pugi::xml_node child = joint_node.child("child");
+        if (!parent || !child)
+        {
+            return std::unexpected(urdf_error{
+                .kind = urdf_failure::malformed_xml,
+                .detail = "joint '" + joint.name + "' missing <parent> or <child>",
+                .location = urdf_source_location{path_str, 0, "joint"}});
+        }
+        joint.parent_link = parent.attribute("link").as_string();
+        joint.child_link = child.attribute("link").as_string();
+        if (!link_names.contains(joint.parent_link))
+        {
+            return std::unexpected(urdf_error{
+                .kind = urdf_failure::unknown_parent_link,
+                .detail = "joint '" + joint.name + "' references unknown parent link '" + joint.parent_link + "'",
+                .location = urdf_source_location{path_str, 0, "joint"}});
+        }
+        if (!link_names.contains(joint.child_link))
+        {
+            return std::unexpected(urdf_error{
+                .kind = urdf_failure::unknown_link_reference,
+                .detail = "joint '" + joint.name + "' references unknown child link '" + joint.child_link + "'",
+                .location = urdf_source_location{path_str, 0, "joint"}});
+        }
+
+        if (auto origin = joint_node.child("origin"); origin)
+        {
+            auto pose = detail::parse_origin<Scalar>(origin);
+            if (!pose.has_value())
+            {
+                return std::unexpected(urdf_error{
+                    .kind = urdf_failure::malformed_xml,
+                    .detail = "joint '" + joint.name + "' has malformed <origin>",
+                    .location = urdf_source_location{path_str, 0, "origin"}});
+            }
+            joint.origin = std::move(pose.value());
+        }
+
+        if (auto axis_node = joint_node.child("axis"); axis_node)
+        {
+            vector3<Scalar> axis;
+            if (auto attr = axis_node.attribute("xyz"); attr)
+            {
+                if (!detail::parse_triple<Scalar>(attr.value(), axis))
+                {
+                    return std::unexpected(urdf_error{
+                        .kind = urdf_failure::malformed_xml,
+                        .detail = "joint '" + joint.name + "' has malformed <axis>",
+                        .location = urdf_source_location{path_str, 0, "axis"}});
+                }
+                joint.axis = axis;
+            }
+        }
+
+        if (auto limit = joint_node.child("limit"); limit)
+        {
+            if (auto attr = limit.attribute("lower"); attr)
+            {
+                joint.position_min = static_cast<Scalar>(attr.as_double());
+            }
+            if (auto attr = limit.attribute("upper"); attr)
+            {
+                joint.position_max = static_cast<Scalar>(attr.as_double());
+            }
+            if (auto attr = limit.attribute("velocity"); attr)
+            {
+                joint.velocity_max = static_cast<Scalar>(attr.as_double());
+            }
+            if (auto attr = limit.attribute("effort"); attr)
+            {
+                joint.effort_max = static_cast<Scalar>(attr.as_double());
+            }
+        }
+
+        model.joints.push_back(std::move(joint));
+    }
+
+    return model;
+}
+
+}
+
+#endif

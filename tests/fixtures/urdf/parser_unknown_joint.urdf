@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<robot name="parser_unknown_joint">
+
+  <link name="base_link"/>
+  <link name="link_1"/>
+
+  <joint name="joint_1" type="screw">
+    <parent link="base_link"/>
+    <child link="link_1"/>
+    <origin xyz="0 0 0.1" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+  </joint>
+
+</robot>

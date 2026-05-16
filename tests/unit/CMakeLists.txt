@@ -91,3 +91,10 @@ if(CARTAN_BUILD_TRAC_IK)
     target_include_directories(kdl_fk_comparison_test PRIVATE "${CMAKE_SOURCE_DIR}/benchmarks")
     target_link_libraries(kdl_fk_comparison_test PRIVATE trac_ik)
 endif()
+
+if (CARTAN_BUILD_URDF)
+    cartan_add_test(urdf_parser_test urdf_parser_test.cpp)
+    target_link_libraries(urdf_parser_test PRIVATE cartan::urdf)
+    target_compile_definitions(urdf_parser_test PRIVATE
+        CARTAN_TESTS_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures")
+endif ()

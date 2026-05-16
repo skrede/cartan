@@ -6,3 +6,7 @@ add_subdirectory(cartan-analytical)
 add_library(cartan_all INTERFACE)
 add_library(cartan::cartan ALIAS cartan_all)
 target_link_libraries(cartan_all INTERFACE cartan::lie cartan::serial_chain cartan::analytical)
+
+if (CARTAN_BUILD_URDF)
+    add_subdirectory(cartan-urdf)
+endif ()
