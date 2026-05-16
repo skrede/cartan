@@ -26,7 +26,7 @@ target_link_libraries(_core
     cartan::cartan
 )
 
-target_compile_features(_core PRIVATE cxx_std_23)
+target_compile_features(_core PRIVATE cxx_std_20)
 
 if (TARGET cartan::urdf)
     target_compile_definitions(_core PRIVATE CARTAN_PY_HAS_URDF=1)

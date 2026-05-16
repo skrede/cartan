@@ -7,7 +7,7 @@
 ///        closest-to-seed selection by std::min_element over the populated
 ///        subset of analytical_result::solutions; projected_lm-based
 ///        iterative IK wrapped in basic_ik_runner; std::chrono per-call
-///        timing and std::format columnar output. Demonstrates that "which
+///        timing and std::cout/std::setw columnar output. Demonstrates that "which
 ///        solver wins" depends entirely on what the student optimizes for.
 
 #include "cartan/serial_chain.h"
@@ -15,7 +15,8 @@
 
 #include <vector>
 #include <chrono>
-#include <format>
+#include <iomanip>
+#include <ios>
 #include <random>
 #include <numbers>
 #include <iostream>
@@ -232,7 +233,7 @@ int main()
         //
         // Single-solution path: basic_ik_runner drives projected_lm from
         // q_seed under the same convergence criteria. The runner returns
-        // an std::expected<ik_result, ik_error>; on success the position
+        // an cartan::expected<ik_result, ik_error>; on success the position
         // is verified by re-walking forward kinematics through the
         // returned configuration -- the same back-check the closed-form
         // path runs internally.
@@ -263,24 +264,31 @@ int main()
     const auto cf = summarize(cf_records);
     const auto it = summarize(it_records);
 
-    std::cout << std::format("Race over N = {} FK-walked random targets on KR6 R900\n",
-        N);
-    std::cout << std::format(
-        "{:>20} | {:>10} | {:>10} | {:>14} | {:>13} | {:>16}\n",
-        "solver", "mean_us", "max_us", "mean_pos_err", "success_rate",
-        "multi_solutions");
+    std::cout << "Race over N = " << N
+              << " FK-walked random targets on KR6 R900\n";
+    std::cout << std::right
+              << std::setw(20) << "solver" << " | "
+              << std::setw(10) << "mean_us" << " | "
+              << std::setw(10) << "max_us" << " | "
+              << std::setw(14) << "mean_pos_err" << " | "
+              << std::setw(13) << "success_rate" << " | "
+              << std::setw(16) << "multi_solutions" << "\n";
     std::cout << std::string(20 + 3 + 10 + 3 + 10 + 3 + 14 + 3 + 13 + 3 + 16,
         '-') << "\n";
-    std::cout << std::format(
-        "{:>20} | {:>10.2f} | {:>10.2f} | {:>14.3e} | {:>12.1f}% | {:>16.2f}\n",
-        "pieper_6r_solver",
-        cf.mean_wall_us, cf.max_wall_us, cf.mean_pos_err,
-        cf.success_rate * 100.0, cf.mean_multi_solutions);
-    std::cout << std::format(
-        "{:>20} | {:>10.2f} | {:>10.2f} | {:>14.3e} | {:>12.1f}% | {:>16}\n",
-        "projected_lm",
-        it.mean_wall_us, it.max_wall_us, it.mean_pos_err,
-        it.success_rate * 100.0, "1");
+    std::cout << std::right
+              << std::setw(20) << "pieper_6r_solver" << " | "
+              << std::setw(10) << std::fixed << std::setprecision(2) << cf.mean_wall_us << " | "
+              << std::setw(10) << std::fixed << std::setprecision(2) << cf.max_wall_us << " | "
+              << std::setw(14) << std::scientific << std::setprecision(3) << cf.mean_pos_err << " | "
+              << std::setw(12) << std::fixed << std::setprecision(1) << (cf.success_rate * 100.0) << "% | "
+              << std::setw(16) << std::fixed << std::setprecision(2) << cf.mean_multi_solutions << "\n";
+    std::cout << std::right
+              << std::setw(20) << "projected_lm" << " | "
+              << std::setw(10) << std::fixed << std::setprecision(2) << it.mean_wall_us << " | "
+              << std::setw(10) << std::fixed << std::setprecision(2) << it.max_wall_us << " | "
+              << std::setw(14) << std::scientific << std::setprecision(3) << it.mean_pos_err << " | "
+              << std::setw(12) << std::fixed << std::setprecision(1) << (it.success_rate * 100.0) << "% | "
+              << std::setw(16) << "1" << "\n";
 
     // --- Footer commentary -------------------------------------------------
     //

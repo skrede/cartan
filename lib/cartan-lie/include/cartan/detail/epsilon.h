@@ -21,7 +21,7 @@ struct epsilon_traits
 #else
     static constexpr Scalar sqrt_value = []
     {
-        if consteval
+        if (std::is_constant_evaluated())
         {
             if constexpr (std::is_same_v<Scalar, float>)
                 return 3.4526698e-4f;
