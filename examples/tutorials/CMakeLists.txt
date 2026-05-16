@@ -2,15 +2,19 @@
 # descendants of the feature demos in the parent examples/ directory, and are
 # registered as CTest entries so they double as build-time smoke tests.
 #
-# Tutorial 02 (FK + Jacobians) builds against the core cartan target only and
-# is always built when CARTAN_BUILD_EXAMPLES=ON. Tutorial 01 (URDF walkthrough)
-# additionally requires the URDF loading module and so is gated on
-# CARTAN_BUILD_URDF=ON. The `tutorials` aggregate target depends on whichever
-# tutorial executables are configured in.
+# Tutorials 02 (FK + Jacobians) and 03 (IK composition tradeoff) build against
+# the core cartan target only and are always built when CARTAN_BUILD_EXAMPLES
+# is on. Tutorial 01 (URDF walkthrough) additionally requires the URDF loading
+# module and so is gated on CARTAN_BUILD_URDF=ON. The `tutorials` aggregate
+# target depends on whichever tutorial executables are configured in.
 
 add_executable(02_fk_and_jacobians 02_fk_and_jacobians.cpp)
 target_link_libraries(02_fk_and_jacobians PRIVATE cartan::cartan)
 add_test(NAME tutorial_02_fk_and_jacobians COMMAND 02_fk_and_jacobians)
+
+add_executable(03_ik_composition 03_ik_composition.cpp)
+target_link_libraries(03_ik_composition PRIVATE cartan::cartan)
+add_test(NAME tutorial_03_ik_composition COMMAND 03_ik_composition)
 
 if (CARTAN_BUILD_URDF)
     add_executable(01_urdf_walkthrough 01_urdf_walkthrough.cpp)
@@ -25,7 +29,7 @@ if (CARTAN_BUILD_URDF)
     add_test(NAME tutorial_01_urdf_walkthrough COMMAND 01_urdf_walkthrough)
 
     add_custom_target(tutorials DEPENDS
-        01_urdf_walkthrough 02_fk_and_jacobians)
+        01_urdf_walkthrough 02_fk_and_jacobians 03_ik_composition)
 else ()
-    add_custom_target(tutorials DEPENDS 02_fk_and_jacobians)
+    add_custom_target(tutorials DEPENDS 02_fk_and_jacobians 03_ik_composition)
 endif ()

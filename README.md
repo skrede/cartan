@@ -170,6 +170,7 @@ target_link_libraries(my_app PRIVATE cartan::cartan)
 - [Getting Started](docs/getting-started.md) -- zero to compiling in 5 minutes
 - [Documentation Index](docs/README.md) -- API reference, background theory, guides
 - [Examples](examples/) -- runnable programs for every feature area
+- [Tutorials](examples/tutorials/) -- step-by-step walkthroughs for FK, Jacobians, IK, and URDF loading
 
 ## Contributing
 
