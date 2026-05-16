@@ -19,3 +19,22 @@ __all__ = [
     "__version__",
     "forward_kinematics",
 ]
+
+try:
+    from ._core import (
+        UrdfError,
+        UrdfFailure,
+        UrdfLoadResult,
+        UrdfMetadata,
+        load_urdf,
+    )
+
+    __all__ += [
+        "UrdfError",
+        "UrdfFailure",
+        "UrdfLoadResult",
+        "UrdfMetadata",
+        "load_urdf",
+    ]
+except ImportError:
+    pass

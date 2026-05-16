@@ -9,4 +9,5 @@ target_link_libraries(cartan_all INTERFACE cartan::lie cartan::serial_chain cart
 
 if (CARTAN_BUILD_URDF)
     add_subdirectory(cartan-urdf)
+    target_link_libraries(cartan_all INTERFACE cartan::urdf)
 endif ()

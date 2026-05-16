@@ -31,3 +31,4 @@ wheel.packages = ["python/cartan"]
 
 [tool.scikit-build.cmake.define]
 CARTAN_BUILD_PYTHON = "ON"
+CARTAN_BUILD_URDF = "ON"

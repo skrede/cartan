@@ -28,4 +28,8 @@ target_link_libraries(_core
 
 target_compile_features(_core PRIVATE cxx_std_23)
 
+if (TARGET cartan::urdf)
+    target_compile_definitions(_core PRIVATE CARTAN_PY_HAS_URDF=1)
+endif ()
+
 install(TARGETS _core LIBRARY DESTINATION cartan)
