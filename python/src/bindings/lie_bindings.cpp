@@ -42,7 +42,22 @@ void register_lie(nb::module_& m)
         .def("__mul__",
              [](const SO3d& a, const SO3d& b) -> SO3d {
                  return a * b;
-             });
+             })
+        .def_static("from_matrix",
+            [](const nb::DRef<const cartan::matrix3<double>>& R) -> SO3d {
+                auto r = SO3d::from_matrix(R);
+                if (!r) throw nb::value_error(r.error().c_str());
+                return *std::move(r);
+            },
+            "Construct an SO(3) from a 3x3 rotation matrix. "
+            "Raises ValueError if R is not orthogonal or has det != 1.",
+            nb::arg("R").noconvert())
+        .def("adjoint",
+            [](const SO3d& self) -> cartan::matrix3<double> {
+                return self.matrix();
+            },
+            "SO(3) adjoint -- equal to the rotation matrix itself "
+            "(Lynch & Park Eq. 3.84).");
 
     nb::class_<SE3d>(m, "SE3", "Rigid-body transformation group element")
         .def_static("identity", &SE3d::identity)
@@ -65,7 +80,22 @@ void register_lie(nb::module_& m)
         .def("__mul__",
              [](const SE3d& a, const SE3d& b) -> SE3d {
                  return a * b;
-             });
+             })
+        .def_static("from_matrix",
+            [](const nb::DRef<const cartan::matrix4<double>>& T) -> SE3d {
+                auto r = SE3d::from_matrix(T);
+                if (!r) throw nb::value_error(r.error().c_str());
+                return *std::move(r);
+            },
+            "Construct an SE(3) from a 4x4 homogeneous transformation matrix. "
+            "Raises ValueError if T is not a valid rigid-body transform.",
+            nb::arg("T").noconvert())
+        .def_prop_ro("translation",
+            [](const SE3d& self) { return cartan::vector3<double>(self.translation()); },
+            "Translation component as a (3,) numpy array (copy).")
+        .def_prop_ro("rotation",
+            [](const SE3d& self) { return SO3d(self.rotation()); },
+            "Rotation component as a cartan.SO3 (copy).");
 }
 
 }
