@@ -128,4 +128,18 @@ TEST_CASE("urdf parity: iiwa14 URDF matches make_iiwa14_chain_extended at 1e-12"
     check_parity(urdf_path, truth, 104ULL);
 }
 
+TEST_CASE("urdf parity: Panda URDF matches make_panda_chain_extended at 1e-12", "[urdf_parity][extended]")
+{
+    const fs::path urdf_path = fs::path{CARTAN_TESTS_FIXTURE_DIR} / "urdf" / "extended" / "panda.urdf";
+    auto truth = cartan::fixtures::make_panda_chain_extended<double>();
+    check_parity(urdf_path, truth, 200ULL);
+}
+
+TEST_CASE("urdf parity: iiwa7 URDF matches make_lbr_iiwa7_chain_extended at 1e-12", "[urdf_parity][extended]")
+{
+    const fs::path urdf_path = fs::path{CARTAN_TESTS_FIXTURE_DIR} / "urdf" / "extended" / "iiwa7.urdf";
+    auto truth = cartan::fixtures::make_lbr_iiwa7_chain_extended<double>();
+    check_parity(urdf_path, truth, 201ULL);
+}
+
 #endif

@@ -176,6 +176,23 @@ build_chain(const parsed_model<Scalar>& model, const load_options& opts = {})
         return child_it == outgoing.end() || child_it->second.empty();
     };
 
+    // A "self-collision wrapper" leaf is a fixed leaf whose child link's name
+    // matches the convention `{parent_link_name}_sc` (the parent link is the
+    // current walk node). The Franka Panda URDF attaches such wrappers to
+    // every chain link to carry separate self-collision sphere/capsule meshes;
+    // they are kinematic dead weight and must not compete with the genuine
+    // tool-offset leaf when the walk reaches the final mobile joint. The rule
+    // is structural rather than name-pattern-only: it triggers only when the
+    // suffix `_sc` is appended verbatim to the parent link name, so unrelated
+    // links whose names happen to contain `_sc` are unaffected.
+    auto is_self_collision_wrapper_leaf =
+        [&](std::size_t idx, const std::string& parent_link) {
+            if (!is_leaf_outgoing(idx)) { return false; }
+            const std::string& child = model.joints[idx].child_link;
+            const std::string expected = parent_link + "_sc";
+            return child == expected;
+        };
+
     while (true)
     {
         if (!opts.tool_link.empty() && current == opts.tool_link)
@@ -211,11 +228,32 @@ build_chain(const parsed_model<Scalar>& model, const load_options& opts = {})
         {
             // All outgoing joints are fixed leaves. A single leaf is treated
             // as a trailing tool offset and folded into the accumulator;
-            // multiple leaves are ambiguous (no canonical pick of which tool
-            // frame is "the" tool) and terminate the walk at the current link.
+            // when multiple leaves are present, partition them into
+            // self-collision wrappers and "other" leaves and fold an unique
+            // "other" leaf as the trailing tool offset (the Franka Panda
+            // attaches up to seven `_sc` wrappers alongside the actual
+            // `panda_joint8` tool offset at link7). A genuine ambiguity (zero
+            // or several non-wrapper leaves) terminates the walk at the
+            // current link without folding any of them, leaving the caller's
+            // explicit `tool_link` override as the disambiguation path.
             if (outs.size() == 1)
             {
                 const auto& fixed_joint = model.joints[outs[0]];
+                T_acc = T_acc * fixed_joint.origin;
+                current = fixed_joint.child_link;
+                continue;
+            }
+            std::size_t other_leaf_count = 0;
+            std::size_t other_leaf_idx = outs.size();
+            for (std::size_t idx : outs)
+            {
+                if (is_self_collision_wrapper_leaf(idx, current)) { continue; }
+                ++other_leaf_count;
+                other_leaf_idx = idx;
+            }
+            if (other_leaf_count == 1)
+            {
+                const auto& fixed_joint = model.joints[other_leaf_idx];
                 T_acc = T_acc * fixed_joint.origin;
                 current = fixed_joint.child_link;
                 continue;

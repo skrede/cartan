@@ -1149,6 +1149,132 @@ auto make_iiwa14_chain_extended() -> cartan::kinematic_chain<Scalar, cartan::dyn
     return chain_static.to_dynamic();
 }
 
+/// Hand-coded ground-truth chain matching the vendored
+/// tests/fixtures/urdf/extended/panda.urdf. The screw axes were derived by
+/// walking the vendored URDF's joint tree from panda_link0 to the
+/// panda_link8 flange, composing the per-joint rpy rotations into the
+/// cumulative base frame and folding the panda_joint8 trailing fixed offset
+/// into the home pose (the same procedure cartan::urdf::build_chain executes
+/// after the multi-fixed-leaf disambiguation that skips the seven
+/// `panda_link{N}_sc` self-collision wrapper sublinks). The chain therefore
+/// reproduces the float64 noise inherited from xacro's exact half-pi
+/// arithmetic verbatim so the 1e-12 parity gate holds. The per-joint limits
+/// preserve the asymmetric ranges declared in the vendored URDF (joint_4 and
+/// joint_6 each have one-sided bounds on the Panda hardware).
+template <typename Scalar = double>
+auto make_panda_chain_extended() -> cartan::kinematic_chain<Scalar, cartan::dynamic>
+{
+    using vec3 = cartan::vector3<Scalar>;
+    using mat3 = cartan::matrix3<Scalar>;
+
+    auto s1 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(0), Scalar(1)),
+        vec3(Scalar(0), Scalar(0), Scalar(0.33300000000000002)));
+    auto s2 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(1), Scalar(6.123233995736766e-17)),
+        vec3(Scalar(0), Scalar(0), Scalar(0.33300000000000002)));
+    auto s3 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(0), Scalar(1)),
+        vec3(Scalar(0), Scalar(-1.9349419426528181e-17), Scalar(0.64900000000000002)));
+    auto s4 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(-1), Scalar(6.123233995736766e-17)),
+        vec3(Scalar(0.082500000000000004), Scalar(-1.9349419426528181e-17), Scalar(0.64900000000000002)));
+    auto s5 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(0), Scalar(1)),
+        vec3(Scalar(0), Scalar(4.1637991171010009e-18), Scalar(1.0329999999999999)));
+    auto s6 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(-1), Scalar(6.123233995736766e-17)),
+        vec3(Scalar(0), Scalar(4.1637991171010009e-18), Scalar(1.0329999999999999)));
+    auto s7 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(-1.2246467991473532e-16), Scalar(-1)),
+        vec3(Scalar(0.087999999999999995), Scalar(4.1637991171010009e-18), Scalar(1.0329999999999999)));
+
+    mat3 R_home;
+    R_home << Scalar(1), Scalar(0), Scalar(0),
+              Scalar(0), Scalar(-1), Scalar(-1.2246467991473532e-16),
+              Scalar(0), Scalar(1.2246467991473532e-16), Scalar(-1);
+    vec3 p_home(Scalar(0.087999999999999995), Scalar(-8.9399216337756786e-18), Scalar(0.92599999999999993));
+    auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::from_matrix(R_home).value(), p_home);
+
+    // Per-joint limits as declared in the vendored URDF.
+    cartan::joint_limits<Scalar> lim1{Scalar(-2.8973), Scalar(2.8973)};
+    cartan::joint_limits<Scalar> lim2{Scalar(-1.7628), Scalar(1.7628)};
+    cartan::joint_limits<Scalar> lim3{Scalar(-2.8973), Scalar(2.8973)};
+    cartan::joint_limits<Scalar> lim4{Scalar(-3.0718), Scalar(-0.0698)};
+    cartan::joint_limits<Scalar> lim5{Scalar(-2.8973), Scalar(2.8973)};
+    cartan::joint_limits<Scalar> lim6{Scalar(-0.0175), Scalar(3.7525)};
+    cartan::joint_limits<Scalar> lim7{Scalar(-2.8973), Scalar(2.8973)};
+
+    auto chain_static = cartan::kinematic_chain<Scalar, 7>(
+        home,
+        {s1, s2, s3, s4, s5, s6, s7},
+        {lim1, lim2, lim3, lim4, lim5, lim6, lim7});
+    return chain_static.to_dynamic();
+}
+
+/// Hand-coded ground-truth chain matching the vendored
+/// tests/fixtures/urdf/extended/iiwa7.urdf. The screw axes were derived by
+/// walking the URDF's joint tree from the world frame through the
+/// world_iiwa_joint fixed pass-through, the seven iiwa_joint_{1..7} mobile
+/// joints, and the trailing iiwa_joint_ee fixed offset (45 mm flange) to
+/// iiwa_link_ee, composing the per-joint rpy rotations into the cumulative
+/// base frame. The chain reproduces the float64 noise inherited from xacro's
+/// exact half-pi arithmetic verbatim so the 1e-12 parity gate holds. All
+/// seven mobile joints are about z in the local link frame; the cumulative
+/// rpy stack rotates them in alternating y/z patterns when projected back to
+/// the base frame.
+template <typename Scalar = double>
+auto make_lbr_iiwa7_chain_extended() -> cartan::kinematic_chain<Scalar, cartan::dynamic>
+{
+    using vec3 = cartan::vector3<Scalar>;
+    using mat3 = cartan::matrix3<Scalar>;
+
+    auto s1 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(0), Scalar(1)),
+        vec3(Scalar(0), Scalar(0), Scalar(0.14999999999999999)));
+    auto s2 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(1.2246467991473532e-16), Scalar(1), Scalar(6.123233995736766e-17)),
+        vec3(Scalar(0), Scalar(0), Scalar(0.33999999999999997)));
+    auto s3 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(-1.2246467991473532e-16), Scalar(1.2325951644078309e-32), Scalar(1)),
+        vec3(Scalar(-1.5747477717949504e-33), Scalar(-1.2858791391047208e-17), Scalar(0.54999999999999993)));
+    auto s4 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(-1.2246467991473532e-16), Scalar(-1), Scalar(6.123233995736766e-17)),
+        vec3(Scalar(-2.3268289183799715e-17), Scalar(-1.2858791391047205e-17), Scalar(0.73999999999999999)));
+    auto s5 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(-1.2246467991473532e-16), Scalar(1.2246467991473535e-16), Scalar(1)),
+        vec3(Scalar(-4.8985871965894131e-17), Scalar(6.1629758220391547e-33), Scalar(0.94999999999999996)));
+    auto s6 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(2.4492935982947064e-16), Scalar(1), Scalar(-6.1232339957367636e-17)),
+        vec3(Scalar(-8.7121373291342709e-17), Scalar(-0.060699999999999976), Scalar(1.1399999999999999)));
+    auto s7 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(-1.2246467991473537e-16), Scalar(2.4651903288156619e-32), Scalar(1)),
+        vec3(Scalar(-8.2173800222787403e-17), Scalar(2.7755575615628914e-17), Scalar(1.2209999999999999)));
+
+    mat3 R_home;
+    R_home << Scalar(1), Scalar(3.6739403974420594e-16), Scalar(-1.2246467991473537e-16),
+              Scalar(-3.6739403974420594e-16), Scalar(1), Scalar(2.4651903288156619e-32),
+              Scalar(1.2246467991473532e-16), Scalar(3.6977854932234928e-32), Scalar(1);
+    vec3 p_home(Scalar(-8.7684710818950493e-17), Scalar(2.7755575615628914e-17), Scalar(1.2659999999999998));
+    auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::from_matrix(R_home).value(), p_home);
+
+    // Per-joint limits as declared in the vendored URDF (symmetric ranges,
+    // joints 1/3/5 at +/-170 deg, joints 2/4/6 at +/-120 deg, joint 7 at
+    // +/-175 deg, expressed in radians).
+    cartan::joint_limits<Scalar> lim_170{
+        Scalar(-2.9670597283903604), Scalar(+2.9670597283903604)};
+    cartan::joint_limits<Scalar> lim_120{
+        Scalar(-2.0943951023931953), Scalar(+2.0943951023931953)};
+    cartan::joint_limits<Scalar> lim_175{
+        Scalar(-3.0543261909900763), Scalar(+3.0543261909900763)};
+
+    auto chain_static = cartan::kinematic_chain<Scalar, 7>(
+        home,
+        {s1, s2, s3, s4, s5, s6, s7},
+        {lim_170, lim_120, lim_170, lim_120, lim_170, lim_120, lim_175});
+    return chain_static.to_dynamic();
+}
+
 #endif
 
 }
