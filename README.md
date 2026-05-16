@@ -159,11 +159,39 @@ find_package(cartan CONFIG REQUIRED)
 target_link_libraries(my_app PRIVATE cartan::cartan)
 ```
 
+### ESP-IDF Component Manager
+
+Cartan ships an `idf_component.yml` at the repo root. Add it to your firmware
+project's `main/idf_component.yml` once it is published to the ESP Component
+Registry, or pin a Git revision directly:
+
+```yaml
+dependencies:
+  skrede/cartan:
+    git: https://github.com/skrede/cartan.git
+    version: "main"
+```
+
+A compile-only smoke test under `tests/embedded/esp32-smoke/` verifies the
+public headers build under xtensa-esp32-elf and riscv32-esp-elf; see that
+directory's README for the `idf.py build` recipe.
+
+### Arduino IDE (manual install)
+
+Cartan ships a `library.properties` at the repo root. Clone or copy the
+repository into your Arduino `libraries/` directory (typically
+`~/Documents/Arduino/libraries/cartan/`), then `#include <cartan/lie.h>` from
+a sketch targeted at ESP32, Teensy 4.x, or RP2040. Classic Arduino AVR boards
+(Uno, Mega, Nano) are unsupported — cartan requires a modern C++20 compiler
+and Eigen, neither of which fit on an AVR.
+
 ## Requirements
 
-- C++23 compiler: GCC 14+, Clang 18+, MSVC 17.10+
+- C++20 compiler: GCC 10+, Clang 13+, MSVC 17.x+
 - CMake 3.28+
 - Eigen 3.4+ (auto-fetched via FetchContent)
+- For embedded targets: ESP-IDF 5.1+, or any Arduino board package whose
+  toolchain offers a C++20 GCC backend (esp32, teensy, rp2040).
 
 ## Documentation
 
