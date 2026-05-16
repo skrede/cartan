@@ -55,7 +55,7 @@ struct ik_request
 
 struct ik_response
 {
-    std::expected<cartan::ik_result<double, 7>, cartan::ik_error<double, 7>> result;
+    cartan::expected<cartan::ik_result<double, 7>, cartan::ik_error<double, 7>> result;
     std::chrono::microseconds solve_time;
 };
 

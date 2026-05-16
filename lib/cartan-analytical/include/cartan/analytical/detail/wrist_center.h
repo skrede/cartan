@@ -10,7 +10,7 @@
 #include "cartan/types.h"
 
 #include <cmath>
-#include <expected>
+#include "cartan/expected.h"
 
 namespace cartan::detail
 {
@@ -83,7 +83,7 @@ template <typename Scalar>
 /// three pairwise distances are below tolerance, the intersection point
 /// is the average of the three pairwise closest points.
 template <typename Scalar>
-[[nodiscard]] std::expected<vector3<Scalar>, analytical_failure>
+[[nodiscard]] cartan::expected<vector3<Scalar>, analytical_failure>
 find_wrist_intersection(
     const screw_axis<Scalar>& axis4,
     const screw_axis<Scalar>& axis5,
@@ -120,7 +120,7 @@ find_wrist_intersection(
 
     // All pairwise distances must be within tolerance
     if (p45.distance > tolerance || p46.distance > tolerance || p56.distance > tolerance)
-        return std::unexpected(analytical_failure::degenerate_geometry);
+        return cartan::unexpected(analytical_failure::degenerate_geometry);
 
     // Average only over non-parallel pairs
     vector3<Scalar> sum = vector3<Scalar>::Zero();
@@ -134,7 +134,7 @@ find_wrist_intersection(
         // All three axes are parallel -- they cannot intersect at a point
         // unless they are all identical, in which case any point suffices.
         // This is a degenerate configuration for a wrist.
-        return std::unexpected(analytical_failure::degenerate_geometry);
+        return cartan::unexpected(analytical_failure::degenerate_geometry);
     }
 
     return sum / Scalar(count);

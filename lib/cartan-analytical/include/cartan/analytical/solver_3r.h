@@ -13,7 +13,7 @@
 #include "cartan/detail/epsilon.h"
 
 #include <cmath>
-#include <expected>
+#include "cartan/expected.h"
 
 namespace cartan
 {
@@ -56,7 +56,7 @@ public:
         m_p_ee = chain.home().translation();
     }
 
-    [[nodiscard]] std::expected<
+    [[nodiscard]] cartan::expected<
         analytical_result<Scalar, 3, 4>,
         analytical_error<Scalar>>
     solve(const se3<Scalar>& target) const
@@ -77,7 +77,7 @@ public:
         auto sp3_result = paden_kahan_3(m_omega[2], m_q[2], m_p_ee, r, delta);
         if (!sp3_result)
         {
-            return std::unexpected(analytical_error<Scalar>{
+            return cartan::unexpected(analytical_error<Scalar>{
                 sp3_result.error(),
                 (p_target - m_p_ee).norm()});
         }
@@ -119,7 +119,7 @@ public:
         if (result.count > 0)
             return result;
 
-        return std::unexpected(analytical_error<Scalar>{
+        return cartan::unexpected(analytical_error<Scalar>{
             analytical_failure::verification_failed,
             (p_target - m_p_ee).norm()});
     }

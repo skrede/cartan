@@ -9,7 +9,7 @@
 #include <cmath>
 #include <string>
 #include <cassert>
-#include <expected>
+#include "cartan/expected.h"
 
 namespace cartan
 {
@@ -95,9 +95,9 @@ public:
 
     /// Construct from 2x2 rotation matrix with validation (D-09).
     /// Checks orthogonality (R^T * R ~= I) and det(R) ~= 1.
-    /// Returns std::unexpected with message on failure.
+    /// Returns cartan::unexpected with message on failure.
     /// Reference: Rotation matrix properties, Lynch & Park, p. 23-24.
-    [[nodiscard]] static std::expected<so2, std::string>
+    [[nodiscard]] static cartan::expected<so2, std::string>
     from_matrix(const matrix2<Scalar>& R)
     {
         Scalar tol = detail::sqrt_epsilon_v<Scalar>;
@@ -106,14 +106,14 @@ public:
         matrix2<Scalar> RtR = R.transpose() * R;
         if ((RtR - matrix2<Scalar>::Identity()).norm() > tol)
         {
-            return std::unexpected("Matrix is not orthogonal: R^T * R deviates from identity");
+            return cartan::unexpected("Matrix is not orthogonal: R^T * R deviates from identity");
         }
 
         // Check determinant ~= +1 (not a reflection)
         Scalar det = R.determinant();
         if (std::abs(det - Scalar(1)) > tol)
         {
-            return std::unexpected("Matrix has determinant != 1: not a proper rotation");
+            return cartan::unexpected("Matrix has determinant != 1: not a proper rotation");
         }
 
         return so2(R(0, 0), R(1, 0));

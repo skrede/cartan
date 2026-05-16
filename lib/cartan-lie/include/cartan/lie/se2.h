@@ -9,7 +9,7 @@
 
 #include <cmath>
 #include <string>
-#include <expected>
+#include "cartan/expected.h"
 
 namespace cartan
 {
@@ -171,7 +171,7 @@ public:
     /// Construct from 3x3 homogeneous matrix with validation (D-09).
     /// Validates rotation block is SO(2) and bottom row is [0, 0, 1].
     /// Reference: SE(2) matrix structure, Lynch & Park, p. 86.
-    [[nodiscard]] static std::expected<se2, std::string>
+    [[nodiscard]] static cartan::expected<se2, std::string>
     from_matrix(const Eigen::Matrix<Scalar, 3, 3>& T)
     {
         Scalar tol = detail::sqrt_epsilon_v<Scalar>;
@@ -180,7 +180,7 @@ public:
         if (std::abs(T(2, 0)) > tol || std::abs(T(2, 1)) > tol ||
             std::abs(T(2, 2) - Scalar(1)) > tol)
         {
-            return std::unexpected("Bottom row is not [0, 0, 1]");
+            return cartan::unexpected("Bottom row is not [0, 0, 1]");
         }
 
         // Validate rotation block
@@ -188,7 +188,7 @@ public:
         auto rot_result = so2<Scalar, Policy>::from_matrix(R);
         if (!rot_result.has_value())
         {
-            return std::unexpected("Rotation block invalid: " + rot_result.error());
+            return cartan::unexpected("Rotation block invalid: " + rot_result.error());
         }
 
         vector2<Scalar> trans = T.template block<2, 1>(0, 2);

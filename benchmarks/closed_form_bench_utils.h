@@ -6,7 +6,7 @@
 ///
 /// Provides three things needed by the closed-form-vs-iterative driver TU:
 ///   1. closest_to_seed: selects the argmin_q ||q - q_seed||_2 from an
-///      analytical_result, returning it as a std::expected so the call site
+///      analytical_result, returning it as a cartan::expected so the call site
 ///      can fail through with the unchanged analytical_error path when the
 ///      solver returned zero solutions.
 ///   2. compute_bounding_box / bbox_target_set: a uniform bounding-box
@@ -32,7 +32,7 @@
 #include <random>
 #include <vector>
 #include <limits>
-#include <expected>
+#include "cartan/expected.h"
 #include <algorithm>
 
 namespace cartan::fixtures
@@ -44,12 +44,12 @@ namespace cartan::fixtures
 /// ||q - q_seed||_2 (compared via squared norm). Returns the unchanged
 /// analytical error path with `analytical_failure::unreachable` if `r.count == 0`
 /// — defensive guard; upstream analytical solvers normally surface this case
-/// via `std::unexpected` directly.
+/// via `cartan::unexpected` directly.
 template <typename Scalar, int N, int MaxSolutions>
 [[nodiscard]] auto closest_to_seed(
     const cartan::analytical_result<Scalar, N, MaxSolutions>& r,
     const Eigen::Vector<Scalar, N>& q_seed)
-    -> std::expected<Eigen::Vector<Scalar, N>, cartan::analytical_error<Scalar>>
+    -> cartan::expected<Eigen::Vector<Scalar, N>, cartan::analytical_error<Scalar>>
 {
     auto it = std::min_element(
         r.begin(), r.end(),
@@ -60,7 +60,7 @@ template <typename Scalar, int N, int MaxSolutions>
 
     if (it == r.end())
     {
-        return std::unexpected(cartan::analytical_error<Scalar>{
+        return cartan::unexpected(cartan::analytical_error<Scalar>{
             cartan::analytical_failure::unreachable, Scalar(0)});
     }
 

@@ -31,7 +31,7 @@ concept analytical_solver = requires
     const se3<typename S::scalar_type>& target)
 {
     { s.solve(target) } -> std::same_as<
-        std::expected<
+        cartan::expected<
             analytical_result<typename S::scalar_type, S::joints, S::max_solutions>,
             analytical_error<typename S::scalar_type>>>;
 };

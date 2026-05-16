@@ -2,7 +2,7 @@
 /// @brief Single IK solve with Levenberg-Marquardt solver on a 3-DOF planar arm.
 ///
 /// Shows: kinematic_chain construction, basic_ik_runner with ik::lm,
-/// std::expected result handling, FK verification of the IK solution.
+/// cartan::expected result handling, FK verification of the IK solution.
 
 #include "cartan/serial_chain.h"
 

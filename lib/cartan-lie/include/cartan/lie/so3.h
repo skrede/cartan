@@ -11,7 +11,7 @@
 #include <string>
 #include <cassert>
 #include <utility>
-#include <expected>
+#include "cartan/expected.h"
 
 namespace cartan
 {
@@ -258,7 +258,7 @@ public:
     /// Construct from 3x3 rotation matrix with validation (D-09).
     /// Checks R^T*R ~= I and det(R) ~= 1.
     /// Ref: Rotation matrix properties, Lynch & Park, Modern Robotics, p. 23-24.
-    [[nodiscard]] static std::expected<so3, std::string>
+    [[nodiscard]] static cartan::expected<so3, std::string>
     from_matrix(const matrix3<Scalar>& R)
     {
         Scalar tol = detail::sqrt_epsilon_v<Scalar>;
@@ -266,12 +266,12 @@ public:
         matrix3<Scalar> RtR = R.transpose() * R;
         if ((RtR - matrix3<Scalar>::Identity()).norm() > tol)
         {
-            return std::unexpected("Matrix is not orthogonal: R^T * R deviates from identity");
+            return cartan::unexpected("Matrix is not orthogonal: R^T * R deviates from identity");
         }
 
         if (std::abs(R.determinant() - Scalar(1)) > tol)
         {
-            return std::unexpected("Matrix has determinant != 1: not a proper rotation");
+            return cartan::unexpected("Matrix has determinant != 1: not a proper rotation");
         }
 
         quaternion<Scalar> q(R);
@@ -280,12 +280,12 @@ public:
 
     /// Construct from quaternion with validation (D-09).
     /// Checks ||q|| ~= 1.
-    [[nodiscard]] static std::expected<so3, std::string>
+    [[nodiscard]] static cartan::expected<so3, std::string>
     from_quaternion(const quaternion<Scalar>& q)
     {
         if (std::abs(q.squaredNorm() - Scalar(1)) > detail::sqrt_epsilon_v<Scalar>)
         {
-            return std::unexpected("Quaternion is not unit: ||q||^2 deviates from 1");
+            return cartan::unexpected("Quaternion is not unit: ||q||^2 deviates from 1");
         }
 
         return so3(q);

@@ -17,7 +17,7 @@
 
 #include <array>
 #include <cmath>
-#include <expected>
+#include "cartan/expected.h"
 #include <numbers>
 #include <tuple>
 
@@ -80,14 +80,14 @@ public:
         m_p_ee = chain.home().translation();
     }
 
-    [[nodiscard]] std::expected<
+    [[nodiscard]] cartan::expected<
         analytical_result<Scalar, 6, 8>,
         analytical_error<Scalar>>
     solve(const se3<Scalar>& target) const
     {
         if (!m_valid)
         {
-            return std::unexpected(analytical_error<Scalar>{
+            return cartan::unexpected(analytical_error<Scalar>{
                 analytical_failure::degenerate_geometry, Scalar(0)});
         }
 
@@ -110,7 +110,7 @@ public:
 
         if (!sp3_result)
         {
-            return std::unexpected(analytical_error<Scalar>{
+            return cartan::unexpected(analytical_error<Scalar>{
                 sp3_result.error(),
                 (p_wrist - m_p_ee).norm()});
         }
@@ -169,7 +169,7 @@ public:
         if (result.count > 0)
             return result;
 
-        return std::unexpected(analytical_error<Scalar>{
+        return cartan::unexpected(analytical_error<Scalar>{
             analytical_failure::unreachable,
             (p_wrist - m_wrist_center_home).norm()});
     }

@@ -14,7 +14,7 @@
 
 #include <cmath>
 #include <string>
-#include <expected>
+#include "cartan/expected.h"
 
 namespace cartan
 {
@@ -46,7 +46,7 @@ public:
     /// Construct from a 6-vector (omega, v) with unit constraint validation.
     /// Revolute (||omega|| > 0): requires ||omega|| = 1.
     /// Prismatic (omega = 0): requires ||v|| = 1.
-    [[nodiscard]] static std::expected<screw_axis, std::string> from_vector(
+    [[nodiscard]] static cartan::expected<screw_axis, std::string> from_vector(
         const vector6<Scalar>& vec)
     {
         vector3<Scalar> omega = vec.template head<3>();
@@ -59,7 +59,7 @@ public:
             // Revolute: ||omega|| must be 1
             if (std::abs(omega_norm - Scalar(1)) > detail::sqrt_epsilon_v<Scalar>)
             {
-                return std::unexpected(
+                return cartan::unexpected(
                     "Revolute screw axis requires ||omega|| = 1, got "
                     + std::to_string(static_cast<double>(omega_norm)));
             }
@@ -70,7 +70,7 @@ public:
         Scalar v_norm = v.norm();
         if (std::abs(v_norm - Scalar(1)) > detail::sqrt_epsilon_v<Scalar>)
         {
-            return std::unexpected(
+            return cartan::unexpected(
                 "Prismatic screw axis requires ||v|| = 1, got "
                 + std::to_string(static_cast<double>(v_norm)));
         }

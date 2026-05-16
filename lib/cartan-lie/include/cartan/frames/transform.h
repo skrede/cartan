@@ -5,7 +5,7 @@
 #include "cartan/lie/policy.h"
 
 #include <string>
-#include <expected>
+#include "cartan/expected.h"
 
 namespace cartan
 {
@@ -72,13 +72,13 @@ struct transform
     }
 
     /// Construct from 4x4 homogeneous matrix with validation.
-    [[nodiscard]] static std::expected<transform, std::string>
+    [[nodiscard]] static cartan::expected<transform, std::string>
     from_matrix(const matrix4<Scalar>& T)
     {
         auto result = se3<Scalar, Policy>::from_matrix(T);
         if (!result.has_value())
         {
-            return std::unexpected(result.error());
+            return cartan::unexpected(result.error());
         }
         return transform{result.value()};
     }

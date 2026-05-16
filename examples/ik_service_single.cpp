@@ -47,7 +47,7 @@ struct ik_request
 
 struct ik_response
 {
-    std::expected<cartan::ik_result<double, 6>, cartan::ik_error<double, 6>> result;
+    cartan::expected<cartan::ik_result<double, 6>, cartan::ik_error<double, 6>> result;
 };
 
 // --- Single-threaded IK service ---

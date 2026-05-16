@@ -28,7 +28,7 @@
 #include <vector>
 #include <limits>
 #include <utility>
-#include <expected>
+#include "cartan/expected.h"
 #include <algorithm>
 #include <unordered_map>
 
@@ -101,7 +101,7 @@ collect_roots(const parsed_model<Scalar>& model,
 /// that link instead of the auto-detected root; when tool_link is set, the
 /// walk stops once it reaches that link.
 template <typename Scalar = double>
-[[nodiscard]] std::expected<urdf_load_result<Scalar>, urdf_error>
+[[nodiscard]] cartan::expected<urdf_load_result<Scalar>, urdf_error>
 build_chain(const parsed_model<Scalar>& model, const load_options& opts = {})
 {
     // Validate overrides against the link set up front so the caller gets the
@@ -112,14 +112,14 @@ build_chain(const parsed_model<Scalar>& model, const load_options& opts = {})
     };
     if (!opts.base_link.empty() && !link_exists(opts.base_link))
     {
-        return std::unexpected(urdf_error{
+        return cartan::unexpected(urdf_error{
             .kind = urdf_failure::link_not_found,
             .detail = opts.base_link,
             .location = std::nullopt});
     }
     if (!opts.tool_link.empty() && !link_exists(opts.tool_link))
     {
-        return std::unexpected(urdf_error{
+        return cartan::unexpected(urdf_error{
             .kind = urdf_failure::link_not_found,
             .detail = opts.tool_link,
             .location = std::nullopt});
@@ -147,7 +147,7 @@ build_chain(const parsed_model<Scalar>& model, const load_options& opts = {})
             detail_msg += roots[i];
         }
         detail_msg += "]";
-        return std::unexpected(urdf_error{
+        return cartan::unexpected(urdf_error{
             .kind = urdf_failure::branched_kinematic_tree,
             .detail = std::move(detail_msg),
             .location = std::nullopt});
@@ -275,7 +275,7 @@ build_chain(const parsed_model<Scalar>& model, const load_options& opts = {})
                 first = false;
             }
             detail_msg += "]";
-            return std::unexpected(urdf_error{
+            return cartan::unexpected(urdf_error{
                 .kind = urdf_failure::branched_kinematic_tree,
                 .detail = std::move(detail_msg),
                 .location = std::nullopt});

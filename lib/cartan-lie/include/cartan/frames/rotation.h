@@ -5,7 +5,7 @@
 #include "cartan/lie/policy.h"
 
 #include <string>
-#include <expected>
+#include "cartan/expected.h"
 
 namespace cartan
 {
@@ -67,25 +67,25 @@ struct rotation
     }
 
     /// Construct from 3x3 rotation matrix with validation.
-    [[nodiscard]] static std::expected<rotation, std::string>
+    [[nodiscard]] static cartan::expected<rotation, std::string>
     from_matrix(const matrix3<Scalar>& R)
     {
         auto result = so3<Scalar, Policy>::from_matrix(R);
         if (!result.has_value())
         {
-            return std::unexpected(result.error());
+            return cartan::unexpected(result.error());
         }
         return rotation{result.value()};
     }
 
     /// Construct from quaternion with validation.
-    [[nodiscard]] static std::expected<rotation, std::string>
+    [[nodiscard]] static cartan::expected<rotation, std::string>
     from_quaternion(const quaternion<Scalar>& q)
     {
         auto result = so3<Scalar, Policy>::from_quaternion(q);
         if (!result.has_value())
         {
-            return std::unexpected(result.error());
+            return cartan::unexpected(result.error());
         }
         return rotation{result.value()};
     }

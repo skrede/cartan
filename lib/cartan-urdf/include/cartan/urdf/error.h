@@ -3,7 +3,7 @@
 
 /// Diagnostic types for the URDF loader.
 ///
-/// All URDF loader entry points return std::expected with urdf_error in the
+/// All URDF loader entry points return cartan::expected with urdf_error in the
 /// failure channel. urdf_error carries a typed kind, a free-form detail
 /// string, and an optional source location populated by the parser when the
 /// failure can be tied to a specific element in the input XML.

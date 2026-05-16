@@ -14,7 +14,7 @@
 
 #include <cmath>
 #include <cstddef>
-#include <expected>
+#include "cartan/expected.h"
 #include <numbers>
 
 namespace cartan
@@ -79,7 +79,7 @@ public:
         m_basis_v = m_plane_normal.cross(m_basis_u);
     }
 
-    [[nodiscard]] std::expected<
+    [[nodiscard]] cartan::expected<
         analytical_result<Scalar, 2, 2>,
         analytical_error<Scalar>>
     solve(const se3<Scalar>& target) const
@@ -99,13 +99,13 @@ public:
         if (dist_sq > max_reach * max_reach + detail::sqrt_epsilon_v<Scalar>)
         {
             Scalar workspace_dist = std::sqrt(dist_sq) - max_reach;
-            return std::unexpected(analytical_error<Scalar>{
+            return cartan::unexpected(analytical_error<Scalar>{
                 analytical_failure::unreachable, workspace_dist});
         }
         if (dist_sq < min_reach * min_reach - detail::sqrt_epsilon_v<Scalar>)
         {
             Scalar workspace_dist = min_reach - std::sqrt(dist_sq);
-            return std::unexpected(analytical_error<Scalar>{
+            return cartan::unexpected(analytical_error<Scalar>{
                 analytical_failure::unreachable, workspace_dist});
         }
 
@@ -159,7 +159,7 @@ public:
 
         if (verified_count == 0)
         {
-            return std::unexpected(analytical_error<Scalar>{
+            return cartan::unexpected(analytical_error<Scalar>{
                 analytical_failure::verification_failed, Scalar(0)});
         }
 

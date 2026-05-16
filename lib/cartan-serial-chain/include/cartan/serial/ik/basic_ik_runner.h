@@ -31,7 +31,7 @@
 #include <tuple>
 #include <limits>
 #include <optional>
-#include <expected>
+#include "cartan/expected.h"
 #include <concepts>
 #include <type_traits>
 
@@ -174,7 +174,7 @@ public:
         return m_status;
     }
 
-    std::expected<ik_result<scalar_type, joints>, ik_error<scalar_type, joints>> solve()
+    cartan::expected<ik_result<scalar_type, joints>, ik_error<scalar_type, joints>> solve()
     {
         if constexpr (sizeof...(Policies) == 1)
         {
@@ -473,7 +473,7 @@ private:
         }
     }
 
-    std::expected<ik_result<scalar_type, joints>, ik_error<scalar_type, joints>> build_result()
+    cartan::expected<ik_result<scalar_type, joints>, ik_error<scalar_type, joints>> build_result()
     {
         if (m_status == ik_status::converged)
         {
@@ -496,7 +496,7 @@ private:
     }
 
     template <std::size_t... Is>
-    std::expected<ik_result<scalar_type, joints>, ik_error<scalar_type, joints>>
+    cartan::expected<ik_result<scalar_type, joints>, ik_error<scalar_type, joints>>
     select_best_result(std::index_sequence<Is...>)
         requires (sizeof...(Policies) > 1)
     {
@@ -541,7 +541,7 @@ private:
         return build_error();
     }
 
-    std::expected<ik_result<scalar_type, joints>, ik_error<scalar_type, joints>>
+    cartan::expected<ik_result<scalar_type, joints>, ik_error<scalar_type, joints>>
     make_result_from_parked(int index)
         requires (sizeof...(Policies) > 1)
     {
@@ -554,7 +554,7 @@ private:
         return result;
     }
 
-    std::expected<ik_result<scalar_type, joints>, ik_error<scalar_type, joints>> build_error()
+    cartan::expected<ik_result<scalar_type, joints>, ik_error<scalar_type, joints>> build_error()
     {
         ik_error<scalar_type, joints> err;
         err.near_singular = false;
@@ -612,7 +612,7 @@ private:
                 break;
         }
 
-        return std::unexpected(err);
+        return cartan::unexpected(err);
     }
 
     template <std::size_t... Is>

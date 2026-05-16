@@ -15,7 +15,7 @@
 #include "cartan/urdf/metadata.h"
 
 #include <utility>
-#include <expected>
+#include "cartan/expected.h"
 #include <filesystem>
 
 namespace cartan
@@ -32,15 +32,15 @@ using urdf::urdf_load_result;
 /// alongside its metadata. Parser failures (malformed XML, unsupported joint
 /// types, unknown link references, mimic joints, non-physical inertials) and
 /// extractor failures (branched tree, missing override link) flow through the
-/// same std::expected channel using the same urdf_error type.
+/// same cartan::expected channel using the same urdf_error type.
 template <typename Scalar = double>
-[[nodiscard]] inline std::expected<urdf_load_result<Scalar>, urdf_error>
+[[nodiscard]] inline cartan::expected<urdf_load_result<Scalar>, urdf_error>
 load_urdf(const std::filesystem::path& path, const load_options& opts = {})
 {
     auto parsed = urdf::parse_urdf_file<Scalar>(path);
     if (!parsed)
     {
-        return std::unexpected(std::move(parsed).error());
+        return cartan::unexpected(std::move(parsed).error());
     }
     return urdf::build_chain<Scalar>(*parsed, opts);
 }
@@ -49,10 +49,10 @@ load_urdf(const std::filesystem::path& path, const load_options& opts = {})
 /// formats live behind a uniform pair of names. Returns
 /// urdf_failure::sdf_not_supported unconditionally.
 template <typename Scalar = double>
-[[nodiscard]] inline std::expected<urdf_load_result<Scalar>, urdf_error>
+[[nodiscard]] inline cartan::expected<urdf_load_result<Scalar>, urdf_error>
 load_sdf(const std::filesystem::path&)
 {
-    return std::unexpected(urdf_error{
+    return cartan::unexpected(urdf_error{
         .kind = urdf_failure::sdf_not_supported,
         .detail = "SDF loading is deferred; URDF is the supported input format.",
         .location = std::nullopt});

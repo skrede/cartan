@@ -8,7 +8,7 @@
 #include "cartan/types.h"
 
 #include <cmath>
-#include <expected>
+#include "cartan/expected.h"
 #include <numbers>
 
 namespace cartan
@@ -21,7 +21,7 @@ namespace cartan
 ///
 /// Reference: Murray, Li and Sastry (1994), Section 3.3.1.
 template <typename Scalar>
-[[nodiscard]] std::expected<Scalar, analytical_failure>
+[[nodiscard]] cartan::expected<Scalar, analytical_failure>
 paden_kahan_1(
     const vector3<Scalar>& omega,
     const vector3<Scalar>& q,
@@ -40,7 +40,7 @@ paden_kahan_1(
     if (std::abs(u_norm - u_prime_norm) >
         detail::sqrt_epsilon_v<Scalar> * std::max({u_norm, u_prime_norm, Scalar(1)}))
     {
-        return std::unexpected(analytical_failure::unreachable);
+        return cartan::unexpected(analytical_failure::unreachable);
     }
 
     Scalar cos_theta = u_perp.dot(u_prime_perp) / (u_norm * u_prime_norm);
@@ -65,7 +65,7 @@ struct paden_kahan_2_result
 ///
 /// Reference: Murray, Li and Sastry (1994), Section 3.3.2.
 template <typename Scalar>
-[[nodiscard]] std::expected<paden_kahan_2_result<Scalar>, analytical_failure>
+[[nodiscard]] cartan::expected<paden_kahan_2_result<Scalar>, analytical_failure>
 paden_kahan_2(
     const vector3<Scalar>& omega1,
     const vector3<Scalar>& omega2,
@@ -80,7 +80,7 @@ paden_kahan_2(
     Scalar one_minus_c_sq = Scalar(1) - c * c;
 
     if (std::abs(one_minus_c_sq) < detail::epsilon_v<Scalar>)
-        return std::unexpected(analytical_failure::degenerate_geometry);
+        return cartan::unexpected(analytical_failure::degenerate_geometry);
 
     Scalar alpha = (omega1.dot(u_prime) - c * omega2.dot(u)) / one_minus_c_sq;
     Scalar beta = (omega2.dot(u) - c * omega1.dot(u_prime)) / one_minus_c_sq;
@@ -92,7 +92,7 @@ paden_kahan_2(
         - Scalar(2) * alpha * beta * c) / cross_sq_norm;
 
     if (gamma_sq < -detail::sqrt_epsilon_v<Scalar>)
-        return std::unexpected(analytical_failure::unreachable);
+        return cartan::unexpected(analytical_failure::unreachable);
 
     gamma_sq = std::max(gamma_sq, Scalar(0));
     Scalar gamma = std::sqrt(gamma_sq);
@@ -118,7 +118,7 @@ paden_kahan_2(
     }
 
     if (result.count == 0)
-        return std::unexpected(analytical_failure::unreachable);
+        return cartan::unexpected(analytical_failure::unreachable);
 
     return result;
 }
@@ -138,7 +138,7 @@ struct paden_kahan_3_result
 ///
 /// Reference: Murray, Li and Sastry (1994), Section 3.3.3.
 template <typename Scalar>
-[[nodiscard]] std::expected<paden_kahan_3_result<Scalar>, analytical_failure>
+[[nodiscard]] cartan::expected<paden_kahan_3_result<Scalar>, analytical_failure>
 paden_kahan_3(
     const vector3<Scalar>& omega,
     const vector3<Scalar>& q,
@@ -158,7 +158,7 @@ paden_kahan_3(
     Scalar delta_perp_sq = delta * delta - (u_par - u_prime_par) * (u_par - u_prime_par);
 
     if (delta_perp_sq < -detail::sqrt_epsilon_v<Scalar>)
-        return std::unexpected(analytical_failure::unreachable);
+        return cartan::unexpected(analytical_failure::unreachable);
 
     delta_perp_sq = std::max(delta_perp_sq, Scalar(0));
 
@@ -168,14 +168,14 @@ paden_kahan_3(
     if (u_perp_norm < detail::sqrt_epsilon_v<Scalar>
         || u_prime_perp_norm < detail::sqrt_epsilon_v<Scalar>)
     {
-        return std::unexpected(analytical_failure::degenerate_geometry);
+        return cartan::unexpected(analytical_failure::degenerate_geometry);
     }
 
     Scalar cos_theta_0 = (u_perp.squaredNorm() + u_prime_perp.squaredNorm() - delta_perp_sq)
         / (Scalar(2) * u_perp_norm * u_prime_perp_norm);
 
     if (std::abs(cos_theta_0) > Scalar(1) + detail::sqrt_epsilon_v<Scalar>)
-        return std::unexpected(analytical_failure::unreachable);
+        return cartan::unexpected(analytical_failure::unreachable);
 
     Scalar theta_0 = detail::safe_acos(cos_theta_0);
     Scalar theta_base = std::atan2(

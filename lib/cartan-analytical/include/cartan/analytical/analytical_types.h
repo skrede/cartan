@@ -4,7 +4,7 @@
 #include "cartan/serial/chain/joint_state.h"
 
 #include <array>
-#include <expected>
+#include "cartan/expected.h"
 
 namespace cartan
 {

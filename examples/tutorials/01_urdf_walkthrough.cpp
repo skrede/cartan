@@ -57,7 +57,7 @@ int main(int argc, char** argv)
 
     std::cout << "Loading URDF: " << urdf_file << "\n";
 
-    // cartan::load_urdf returns std::expected<urdf_load_result<Scalar>,
+    // cartan::load_urdf returns cartan::expected<urdf_load_result<Scalar>,
     // urdf_error>. Surface the parser's diagnostic string on failure so a
     // broken path or malformed URDF fails loudly under CTest rather than
     // silently producing a default-constructed chain. The underlying parser
