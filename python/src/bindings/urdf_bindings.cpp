@@ -14,13 +14,14 @@
 #include <nanobind/nanobind.h>
 
 #include <utility>
+#include <iterator>
+#include <algorithm>
 
 namespace nb = nanobind;
 
 namespace
 {
 
-using UrdfErrord = cartan::urdf_error;
 using UrdfLoadResultd = cartan::urdf_load_result<double>;
 using UrdfMetadatad = cartan::urdf_metadata<double>;
 
@@ -44,16 +45,79 @@ void register_urdf(nb::module_& m)
         .value("sdf_not_supported", cartan::urdf::urdf_failure::sdf_not_supported)
         .value("unknown_error", cartan::urdf::urdf_failure::unknown_error);
 
-    nb::class_<UrdfErrord>(m, "UrdfError",
-        "Diagnostic returned in the failure channel of load_urdf.")
-        .def_ro("kind", &UrdfErrord::kind)
-        .def_ro("detail", &UrdfErrord::detail);
+    // Create the Python exception class as a true subclass of RuntimeError via
+    // the C API. nanobind's nb::class_ with PyExc_RuntimeError as base rejects
+    // non-nanobind base types at runtime; nb::exception<T> only carries a
+    // what() string and cannot expose kind/detail attributes. The C API path
+    // creates a regular Python exception class, then we set `kind` and `detail`
+    // on each instance via the translator.
+    PyObject* urdf_error_cls = PyErr_NewExceptionWithDoc(
+        "cartan._core.UrdfError",
+        "URDF parse/extract failure. Carries `kind` (UrdfFailure enum) and "
+        "`detail` (str).",
+        PyExc_RuntimeError,
+        /*dict=*/nullptr);
+    if (!urdf_error_cls)
+        throw nb::python_error();
+
+    // Attach the class to the module under the name "UrdfError". The module
+    // takes a new reference; we release ours via Py_DECREF after attaching.
+    if (PyModule_AddObject(m.ptr(), "UrdfError", urdf_error_cls) < 0)
+    {
+        Py_DECREF(urdf_error_cls);
+        throw nb::python_error();
+    }
+    // PyModule_AddObject steals the reference on success; reacquire one for
+    // the translator-captured payload to keep the class alive for the module's
+    // lifetime.
+    Py_INCREF(urdf_error_cls);
+
+    nb::register_exception_translator(
+        [](const std::exception_ptr& p, void* payload) {
+            auto* cls = static_cast<PyObject*>(payload);
+            try
+            {
+                std::rethrow_exception(p);
+            }
+            catch (const cartan::detail::urdf_python_error& e)
+            {
+                nb::object py_kind = nb::cast(e.kind);
+                nb::object py_detail = nb::cast(e.detail);
+                PyObject* exc_obj = PyObject_CallFunctionObjArgs(
+                    cls, py_detail.ptr(), nullptr);
+                if (!exc_obj)
+                    return;
+                if (PyObject_SetAttrString(exc_obj, "kind", py_kind.ptr()) < 0)
+                {
+                    Py_DECREF(exc_obj);
+                    return;
+                }
+                if (PyObject_SetAttrString(exc_obj, "detail", py_detail.ptr()) < 0)
+                {
+                    Py_DECREF(exc_obj);
+                    return;
+                }
+                PyErr_SetObject(cls, exc_obj);
+                Py_DECREF(exc_obj);
+            }
+        },
+        urdf_error_cls);
 
     nb::class_<UrdfMetadatad>(m, "UrdfMetadata",
         "Strings and inertial properties accompanying a loaded chain.")
         .def_ro("base_link_name", &UrdfMetadatad::base_link_name)
         .def_ro("tool_link_name", &UrdfMetadatad::tool_link_name)
-        .def_ro("joint_names", &UrdfMetadatad::joint_names);
+        .def_ro("joint_names", &UrdfMetadatad::joint_names)
+        .def("joint_index",
+             [](const UrdfMetadatad& meta, const std::string& name) -> int {
+                 auto it = std::find(meta.joint_names.begin(),
+                                     meta.joint_names.end(), name);
+                 if (it == meta.joint_names.end())
+                     throw nb::key_error(name.c_str());
+                 return static_cast<int>(std::distance(meta.joint_names.begin(), it));
+             },
+             "Look up the joint index for a name. Raises KeyError if not found.",
+             nb::arg("name"));
 
     nb::class_<UrdfLoadResultd>(m, "UrdfLoadResult",
         "Success value of load_urdf: kinematic chain + metadata side-table.")
@@ -63,15 +127,15 @@ void register_urdf(nb::module_& m)
     m.def("load_urdf",
           [](const std::filesystem::path& path) -> UrdfLoadResultd {
               auto result = cartan::load_urdf<double>(path);
-              if (!result) {
-                  const auto& err = result.error();
-                  throw std::runtime_error(
-                      "cartan.load_urdf failed: " + err.detail);
+              if (!result)
+              {
+                  auto err = std::move(result).error();
+                  throw cartan::detail::urdf_python_error{err.kind, std::move(err.detail)};
               }
               return std::move(*result);
           },
           "Load a URDF document and return the extracted kinematic chain "
-          "and metadata. Raises RuntimeError on parse or extraction failure.",
+          "and metadata. Raises cartan.UrdfError on parse or extraction failure.",
           nb::arg("path"));
 }
 

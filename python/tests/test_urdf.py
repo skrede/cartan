@@ -28,9 +28,32 @@ def test_cartanbot_metadata_carries_joint_names() -> None:
     ]
 
 
-def test_load_urdf_raises_runtime_error_on_missing_file() -> None:
-    with pytest.raises(RuntimeError, match="cartan.load_urdf failed"):
+def test_load_urdf_raises_typed_error_on_missing_file() -> None:
+    with pytest.raises(cartan.UrdfError) as excinfo:
         cartan.load_urdf("/nonexistent.urdf")
+    assert isinstance(excinfo.value.kind, cartan.UrdfFailure)
+    assert isinstance(excinfo.value.detail, str)
+    assert excinfo.value.detail != ""
+
+
+def test_urdf_error_is_subclass_of_runtime_error() -> None:
+    assert issubclass(cartan.UrdfError, RuntimeError)
+
+
+def test_urdf_metadata_joint_index_happy_path() -> None:
+    repo_root = Path(__file__).resolve().parent.parent.parent
+    result = cartan.load_urdf(str(repo_root / "tests" / "fixtures" / "urdf" / "cartanbot.urdf"))
+    meta = result.metadata
+    for i, name in enumerate(meta.joint_names):
+        assert meta.joint_index(name) == i
+
+
+def test_urdf_metadata_joint_index_raises_keyerror_on_unknown() -> None:
+    repo_root = Path(__file__).resolve().parent.parent.parent
+    result = cartan.load_urdf(str(repo_root / "tests" / "fixtures" / "urdf" / "cartanbot.urdf"))
+    meta = result.metadata
+    with pytest.raises(KeyError):
+        meta.joint_index("no_such_joint_42")
 
 
 def test_ur3e_loads_and_fk_is_reproducible(ur3e_chain: cartan.KinematicChain) -> None:
