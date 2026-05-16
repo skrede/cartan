@@ -52,6 +52,9 @@ cmake-build-*
 **/build*/
 **/.userfiles/
 
+# Top-level compile_commands.json symlink (developer-local; points into build/)
+/compile_commands.json
+
 # Python build / cache
 __pycache__/
 *.py[cod]

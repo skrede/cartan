@@ -15,6 +15,19 @@
             }
         },
         {
+            "name": "python-dev",
+            "displayName": "Python development (bindings + URDF + compile_commands)",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/python-dev",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "CARTAN_BUILD_PYTHON": "ON",
+                "CARTAN_BUILD_URDF": "ON",
+                "CARTAN_CMAKE_FETCH_DEPS": "ON"
+            }
+        },
+        {
             "name": "dev-full",
             "displayName": "Full development (tests + examples + fuzz + property)",
             "generator": "Ninja",
@@ -114,6 +127,10 @@
         {
             "name": "dev",
             "configurePreset": "dev"
+        },
+        {
+            "name": "python-dev",
+            "configurePreset": "python-dev"
         },
         {
             "name": "dev-full",
