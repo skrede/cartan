@@ -39,6 +39,7 @@ option(CARTAN_BUILD_BENCHMARKS "Build benchmarks (requires Google Benchmark)" OF
 option(CARTAN_BUILD_TRAC_IK "Build TRAC-IK comparison benchmarks (requires orocos-kdl, NLopt)" OFF)
 option(CARTAN_BUILD_PINOCCHIO "Build Pinocchio comparison benchmarks (requires pinocchio)" OFF)
 option(CARTAN_BUILD_PROFILING "Build profiling benchmarks (no external robot library dependencies)" OFF)
+option(CARTAN_BUILD_PYTHON "Build Python bindings via nanobind" OFF)
 option(CARTAN_CMAKE_FETCH_DEPS "Use CMake FetchContent to download and install dependencies" OFF)
 
 set(CARTAN_ARGMIN_SOURCE_DIR "" CACHE PATH "Path to local argmin source checkout")
@@ -74,4 +75,8 @@ endif ()
 
 if (CARTAN_BUILD_PROFILING)
     add_subdirectory(profiling)
+endif ()
+
+if (CARTAN_BUILD_PYTHON)
+    add_subdirectory(python)
 endif ()

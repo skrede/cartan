@@ -1,0 +1,33 @@
+[build-system]
+requires = [
+    "scikit-build-core>=0.10",
+    "nanobind>=2.0",
+]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "cartan"
+version = "0.4.1.dev0"
+description = "Python bindings for cartan — C++23 Lie group, kinematics, and IK library"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Aleksander Skrede", email = "code@skrede.me" },
+]
+dependencies = [
+    "numpy>=1.20",
+]
+
+[project.urls]
+Homepage = "https://github.com/skrede/cartan"
+
+[tool.scikit-build]
+cmake.version = ">=3.28"
+cmake.build-type = "Release"
+build-dir = "build/{wheel_tag}"
+minimum-version = "build-system.requires"
+wheel.packages = ["python/cartan"]
+
+[tool.scikit-build.cmake.define]
+CARTAN_BUILD_PYTHON = "ON"
