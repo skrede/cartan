@@ -7,7 +7,9 @@ from ._core import (
     KinematicChain,
     ScrewAxis,
     __version__,
+    body_jacobian,
     forward_kinematics,
+    space_jacobian,
 )
 
 __all__ = [
@@ -17,7 +19,9 @@ __all__ = [
     "KinematicChain",
     "ScrewAxis",
     "__version__",
+    "body_jacobian",
     "forward_kinematics",
+    "space_jacobian",
 ]
 
 try:
