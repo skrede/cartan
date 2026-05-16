@@ -4,7 +4,6 @@
 
 #include "cartan/urdf.h"
 
-#include "detail/expected_caster.h"
 #include "detail/urdf_python_error.h"
 
 #include <nanobind/eigen/dense.h>

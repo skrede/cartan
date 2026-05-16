@@ -27,7 +27,7 @@ void register_lie(nb::module_& m)
         .def_static("identity", &SO3d::identity)
         .def_static("exp", &SO3d::exp,
                     "Exponential map: rotation vector (3,) -> SO(3).",
-                    nb::arg("omega"))
+                    nb::arg("omega").noconvert())
         .def("log", &SO3d::log,
              "Logarithmic map: SO(3) -> rotation vector (3,).")
         .def("matrix", &SO3d::matrix,
@@ -38,7 +38,7 @@ void register_lie(nb::module_& m)
                  return self.act(p);
              },
              "Rotate a 3D point.",
-             nb::arg("p"))
+             nb::arg("p").noconvert())
         .def("__mul__",
              [](const SO3d& a, const SO3d& b) -> SO3d {
                  return a * b;
@@ -63,7 +63,7 @@ void register_lie(nb::module_& m)
         .def_static("identity", &SE3d::identity)
         .def_static("exp", &SE3d::exp,
                     "Exponential map: twist (6,) in (omega, rho) order -> SE(3).",
-                    nb::arg("twist"))
+                    nb::arg("twist").noconvert())
         .def("log", &SE3d::log,
              "Logarithmic map: SE(3) -> twist (6,) in (omega, rho) order.")
         .def("matrix", &SE3d::matrix,
@@ -76,7 +76,7 @@ void register_lie(nb::module_& m)
                  return self.act(p);
              },
              "Transform a 3D point: R p + t.",
-             nb::arg("p"))
+             nb::arg("p").noconvert())
         .def("__mul__",
              [](const SE3d& a, const SE3d& b) -> SE3d {
                  return a * b;

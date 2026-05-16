@@ -35,10 +35,10 @@ void register_chain(nb::module_& m)
     nb::class_<ScrewAxisd>(m, "ScrewAxis", "Spatial screw axis (omega, v) in 6-vector form")
         .def_static("revolute", &ScrewAxisd::revolute,
                     "Revolute joint screw axis with rotation axis through point.",
-                    nb::arg("axis"), nb::arg("point"))
+                    nb::arg("axis").noconvert(), nb::arg("point").noconvert())
         .def_static("prismatic", &ScrewAxisd::prismatic,
                     "Prismatic joint screw axis with translation direction.",
-                    nb::arg("direction"))
+                    nb::arg("direction").noconvert())
         .def("omega",
              [](const ScrewAxisd& s) -> Vector3d { return s.omega(); },
              "Angular component.")
