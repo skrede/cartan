@@ -164,6 +164,18 @@ build_chain(const parsed_model<Scalar>& model, const load_options& opts = {})
     std::vector<std::optional<Scalar>> velocity_max;
     std::vector<std::optional<Scalar>> effort_max;
 
+    // Helper: a "leaf" outgoing joint is a fixed joint whose child link has
+    // no further outgoing joints. ROS-Industrial URDFs commonly attach such
+    // joints to the chain root as world-frame attachment markers (the `base`
+    // link sibling of `base_link_inertia` on Universal Robots arms is a
+    // canonical example). They carry no kinematic content for a serial chain
+    // and can be elided from the walk.
+    auto is_leaf_outgoing = [&](std::size_t idx) {
+        if (model.joints[idx].kind != parsed_joint_kind::fixed) { return false; }
+        auto child_it = outgoing.find(model.joints[idx].child_link);
+        return child_it == outgoing.end() || child_it->second.empty();
+    };
+
     while (true)
     {
         if (!opts.tool_link.empty() && current == opts.tool_link)
@@ -177,58 +189,49 @@ build_chain(const parsed_model<Scalar>& model, const load_options& opts = {})
             break;
         }
 
-        // Single-outgoing-joint paths and a single non-fixed outgoing joint
-        // with any number of fixed siblings are extractable; multiple
-        // non-fixed siblings make the tree branched.
+        // Classify outgoing joints. A "chain-continuing" child is either a
+        // mobile joint or a fixed joint whose child link itself has further
+        // outgoing joints (a "pass-through" fixed joint). The walk is
+        // well-defined when there is exactly one chain-continuing child;
+        // fixed-leaf siblings attach world-side reference frames and are
+        // silently skipped. When no chain-continuing child exists and there
+        // is exactly one fixed-leaf child, fold it into T_acc as the trailing
+        // tool-offset pattern (e.g. wrist_3 -> flange -> tool0 in the ROS
+        // canonical UR URDFs).
         const auto& outs = it->second;
-        std::size_t mobile_count = 0;
+        std::size_t chain_continuing_count = 0;
         std::size_t chosen = outs.size();
         for (std::size_t idx : outs)
         {
-            if (model.joints[idx].kind != parsed_joint_kind::fixed)
-            {
-                ++mobile_count;
-                chosen = idx;
-            }
+            if (is_leaf_outgoing(idx)) { continue; }
+            ++chain_continuing_count;
+            chosen = idx;
         }
-        if (mobile_count > 1)
+        if (chain_continuing_count == 0)
         {
-            // Identify leaf links of the branch for the diagnostic.
-            std::string detail_msg = "branched tree; non-fixed branches at link '"
-                + current + "': [";
-            bool first = true;
-            for (std::size_t idx : outs)
-            {
-                if (model.joints[idx].kind == parsed_joint_kind::fixed) { continue; }
-                if (!first) { detail_msg += ", "; }
-                detail_msg += model.joints[idx].child_link;
-                first = false;
-            }
-            detail_msg += "]";
-            return std::unexpected(urdf_error{
-                .kind = urdf_failure::branched_kinematic_tree,
-                .detail = std::move(detail_msg),
-                .location = std::nullopt});
-        }
-        if (mobile_count == 0)
-        {
-            // Only fixed children. If there is exactly one, fold it; otherwise
-            // the branching is purely cosmetic (multiple tool plates on the
-            // same parent link) and we treat it as branched as well, since
-            // there is no canonical choice of which fixed branch to follow.
+            // All outgoing joints are fixed leaves. A single leaf is treated
+            // as a trailing tool offset and folded into the accumulator;
+            // multiple leaves are ambiguous (no canonical pick of which tool
+            // frame is "the" tool) and terminate the walk at the current link.
             if (outs.size() == 1)
             {
-                chosen = outs[0];
-                const auto& fixed_joint = model.joints[chosen];
+                const auto& fixed_joint = model.joints[outs[0]];
                 T_acc = T_acc * fixed_joint.origin;
                 current = fixed_joint.child_link;
                 continue;
             }
-            std::string detail_msg = "branched tree; fixed-only branches at link '"
-                + current + "': [";
+            break;
+        }
+        if (chain_continuing_count > 1)
+        {
+            // Genuine branching: more than one outgoing joint leads to a
+            // sub-tree that needs further traversal.
+            std::string detail_msg = "branched tree; multiple chain-continuing"
+                " branches at link '" + current + "': [";
             bool first = true;
             for (std::size_t idx : outs)
             {
+                if (is_leaf_outgoing(idx)) { continue; }
                 if (!first) { detail_msg += ", "; }
                 detail_msg += model.joints[idx].child_link;
                 first = false;
@@ -240,28 +243,12 @@ build_chain(const parsed_model<Scalar>& model, const load_options& opts = {})
                 .location = std::nullopt});
         }
 
-        // mobile_count == 1: fold any fixed siblings into the accumulator
-        // would mean ignoring tool branches, which is not what the user
-        // expects. We require non-fixed-mobile uniqueness as the only
-        // extractable path. Fixed siblings of a mobile joint are also a
-        // branch; surface as branched_kinematic_tree.
-        if (outs.size() > 1)
+        if (model.joints[chosen].kind == parsed_joint_kind::fixed)
         {
-            std::string detail_msg = "branched tree; mobile joint shares link '"
-                + current + "' with siblings: [";
-            bool first = true;
-            for (std::size_t idx : outs)
-            {
-                if (idx == chosen) { continue; }
-                if (!first) { detail_msg += ", "; }
-                detail_msg += model.joints[idx].child_link;
-                first = false;
-            }
-            detail_msg += "]";
-            return std::unexpected(urdf_error{
-                .kind = urdf_failure::branched_kinematic_tree,
-                .detail = std::move(detail_msg),
-                .location = std::nullopt});
+            const auto& fixed_joint = model.joints[chosen];
+            T_acc = T_acc * fixed_joint.origin;
+            current = fixed_joint.child_link;
+            continue;
         }
 
         const auto& j = model.joints[chosen];
