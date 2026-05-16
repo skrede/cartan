@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_CARTAN_PROFILING_CHAIN_FACTORIES_H
-#define HPP_GUARD_CARTAN_PROFILING_CHAIN_FACTORIES_H
+#ifndef HPP_GUARD_CARTAN_TESTS_FIXTURES_CHAIN_FACTORIES_H
+#define HPP_GUARD_CARTAN_TESTS_FIXTURES_CHAIN_FACTORIES_H
 
 /// @file chain_factories.h
 /// @brief Shared cartan PoE chain factories, random target generation, and error
@@ -22,10 +22,11 @@
 
 #include <cmath>
 #include <random>
+#include <limits>
 #include <numbers>
 #include <utility>
 
-namespace cartan::benchmarks
+namespace cartan::fixtures
 {
 
 // ===========================================================================
@@ -840,6 +841,315 @@ auto compute_pose_errors(
 
     return {position_error, orientation_error};
 }
+
+// ===========================================================================
+// Synthetic Cartanbot fixture (paired with tests/fixtures/urdf/cartanbot.urdf)
+// ===========================================================================
+
+/// Pedagogical 6-DOF synthetic chain matching the always-on cartanbot.urdf
+/// fixture; revolute, prismatic, and continuous joints exercise every URDF
+/// code path the parser supports. Two fixed joints in the URDF (a sensor
+/// mount between joint5 and joint6, and a tool offset after joint6) fold
+/// into joint6's screw-axis origin and the home pose translation
+/// respectively, leaving exactly six mobile joints in the chain.
+template <typename Scalar = double>
+auto make_cartanbot_chain() -> cartan::kinematic_chain<Scalar, cartan::dynamic>
+{
+    using vec3 = cartan::vector3<Scalar>;
+
+    // Mobile joint axes (in the base frame at zero configuration).
+    // Cumulative joint positions, threading through the parent-child URDF tree
+    // (xyz origins relative to the parent link), compose to:
+    //   joint1: (0, 0, 0.10)
+    //   joint2: (0, 0, 0.30)        = 0.10 + 0.20
+    //   joint3: (0, 0, 0.50)        = 0.30 + 0.20 (prismatic, direction only)
+    //   joint4: (0, 0, 0.85)        = 0.50 + 0.35
+    //   joint5: (0, 0, 1.20)        = 0.85 + 0.35 (continuous wrist roll)
+    //   sensor_offset fixed (0, 0.05, 0) shifts the frame to (0, 0.05, 1.20)
+    //   joint6: (0, 0.05, 1.35)     = sensor frame + (0, 0, 0.15)
+    //   tool_offset fixed (0, 0, 0.05) folds into the home translation
+    //   tool0:  (0, 0.05, 1.40)
+    auto s1 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(0), Scalar(1)),
+        vec3(Scalar(0), Scalar(0), Scalar(0.10)));
+    auto s2 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(1), Scalar(0)),
+        vec3(Scalar(0), Scalar(0), Scalar(0.30)));
+    auto s3 = cartan::screw_axis<Scalar>::prismatic(
+        vec3(Scalar(0), Scalar(0), Scalar(1)));
+    auto s4 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(1), Scalar(0)),
+        vec3(Scalar(0), Scalar(0), Scalar(0.85)));
+    auto s5 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(0), Scalar(1)),
+        vec3(Scalar(0), Scalar(0), Scalar(1.20)));
+    auto s6 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(1), Scalar(0)),
+        vec3(Scalar(0), Scalar(0.05), Scalar(1.35)));
+
+    vec3 home_trans(Scalar(0), Scalar(0.05), Scalar(1.40));
+    auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::identity(), home_trans);
+
+    cartan::joint_limits<Scalar> rev_lim{
+        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
+    cartan::joint_limits<Scalar> prismatic_lim{Scalar(0), Scalar(0.20)};
+    cartan::joint_limits<Scalar> continuous_lim{
+        -std::numeric_limits<Scalar>::infinity(),
+        +std::numeric_limits<Scalar>::infinity()};
+
+    auto chain_static = cartan::kinematic_chain<Scalar, 6>(
+        home,
+        {s1, s2, s3, s4, s5, s6},
+        {rev_lim, rev_lim, prismatic_lim, rev_lim, continuous_lim, rev_lim});
+    return chain_static.to_dynamic();
+}
+
+// ===========================================================================
+// Extended real-world fixtures (CARTAN_URDF_EXTENDED_TESTS opt-in)
+// ===========================================================================
+
+#ifdef CARTAN_URDF_EXTENDED_TESTS
+
+// The five extended factories below mirror the vendored real-world URDFs
+// under tests/fixtures/urdf/extended/. Their screw axes were derived by
+// walking each URDF's joint tree from base_link to the unique tool leaf,
+// composing the per-joint <origin rpy/> rotations into the cumulative
+// base-frame and folding fixed joints into the surrounding accumulator
+// (the same procedure cartan::urdf::build_chain executes). They therefore
+// reproduce numerical noise inherited from the upstream xacro arithmetic
+// (e.g. the 2e-10 axis components on the UR variants that come from
+// xacro's exact half-pi handling). Keeping the noise in the factories
+// matches what the parser produces exactly so the 1e-12 parity gate holds.
+
+/// Hand-coded ground-truth chain matching the vendored
+/// tests/fixtures/urdf/extended/ur3e.urdf.
+template <typename Scalar = double>
+auto make_ur3e_chain_extended() -> cartan::kinematic_chain<Scalar, cartan::dynamic>
+{
+    using vec3 = cartan::vector3<Scalar>;
+    using mat3 = cartan::matrix3<Scalar>;
+
+    auto s1 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(0), Scalar(1.0)),
+        vec3(Scalar(0), Scalar(0), Scalar(0.15185)));
+    auto s2 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(1.0), Scalar(-2.05103e-10)),
+        vec3(Scalar(0), Scalar(0), Scalar(0.15185)));
+    auto s3 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(1.0), Scalar(-2.05103e-10)),
+        vec3(Scalar(0.24355), Scalar(0), Scalar(0.15185)));
+    auto s4 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(1.0), Scalar(-2.05103e-10)),
+        vec3(Scalar(0.45675), Scalar(0.13105), Scalar(0.151849999973121)));
+    auto s5 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(-4.10207e-10), Scalar(-1.0)),
+        vec3(Scalar(0.45675), Scalar(0.131049999964989), Scalar(0.066499999973121)));
+    auto s6 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(1.0), Scalar(-2.05103e-10)),
+        vec3(Scalar(0.45675), Scalar(0.223149999964989), Scalar(0.066499999954231)));
+
+    mat3 R_home;
+    R_home << Scalar(-1.0), Scalar(0), Scalar(0),
+              Scalar(0), Scalar(2.05103e-10), Scalar(1.0),
+              Scalar(0), Scalar(1.0), Scalar(-2.05103e-10);
+    vec3 p_home(Scalar(0.45675), Scalar(0.223149999964989), Scalar(0.066499999954231));
+    auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::from_matrix(R_home).value(), p_home);
+
+    cartan::joint_limits<Scalar> lim{
+        -Scalar(2) * std::numbers::pi_v<Scalar>,
+        +Scalar(2) * std::numbers::pi_v<Scalar>};
+
+    auto chain_static = cartan::kinematic_chain<Scalar, 6>(
+        home,
+        {s1, s2, s3, s4, s5, s6},
+        {lim, lim, lim, lim, lim, lim});
+    return chain_static.to_dynamic();
+}
+
+/// Hand-coded ground-truth chain matching the vendored
+/// tests/fixtures/urdf/extended/ur5e.urdf.
+template <typename Scalar = double>
+auto make_ur5e_chain_extended() -> cartan::kinematic_chain<Scalar, cartan::dynamic>
+{
+    using vec3 = cartan::vector3<Scalar>;
+    using mat3 = cartan::matrix3<Scalar>;
+
+    auto s1 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(0), Scalar(1.0)),
+        vec3(Scalar(0), Scalar(0), Scalar(0.1625)));
+    auto s2 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(1.0), Scalar(-2.05103e-10)),
+        vec3(Scalar(0), Scalar(0), Scalar(0.1625)));
+    auto s3 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(1.0), Scalar(-2.05103e-10)),
+        vec3(Scalar(0.425), Scalar(0), Scalar(0.1625)));
+    auto s4 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(1.0), Scalar(-2.05103e-10)),
+        vec3(Scalar(0.8172), Scalar(0.1333), Scalar(0.16249999997266)));
+    auto s5 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(-4.10207e-10), Scalar(-1.0)),
+        vec3(Scalar(0.8172), Scalar(0.133299999959102), Scalar(0.06279999997266)));
+    auto s6 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(1.0), Scalar(-2.05103e-10)),
+        vec3(Scalar(0.8172), Scalar(0.232899999959102), Scalar(0.062799999952231)));
+
+    mat3 R_home;
+    R_home << Scalar(-1.0), Scalar(0), Scalar(0),
+              Scalar(0), Scalar(2.05103e-10), Scalar(1.0),
+              Scalar(0), Scalar(1.0), Scalar(-2.05103e-10);
+    vec3 p_home(Scalar(0.8172), Scalar(0.232899999959102), Scalar(0.062799999952231));
+    auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::from_matrix(R_home).value(), p_home);
+
+    cartan::joint_limits<Scalar> lim{
+        -Scalar(2) * std::numbers::pi_v<Scalar>,
+        +Scalar(2) * std::numbers::pi_v<Scalar>};
+
+    auto chain_static = cartan::kinematic_chain<Scalar, 6>(
+        home,
+        {s1, s2, s3, s4, s5, s6},
+        {lim, lim, lim, lim, lim, lim});
+    return chain_static.to_dynamic();
+}
+
+/// Hand-coded ground-truth chain matching the vendored
+/// tests/fixtures/urdf/extended/ur10.urdf.
+template <typename Scalar = double>
+auto make_ur10_chain_extended() -> cartan::kinematic_chain<Scalar, cartan::dynamic>
+{
+    using vec3 = cartan::vector3<Scalar>;
+    using mat3 = cartan::matrix3<Scalar>;
+
+    auto s1 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(0), Scalar(1.0)),
+        vec3(Scalar(0), Scalar(0), Scalar(0.1273)));
+    auto s2 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(1.0), Scalar(-2.05103e-10)),
+        vec3(Scalar(0), Scalar(0), Scalar(0.1273)));
+    auto s3 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(1.0), Scalar(-2.05103e-10)),
+        vec3(Scalar(0.612), Scalar(0), Scalar(0.1273)));
+    auto s4 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(1.0), Scalar(-2.05103e-10)),
+        vec3(Scalar(1.1843), Scalar(0.163941), Scalar(0.127299999966375)));
+    auto s5 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(-4.10207e-10), Scalar(-1.0)),
+        vec3(Scalar(1.1843), Scalar(0.163940999952539), Scalar(0.011599999966375)));
+    auto s6 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(1.0), Scalar(-2.05103e-10)),
+        vec3(Scalar(1.1843), Scalar(0.256140999952539), Scalar(0.011599999947465)));
+
+    mat3 R_home;
+    R_home << Scalar(-1.0), Scalar(0), Scalar(0),
+              Scalar(0), Scalar(2.05103e-10), Scalar(1.0),
+              Scalar(0), Scalar(1.0), Scalar(-2.05103e-10);
+    vec3 p_home(Scalar(1.1843), Scalar(0.256140999952539), Scalar(0.011599999947465));
+    auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::from_matrix(R_home).value(), p_home);
+
+    cartan::joint_limits<Scalar> lim{
+        -Scalar(2) * std::numbers::pi_v<Scalar>,
+        +Scalar(2) * std::numbers::pi_v<Scalar>};
+
+    auto chain_static = cartan::kinematic_chain<Scalar, 6>(
+        home,
+        {s1, s2, s3, s4, s5, s6},
+        {lim, lim, lim, lim, lim, lim});
+    return chain_static.to_dynamic();
+}
+
+/// Hand-coded ground-truth chain matching the vendored
+/// tests/fixtures/urdf/extended/ur16.urdf.
+template <typename Scalar = double>
+auto make_ur16_chain_extended() -> cartan::kinematic_chain<Scalar, cartan::dynamic>
+{
+    using vec3 = cartan::vector3<Scalar>;
+    using mat3 = cartan::matrix3<Scalar>;
+
+    auto s1 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(0), Scalar(1.0)),
+        vec3(Scalar(0), Scalar(0), Scalar(0.1807)));
+    auto s2 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(1.0), Scalar(-2.05103e-10)),
+        vec3(Scalar(0), Scalar(0), Scalar(0.1807)));
+    auto s3 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(1.0), Scalar(-2.05103e-10)),
+        vec3(Scalar(0.4784), Scalar(0), Scalar(0.1807)));
+    auto s4 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(1.0), Scalar(-2.05103e-10)),
+        vec3(Scalar(0.8384), Scalar(0.17415), Scalar(0.180699999964281)));
+    auto s5 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(-4.10207e-10), Scalar(-1.0)),
+        vec3(Scalar(0.8384), Scalar(0.174149999950837), Scalar(0.060849999964281)));
+    auto s6 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(1.0), Scalar(-2.05103e-10)),
+        vec3(Scalar(0.8384), Scalar(0.290699999950837), Scalar(0.060849999940376)));
+
+    mat3 R_home;
+    R_home << Scalar(-1.0), Scalar(0), Scalar(0),
+              Scalar(0), Scalar(2.05103e-10), Scalar(1.0),
+              Scalar(0), Scalar(1.0), Scalar(-2.05103e-10);
+    vec3 p_home(Scalar(0.8384), Scalar(0.290699999950837), Scalar(0.060849999940376));
+    auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::from_matrix(R_home).value(), p_home);
+
+    cartan::joint_limits<Scalar> lim{
+        -Scalar(2) * std::numbers::pi_v<Scalar>,
+        +Scalar(2) * std::numbers::pi_v<Scalar>};
+
+    auto chain_static = cartan::kinematic_chain<Scalar, 6>(
+        home,
+        {s1, s2, s3, s4, s5, s6},
+        {lim, lim, lim, lim, lim, lim});
+    return chain_static.to_dynamic();
+}
+
+/// Hand-coded ground-truth chain matching the vendored
+/// tests/fixtures/urdf/extended/iiwa14.urdf.
+template <typename Scalar = double>
+auto make_iiwa14_chain_extended() -> cartan::kinematic_chain<Scalar, cartan::dynamic>
+{
+    using vec3 = cartan::vector3<Scalar>;
+    using mat3 = cartan::matrix3<Scalar>;
+
+    auto s1 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(0), Scalar(1.0)),
+        vec3(Scalar(0), Scalar(0), Scalar(0)));
+    auto s2 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(1.0), Scalar(0)),
+        vec3(Scalar(-0.00043624), Scalar(0), Scalar(0.36)));
+    auto s3 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(0), Scalar(1.0)),
+        vec3(Scalar(-0.00043624), Scalar(0), Scalar(0.36)));
+    auto s4 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(-1.0), Scalar(0)),
+        vec3(Scalar(0), Scalar(0), Scalar(0.78)));
+    auto s5 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(0), Scalar(1.0)),
+        vec3(Scalar(0), Scalar(0), Scalar(0.78)));
+    auto s6 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(1.0), Scalar(0)),
+        vec3(Scalar(0), Scalar(0), Scalar(1.18)));
+    auto s7 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(0), Scalar(1.0)),
+        vec3(Scalar(0), Scalar(0), Scalar(1.18)));
+
+    mat3 R_home;
+    R_home << Scalar(1.0), Scalar(0), Scalar(0),
+              Scalar(0), Scalar(1.0), Scalar(0),
+              Scalar(0), Scalar(0), Scalar(1.0);
+    vec3 p_home(Scalar(0), Scalar(0), Scalar(1.306));
+    auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::from_matrix(R_home).value(), p_home);
+
+    cartan::joint_limits<Scalar> lim{
+        -std::numbers::pi_v<Scalar>,
+        +std::numbers::pi_v<Scalar>};
+
+    auto chain_static = cartan::kinematic_chain<Scalar, 7>(
+        home,
+        {s1, s2, s3, s4, s5, s6, s7},
+        {lim, lim, lim, lim, lim, lim, lim});
+    return chain_static.to_dynamic();
+}
+
+#endif
 
 }
 

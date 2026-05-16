@@ -34,6 +34,7 @@ option(CARTAN_BUILD_PROPERTY_TESTS "Build property-based test targets (requires 
 option(CARTAN_BUILD_ARGMIN "Build with Argmin NLP solver backend" OFF)
 option(CARTAN_BUILD_NLOPT "Build NLopt solver backend for IK" OFF)
 option(CARTAN_BUILD_URDF "Build URDF loading module" OFF)
+option(CARTAN_BUILD_URDF_EXTENDED_TESTS "Build extended URDF parity tests against vendored real-world URDFs" OFF)
 option(CARTAN_BUILD_BENCHMARKS "Build benchmarks (requires Google Benchmark)" OFF)
 option(CARTAN_BUILD_TRAC_IK "Build TRAC-IK comparison benchmarks (requires orocos-kdl, NLopt)" OFF)
 option(CARTAN_BUILD_PINOCCHIO "Build Pinocchio comparison benchmarks (requires pinocchio)" OFF)

@@ -148,8 +148,8 @@ struct target_set
         seeds.reserve(static_cast<std::size_t>(count));
         for (int i = 0; i < count; ++i)
         {
-            targets.push_back(cartan::benchmarks::random_reachable_target(chain, rng));
-            seeds.push_back(cartan::benchmarks::random_joint_config(chain, rng));
+            targets.push_back(cartan::fixtures::random_reachable_target(chain, rng));
+            seeds.push_back(cartan::fixtures::random_joint_config(chain, rng));
         }
     }
 };
@@ -370,7 +370,7 @@ void bm_cartan_lm(
         {
             ++successes;
             total_iter += result->iterations;
-            auto [pos_err, ori_err] = cartan::benchmarks::compute_pose_errors(
+            auto [pos_err, ori_err] = cartan::fixtures::compute_pose_errors(
                 chain, result->solution.position, target);
             total_pos += pos_err;
             total_ori += ori_err;
@@ -422,7 +422,7 @@ void bm_cartan_restart_lm(
         {
             ++successes;
             total_iter += result->iterations;
-            auto [pos_err, ori_err] = cartan::benchmarks::compute_pose_errors(
+            auto [pos_err, ori_err] = cartan::fixtures::compute_pose_errors(
                 chain, result->solution.position, target);
             total_pos += pos_err;
             total_ori += ori_err;
@@ -481,7 +481,7 @@ void bm_cartan_solver(
         {
             ++successes;
             total_iter += result->iterations;
-            auto [pos_err, ori_err] = cartan::benchmarks::compute_pose_errors(
+            auto [pos_err, ori_err] = cartan::fixtures::compute_pose_errors(
                 chain, result->solution.position, target);
             total_pos += pos_err;
             total_ori += ori_err;
@@ -549,7 +549,7 @@ void bm_cartan_argmin_slsqp_kreest(
         {
             ++successes;
             total_iter += result->iterations;
-            auto [pos_err, ori_err] = cartan::benchmarks::compute_pose_errors(
+            auto [pos_err, ori_err] = cartan::fixtures::compute_pose_errors(
                 chain, result->solution.position, target);
             total_pos += pos_err;
             total_ori += ori_err;
@@ -651,7 +651,7 @@ void bm_trac_ik_verified(
     kdl_seeds.reserve(count);
     for (std::size_t i = 0; i < count; ++i)
     {
-        kdl_targets.push_back(cartan::benchmarks::se3_to_kdl_frame(ts.targets[i]));
+        kdl_targets.push_back(cartan::fixtures::se3_to_kdl_frame(ts.targets[i]));
         KDL::JntArray seed(static_cast<unsigned int>(N));
         for (unsigned int j = 0; j < static_cast<unsigned int>(N); ++j)
             seed(j) = ts.seeds[i](static_cast<int>(j));
@@ -685,7 +685,7 @@ void bm_trac_ik_verified(
             // External verification: cartan FK + body twist error vs target
             position_type q_cartan;
             for (int j = 0; j < N; ++j) q_cartan(j) = q_out(static_cast<unsigned int>(j));
-            auto [pos_err, ori_err] = cartan::benchmarks::compute_pose_errors(
+            auto [pos_err, ori_err] = cartan::fixtures::compute_pose_errors(
                 chain, q_cartan, ts.targets[cur]);
             if (ori_err < tol && pos_err < tol)
             {
@@ -717,11 +717,11 @@ void bm_trac_ik_verified(
 #define IK_BENCH_ROBOT_TRAC_IK(ROBOT, FACTORY, KDL_FACTORY, KDL_LIMITS_FACTORY, N_DOF)  \
 static void bm_ik_##ROBOT##_trac_ik(benchmark::State& state)                            \
 {                                                                                       \
-    static auto chain = cartan::benchmarks::FACTORY<double>();                          \
+    static auto chain = cartan::fixtures::FACTORY<double>();                          \
     static target_set<double, N_DOF> ts(chain, num_targets);                            \
-    static auto kdl_chain = cartan::benchmarks::KDL_FACTORY();                          \
+    static auto kdl_chain = cartan::fixtures::KDL_FACTORY();                          \
     KDL::JntArray q_min(N_DOF), q_max(N_DOF);                                           \
-    cartan::benchmarks::KDL_LIMITS_FACTORY(q_min, q_max);                               \
+    cartan::fixtures::KDL_LIMITS_FACTORY(q_min, q_max);                               \
     bm_trac_ik_verified<N_DOF>(state, chain, kdl_chain, q_min, q_max, ts);              \
 }                                                                                       \
 BENCHMARK(bm_ik_##ROBOT##_trac_ik)->Iterations(2000)->Unit(benchmark::kMicrosecond)
@@ -732,21 +732,21 @@ BENCHMARK(bm_ik_##ROBOT##_trac_ik)->Iterations(2000)->Unit(benchmark::kMicroseco
 #define IK_BENCH_ROBOT(ROBOT, FACTORY, KDL_FACTORY, KDL_LIMITS_FACTORY, N_DOF)          \
 static void bm_ik_##ROBOT##_cartan_lm(benchmark::State& state)                          \
 {                                                                                       \
-    static auto chain = cartan::benchmarks::FACTORY<double>();                          \
+    static auto chain = cartan::fixtures::FACTORY<double>();                          \
     static target_set<double, N_DOF> ts(chain, num_targets);                            \
     bm_cartan_lm<N_DOF>(state, chain, ts);                                              \
 }                                                                                       \
 BENCHMARK(bm_ik_##ROBOT##_cartan_lm)->Iterations(2000)->Unit(benchmark::kMicrosecond);  \
 static void bm_ik_##ROBOT##_cartan_restart_lm(benchmark::State& state)                  \
 {                                                                                       \
-    static auto chain = cartan::benchmarks::FACTORY<double>();                          \
+    static auto chain = cartan::fixtures::FACTORY<double>();                          \
     static target_set<double, N_DOF> ts(chain, num_targets);                            \
     bm_cartan_restart_lm<N_DOF>(state, chain, ts);                                      \
 }                                                                                       \
 BENCHMARK(bm_ik_##ROBOT##_cartan_restart_lm)->Iterations(2000)->Unit(benchmark::kMicrosecond); \
 static void bm_ik_##ROBOT##_pinocchio_lm(benchmark::State& state)                       \
 {                                                                                       \
-    static auto chain = cartan::benchmarks::FACTORY<double>();                          \
+    static auto chain = cartan::fixtures::FACTORY<double>();                          \
     static target_set<double, N_DOF> ts(chain, num_targets);                            \
     static auto pc = build_pinocchio_chain(chain, #ROBOT);                              \
     bm_pinocchio_lm<N_DOF>(state, pc.model, pc.ee_frame_id, ts);                        \
@@ -771,7 +771,7 @@ IK_BENCH_ROBOT_TRAC_IK(ROBOT, FACTORY, KDL_FACTORY, KDL_LIMITS_FACTORY, N_DOF)
 static void bm_ik_##ROBOT##_##SOLVER_NAME(benchmark::State& state)                       \
 {                                                                                        \
     using chain_t = cartan::kinematic_chain<double, N_DOF>;                              \
-    static auto chain = cartan::benchmarks::FACTORY<double>();                           \
+    static auto chain = cartan::fixtures::FACTORY<double>();                           \
     static target_set<double, N_DOF> ts(chain, num_targets);                             \
     bm_cartan_solver<N_DOF, SOLVER_TPL<chain_t>>(                                        \
         state, chain, ts,                                                                \
@@ -782,7 +782,7 @@ BENCHMARK(bm_ik_##ROBOT##_##SOLVER_NAME)->Iterations(2000)->Unit(benchmark::kMic
 static void bm_ik_##ROBOT##_##SOLVER_NAME##_no_limits(benchmark::State& state)           \
 {                                                                                        \
     using chain_t = cartan::kinematic_chain<double, N_DOF>;                              \
-    static auto chain = cartan::benchmarks::FACTORY<double>();                           \
+    static auto chain = cartan::fixtures::FACTORY<double>();                           \
     static target_set<double, N_DOF> ts(chain, num_targets);                             \
     bm_cartan_solver<N_DOF, SOLVER_TPL<chain_t, cartan::no_limits>>(                     \
         state, chain, ts,                                                                \
@@ -793,7 +793,7 @@ BENCHMARK(bm_ik_##ROBOT##_##SOLVER_NAME##_no_limits)->Iterations(2000)->Unit(ben
 static void bm_ik_##ROBOT##_##SOLVER_NAME##_restart(benchmark::State& state)             \
 {                                                                                        \
     using chain_t = cartan::kinematic_chain<double, N_DOF>;                              \
-    static auto chain = cartan::benchmarks::FACTORY<double>();                           \
+    static auto chain = cartan::fixtures::FACTORY<double>();                           \
     static target_set<double, N_DOF> ts(chain, num_targets);                             \
     bm_cartan_solver<N_DOF,                                                              \
         cartan::ik::restart_wrapper<chain_t, SOLVER_TPL<chain_t>>>(                      \
@@ -820,7 +820,7 @@ BENCHMARK(bm_ik_##ROBOT##_##SOLVER_NAME##_restart)->Iterations(2000)->Unit(bench
 static void bm_ik_##ROBOT##_##SOLVER_NAME##_kreest_k##K_VALUE(benchmark::State& state)              \
 {                                                                                                   \
     using chain_t = cartan::kinematic_chain<double, N_DOF>;                                         \
-    static auto chain = cartan::benchmarks::FACTORY<double>();                                      \
+    static auto chain = cartan::fixtures::FACTORY<double>();                                      \
     static target_set<double, N_DOF> ts(chain, num_targets);                                        \
     bm_cartan_argmin_slsqp_kreest<N_DOF, SOLVER_TPL<chain_t>>(                                      \
         state, chain, ts,                                                                           \
@@ -832,7 +832,7 @@ BENCHMARK(bm_ik_##ROBOT##_##SOLVER_NAME##_kreest_k##K_VALUE)->Iterations(2000)->
 static void bm_ik_##ROBOT##_##SOLVER_NAME##_kreest_k##K_VALUE##_no_limits(benchmark::State& state)  \
 {                                                                                                   \
     using chain_t = cartan::kinematic_chain<double, N_DOF>;                                         \
-    static auto chain = cartan::benchmarks::FACTORY<double>();                                      \
+    static auto chain = cartan::fixtures::FACTORY<double>();                                      \
     static target_set<double, N_DOF> ts(chain, num_targets);                                        \
     bm_cartan_argmin_slsqp_kreest<N_DOF, SOLVER_TPL<chain_t, cartan::no_limits>>(                   \
         state, chain, ts,                                                                           \
@@ -846,7 +846,7 @@ static void bm_ik_##ROBOT##_##SOLVER_NAME##_kreest_k##K_VALUE##_restart(benchmar
     using chain_t = cartan::kinematic_chain<double, N_DOF>;                                         \
     using inner_t = SOLVER_TPL<chain_t>;                                                            \
     using wrapped_t = cartan::ik::restart_wrapper<chain_t, inner_t>;                                \
-    static auto chain = cartan::benchmarks::FACTORY<double>();                                      \
+    static auto chain = cartan::fixtures::FACTORY<double>();                                      \
     static target_set<double, N_DOF> ts(chain, num_targets);                                        \
     /* Restart-wrapped variant: construct the inner solver explicitly with k-override, */          \
     /* then wrap it. Same shape as bm_cartan_argmin_slsqp_kreest but Solver=wrapped_t. */           \
@@ -871,7 +871,7 @@ static void bm_ik_##ROBOT##_##SOLVER_NAME##_kreest_k##K_VALUE##_restart(benchmar
         if (result.has_value()) {                                                                   \
             ++successes;                                                                            \
             total_iter += result->iterations;                                                       \
-            auto [pos_err, ori_err] = cartan::benchmarks::compute_pose_errors(                      \
+            auto [pos_err, ori_err] = cartan::fixtures::compute_pose_errors(                      \
                 chain, result->solution.position, target);                                          \
             total_pos += pos_err;                                                                   \
             total_ori += ori_err;                                                                   \
@@ -897,7 +897,7 @@ BENCHMARK(bm_ik_##ROBOT##_##SOLVER_NAME##_kreest_k##K_VALUE##_restart)->Iteratio
 static void bm_ik_##ROBOT##_##SOLVER_NAME(benchmark::State& state)                       \
 {                                                                                        \
     using chain_t = cartan::kinematic_chain<double, N_DOF>;                              \
-    static auto chain = cartan::benchmarks::FACTORY<double>();                           \
+    static auto chain = cartan::fixtures::FACTORY<double>();                           \
     static target_set<double, N_DOF> ts(chain, num_targets);                             \
     bm_cartan_solver<N_DOF, SOLVER_TPL<chain_t>>(                                        \
         state, chain, ts,                                                                \

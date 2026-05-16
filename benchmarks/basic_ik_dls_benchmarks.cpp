@@ -17,7 +17,7 @@
 
 static void bm_ik_cartan_dls_3r_planar(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_3r_planar_chain<double>();
+    auto chain = cartan::fixtures::make_3r_planar_chain<double>();
     cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 100};
     std::mt19937 rng(42);
 
@@ -29,8 +29,8 @@ static void bm_ik_cartan_dls_3r_planar(benchmark::State& state)
 
     for (auto _ : state)
     {
-        auto target = cartan::benchmarks::random_reachable_target(chain, rng);
-        auto q_seed = cartan::benchmarks::random_joint_config(chain, rng);
+        auto target = cartan::fixtures::random_reachable_target(chain, rng);
+        auto q_seed = cartan::fixtures::random_joint_config(chain, rng);
 
         cartan::basic_ik_runner<cartan::ik::dls<cartan::kinematic_chain<double, 3>>> solver;
         solver.setup(chain, target, q_seed, criteria);
@@ -41,7 +41,7 @@ static void bm_ik_cartan_dls_3r_planar(benchmark::State& state)
         {
             ++successes;
             total_iterations += result->iterations;
-            auto [pos_err, ori_err] = cartan::benchmarks::compute_pose_errors(
+            auto [pos_err, ori_err] = cartan::fixtures::compute_pose_errors(
                 chain, result->solution.position, target);
             total_pos_error += pos_err;
             total_ori_error += ori_err;
@@ -66,7 +66,7 @@ BENCHMARK(bm_ik_cartan_dls_3r_planar)->Iterations(10000)->Unit(benchmark::kMicro
 
 static void bm_ik_cartan_dls_ur3e(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    auto chain = cartan::fixtures::make_ur3e_chain<double>();
     cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 100};
     std::mt19937 rng(42);
 
@@ -78,8 +78,8 @@ static void bm_ik_cartan_dls_ur3e(benchmark::State& state)
 
     for (auto _ : state)
     {
-        auto target = cartan::benchmarks::random_reachable_target(chain, rng);
-        auto q_seed = cartan::benchmarks::random_joint_config(chain, rng);
+        auto target = cartan::fixtures::random_reachable_target(chain, rng);
+        auto q_seed = cartan::fixtures::random_joint_config(chain, rng);
 
         cartan::basic_ik_runner<cartan::ik::dls<cartan::kinematic_chain<double, 6>>> solver;
         solver.setup(chain, target, q_seed, criteria);
@@ -90,7 +90,7 @@ static void bm_ik_cartan_dls_ur3e(benchmark::State& state)
         {
             ++successes;
             total_iterations += result->iterations;
-            auto [pos_err, ori_err] = cartan::benchmarks::compute_pose_errors(
+            auto [pos_err, ori_err] = cartan::fixtures::compute_pose_errors(
                 chain, result->solution.position, target);
             total_pos_error += pos_err;
             total_ori_error += ori_err;
@@ -115,7 +115,7 @@ BENCHMARK(bm_ik_cartan_dls_ur3e)->Iterations(10000)->Unit(benchmark::kMicrosecon
 
 static void bm_ik_cartan_dls_lbr_med14(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_lbr_med14_chain<double>();
+    auto chain = cartan::fixtures::make_lbr_med14_chain<double>();
     cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 100};
     std::mt19937 rng(42);
 
@@ -127,8 +127,8 @@ static void bm_ik_cartan_dls_lbr_med14(benchmark::State& state)
 
     for (auto _ : state)
     {
-        auto target = cartan::benchmarks::random_reachable_target(chain, rng);
-        auto q_seed = cartan::benchmarks::random_joint_config(chain, rng);
+        auto target = cartan::fixtures::random_reachable_target(chain, rng);
+        auto q_seed = cartan::fixtures::random_joint_config(chain, rng);
 
         cartan::basic_ik_runner<cartan::ik::dls<cartan::kinematic_chain<double, 7>>> solver;
         solver.setup(chain, target, q_seed, criteria);
@@ -139,7 +139,7 @@ static void bm_ik_cartan_dls_lbr_med14(benchmark::State& state)
         {
             ++successes;
             total_iterations += result->iterations;
-            auto [pos_err, ori_err] = cartan::benchmarks::compute_pose_errors(
+            auto [pos_err, ori_err] = cartan::fixtures::compute_pose_errors(
                 chain, result->solution.position, target);
             total_pos_error += pos_err;
             total_ori_error += ori_err;

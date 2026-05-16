@@ -8,7 +8,7 @@
 /// This file is standalone from test infrastructure (D-14).
 /// Chain factories cover ~10 robots in both cartan PoE and KDL representations (D-11, D-12).
 
-#include "../profiling/chain_factories.h"
+#include "../tests/fixtures/chain_factories.h"
 
 #include <kdl/chain.hpp>
 #include <kdl/joint.hpp>
@@ -16,7 +16,7 @@
 #include <kdl/segment.hpp>
 #include <kdl/jntarray.hpp>
 
-namespace cartan::benchmarks
+namespace cartan::fixtures
 {
 
 // ===========================================================================

@@ -27,7 +27,7 @@ namespace
 template <typename Scalar>
 auto make_3r_planar_static()
 {
-    auto kc = cartan::benchmarks::make_3r_planar_chain<Scalar>();
+    auto kc = cartan::fixtures::make_3r_planar_chain<Scalar>();
     return cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_z, cartan::revolute_z>(
         kc.home(), kc.axes(), kc.limits());
 }
@@ -35,7 +35,7 @@ auto make_3r_planar_static()
 template <typename Scalar>
 auto make_ur3e_static()
 {
-    auto kc = cartan::benchmarks::make_ur3e_chain<Scalar>();
+    auto kc = cartan::fixtures::make_ur3e_chain<Scalar>();
     return cartan::static_chain<Scalar,
         cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
         cartan::revolute_y, cartan::revolute_z, cartan::revolute_y>(
@@ -45,7 +45,7 @@ auto make_ur3e_static()
 template <typename Scalar>
 auto make_lbr_med14_static()
 {
-    auto kc = cartan::benchmarks::make_lbr_med14_chain<Scalar>();
+    auto kc = cartan::fixtures::make_lbr_med14_chain<Scalar>();
     return cartan::static_chain<Scalar,
         cartan::revolute_z, cartan::revolute_y, cartan::revolute_z, cartan::revolute_y,
         cartan::revolute_z, cartan::revolute_y, cartan::revolute_z>(
@@ -55,7 +55,7 @@ auto make_lbr_med14_static()
 template <typename Scalar>
 auto make_kr6_sixx_static()
 {
-    auto kc = cartan::benchmarks::make_kr6_sixx_chain<Scalar>();
+    auto kc = cartan::fixtures::make_kr6_sixx_chain<Scalar>();
     return cartan::static_chain<Scalar,
         cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
         cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>(
@@ -65,7 +65,7 @@ auto make_kr6_sixx_static()
 template <typename Scalar>
 auto make_panda_static()
 {
-    auto kc = cartan::benchmarks::make_panda_chain<Scalar>();
+    auto kc = cartan::fixtures::make_panda_chain<Scalar>();
     return cartan::static_chain<Scalar,
         cartan::revolute_z, cartan::revolute_y, cartan::revolute_z, cartan::revolute_y,
         cartan::revolute_z, cartan::revolute_y, cartan::revolute_z>(
@@ -75,7 +75,7 @@ auto make_panda_static()
 template <typename Scalar>
 auto make_abb_irb120_static()
 {
-    auto kc = cartan::benchmarks::make_abb_irb120_chain<Scalar>();
+    auto kc = cartan::fixtures::make_abb_irb120_chain<Scalar>();
     return cartan::static_chain<Scalar,
         cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
         cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>(
@@ -85,7 +85,7 @@ auto make_abb_irb120_static()
 template <typename Scalar>
 auto make_jaco2_static()
 {
-    auto kc = cartan::benchmarks::make_jaco2_chain<Scalar>();
+    auto kc = cartan::fixtures::make_jaco2_chain<Scalar>();
     return cartan::static_chain<Scalar,
         cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
         cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>(
@@ -95,7 +95,7 @@ auto make_jaco2_static()
 template <typename Scalar>
 auto make_fetch_static()
 {
-    auto kc = cartan::benchmarks::make_fetch_chain<Scalar>();
+    auto kc = cartan::fixtures::make_fetch_chain<Scalar>();
     return cartan::static_chain<Scalar,
         cartan::revolute_z, cartan::revolute_y, cartan::revolute_x, cartan::revolute_y,
         cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>(
@@ -105,7 +105,7 @@ auto make_fetch_static()
 template <typename Scalar>
 auto make_baxter_static()
 {
-    auto kc = cartan::benchmarks::make_baxter_chain<Scalar>();
+    auto kc = cartan::fixtures::make_baxter_chain<Scalar>();
     return cartan::static_chain<Scalar,
         cartan::revolute_z, cartan::revolute_y, cartan::revolute_x, cartan::revolute_y,
         cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>(
@@ -472,7 +472,7 @@ template <typename Chain>
 void verify_fk_matrix_native(const Chain& chain, const std::string& robot)
 {
     std::mt19937 rng(123);
-    auto q = cartan::benchmarks::random_joint_config(chain, rng);
+    auto q = cartan::fixtures::random_joint_config(chain, rng);
     auto cartan_fk = cartan::forward_kinematics(chain, q);
     auto [R_m, t_m] = fk_matrix_native(chain, q);
     auto R_q = cartan_fk.end_effector.rotation().matrix();
@@ -543,7 +543,7 @@ template <typename Chain>
 void verify_jacobian_matrix(const Chain& chain, const std::string& robot)
 {
     std::mt19937 rng(123);
-    auto q = cartan::benchmarks::random_joint_config(chain, rng);
+    auto q = cartan::fixtures::random_joint_config(chain, rng);
     auto fk_q = cartan::forward_kinematics(chain, q);
     auto J_q = cartan::space_jacobian(chain, fk_q);
 
@@ -558,9 +558,9 @@ void verify_jacobian_matrix(const Chain& chain, const std::string& robot)
 #define FK_BENCH_CARTAN_MATRIX(ROBOT, KC_FACTORY)                                       \
 static void bm_fk_##ROBOT##_cartan_matrix(benchmark::State& state)                      \
 {                                                                                       \
-    auto chain = cartan::benchmarks::KC_FACTORY<double>();                              \
+    auto chain = cartan::fixtures::KC_FACTORY<double>();                              \
     std::mt19937 rng(42);                                                               \
-    auto q = cartan::benchmarks::random_joint_config(chain, rng);                       \
+    auto q = cartan::fixtures::random_joint_config(chain, rng);                       \
     for (auto _ : state)                                                                \
     {                                                                                   \
         auto r = fk_matrix_accum(chain, q);                                             \
@@ -570,10 +570,10 @@ static void bm_fk_##ROBOT##_cartan_matrix(benchmark::State& state)              
 BENCHMARK(bm_fk_##ROBOT##_cartan_matrix);                                               \
 static void bm_fk_##ROBOT##_cartan_matrix_native(benchmark::State& state)               \
 {                                                                                       \
-    auto chain = cartan::benchmarks::KC_FACTORY<double>();                              \
+    auto chain = cartan::fixtures::KC_FACTORY<double>();                              \
     verify_fk_matrix_native(chain, #ROBOT);                                             \
     std::mt19937 rng(42);                                                               \
-    auto q = cartan::benchmarks::random_joint_config(chain, rng);                       \
+    auto q = cartan::fixtures::random_joint_config(chain, rng);                       \
     for (auto _ : state)                                                                \
     {                                                                                   \
         auto r = fk_matrix_native(chain, q);                                            \
@@ -583,9 +583,9 @@ static void bm_fk_##ROBOT##_cartan_matrix_native(benchmark::State& state)       
 BENCHMARK(bm_fk_##ROBOT##_cartan_matrix_native);                                        \
 static void bm_fk_##ROBOT##_cartan_matrix_native_full(benchmark::State& state)          \
 {                                                                                       \
-    auto chain = cartan::benchmarks::KC_FACTORY<double>();                              \
+    auto chain = cartan::fixtures::KC_FACTORY<double>();                              \
     std::mt19937 rng(42);                                                               \
-    auto q = cartan::benchmarks::random_joint_config(chain, rng);                       \
+    auto q = cartan::fixtures::random_joint_config(chain, rng);                       \
     for (auto _ : state)                                                                \
     {                                                                                   \
         auto r = fk_matrix_native_full(chain, q);                                       \
@@ -628,9 +628,9 @@ BENCHMARK(bm_fk_##ROBOT##_cartan_static)
 #define FK_BENCH_CARTAN_KC(ROBOT, KC_FACTORY)                                           \
 static void bm_fk_##ROBOT##_cartan_kc(benchmark::State& state)                          \
 {                                                                                       \
-    auto chain = cartan::benchmarks::KC_FACTORY<double>();                              \
+    auto chain = cartan::fixtures::KC_FACTORY<double>();                              \
     std::mt19937 rng(42);                                                               \
-    auto q = cartan::benchmarks::random_joint_config(chain, rng);                       \
+    auto q = cartan::fixtures::random_joint_config(chain, rng);                       \
     for (auto _ : state)                                                                \
     {                                                                                   \
         auto result = cartan::forward_kinematics(chain, q);                             \
@@ -642,9 +642,9 @@ BENCHMARK(bm_fk_##ROBOT##_cartan_kc)
 #define JAC_BENCH_CARTAN(ROBOT, KC_FACTORY)                                             \
 static void bm_jac_##ROBOT##_cartan(benchmark::State& state)                            \
 {                                                                                       \
-    auto chain = cartan::benchmarks::KC_FACTORY<double>();                              \
+    auto chain = cartan::fixtures::KC_FACTORY<double>();                              \
     std::mt19937 rng(42);                                                               \
-    auto q = cartan::benchmarks::random_joint_config(chain, rng);                       \
+    auto q = cartan::fixtures::random_joint_config(chain, rng);                       \
     auto fk = cartan::forward_kinematics(chain, q);                                     \
     for (auto _ : state)                                                                \
     {                                                                                   \
@@ -655,9 +655,9 @@ static void bm_jac_##ROBOT##_cartan(benchmark::State& state)                    
 BENCHMARK(bm_jac_##ROBOT##_cartan);                                                     \
 static void bm_jac_##ROBOT##_matrix(benchmark::State& state)                            \
 {                                                                                       \
-    auto chain = cartan::benchmarks::KC_FACTORY<double>();                              \
+    auto chain = cartan::fixtures::KC_FACTORY<double>();                              \
     std::mt19937 rng(42);                                                               \
-    auto q = cartan::benchmarks::random_joint_config(chain, rng);                       \
+    auto q = cartan::fixtures::random_joint_config(chain, rng);                       \
     auto fkm = cartan::forward_kinematics_matrix(chain, q);                             \
     for (auto _ : state)                                                                \
     {                                                                                   \
@@ -668,9 +668,9 @@ static void bm_jac_##ROBOT##_matrix(benchmark::State& state)                    
 BENCHMARK(bm_jac_##ROBOT##_matrix);                                                     \
 static void bm_fk_##ROBOT##_matrix_api(benchmark::State& state)                         \
 {                                                                                       \
-    auto chain = cartan::benchmarks::KC_FACTORY<double>();                              \
+    auto chain = cartan::fixtures::KC_FACTORY<double>();                              \
     std::mt19937 rng(42);                                                               \
-    auto q = cartan::benchmarks::random_joint_config(chain, rng);                       \
+    auto q = cartan::fixtures::random_joint_config(chain, rng);                       \
     for (auto _ : state)                                                                \
     {                                                                                   \
         auto fkm = cartan::forward_kinematics_matrix(chain, q);                         \
@@ -680,9 +680,9 @@ static void bm_fk_##ROBOT##_matrix_api(benchmark::State& state)                 
 BENCHMARK(bm_fk_##ROBOT##_matrix_api);                                                  \
 static void bm_fkjac_##ROBOT##_cartan(benchmark::State& state)                          \
 {                                                                                       \
-    auto chain = cartan::benchmarks::KC_FACTORY<double>();                              \
+    auto chain = cartan::fixtures::KC_FACTORY<double>();                              \
     std::mt19937 rng(42);                                                               \
-    auto q = cartan::benchmarks::random_joint_config(chain, rng);                       \
+    auto q = cartan::fixtures::random_joint_config(chain, rng);                       \
     for (auto _ : state)                                                                \
     {                                                                                   \
         auto fk = cartan::forward_kinematics(chain, q);                                 \
@@ -694,9 +694,9 @@ static void bm_fkjac_##ROBOT##_cartan(benchmark::State& state)                  
 BENCHMARK(bm_fkjac_##ROBOT##_cartan);                                                   \
 static void bm_fkjac_##ROBOT##_matrix(benchmark::State& state)                          \
 {                                                                                       \
-    auto chain = cartan::benchmarks::KC_FACTORY<double>();                              \
+    auto chain = cartan::fixtures::KC_FACTORY<double>();                              \
     std::mt19937 rng(42);                                                               \
-    auto q = cartan::benchmarks::random_joint_config(chain, rng);                       \
+    auto q = cartan::fixtures::random_joint_config(chain, rng);                       \
     for (auto _ : state)                                                                \
     {                                                                                   \
         auto fkm = cartan::forward_kinematics_matrix(chain, q);                         \

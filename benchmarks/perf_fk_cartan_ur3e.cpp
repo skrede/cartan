@@ -9,9 +9,9 @@
 
 int main(int argc, char**)
 {
-    auto kc = cartan::benchmarks::make_ur3e_chain<double>();
+    auto kc = cartan::fixtures::make_ur3e_chain<double>();
     std::mt19937 rng(42);
-    auto q = cartan::benchmarks::random_joint_config(kc, rng);
+    auto q = cartan::fixtures::random_joint_config(kc, rng);
 
     const long iters = (argc > 1) ? 1 : 50'000'000;
     double accum = 0.0;

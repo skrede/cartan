@@ -79,8 +79,8 @@ struct target_set
         seeds.reserve(static_cast<std::size_t>(count));
         for (int i = 0; i < count; ++i)
         {
-            targets.push_back(cartan::benchmarks::random_reachable_target(chain, rng));
-            seeds.push_back(cartan::benchmarks::random_joint_config(chain, rng));
+            targets.push_back(cartan::fixtures::random_reachable_target(chain, rng));
+            seeds.push_back(cartan::fixtures::random_joint_config(chain, rng));
         }
     }
 };
@@ -118,7 +118,7 @@ void bm_full_solver(
         {
             ++successes;
             total_iterations += result->iterations;
-            auto [position_error, orientation_error] = cartan::benchmarks::compute_pose_errors(
+            auto [position_error, orientation_error] = cartan::fixtures::compute_pose_errors(
                 chain, result->solution.position, target);
             total_position_error += position_error;
             total_orientation_error += orientation_error;
@@ -218,7 +218,7 @@ void bm_racing_solver(
         {
             ++successes;
             total_iterations += result->iterations;
-            auto [position_error, orientation_error] = cartan::benchmarks::compute_pose_errors(
+            auto [position_error, orientation_error] = cartan::fixtures::compute_pose_errors(
                 chain, result->solution.position, target);
             total_position_error += position_error;
             total_orientation_error += orientation_error;
@@ -282,7 +282,7 @@ void bm_trac_ik_baseline(
 
     for (std::size_t i = 0; i < count; ++i)
     {
-        kdl_targets.push_back(cartan::benchmarks::se3_to_kdl_frame(ts.targets[i]));
+        kdl_targets.push_back(cartan::fixtures::se3_to_kdl_frame(ts.targets[i]));
         KDL::JntArray kdl_seed(static_cast<unsigned int>(N));
         for (unsigned int j = 0; j < static_cast<unsigned int>(N); ++j)
         {
@@ -320,7 +320,7 @@ void bm_trac_ik_baseline(
             {
                 q_solution(static_cast<int>(j)) = q_out(j);
             }
-            auto [position_error, orientation_error] = cartan::benchmarks::compute_pose_errors(
+            auto [position_error, orientation_error] = cartan::fixtures::compute_pose_errors(
                 chain, q_solution, ts.targets[idx - 1]);
             total_position_error += position_error;
             total_orientation_error += orientation_error;
@@ -412,7 +412,7 @@ void bm_lbfgsb_aggressive(
         {
             ++successes;
             total_iterations += result->iterations;
-            auto [position_error, orientation_error] = cartan::benchmarks::compute_pose_errors(
+            auto [position_error, orientation_error] = cartan::fixtures::compute_pose_errors(
                 chain, result->solution.position, target);
             total_position_error += position_error;
             total_orientation_error += orientation_error;
@@ -497,7 +497,7 @@ void bm_gauss_newton(
         {
             ++successes;
             total_iterations += result->iterations;
-            auto [position_error, orientation_error] = cartan::benchmarks::compute_pose_errors(
+            auto [position_error, orientation_error] = cartan::fixtures::compute_pose_errors(
                 chain, result->solution.position, target);
             total_position_error += position_error;
             total_orientation_error += orientation_error;
@@ -719,7 +719,7 @@ inline cartan::convergence_criteria<double> argmin_projected_gradient_gn_criteri
                                                                                                      \
 static void bm_full_##ROBOT##_cartan_dls(benchmark::State& state)                                        \
 {                                                                                                    \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                              \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                   \
     bm_full_solver<6, dls_ik_solver<6>>(state, chain, ts, dls_criteria());                         \
 }                                                                                                    \
@@ -727,7 +727,7 @@ BENCHMARK(bm_full_##ROBOT##_cartan_dls)->Iterations(1000)->Unit(benchmark::kMicr
                                                                                                      \
 static void bm_full_##ROBOT##_cartan_lm(benchmark::State& state)                                         \
 {                                                                                                    \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                              \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                   \
     bm_full_solver<6, lm_ik_solver<6>>(state, chain, ts, lm_criteria());                           \
 }                                                                                                    \
@@ -735,7 +735,7 @@ BENCHMARK(bm_full_##ROBOT##_cartan_lm)->Iterations(1000)->Unit(benchmark::kMicro
                                                                                                      \
 static void bm_full_##ROBOT##_cartan_projected_lm(benchmark::State& state)                               \
 {                                                                                                    \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                              \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                   \
     bm_full_solver<6, projected_lm_ik_solver<6>>(state, chain, ts, plm_criteria());                \
 }                                                                                                    \
@@ -743,7 +743,7 @@ BENCHMARK(bm_full_##ROBOT##_cartan_projected_lm)->Iterations(1000)->Unit(benchma
                                                                                                      \
 static void bm_full_##ROBOT##_cartan_lbfgsb(benchmark::State& state)                                     \
 {                                                                                                    \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                              \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                   \
     bm_full_solver<6, lbfgsb_ik_solver<6>>(state, chain, ts, lbfgsb_criteria());                   \
 }                                                                                                    \
@@ -751,7 +751,7 @@ BENCHMARK(bm_full_##ROBOT##_cartan_lbfgsb)->Iterations(1000)->Unit(benchmark::kM
                                                                                                      \
 static void bm_full_##ROBOT##_cartan_speed(benchmark::State& state)                                      \
 {                                                                                                    \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                              \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                   \
     bm_full_solver<6, speed_ik_solver<6>>(state, chain, ts, speed_criteria());                     \
 }                                                                                                    \
@@ -759,7 +759,7 @@ BENCHMARK(bm_full_##ROBOT##_cartan_speed)->Iterations(1000)->Unit(benchmark::kMi
                                                                                                      \
 static void bm_full_##ROBOT##_cartan_convergence(benchmark::State& state)                                \
 {                                                                                                    \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                              \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                   \
     bm_full_solver<6, convergence_ik_solver<6>>(state, chain, ts, convergence_criteria_tuned());   \
 }                                                                                                    \
@@ -767,7 +767,7 @@ BENCHMARK(bm_full_##ROBOT##_cartan_convergence)->Iterations(1000)->Unit(benchmar
                                                                                                      \
 static void bm_full_##ROBOT##_cartan_restart_lm(benchmark::State& state)                                 \
 {                                                                                                    \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                              \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                   \
     bm_full_solver<6, restart_lm_ik_solver<6>>(state, chain, ts, restart_lm_criteria());           \
 }                                                                                                    \
@@ -775,7 +775,7 @@ BENCHMARK(bm_full_##ROBOT##_cartan_restart_lm)->Iterations(1000)->Unit(benchmark
                                                                                                      \
 static void bm_full_##ROBOT##_cartan_newton_raphson(benchmark::State& state)                              \
 {                                                                                                    \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                              \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                   \
     bm_full_solver<6, nr_ik_solver<6>>(state, chain, ts, nr_criteria());                           \
 }                                                                                                    \
@@ -783,7 +783,7 @@ BENCHMARK(bm_full_##ROBOT##_cartan_newton_raphson)->Iterations(1000)->Unit(bench
                                                                                                      \
 static void bm_full_##ROBOT##_cartan_gauss_newton(benchmark::State& state)                               \
 {                                                                                                    \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                              \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                   \
     bm_gauss_newton<6>(state, chain, ts);                                                            \
 }                                                                                                    \
@@ -791,7 +791,7 @@ BENCHMARK(bm_full_##ROBOT##_cartan_gauss_newton)->Iterations(1000)->Unit(benchma
                                                                                                      \
 static void bm_full_##ROBOT##_cartan_lbfgsb_aggressive(benchmark::State& state)                          \
 {                                                                                                    \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                              \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                   \
     bm_lbfgsb_aggressive<6>(state, chain, ts);                                                       \
 }                                                                                                    \
@@ -799,7 +799,7 @@ BENCHMARK(bm_full_##ROBOT##_cartan_lbfgsb_aggressive)->Iterations(1000)->Unit(be
                                                                                                      \
 static void bm_full_##ROBOT##_cartan_racing(benchmark::State& state)                                     \
 {                                                                                                    \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                              \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                   \
     bm_racing_solver<6, racing_solver<6>>(state, chain, ts, 1000);                                \
 }                                                                                                    \
@@ -811,10 +811,10 @@ BENCHMARK(bm_full_##ROBOT##_cartan_racing)->Iterations(1000)->Unit(benchmark::kM
                                                                                                      \
 static void bm_full_##ROBOT##_trac_ik(benchmark::State& state)                                    \
 {                                                                                                    \
-    auto cartan_chain = cartan::benchmarks::CHAIN_FN<double>();                                        \
-    auto kdl_chain = cartan::benchmarks::KDL_FN();                                                    \
+    auto cartan_chain = cartan::fixtures::CHAIN_FN<double>();                                        \
+    auto kdl_chain = cartan::fixtures::KDL_FN();                                                    \
     KDL::JntArray q_min(6), q_max(6);                                                                \
-    cartan::benchmarks::LIMITS_FN(q_min, q_max);                                                      \
+    cartan::fixtures::LIMITS_FN(q_min, q_max);                                                      \
     static const target_set<double, 6> ts(cartan_chain, num_targets, 42);                             \
     bm_trac_ik_baseline<6>(state, cartan_chain, kdl_chain, q_min, q_max, ts);                         \
 }                                                                                                    \
@@ -826,7 +826,7 @@ BENCHMARK(bm_full_##ROBOT##_trac_ik)->Iterations(1000)->Unit(benchmark::kMicrose
                                                                                                      \
 static void bm_full_##ROBOT##_nlopt_bobyqa(benchmark::State& state)                                     \
 {                                                                                                    \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                              \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                   \
     bm_full_solver<6, bobyqa_ik_solver<6>>(state, chain, ts, bobyqa_criteria());                   \
 }                                                                                                    \
@@ -834,7 +834,7 @@ BENCHMARK(bm_full_##ROBOT##_nlopt_bobyqa)->Iterations(1000)->Unit(benchmark::kMi
                                                                                                      \
 static void bm_full_##ROBOT##_nlopt_slsqp(benchmark::State& state)                                      \
 {                                                                                                    \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                              \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                   \
     bm_full_solver<6, slsqp_ik_solver<6>>(state, chain, ts, slsqp_criteria());                     \
 }                                                                                                    \
@@ -849,7 +849,7 @@ BENCHMARK(bm_full_##ROBOT##_nlopt_slsqp)->Iterations(1000)->Unit(benchmark::kMic
                                                                                                       \
 static void bm_full_##ROBOT##_argmin_slsqp(benchmark::State& state)                               \
 {                                                                                                     \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                               \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
     bm_full_solver<6, argmin_slsqp_ik_solver<6>>(state, chain, ts, argmin_slsqp_criteria());     \
 }                                                                                                     \
@@ -857,7 +857,7 @@ BENCHMARK(bm_full_##ROBOT##_argmin_slsqp)->Iterations(1000)->Unit(benchmark::kMi
                                                                                                       \
 static void bm_full_##ROBOT##_argmin_lbfgsb(benchmark::State& state)                              \
 {                                                                                                     \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                               \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
     bm_full_solver<6, argmin_lbfgsb_ik_solver<6>>(state, chain, ts, argmin_lbfgsb_criteria());   \
 }                                                                                                     \
@@ -865,7 +865,7 @@ BENCHMARK(bm_full_##ROBOT##_argmin_lbfgsb)->Iterations(1000)->Unit(benchmark::kM
                                                                                                       \
 static void bm_full_##ROBOT##_argmin_nw_sqp(benchmark::State& state)                                      \
 {                                                                                                     \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                               \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
     bm_full_solver<6, nw_sqp_ik_solver<6>>(state, chain, ts, nw_sqp_criteria());                   \
 }                                                                                                     \
@@ -873,7 +873,7 @@ BENCHMARK(bm_full_##ROBOT##_argmin_nw_sqp)->Iterations(1000)->Unit(benchmark::kM
                                                                                                       \
 static void bm_full_##ROBOT##_argmin_lm(benchmark::State& state)                                  \
 {                                                                                                     \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                               \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
     bm_full_solver<6, argmin_lm_ik_solver<6>>(state, chain, ts, argmin_lm_criteria());           \
 }                                                                                                     \
@@ -881,7 +881,7 @@ BENCHMARK(bm_full_##ROBOT##_argmin_lm)->Iterations(1000)->Unit(benchmark::kMicro
                                                                                                       \
 static void bm_full_##ROBOT##_argmin_auglag(benchmark::State& state)                                      \
 {                                                                                                     \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                               \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
     bm_full_solver<6, auglag_ik_solver<6>>(state, chain, ts, auglag_criteria());                   \
 }                                                                                                     \
@@ -889,7 +889,7 @@ BENCHMARK(bm_full_##ROBOT##_argmin_auglag)->Iterations(1000)->Unit(benchmark::kM
                                                                                                       \
 static void bm_full_##ROBOT##_argmin_filter_slsqp(benchmark::State& state)                                \
 {                                                                                                     \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                               \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
     bm_full_solver<6, filter_slsqp_ik_solver<6>>(state, chain, ts, filter_slsqp_criteria());       \
 }                                                                                                     \
@@ -897,7 +897,7 @@ BENCHMARK(bm_full_##ROBOT##_argmin_filter_slsqp)->Iterations(1000)->Unit(benchma
                                                                                                       \
 static void bm_full_##ROBOT##_argmin_filter_nw_sqp(benchmark::State& state)                               \
 {                                                                                                     \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                               \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
     bm_full_solver<6, filter_nw_sqp_ik_solver<6>>(state, chain, ts, filter_nw_sqp_criteria());     \
 }                                                                                                     \
@@ -905,7 +905,7 @@ BENCHMARK(bm_full_##ROBOT##_argmin_filter_nw_sqp)->Iterations(1000)->Unit(benchm
                                                                                                       \
 static void bm_full_##ROBOT##_argmin_projected_gn(benchmark::State& state)                           \
 {                                                                                                     \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                               \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
     bm_full_solver<6, argmin_projected_gn_ik_solver<6>>(                                             \
         state, chain, ts, argmin_projected_gn_criteria());                                           \
@@ -914,7 +914,7 @@ BENCHMARK(bm_full_##ROBOT##_argmin_projected_gn)->Iterations(1000)->Unit(benchma
                                                                                                       \
 static void bm_full_##ROBOT##_argmin_projected_gradient_gn(benchmark::State& state)                  \
 {                                                                                                     \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                               \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
     bm_full_solver<6, argmin_projected_gradient_gn_ik_solver<6>>(                                    \
         state, chain, ts, argmin_projected_gradient_gn_criteria());                                  \
@@ -929,7 +929,7 @@ BENCHMARK(bm_full_##ROBOT##_argmin_projected_gradient_gn)->Iterations(1000)->Uni
                                                                                                      \
 static void bm_full_##ROBOT##_cartan_dls(benchmark::State& state)                                        \
 {                                                                                                    \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                              \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                   \
     bm_full_solver<7, dls_ik_solver<7>>(state, chain, ts, dls_criteria());                         \
 }                                                                                                    \
@@ -937,7 +937,7 @@ BENCHMARK(bm_full_##ROBOT##_cartan_dls)->Iterations(1000)->Unit(benchmark::kMicr
                                                                                                      \
 static void bm_full_##ROBOT##_cartan_lm(benchmark::State& state)                                         \
 {                                                                                                    \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                              \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                   \
     bm_full_solver<7, lm_ik_solver<7>>(state, chain, ts, lm_criteria());                           \
 }                                                                                                    \
@@ -945,7 +945,7 @@ BENCHMARK(bm_full_##ROBOT##_cartan_lm)->Iterations(1000)->Unit(benchmark::kMicro
                                                                                                      \
 static void bm_full_##ROBOT##_cartan_projected_lm(benchmark::State& state)                               \
 {                                                                                                    \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                              \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                   \
     bm_full_solver<7, projected_lm_ik_solver<7>>(state, chain, ts, plm_criteria());                \
 }                                                                                                    \
@@ -953,7 +953,7 @@ BENCHMARK(bm_full_##ROBOT##_cartan_projected_lm)->Iterations(1000)->Unit(benchma
                                                                                                      \
 static void bm_full_##ROBOT##_cartan_lbfgsb(benchmark::State& state)                                     \
 {                                                                                                    \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                              \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                   \
     bm_full_solver<7, lbfgsb_ik_solver<7>>(state, chain, ts, lbfgsb_criteria());                   \
 }                                                                                                    \
@@ -961,7 +961,7 @@ BENCHMARK(bm_full_##ROBOT##_cartan_lbfgsb)->Iterations(1000)->Unit(benchmark::kM
                                                                                                      \
 static void bm_full_##ROBOT##_cartan_speed(benchmark::State& state)                                      \
 {                                                                                                    \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                              \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                   \
     bm_full_solver<7, speed_ik_solver<7>>(state, chain, ts, speed_criteria());                     \
 }                                                                                                    \
@@ -969,7 +969,7 @@ BENCHMARK(bm_full_##ROBOT##_cartan_speed)->Iterations(1000)->Unit(benchmark::kMi
                                                                                                      \
 static void bm_full_##ROBOT##_cartan_convergence(benchmark::State& state)                                \
 {                                                                                                    \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                              \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                   \
     bm_full_solver<7, convergence_ik_solver<7>>(state, chain, ts, convergence_criteria_tuned());   \
 }                                                                                                    \
@@ -977,7 +977,7 @@ BENCHMARK(bm_full_##ROBOT##_cartan_convergence)->Iterations(1000)->Unit(benchmar
                                                                                                      \
 static void bm_full_##ROBOT##_cartan_restart_lm(benchmark::State& state)                                 \
 {                                                                                                    \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                              \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                   \
     bm_full_solver<7, restart_lm_ik_solver<7>>(state, chain, ts, restart_lm_criteria());           \
 }                                                                                                    \
@@ -985,7 +985,7 @@ BENCHMARK(bm_full_##ROBOT##_cartan_restart_lm)->Iterations(1000)->Unit(benchmark
                                                                                                      \
 static void bm_full_##ROBOT##_cartan_newton_raphson(benchmark::State& state)                              \
 {                                                                                                    \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                              \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                   \
     bm_full_solver<7, nr_ik_solver<7>>(state, chain, ts, nr_criteria());                           \
 }                                                                                                    \
@@ -993,7 +993,7 @@ BENCHMARK(bm_full_##ROBOT##_cartan_newton_raphson)->Iterations(1000)->Unit(bench
                                                                                                      \
 static void bm_full_##ROBOT##_cartan_gauss_newton(benchmark::State& state)                               \
 {                                                                                                    \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                              \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                   \
     bm_gauss_newton<7>(state, chain, ts);                                                            \
 }                                                                                                    \
@@ -1001,7 +1001,7 @@ BENCHMARK(bm_full_##ROBOT##_cartan_gauss_newton)->Iterations(1000)->Unit(benchma
                                                                                                      \
 static void bm_full_##ROBOT##_cartan_lbfgsb_aggressive(benchmark::State& state)                          \
 {                                                                                                    \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                              \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                   \
     bm_lbfgsb_aggressive<7>(state, chain, ts);                                                       \
 }                                                                                                    \
@@ -1009,7 +1009,7 @@ BENCHMARK(bm_full_##ROBOT##_cartan_lbfgsb_aggressive)->Iterations(1000)->Unit(be
                                                                                                      \
 static void bm_full_##ROBOT##_cartan_racing(benchmark::State& state)                                     \
 {                                                                                                    \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                              \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                   \
     bm_racing_solver<7, racing_solver<7>>(state, chain, ts, 1000);                                \
 }                                                                                                    \
@@ -1020,10 +1020,10 @@ BENCHMARK(bm_full_##ROBOT##_cartan_racing)->Iterations(1000)->Unit(benchmark::kM
                                                                                                      \
 static void bm_full_##ROBOT##_trac_ik(benchmark::State& state)                                    \
 {                                                                                                    \
-    auto cartan_chain = cartan::benchmarks::CHAIN_FN<double>();                                        \
-    auto kdl_chain = cartan::benchmarks::KDL_FN();                                                    \
+    auto cartan_chain = cartan::fixtures::CHAIN_FN<double>();                                        \
+    auto kdl_chain = cartan::fixtures::KDL_FN();                                                    \
     KDL::JntArray q_min(7), q_max(7);                                                                \
-    cartan::benchmarks::LIMITS_FN(q_min, q_max);                                                      \
+    cartan::fixtures::LIMITS_FN(q_min, q_max);                                                      \
     static const target_set<double, 7> ts(cartan_chain, num_targets, 42);                             \
     bm_trac_ik_baseline<7>(state, cartan_chain, kdl_chain, q_min, q_max, ts);                         \
 }                                                                                                    \
@@ -1035,7 +1035,7 @@ BENCHMARK(bm_full_##ROBOT##_trac_ik)->Iterations(1000)->Unit(benchmark::kMicrose
                                                                                                      \
 static void bm_full_##ROBOT##_nlopt_bobyqa(benchmark::State& state)                                     \
 {                                                                                                    \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                              \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                   \
     bm_full_solver<7, bobyqa_ik_solver<7>>(state, chain, ts, bobyqa_criteria());                   \
 }                                                                                                    \
@@ -1043,7 +1043,7 @@ BENCHMARK(bm_full_##ROBOT##_nlopt_bobyqa)->Iterations(1000)->Unit(benchmark::kMi
                                                                                                      \
 static void bm_full_##ROBOT##_nlopt_slsqp(benchmark::State& state)                                      \
 {                                                                                                    \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                              \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                              \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                   \
     bm_full_solver<7, slsqp_ik_solver<7>>(state, chain, ts, slsqp_criteria());                     \
 }                                                                                                    \
@@ -1058,7 +1058,7 @@ BENCHMARK(bm_full_##ROBOT##_nlopt_slsqp)->Iterations(1000)->Unit(benchmark::kMic
                                                                                                       \
 static void bm_full_##ROBOT##_argmin_slsqp(benchmark::State& state)                               \
 {                                                                                                     \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                               \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
     bm_full_solver<7, argmin_slsqp_ik_solver<7>>(state, chain, ts, argmin_slsqp_criteria());     \
 }                                                                                                     \
@@ -1066,7 +1066,7 @@ BENCHMARK(bm_full_##ROBOT##_argmin_slsqp)->Iterations(1000)->Unit(benchmark::kMi
                                                                                                       \
 static void bm_full_##ROBOT##_argmin_lbfgsb(benchmark::State& state)                              \
 {                                                                                                     \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                               \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
     bm_full_solver<7, argmin_lbfgsb_ik_solver<7>>(state, chain, ts, argmin_lbfgsb_criteria());   \
 }                                                                                                     \
@@ -1074,7 +1074,7 @@ BENCHMARK(bm_full_##ROBOT##_argmin_lbfgsb)->Iterations(1000)->Unit(benchmark::kM
                                                                                                       \
 static void bm_full_##ROBOT##_argmin_nw_sqp(benchmark::State& state)                                      \
 {                                                                                                     \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                               \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
     bm_full_solver<7, nw_sqp_ik_solver<7>>(state, chain, ts, nw_sqp_criteria());                   \
 }                                                                                                     \
@@ -1082,7 +1082,7 @@ BENCHMARK(bm_full_##ROBOT##_argmin_nw_sqp)->Iterations(1000)->Unit(benchmark::kM
                                                                                                       \
 static void bm_full_##ROBOT##_argmin_lm(benchmark::State& state)                                  \
 {                                                                                                     \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                               \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
     bm_full_solver<7, argmin_lm_ik_solver<7>>(state, chain, ts, argmin_lm_criteria());           \
 }                                                                                                     \
@@ -1090,7 +1090,7 @@ BENCHMARK(bm_full_##ROBOT##_argmin_lm)->Iterations(1000)->Unit(benchmark::kMicro
                                                                                                       \
 static void bm_full_##ROBOT##_argmin_auglag(benchmark::State& state)                                      \
 {                                                                                                     \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                               \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
     bm_full_solver<7, auglag_ik_solver<7>>(state, chain, ts, auglag_criteria());                   \
 }                                                                                                     \
@@ -1098,7 +1098,7 @@ BENCHMARK(bm_full_##ROBOT##_argmin_auglag)->Iterations(1000)->Unit(benchmark::kM
                                                                                                       \
 static void bm_full_##ROBOT##_argmin_filter_slsqp(benchmark::State& state)                                \
 {                                                                                                     \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                               \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
     bm_full_solver<7, filter_slsqp_ik_solver<7>>(state, chain, ts, filter_slsqp_criteria());       \
 }                                                                                                     \
@@ -1106,7 +1106,7 @@ BENCHMARK(bm_full_##ROBOT##_argmin_filter_slsqp)->Iterations(1000)->Unit(benchma
                                                                                                       \
 static void bm_full_##ROBOT##_argmin_filter_nw_sqp(benchmark::State& state)                               \
 {                                                                                                     \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                               \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
     bm_full_solver<7, filter_nw_sqp_ik_solver<7>>(state, chain, ts, filter_nw_sqp_criteria());     \
 }                                                                                                     \
@@ -1114,7 +1114,7 @@ BENCHMARK(bm_full_##ROBOT##_argmin_filter_nw_sqp)->Iterations(1000)->Unit(benchm
                                                                                                       \
 static void bm_full_##ROBOT##_argmin_projected_gn(benchmark::State& state)                           \
 {                                                                                                     \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                               \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
     bm_full_solver<7, argmin_projected_gn_ik_solver<7>>(                                             \
         state, chain, ts, argmin_projected_gn_criteria());                                           \
@@ -1123,7 +1123,7 @@ BENCHMARK(bm_full_##ROBOT##_argmin_projected_gn)->Iterations(1000)->Unit(benchma
                                                                                                       \
 static void bm_full_##ROBOT##_argmin_projected_gradient_gn(benchmark::State& state)                  \
 {                                                                                                     \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                               \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
     bm_full_solver<7, argmin_projected_gradient_gn_ik_solver<7>>(                                    \
         state, chain, ts, argmin_projected_gradient_gn_criteria());                                  \
@@ -1203,7 +1203,7 @@ using argmin_slsqp_dynamic_solver = cartan::basic_ik_runner<argmin_slsqp_dynamic
 // Fixed-size UR3e argmin SLSQP (reference: same as bm_full_ur3e_argmin_slsqp above)
 static void bm_full_ur3e_argmin_slsqp_fixed(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    auto chain = cartan::fixtures::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_full_solver<6, argmin_slsqp_ik_solver<6>>(state, chain, ts, argmin_slsqp_criteria());
 }
@@ -1212,7 +1212,7 @@ BENCHMARK(bm_full_ur3e_argmin_slsqp_fixed)->Iterations(1000)->Unit(benchmark::kM
 // Dynamic-size UR3e argmin SLSQP
 static void bm_full_ur3e_argmin_slsqp_dynamic(benchmark::State& state)
 {
-    auto fixed_chain = cartan::benchmarks::make_ur3e_chain<double>();
+    auto fixed_chain = cartan::fixtures::make_ur3e_chain<double>();
     auto chain = fixed_chain.to_dynamic();
     static const target_set<double, cartan::dynamic> ts(chain, num_targets, 42);
     bm_full_solver<cartan::dynamic, argmin_slsqp_dynamic_solver>(state, chain, ts, argmin_slsqp_criteria());

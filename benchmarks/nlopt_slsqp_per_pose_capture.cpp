@@ -14,7 +14,7 @@
 ///
 /// Usage: nlopt_slsqp_per_pose_capture <output.csv>
 
-#include "../profiling/chain_factories.h"
+#include "../tests/fixtures/chain_factories.h"
 
 #include <cartan/serial/ik/ik_status.h>
 #include <cartan/serial/ik/ik_result.h>
@@ -52,8 +52,8 @@ struct target_set
         seeds.reserve(static_cast<std::size_t>(count));
         for (int i = 0; i < count; ++i)
         {
-            targets.push_back(cartan::benchmarks::random_reachable_target(chain, rng));
-            seeds.push_back(cartan::benchmarks::random_joint_config(chain, rng));
+            targets.push_back(cartan::fixtures::random_reachable_target(chain, rng));
+            seeds.push_back(cartan::fixtures::random_joint_config(chain, rng));
         }
     }
 };
@@ -208,13 +208,13 @@ int main(int argc, char** argv)
     const cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 500};
 
     {
-        auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+        auto chain = cartan::fixtures::make_ur3e_chain<double>();
         target_set<double, 6> ts(chain, num_targets, target_seed);
         run_per_pose<6, nlopt_slsqp_solver<6>>("ur3e", chain, ts, criteria, out);
         std::cerr << "ur3e: 1000 poses written\n";
     }
     {
-        auto chain = cartan::benchmarks::make_panda_chain<double>();
+        auto chain = cartan::fixtures::make_panda_chain<double>();
         target_set<double, 7> ts(chain, num_targets, target_seed);
         run_per_pose<7, nlopt_slsqp_solver<7>>("panda", chain, ts, criteria, out);
         std::cerr << "panda: 1000 poses written\n";

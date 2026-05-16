@@ -15,7 +15,7 @@
 
 int main(int argc, char**)
 {
-    auto kc = cartan::benchmarks::make_ur3e_chain<double>();
+    auto kc = cartan::fixtures::make_ur3e_chain<double>();
     pinocchio::Model model;
     pinocchio::JointIndex parent = 0;
     Eigen::Vector3d prev = Eigen::Vector3d::Zero();
@@ -41,7 +41,7 @@ int main(int argc, char**)
     pinocchio::Data data(model);
 
     std::mt19937 rng(42);
-    auto q_cartan = cartan::benchmarks::random_joint_config(kc, rng);
+    auto q_cartan = cartan::fixtures::random_joint_config(kc, rng);
     Eigen::VectorXd q(kc.num_joints());
     for (int i = 0; i < kc.num_joints(); ++i) q(i) = q_cartan(i);
 

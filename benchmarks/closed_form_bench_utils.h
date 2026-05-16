@@ -17,7 +17,7 @@
 ///   3. bm_closed_form_solver / bm_closed_form_coverage / bm_iterative_solver:
 ///      template benchmark drivers parameterized on the cartan::chain concept.
 
-#include "../profiling/chain_factories.h"
+#include "../tests/fixtures/chain_factories.h"
 
 #include <cartan/analytical/analytical_types.h>
 #include <cartan/analytical/analytical_solver.h>
@@ -35,7 +35,7 @@
 #include <expected>
 #include <algorithm>
 
-namespace cartan::benchmarks
+namespace cartan::fixtures
 {
 
 /// Pick the solution branch closest to a seed configuration.
@@ -194,7 +194,7 @@ void bm_closed_form_solver(
             if (pick.has_value())
             {
                 ++successes;
-                auto [pos_err, ori_err] = cartan::benchmarks::compute_pose_errors(
+                auto [pos_err, ori_err] = cartan::fixtures::compute_pose_errors(
                     chain_for_fk_check, *pick, target);
                 total_pos += pos_err;
                 total_ori += ori_err;
@@ -293,7 +293,7 @@ void bm_iterative_solver(
         {
             ++successes;
             total_iter += result->iterations;
-            auto [pos_err, ori_err] = cartan::benchmarks::compute_pose_errors(
+            auto [pos_err, ori_err] = cartan::fixtures::compute_pose_errors(
                 chain, result->solution.position, target);
             total_pos += pos_err;
             total_ori += ori_err;

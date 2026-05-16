@@ -75,8 +75,8 @@ struct target_set
         seeds.reserve(static_cast<std::size_t>(count));
         for (int i = 0; i < count; ++i)
         {
-            targets.push_back(cartan::benchmarks::random_reachable_target(chain, rng));
-            seeds.push_back(cartan::benchmarks::random_joint_config(chain, rng));
+            targets.push_back(cartan::fixtures::random_reachable_target(chain, rng));
+            seeds.push_back(cartan::fixtures::random_joint_config(chain, rng));
         }
     }
 };
@@ -115,7 +115,7 @@ void bm_cartan_comparison(
         {
             ++successes;
             total_iterations += result->iterations;
-            auto [pos_err, ori_err] = cartan::benchmarks::compute_pose_errors(
+            auto [pos_err, ori_err] = cartan::fixtures::compute_pose_errors(
                 chain, result->solution.position, target);
             total_pos_error += pos_err;
             total_ori_error += ori_err;
@@ -176,7 +176,7 @@ void bm_cartan_restart_lm_comparison(
         {
             ++successes;
             total_iterations += result->iterations;
-            auto [pos_err, ori_err] = cartan::benchmarks::compute_pose_errors(
+            auto [pos_err, ori_err] = cartan::fixtures::compute_pose_errors(
                 chain, result->solution.position, target);
             total_pos_error += pos_err;
             total_ori_error += ori_err;
@@ -235,7 +235,7 @@ void bm_cartan_speed_comparison(
         {
             ++successes;
             total_iterations += result->iterations;
-            auto [pos_err, ori_err] = cartan::benchmarks::compute_pose_errors(
+            auto [pos_err, ori_err] = cartan::fixtures::compute_pose_errors(
                 chain, result->solution.position, target);
             total_pos_error += pos_err;
             total_ori_error += ori_err;
@@ -294,7 +294,7 @@ void bm_cartan_racing_comparison(
         {
             ++successes;
             total_iterations += result->iterations;
-            auto [pos_err, ori_err] = cartan::benchmarks::compute_pose_errors(
+            auto [pos_err, ori_err] = cartan::fixtures::compute_pose_errors(
                 chain, result->solution.position, target);
             total_pos_error += pos_err;
             total_ori_error += ori_err;
@@ -335,7 +335,7 @@ void bm_trac_ik_comparison(
 
     for (std::size_t i = 0; i < count; ++i)
     {
-        kdl_targets.push_back(cartan::benchmarks::se3_to_kdl_frame(ts.targets[i]));
+        kdl_targets.push_back(cartan::fixtures::se3_to_kdl_frame(ts.targets[i]));
         KDL::JntArray kdl_seed(static_cast<unsigned int>(N));
         for (unsigned int j = 0; j < static_cast<unsigned int>(N); ++j)
         {
@@ -385,7 +385,7 @@ void bm_trac_ik_comparison(
 
 static void bm_comparison_ur3e_cartan(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    auto chain = cartan::fixtures::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_comparison<6>(state, chain, ts);
 }
@@ -393,10 +393,10 @@ BENCHMARK(bm_comparison_ur3e_cartan)->Iterations(1000)->Unit(benchmark::kMicrose
 
 static void bm_comparison_ur3e_trac_ik(benchmark::State& state)
 {
-    auto cartan_chain = cartan::benchmarks::make_ur3e_chain<double>();
-    auto kdl_chain = cartan::benchmarks::make_ur3e_kdl_chain();
+    auto cartan_chain = cartan::fixtures::make_ur3e_chain<double>();
+    auto kdl_chain = cartan::fixtures::make_ur3e_kdl_chain();
     KDL::JntArray q_min(6), q_max(6);
-    cartan::benchmarks::make_ur3e_kdl_limits(q_min, q_max);
+    cartan::fixtures::make_ur3e_kdl_limits(q_min, q_max);
     static const target_set<double, 6> ts(cartan_chain, num_targets, 42);
     bm_trac_ik_comparison<6>(state, kdl_chain, q_min, q_max, ts);
 }
@@ -404,7 +404,7 @@ BENCHMARK(bm_comparison_ur3e_trac_ik)->Iterations(1000)->Unit(benchmark::kMicros
 
 static void bm_comparison_ur3e_cartan_restart_lm(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    auto chain = cartan::fixtures::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_restart_lm_comparison<6>(state, chain, ts);
 }
@@ -412,7 +412,7 @@ BENCHMARK(bm_comparison_ur3e_cartan_restart_lm)->Iterations(1000)->Unit(benchmar
 
 static void bm_comparison_ur3e_cartan_restart_lm_clamped(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    auto chain = cartan::fixtures::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_restart_lm_comparison<6, cartan::clamp_limits>(state, chain, ts);
 }
@@ -420,7 +420,7 @@ BENCHMARK(bm_comparison_ur3e_cartan_restart_lm_clamped)->Iterations(1000)->Unit(
 
 static void bm_comparison_ur3e_cartan_speed(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    auto chain = cartan::fixtures::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_speed_comparison<6>(state, chain, ts);
 }
@@ -428,7 +428,7 @@ BENCHMARK(bm_comparison_ur3e_cartan_speed)->Iterations(1000)->Unit(benchmark::kM
 
 static void bm_comparison_ur3e_cartan_racing(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    auto chain = cartan::fixtures::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_racing_comparison<6>(state, chain, ts);
 }
@@ -438,7 +438,7 @@ BENCHMARK(bm_comparison_ur3e_cartan_racing)->Iterations(1000)->Unit(benchmark::k
 
 static void bm_comparison_kr6_sixx_cartan(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_kr6_sixx_chain<double>();
+    auto chain = cartan::fixtures::make_kr6_sixx_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_comparison<6>(state, chain, ts);
 }
@@ -446,10 +446,10 @@ BENCHMARK(bm_comparison_kr6_sixx_cartan)->Iterations(1000)->Unit(benchmark::kMic
 
 static void bm_comparison_kr6_sixx_trac_ik(benchmark::State& state)
 {
-    auto cartan_chain = cartan::benchmarks::make_kr6_sixx_chain<double>();
-    auto kdl_chain = cartan::benchmarks::make_kr6_sixx_kdl_chain();
+    auto cartan_chain = cartan::fixtures::make_kr6_sixx_chain<double>();
+    auto kdl_chain = cartan::fixtures::make_kr6_sixx_kdl_chain();
     KDL::JntArray q_min(6), q_max(6);
-    cartan::benchmarks::make_kr6_sixx_kdl_limits(q_min, q_max);
+    cartan::fixtures::make_kr6_sixx_kdl_limits(q_min, q_max);
     static const target_set<double, 6> ts(cartan_chain, num_targets, 42);
     bm_trac_ik_comparison<6>(state, kdl_chain, q_min, q_max, ts);
 }
@@ -457,7 +457,7 @@ BENCHMARK(bm_comparison_kr6_sixx_trac_ik)->Iterations(1000)->Unit(benchmark::kMi
 
 static void bm_comparison_kr6_sixx_cartan_restart_lm(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_kr6_sixx_chain<double>();
+    auto chain = cartan::fixtures::make_kr6_sixx_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_restart_lm_comparison<6>(state, chain, ts);
 }
@@ -465,7 +465,7 @@ BENCHMARK(bm_comparison_kr6_sixx_cartan_restart_lm)->Iterations(1000)->Unit(benc
 
 static void bm_comparison_kr6_sixx_cartan_restart_lm_clamped(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_kr6_sixx_chain<double>();
+    auto chain = cartan::fixtures::make_kr6_sixx_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_restart_lm_comparison<6, cartan::clamp_limits>(state, chain, ts);
 }
@@ -473,7 +473,7 @@ BENCHMARK(bm_comparison_kr6_sixx_cartan_restart_lm_clamped)->Iterations(1000)->U
 
 static void bm_comparison_kr6_sixx_cartan_speed(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_kr6_sixx_chain<double>();
+    auto chain = cartan::fixtures::make_kr6_sixx_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_speed_comparison<6>(state, chain, ts);
 }
@@ -481,7 +481,7 @@ BENCHMARK(bm_comparison_kr6_sixx_cartan_speed)->Iterations(1000)->Unit(benchmark
 
 static void bm_comparison_kr6_sixx_cartan_racing(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_kr6_sixx_chain<double>();
+    auto chain = cartan::fixtures::make_kr6_sixx_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_racing_comparison<6>(state, chain, ts);
 }
@@ -491,7 +491,7 @@ BENCHMARK(bm_comparison_kr6_sixx_cartan_racing)->Iterations(1000)->Unit(benchmar
 
 static void bm_comparison_abb_irb120_cartan(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_abb_irb120_chain<double>();
+    auto chain = cartan::fixtures::make_abb_irb120_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_comparison<6>(state, chain, ts);
 }
@@ -499,10 +499,10 @@ BENCHMARK(bm_comparison_abb_irb120_cartan)->Iterations(1000)->Unit(benchmark::kM
 
 static void bm_comparison_abb_irb120_trac_ik(benchmark::State& state)
 {
-    auto cartan_chain = cartan::benchmarks::make_abb_irb120_chain<double>();
-    auto kdl_chain = cartan::benchmarks::make_abb_irb120_kdl_chain();
+    auto cartan_chain = cartan::fixtures::make_abb_irb120_chain<double>();
+    auto kdl_chain = cartan::fixtures::make_abb_irb120_kdl_chain();
     KDL::JntArray q_min(6), q_max(6);
-    cartan::benchmarks::make_abb_irb120_kdl_limits(q_min, q_max);
+    cartan::fixtures::make_abb_irb120_kdl_limits(q_min, q_max);
     static const target_set<double, 6> ts(cartan_chain, num_targets, 42);
     bm_trac_ik_comparison<6>(state, kdl_chain, q_min, q_max, ts);
 }
@@ -510,7 +510,7 @@ BENCHMARK(bm_comparison_abb_irb120_trac_ik)->Iterations(1000)->Unit(benchmark::k
 
 static void bm_comparison_abb_irb120_cartan_restart_lm(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_abb_irb120_chain<double>();
+    auto chain = cartan::fixtures::make_abb_irb120_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_restart_lm_comparison<6>(state, chain, ts);
 }
@@ -518,7 +518,7 @@ BENCHMARK(bm_comparison_abb_irb120_cartan_restart_lm)->Iterations(1000)->Unit(be
 
 static void bm_comparison_abb_irb120_cartan_restart_lm_clamped(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_abb_irb120_chain<double>();
+    auto chain = cartan::fixtures::make_abb_irb120_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_restart_lm_comparison<6, cartan::clamp_limits>(state, chain, ts);
 }
@@ -526,7 +526,7 @@ BENCHMARK(bm_comparison_abb_irb120_cartan_restart_lm_clamped)->Iterations(1000)-
 
 static void bm_comparison_abb_irb120_cartan_speed(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_abb_irb120_chain<double>();
+    auto chain = cartan::fixtures::make_abb_irb120_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_speed_comparison<6>(state, chain, ts);
 }
@@ -534,7 +534,7 @@ BENCHMARK(bm_comparison_abb_irb120_cartan_speed)->Iterations(1000)->Unit(benchma
 
 static void bm_comparison_abb_irb120_cartan_racing(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_abb_irb120_chain<double>();
+    auto chain = cartan::fixtures::make_abb_irb120_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_racing_comparison<6>(state, chain, ts);
 }
@@ -544,7 +544,7 @@ BENCHMARK(bm_comparison_abb_irb120_cartan_racing)->Iterations(1000)->Unit(benchm
 
 static void bm_comparison_jaco2_cartan(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_jaco2_chain<double>();
+    auto chain = cartan::fixtures::make_jaco2_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_comparison<6>(state, chain, ts);
 }
@@ -552,10 +552,10 @@ BENCHMARK(bm_comparison_jaco2_cartan)->Iterations(1000)->Unit(benchmark::kMicros
 
 static void bm_comparison_jaco2_trac_ik(benchmark::State& state)
 {
-    auto cartan_chain = cartan::benchmarks::make_jaco2_chain<double>();
-    auto kdl_chain = cartan::benchmarks::make_jaco2_kdl_chain();
+    auto cartan_chain = cartan::fixtures::make_jaco2_chain<double>();
+    auto kdl_chain = cartan::fixtures::make_jaco2_kdl_chain();
     KDL::JntArray q_min(6), q_max(6);
-    cartan::benchmarks::make_jaco2_kdl_limits(q_min, q_max);
+    cartan::fixtures::make_jaco2_kdl_limits(q_min, q_max);
     static const target_set<double, 6> ts(cartan_chain, num_targets, 42);
     bm_trac_ik_comparison<6>(state, kdl_chain, q_min, q_max, ts);
 }
@@ -563,7 +563,7 @@ BENCHMARK(bm_comparison_jaco2_trac_ik)->Iterations(1000)->Unit(benchmark::kMicro
 
 static void bm_comparison_jaco2_cartan_restart_lm(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_jaco2_chain<double>();
+    auto chain = cartan::fixtures::make_jaco2_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_restart_lm_comparison<6>(state, chain, ts);
 }
@@ -571,7 +571,7 @@ BENCHMARK(bm_comparison_jaco2_cartan_restart_lm)->Iterations(1000)->Unit(benchma
 
 static void bm_comparison_jaco2_cartan_restart_lm_clamped(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_jaco2_chain<double>();
+    auto chain = cartan::fixtures::make_jaco2_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_restart_lm_comparison<6, cartan::clamp_limits>(state, chain, ts);
 }
@@ -579,7 +579,7 @@ BENCHMARK(bm_comparison_jaco2_cartan_restart_lm_clamped)->Iterations(1000)->Unit
 
 static void bm_comparison_jaco2_cartan_speed(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_jaco2_chain<double>();
+    auto chain = cartan::fixtures::make_jaco2_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_speed_comparison<6>(state, chain, ts);
 }
@@ -587,7 +587,7 @@ BENCHMARK(bm_comparison_jaco2_cartan_speed)->Iterations(1000)->Unit(benchmark::k
 
 static void bm_comparison_jaco2_cartan_racing(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_jaco2_chain<double>();
+    auto chain = cartan::fixtures::make_jaco2_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_racing_comparison<6>(state, chain, ts);
 }
@@ -601,7 +601,7 @@ BENCHMARK(bm_comparison_jaco2_cartan_racing)->Iterations(1000)->Unit(benchmark::
 
 static void bm_comparison_lbr_med14_cartan(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_lbr_med14_chain<double>();
+    auto chain = cartan::fixtures::make_lbr_med14_chain<double>();
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_comparison<7>(state, chain, ts);
 }
@@ -609,10 +609,10 @@ BENCHMARK(bm_comparison_lbr_med14_cartan)->Iterations(1000)->Unit(benchmark::kMi
 
 static void bm_comparison_lbr_med14_trac_ik(benchmark::State& state)
 {
-    auto cartan_chain = cartan::benchmarks::make_lbr_med14_chain<double>();
-    auto kdl_chain = cartan::benchmarks::make_lbr_med14_kdl_chain();
+    auto cartan_chain = cartan::fixtures::make_lbr_med14_chain<double>();
+    auto kdl_chain = cartan::fixtures::make_lbr_med14_kdl_chain();
     KDL::JntArray q_min(7), q_max(7);
-    cartan::benchmarks::make_lbr_med14_kdl_limits(q_min, q_max);
+    cartan::fixtures::make_lbr_med14_kdl_limits(q_min, q_max);
     static const target_set<double, 7> ts(cartan_chain, num_targets, 42);
     bm_trac_ik_comparison<7>(state, kdl_chain, q_min, q_max, ts);
 }
@@ -620,7 +620,7 @@ BENCHMARK(bm_comparison_lbr_med14_trac_ik)->Iterations(1000)->Unit(benchmark::kM
 
 static void bm_comparison_lbr_med14_cartan_restart_lm(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_lbr_med14_chain<double>();
+    auto chain = cartan::fixtures::make_lbr_med14_chain<double>();
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_restart_lm_comparison<7>(state, chain, ts);
 }
@@ -628,7 +628,7 @@ BENCHMARK(bm_comparison_lbr_med14_cartan_restart_lm)->Iterations(1000)->Unit(ben
 
 static void bm_comparison_lbr_med14_cartan_restart_lm_clamped(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_lbr_med14_chain<double>();
+    auto chain = cartan::fixtures::make_lbr_med14_chain<double>();
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_restart_lm_comparison<7, cartan::clamp_limits>(state, chain, ts);
 }
@@ -636,7 +636,7 @@ BENCHMARK(bm_comparison_lbr_med14_cartan_restart_lm_clamped)->Iterations(1000)->
 
 static void bm_comparison_lbr_med14_cartan_speed(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_lbr_med14_chain<double>();
+    auto chain = cartan::fixtures::make_lbr_med14_chain<double>();
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_speed_comparison<7>(state, chain, ts);
 }
@@ -644,7 +644,7 @@ BENCHMARK(bm_comparison_lbr_med14_cartan_speed)->Iterations(1000)->Unit(benchmar
 
 static void bm_comparison_lbr_med14_cartan_racing(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_lbr_med14_chain<double>();
+    auto chain = cartan::fixtures::make_lbr_med14_chain<double>();
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_racing_comparison<7>(state, chain, ts);
 }
@@ -654,7 +654,7 @@ BENCHMARK(bm_comparison_lbr_med14_cartan_racing)->Iterations(1000)->Unit(benchma
 
 static void bm_comparison_panda_cartan(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_panda_chain<double>();
+    auto chain = cartan::fixtures::make_panda_chain<double>();
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_comparison<7>(state, chain, ts);
 }
@@ -662,10 +662,10 @@ BENCHMARK(bm_comparison_panda_cartan)->Iterations(1000)->Unit(benchmark::kMicros
 
 static void bm_comparison_panda_trac_ik(benchmark::State& state)
 {
-    auto cartan_chain = cartan::benchmarks::make_panda_chain<double>();
-    auto kdl_chain = cartan::benchmarks::make_panda_kdl_chain();
+    auto cartan_chain = cartan::fixtures::make_panda_chain<double>();
+    auto kdl_chain = cartan::fixtures::make_panda_kdl_chain();
     KDL::JntArray q_min(7), q_max(7);
-    cartan::benchmarks::make_panda_kdl_limits(q_min, q_max);
+    cartan::fixtures::make_panda_kdl_limits(q_min, q_max);
     static const target_set<double, 7> ts(cartan_chain, num_targets, 42);
     bm_trac_ik_comparison<7>(state, kdl_chain, q_min, q_max, ts);
 }
@@ -673,7 +673,7 @@ BENCHMARK(bm_comparison_panda_trac_ik)->Iterations(1000)->Unit(benchmark::kMicro
 
 static void bm_comparison_panda_cartan_restart_lm(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_panda_chain<double>();
+    auto chain = cartan::fixtures::make_panda_chain<double>();
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_restart_lm_comparison<7>(state, chain, ts);
 }
@@ -681,7 +681,7 @@ BENCHMARK(bm_comparison_panda_cartan_restart_lm)->Iterations(1000)->Unit(benchma
 
 static void bm_comparison_panda_cartan_restart_lm_clamped(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_panda_chain<double>();
+    auto chain = cartan::fixtures::make_panda_chain<double>();
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_restart_lm_comparison<7, cartan::clamp_limits>(state, chain, ts);
 }
@@ -689,7 +689,7 @@ BENCHMARK(bm_comparison_panda_cartan_restart_lm_clamped)->Iterations(1000)->Unit
 
 static void bm_comparison_panda_cartan_speed(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_panda_chain<double>();
+    auto chain = cartan::fixtures::make_panda_chain<double>();
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_speed_comparison<7>(state, chain, ts);
 }
@@ -697,7 +697,7 @@ BENCHMARK(bm_comparison_panda_cartan_speed)->Iterations(1000)->Unit(benchmark::k
 
 static void bm_comparison_panda_cartan_racing(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_panda_chain<double>();
+    auto chain = cartan::fixtures::make_panda_chain<double>();
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_racing_comparison<7>(state, chain, ts);
 }
@@ -707,7 +707,7 @@ BENCHMARK(bm_comparison_panda_cartan_racing)->Iterations(1000)->Unit(benchmark::
 
 static void bm_comparison_fetch_cartan(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_fetch_chain<double>();
+    auto chain = cartan::fixtures::make_fetch_chain<double>();
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_comparison<7>(state, chain, ts);
 }
@@ -715,10 +715,10 @@ BENCHMARK(bm_comparison_fetch_cartan)->Iterations(1000)->Unit(benchmark::kMicros
 
 static void bm_comparison_fetch_trac_ik(benchmark::State& state)
 {
-    auto cartan_chain = cartan::benchmarks::make_fetch_chain<double>();
-    auto kdl_chain = cartan::benchmarks::make_fetch_kdl_chain();
+    auto cartan_chain = cartan::fixtures::make_fetch_chain<double>();
+    auto kdl_chain = cartan::fixtures::make_fetch_kdl_chain();
     KDL::JntArray q_min(7), q_max(7);
-    cartan::benchmarks::make_fetch_kdl_limits(q_min, q_max);
+    cartan::fixtures::make_fetch_kdl_limits(q_min, q_max);
     static const target_set<double, 7> ts(cartan_chain, num_targets, 42);
     bm_trac_ik_comparison<7>(state, kdl_chain, q_min, q_max, ts);
 }
@@ -726,7 +726,7 @@ BENCHMARK(bm_comparison_fetch_trac_ik)->Iterations(1000)->Unit(benchmark::kMicro
 
 static void bm_comparison_fetch_cartan_restart_lm(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_fetch_chain<double>();
+    auto chain = cartan::fixtures::make_fetch_chain<double>();
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_restart_lm_comparison<7>(state, chain, ts);
 }
@@ -734,7 +734,7 @@ BENCHMARK(bm_comparison_fetch_cartan_restart_lm)->Iterations(1000)->Unit(benchma
 
 static void bm_comparison_fetch_cartan_restart_lm_clamped(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_fetch_chain<double>();
+    auto chain = cartan::fixtures::make_fetch_chain<double>();
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_restart_lm_comparison<7, cartan::clamp_limits>(state, chain, ts);
 }
@@ -742,7 +742,7 @@ BENCHMARK(bm_comparison_fetch_cartan_restart_lm_clamped)->Iterations(1000)->Unit
 
 static void bm_comparison_fetch_cartan_speed(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_fetch_chain<double>();
+    auto chain = cartan::fixtures::make_fetch_chain<double>();
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_speed_comparison<7>(state, chain, ts);
 }
@@ -750,7 +750,7 @@ BENCHMARK(bm_comparison_fetch_cartan_speed)->Iterations(1000)->Unit(benchmark::k
 
 static void bm_comparison_fetch_cartan_racing(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_fetch_chain<double>();
+    auto chain = cartan::fixtures::make_fetch_chain<double>();
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_racing_comparison<7>(state, chain, ts);
 }
@@ -760,7 +760,7 @@ BENCHMARK(bm_comparison_fetch_cartan_racing)->Iterations(1000)->Unit(benchmark::
 
 static void bm_comparison_baxter_cartan(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_baxter_chain<double>();
+    auto chain = cartan::fixtures::make_baxter_chain<double>();
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_comparison<7>(state, chain, ts);
 }
@@ -768,10 +768,10 @@ BENCHMARK(bm_comparison_baxter_cartan)->Iterations(1000)->Unit(benchmark::kMicro
 
 static void bm_comparison_baxter_trac_ik(benchmark::State& state)
 {
-    auto cartan_chain = cartan::benchmarks::make_baxter_chain<double>();
-    auto kdl_chain = cartan::benchmarks::make_baxter_kdl_chain();
+    auto cartan_chain = cartan::fixtures::make_baxter_chain<double>();
+    auto kdl_chain = cartan::fixtures::make_baxter_kdl_chain();
     KDL::JntArray q_min(7), q_max(7);
-    cartan::benchmarks::make_baxter_kdl_limits(q_min, q_max);
+    cartan::fixtures::make_baxter_kdl_limits(q_min, q_max);
     static const target_set<double, 7> ts(cartan_chain, num_targets, 42);
     bm_trac_ik_comparison<7>(state, kdl_chain, q_min, q_max, ts);
 }
@@ -779,7 +779,7 @@ BENCHMARK(bm_comparison_baxter_trac_ik)->Iterations(1000)->Unit(benchmark::kMicr
 
 static void bm_comparison_baxter_cartan_restart_lm(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_baxter_chain<double>();
+    auto chain = cartan::fixtures::make_baxter_chain<double>();
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_restart_lm_comparison<7>(state, chain, ts);
 }
@@ -787,7 +787,7 @@ BENCHMARK(bm_comparison_baxter_cartan_restart_lm)->Iterations(1000)->Unit(benchm
 
 static void bm_comparison_baxter_cartan_restart_lm_clamped(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_baxter_chain<double>();
+    auto chain = cartan::fixtures::make_baxter_chain<double>();
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_restart_lm_comparison<7, cartan::clamp_limits>(state, chain, ts);
 }
@@ -795,7 +795,7 @@ BENCHMARK(bm_comparison_baxter_cartan_restart_lm_clamped)->Iterations(1000)->Uni
 
 static void bm_comparison_baxter_cartan_speed(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_baxter_chain<double>();
+    auto chain = cartan::fixtures::make_baxter_chain<double>();
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_speed_comparison<7>(state, chain, ts);
 }
@@ -803,7 +803,7 @@ BENCHMARK(bm_comparison_baxter_cartan_speed)->Iterations(1000)->Unit(benchmark::
 
 static void bm_comparison_baxter_cartan_racing(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_baxter_chain<double>();
+    auto chain = cartan::fixtures::make_baxter_chain<double>();
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_racing_comparison<7>(state, chain, ts);
 }
@@ -813,7 +813,7 @@ BENCHMARK(bm_comparison_baxter_cartan_racing)->Iterations(1000)->Unit(benchmark:
 
 static void bm_comparison_kuka_lwr4_cartan(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_kuka_lwr4_chain<double>();
+    auto chain = cartan::fixtures::make_kuka_lwr4_chain<double>();
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_comparison<7>(state, chain, ts);
 }
@@ -821,10 +821,10 @@ BENCHMARK(bm_comparison_kuka_lwr4_cartan)->Iterations(1000)->Unit(benchmark::kMi
 
 static void bm_comparison_kuka_lwr4_trac_ik(benchmark::State& state)
 {
-    auto cartan_chain = cartan::benchmarks::make_kuka_lwr4_chain<double>();
-    auto kdl_chain = cartan::benchmarks::make_kuka_lwr4_kdl_chain();
+    auto cartan_chain = cartan::fixtures::make_kuka_lwr4_chain<double>();
+    auto kdl_chain = cartan::fixtures::make_kuka_lwr4_kdl_chain();
     KDL::JntArray q_min(7), q_max(7);
-    cartan::benchmarks::make_kuka_lwr4_kdl_limits(q_min, q_max);
+    cartan::fixtures::make_kuka_lwr4_kdl_limits(q_min, q_max);
     static const target_set<double, 7> ts(cartan_chain, num_targets, 42);
     bm_trac_ik_comparison<7>(state, kdl_chain, q_min, q_max, ts);
 }
@@ -832,7 +832,7 @@ BENCHMARK(bm_comparison_kuka_lwr4_trac_ik)->Iterations(1000)->Unit(benchmark::kM
 
 static void bm_comparison_kuka_lwr4_cartan_restart_lm(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_kuka_lwr4_chain<double>();
+    auto chain = cartan::fixtures::make_kuka_lwr4_chain<double>();
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_restart_lm_comparison<7>(state, chain, ts);
 }
@@ -840,7 +840,7 @@ BENCHMARK(bm_comparison_kuka_lwr4_cartan_restart_lm)->Iterations(1000)->Unit(ben
 
 static void bm_comparison_kuka_lwr4_cartan_restart_lm_clamped(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_kuka_lwr4_chain<double>();
+    auto chain = cartan::fixtures::make_kuka_lwr4_chain<double>();
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_restart_lm_comparison<7, cartan::clamp_limits>(state, chain, ts);
 }
@@ -848,7 +848,7 @@ BENCHMARK(bm_comparison_kuka_lwr4_cartan_restart_lm_clamped)->Iterations(1000)->
 
 static void bm_comparison_kuka_lwr4_cartan_speed(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_kuka_lwr4_chain<double>();
+    auto chain = cartan::fixtures::make_kuka_lwr4_chain<double>();
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_speed_comparison<7>(state, chain, ts);
 }
@@ -856,7 +856,7 @@ BENCHMARK(bm_comparison_kuka_lwr4_cartan_speed)->Iterations(1000)->Unit(benchmar
 
 static void bm_comparison_kuka_lwr4_cartan_racing(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_kuka_lwr4_chain<double>();
+    auto chain = cartan::fixtures::make_kuka_lwr4_chain<double>();
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_racing_comparison<7>(state, chain, ts);
 }
@@ -895,7 +895,7 @@ void bm_argmin_comparison(
         {
             ++successes;
             total_iterations += result->iterations;
-            auto [pos_err, ori_err] = cartan::benchmarks::compute_pose_errors(
+            auto [pos_err, ori_err] = cartan::fixtures::compute_pose_errors(
                 chain, result->solution.position, target);
             total_pos_error += pos_err;
             total_ori_error += ori_err;
@@ -990,7 +990,7 @@ inline cartan::convergence_criteria<double> argmin_comparison_criteria()
 
 static void bm_comparison_ur3e_argmin_slsqp_bounded(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    auto chain = cartan::fixtures::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_argmin_comparison<6, argmin_slsqp_solver<6>>(state, chain, ts, argmin_comparison_criteria());
 }
@@ -998,7 +998,7 @@ BENCHMARK(bm_comparison_ur3e_argmin_slsqp_bounded)->Iterations(1000)->Unit(bench
 
 static void bm_comparison_ur3e_nw_sqp_inequality(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    auto chain = cartan::fixtures::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_argmin_comparison<6, argmin_nw_sqp_solver<6>>(state, chain, ts, argmin_comparison_criteria());
 }
@@ -1010,7 +1010,7 @@ BENCHMARK(bm_comparison_ur3e_nw_sqp_inequality)->Iterations(1000)->Unit(benchmar
 
 static void bm_comparison_ur3e_argmin_slsqp(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    auto chain = cartan::fixtures::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_argmin_comparison<6, argmin_slsqp_solver<6>>(state, chain, ts, argmin_comparison_criteria());
 }
@@ -1018,7 +1018,7 @@ BENCHMARK(bm_comparison_ur3e_argmin_slsqp)->Iterations(1000)->Unit(benchmark::kM
 
 static void bm_comparison_ur3e_argmin_projected_gn(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    auto chain = cartan::fixtures::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_argmin_comparison<6, argmin_projected_gn_comparison_solver<6>>(
         state, chain, ts, argmin_comparison_criteria());
@@ -1027,7 +1027,7 @@ BENCHMARK(bm_comparison_ur3e_argmin_projected_gn)->Iterations(1000)->Unit(benchm
 
 static void bm_comparison_ur3e_argmin_projected_gradient_gn(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    auto chain = cartan::fixtures::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_argmin_comparison<6, argmin_projected_gradient_gn_comparison_solver<6>>(
         state, chain, ts, argmin_comparison_criteria());
@@ -1037,7 +1037,7 @@ BENCHMARK(bm_comparison_ur3e_argmin_projected_gradient_gn)->Iterations(1000)->Un
 // MMA / GCMMA entries for UR3e.
 static void bm_comparison_ur3e_argmin_mma(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    auto chain = cartan::fixtures::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_argmin_comparison<6, argmin_mma_solver<6>>(state, chain, ts, argmin_comparison_criteria());
 }
@@ -1045,7 +1045,7 @@ BENCHMARK(bm_comparison_ur3e_argmin_mma)->Iterations(1000)->Unit(benchmark::kMic
 
 static void bm_comparison_ur3e_argmin_gcmma(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    auto chain = cartan::fixtures::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_argmin_comparison<6, argmin_gcmma_solver<6>>(state, chain, ts, argmin_comparison_criteria());
 }
@@ -1059,7 +1059,7 @@ BENCHMARK(bm_comparison_ur3e_argmin_gcmma)->Iterations(1000)->Unit(benchmark::kM
 // "argmin takes 4x more outer iterations than nlopt" gap.
 static void bm_comparison_ur3e_argmin_slsqp_nlopt_compat(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    auto chain = cartan::fixtures::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_argmin_comparison<6, argmin_slsqp_nlopt_compat_solver<6>>(
         state, chain, ts, argmin_comparison_criteria());
@@ -1085,7 +1085,7 @@ BENCHMARK(bm_comparison_ur3e_argmin_slsqp_nlopt_compat)->Iterations(1000)->Unit(
 template <int BudgetPerStep>
 static void bm_comparison_ur3e_argmin_slsqp_phi_ls_calls_impl(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    auto chain = cartan::fixtures::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     const auto criteria = argmin_comparison_criteria();
 
@@ -1181,7 +1181,7 @@ BENCHMARK(bm_comparison_ur3e_argmin_slsqp_phi_ls_calls_budget500)->Iterations(10
 // value the criterion would have reported.
 static void bm_comparison_ur3e_argmin_slsqp_last_check_results(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    auto chain = cartan::fixtures::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     const auto criteria = argmin_comparison_criteria();
 
@@ -1253,7 +1253,7 @@ static void bm_comparison_ur3e_argmin_slsqp_grad_sweep(benchmark::State& state)
     const int exponent = static_cast<int>(state.range(0));
     const double gradient_threshold = std::pow(10.0, -static_cast<double>(exponent));
 
-    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    auto chain = cartan::fixtures::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     const auto criteria = argmin_comparison_criteria();
 
@@ -1349,7 +1349,7 @@ static void bm_comparison_ur3e_argmin_slsqp_budget_sweep(benchmark::State& state
 {
     const int budget_per_step = static_cast<int>(state.range(0));
 
-    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    auto chain = cartan::fixtures::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     const auto criteria = argmin_comparison_criteria();
 
@@ -1437,7 +1437,7 @@ BENCHMARK(bm_comparison_ur3e_argmin_slsqp_budget_sweep)
 
 static void bm_comparison_ur3e_argmin_slsqp_retry(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    auto chain = cartan::fixtures::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     const auto criteria = argmin_comparison_criteria();
 
@@ -1512,7 +1512,7 @@ BENCHMARK(bm_comparison_ur3e_argmin_slsqp_retry)
 // replaces absolute thresholds with relative ones at 1e-10.
 static void bm_comparison_ur3e_argmin_slsqp_last_check_results_alias(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    auto chain = cartan::fixtures::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     const auto criteria = argmin_comparison_criteria();
 
@@ -1593,7 +1593,7 @@ BENCHMARK(bm_comparison_ur3e_argmin_slsqp_last_check_results_alias)
 // and branches on `grad.empty()`, so this is a unified counter.
 static void bm_comparison_ur3e_nlopt_slsqp_inner_iter_count(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    auto chain = cartan::fixtures::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     const auto criteria = argmin_comparison_criteria();
 
@@ -1664,7 +1664,7 @@ BENCHMARK(bm_comparison_ur3e_nlopt_slsqp_inner_iter_count)
 // loop.
 static void bm_comparison_ur3e_nlopt_slsqp_restart_count(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    auto chain = cartan::fixtures::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     const auto criteria = argmin_comparison_criteria();
 
@@ -1761,7 +1761,7 @@ static void bm_comparison_ur3e_argmin_slsqp_grad_sweep_runner(benchmark::State& 
     const int exponent = static_cast<int>(state.range(0));
     const double gradient_threshold = std::pow(10.0, -static_cast<double>(exponent));
 
-    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    auto chain = cartan::fixtures::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     const auto criteria = argmin_comparison_criteria();
 
@@ -1792,7 +1792,7 @@ static void bm_comparison_ur3e_argmin_slsqp_grad_sweep_runner(benchmark::State& 
         {
             ++successes;
             total_iterations += result->iterations;
-            auto [pos_err, ori_err] = cartan::benchmarks::compute_pose_errors(
+            auto [pos_err, ori_err] = cartan::fixtures::compute_pose_errors(
                 chain, result->solution.position, target);
             total_pos_error += pos_err;
             total_ori_error += ori_err;
@@ -1824,7 +1824,7 @@ static void bm_comparison_ur3e_argmin_slsqp_phi_ls_calls_dynamicN(benchmark::Sta
 {
     using dynamic_chain = cartan::kinematic_chain<double, cartan::dynamic>;
 
-    auto chain = cartan::benchmarks::make_ur3e_chain_dynamic<double>();
+    auto chain = cartan::fixtures::make_ur3e_chain_dynamic<double>();
     static const target_set<double, cartan::dynamic> ts(chain, num_targets, 42);
     const auto criteria = argmin_comparison_criteria();
 
@@ -1884,7 +1884,7 @@ BENCHMARK(bm_comparison_ur3e_argmin_slsqp_phi_ls_calls_dynamicN)->Iterations(100
 #ifdef CARTAN_HAS_NLOPT
 static void bm_comparison_ur3e_nlopt_slsqp(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    auto chain = cartan::fixtures::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_argmin_comparison<6, nlopt_slsqp_solver<6>>(state, chain, ts, argmin_comparison_criteria());
 }
@@ -1892,7 +1892,7 @@ BENCHMARK(bm_comparison_ur3e_nlopt_slsqp)->Iterations(1000)->Unit(benchmark::kMi
 
 static void bm_comparison_ur3e_nlopt_bobyqa(benchmark::State& state)
 {
-    auto chain = cartan::benchmarks::make_ur3e_chain<double>();
+    auto chain = cartan::fixtures::make_ur3e_chain<double>();
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_argmin_comparison<6, nlopt_bobyqa_solver<6>>(state, chain, ts, argmin_comparison_criteria());
 }
@@ -1909,7 +1909,7 @@ BENCHMARK(bm_comparison_ur3e_nlopt_bobyqa)->Iterations(1000)->Unit(benchmark::kM
                                                                                                       \
 static void bm_comparison_##ROBOT##_argmin_slsqp(benchmark::State& state)                           \
 {                                                                                                     \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                               \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
     bm_argmin_comparison<6, argmin_slsqp_solver<6>>(state, chain, ts, argmin_comparison_criteria()); \
 }                                                                                                     \
@@ -1917,7 +1917,7 @@ BENCHMARK(bm_comparison_##ROBOT##_argmin_slsqp)->Iterations(1000)->Unit(benchmar
                                                                                                       \
 static void bm_comparison_##ROBOT##_argmin_lbfgsb(benchmark::State& state)                          \
 {                                                                                                     \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                               \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
     bm_argmin_comparison<6, argmin_lbfgsb_solver<6>>(state, chain, ts, argmin_comparison_criteria()); \
 }                                                                                                     \
@@ -1925,7 +1925,7 @@ BENCHMARK(bm_comparison_##ROBOT##_argmin_lbfgsb)->Iterations(1000)->Unit(benchma
                                                                                                       \
 static void bm_comparison_##ROBOT##_nw_sqp(benchmark::State& state)                                  \
 {                                                                                                     \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                               \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
     bm_argmin_comparison<6, argmin_nw_sqp_solver<6>>(state, chain, ts, argmin_comparison_criteria()); \
 }                                                                                                     \
@@ -1933,7 +1933,7 @@ BENCHMARK(bm_comparison_##ROBOT##_nw_sqp)->Iterations(1000)->Unit(benchmark::kMi
                                                                                                       \
 static void bm_comparison_##ROBOT##_argmin_mma(benchmark::State& state)                              \
 {                                                                                                     \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                               \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
     bm_argmin_comparison<6, argmin_mma_solver<6>>(state, chain, ts, argmin_comparison_criteria()); \
 }                                                                                                     \
@@ -1941,7 +1941,7 @@ BENCHMARK(bm_comparison_##ROBOT##_argmin_mma)->Iterations(1000)->Unit(benchmark:
                                                                                                       \
 static void bm_comparison_##ROBOT##_argmin_gcmma(benchmark::State& state)                            \
 {                                                                                                     \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                               \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
     bm_argmin_comparison<6, argmin_gcmma_solver<6>>(state, chain, ts, argmin_comparison_criteria()); \
 }                                                                                                     \
@@ -1951,7 +1951,7 @@ BENCHMARK(bm_comparison_##ROBOT##_argmin_gcmma)->Iterations(1000)->Unit(benchmar
                                                                                                       \
 static void bm_comparison_##ROBOT##_argmin_slsqp(benchmark::State& state)                           \
 {                                                                                                     \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                               \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
     bm_argmin_comparison<7, argmin_slsqp_solver<7>>(state, chain, ts, argmin_comparison_criteria()); \
 }                                                                                                     \
@@ -1959,7 +1959,7 @@ BENCHMARK(bm_comparison_##ROBOT##_argmin_slsqp)->Iterations(1000)->Unit(benchmar
                                                                                                       \
 static void bm_comparison_##ROBOT##_argmin_lbfgsb(benchmark::State& state)                          \
 {                                                                                                     \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                               \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
     bm_argmin_comparison<7, argmin_lbfgsb_solver<7>>(state, chain, ts, argmin_comparison_criteria()); \
 }                                                                                                     \
@@ -1967,7 +1967,7 @@ BENCHMARK(bm_comparison_##ROBOT##_argmin_lbfgsb)->Iterations(1000)->Unit(benchma
                                                                                                       \
 static void bm_comparison_##ROBOT##_nw_sqp(benchmark::State& state)                                  \
 {                                                                                                     \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                               \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
     bm_argmin_comparison<7, argmin_nw_sqp_solver<7>>(state, chain, ts, argmin_comparison_criteria()); \
 }                                                                                                     \
@@ -1975,7 +1975,7 @@ BENCHMARK(bm_comparison_##ROBOT##_nw_sqp)->Iterations(1000)->Unit(benchmark::kMi
                                                                                                       \
 static void bm_comparison_##ROBOT##_argmin_mma(benchmark::State& state)                              \
 {                                                                                                     \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                               \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
     bm_argmin_comparison<7, argmin_mma_solver<7>>(state, chain, ts, argmin_comparison_criteria()); \
 }                                                                                                     \
@@ -1983,7 +1983,7 @@ BENCHMARK(bm_comparison_##ROBOT##_argmin_mma)->Iterations(1000)->Unit(benchmark:
                                                                                                       \
 static void bm_comparison_##ROBOT##_argmin_gcmma(benchmark::State& state)                            \
 {                                                                                                     \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                               \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
     bm_argmin_comparison<7, argmin_gcmma_solver<7>>(state, chain, ts, argmin_comparison_criteria()); \
 }                                                                                                     \
@@ -2027,7 +2027,7 @@ REGISTER_7DOF_ARGMIN_COMPARISON(kuka_lwr4,  make_kuka_lwr4_chain)
 struct ur3e_per_call_fixture
 {
     ur3e_per_call_fixture()
-        : chain{cartan::benchmarks::make_ur3e_chain<double>()}
+        : chain{cartan::fixtures::make_ur3e_chain<double>()}
         , ts{chain, num_targets, 42}
         , problem{chain, ts.targets[0], cartan::error_weight<double>{}}
     {

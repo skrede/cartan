@@ -63,8 +63,8 @@ struct target_set
         seeds.reserve(static_cast<std::size_t>(count));
         for (int i = 0; i < count; ++i)
         {
-            targets.push_back(cartan::benchmarks::random_reachable_target(chain, rng));
-            seeds.push_back(cartan::benchmarks::random_joint_config(chain, rng));
+            targets.push_back(cartan::fixtures::random_reachable_target(chain, rng));
+            seeds.push_back(cartan::fixtures::random_joint_config(chain, rng));
         }
     }
 };
@@ -77,10 +77,10 @@ void bm_2r_closed_form(benchmark::State& state)
 {
     using solver_t = cartan::planar_2r_solver<
         double, cartan::revolute_y, cartan::revolute_y>;
-    static auto static_chain = cartan::benchmarks::make_planar_2r_static<double>();
-    static auto bench_chain  = cartan::benchmarks::make_planar_2r_chain<double>();
+    static auto static_chain = cartan::fixtures::make_planar_2r_static<double>();
+    static auto bench_chain  = cartan::fixtures::make_planar_2r_chain<double>();
     static target_set<double, 2> ts(bench_chain, num_targets);
-    cartan::benchmarks::bm_closed_form_solver<
+    cartan::fixtures::bm_closed_form_solver<
         decltype(static_chain), decltype(bench_chain), solver_t>(
         state, static_chain, bench_chain, ts);
 }
@@ -90,9 +90,9 @@ void bm_2r_projected_lm(benchmark::State& state)
 {
     using chain_t  = cartan::kinematic_chain<double, 2>;
     using solver_t = cartan::ik::projected_lm<chain_t>;
-    static auto chain = cartan::benchmarks::make_planar_2r_chain<double>();
+    static auto chain = cartan::fixtures::make_planar_2r_chain<double>();
     static target_set<double, 2> ts(chain, num_targets);
-    cartan::benchmarks::bm_iterative_solver<chain_t, solver_t>(state, chain, ts);
+    cartan::fixtures::bm_iterative_solver<chain_t, solver_t>(state, chain, ts);
 }
 BENCHMARK(bm_2r_projected_lm)->Iterations(2000)->Unit(benchmark::kMicrosecond);
 
@@ -100,9 +100,9 @@ void bm_2r_builtin_lm(benchmark::State& state)
 {
     using chain_t  = cartan::kinematic_chain<double, 2>;
     using solver_t = cartan::ik::builtin_lm<chain_t>;
-    static auto chain = cartan::benchmarks::make_planar_2r_chain<double>();
+    static auto chain = cartan::fixtures::make_planar_2r_chain<double>();
     static target_set<double, 2> ts(chain, num_targets);
-    cartan::benchmarks::bm_iterative_solver<chain_t, solver_t>(state, chain, ts);
+    cartan::fixtures::bm_iterative_solver<chain_t, solver_t>(state, chain, ts);
 }
 BENCHMARK(bm_2r_builtin_lm)->Iterations(2000)->Unit(benchmark::kMicrosecond);
 
@@ -110,10 +110,10 @@ void bm_2r_coverage(benchmark::State& state)
 {
     using solver_t = cartan::planar_2r_solver<
         double, cartan::revolute_y, cartan::revolute_y>;
-    static auto static_chain = cartan::benchmarks::make_planar_2r_static<double>();
-    static auto bench_chain  = cartan::benchmarks::make_planar_2r_chain<double>();
-    static cartan::benchmarks::bbox_target_set<double, 2> bbox_ts(bench_chain, bbox_targets);
-    cartan::benchmarks::bm_closed_form_coverage<
+    static auto static_chain = cartan::fixtures::make_planar_2r_static<double>();
+    static auto bench_chain  = cartan::fixtures::make_planar_2r_chain<double>();
+    static cartan::fixtures::bbox_target_set<double, 2> bbox_ts(bench_chain, bbox_targets);
+    cartan::fixtures::bm_closed_form_coverage<
         decltype(static_chain), solver_t>(state, static_chain, bbox_ts);
 }
 BENCHMARK(bm_2r_coverage)->Iterations(2000)->Unit(benchmark::kMicrosecond);
@@ -126,10 +126,10 @@ void bm_3r_closed_form(benchmark::State& state)
 {
     using solver_t = cartan::spatial_3r_solver<
         double, cartan::revolute_z, cartan::revolute_y, cartan::revolute_z>;
-    static auto static_chain = cartan::benchmarks::make_spatial_3r_static<double>();
-    static auto bench_chain  = cartan::benchmarks::make_spatial_3r_chain<double>();
+    static auto static_chain = cartan::fixtures::make_spatial_3r_static<double>();
+    static auto bench_chain  = cartan::fixtures::make_spatial_3r_chain<double>();
     static target_set<double, 3> ts(bench_chain, num_targets);
-    cartan::benchmarks::bm_closed_form_solver<
+    cartan::fixtures::bm_closed_form_solver<
         decltype(static_chain), decltype(bench_chain), solver_t>(
         state, static_chain, bench_chain, ts);
 }
@@ -139,9 +139,9 @@ void bm_3r_projected_lm(benchmark::State& state)
 {
     using chain_t  = cartan::kinematic_chain<double, 3>;
     using solver_t = cartan::ik::projected_lm<chain_t>;
-    static auto chain = cartan::benchmarks::make_spatial_3r_chain<double>();
+    static auto chain = cartan::fixtures::make_spatial_3r_chain<double>();
     static target_set<double, 3> ts(chain, num_targets);
-    cartan::benchmarks::bm_iterative_solver<chain_t, solver_t>(state, chain, ts);
+    cartan::fixtures::bm_iterative_solver<chain_t, solver_t>(state, chain, ts);
 }
 BENCHMARK(bm_3r_projected_lm)->Iterations(2000)->Unit(benchmark::kMicrosecond);
 
@@ -149,9 +149,9 @@ void bm_3r_builtin_lm(benchmark::State& state)
 {
     using chain_t  = cartan::kinematic_chain<double, 3>;
     using solver_t = cartan::ik::builtin_lm<chain_t>;
-    static auto chain = cartan::benchmarks::make_spatial_3r_chain<double>();
+    static auto chain = cartan::fixtures::make_spatial_3r_chain<double>();
     static target_set<double, 3> ts(chain, num_targets);
-    cartan::benchmarks::bm_iterative_solver<chain_t, solver_t>(state, chain, ts);
+    cartan::fixtures::bm_iterative_solver<chain_t, solver_t>(state, chain, ts);
 }
 BENCHMARK(bm_3r_builtin_lm)->Iterations(2000)->Unit(benchmark::kMicrosecond);
 
@@ -159,10 +159,10 @@ void bm_3r_coverage(benchmark::State& state)
 {
     using solver_t = cartan::spatial_3r_solver<
         double, cartan::revolute_z, cartan::revolute_y, cartan::revolute_z>;
-    static auto static_chain = cartan::benchmarks::make_spatial_3r_static<double>();
-    static auto bench_chain  = cartan::benchmarks::make_spatial_3r_chain<double>();
-    static cartan::benchmarks::bbox_target_set<double, 3> bbox_ts(bench_chain, bbox_targets);
-    cartan::benchmarks::bm_closed_form_coverage<
+    static auto static_chain = cartan::fixtures::make_spatial_3r_static<double>();
+    static auto bench_chain  = cartan::fixtures::make_spatial_3r_chain<double>();
+    static cartan::fixtures::bbox_target_set<double, 3> bbox_ts(bench_chain, bbox_targets);
+    cartan::fixtures::bm_closed_form_coverage<
         decltype(static_chain), solver_t>(state, static_chain, bbox_ts);
 }
 BENCHMARK(bm_3r_coverage)->Iterations(2000)->Unit(benchmark::kMicrosecond);
@@ -177,10 +177,10 @@ void bm_abb_irb120_pieper_6r(benchmark::State& state)
         double,
         cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
         cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>;
-    static auto static_chain = cartan::benchmarks::make_abb_irb120_static<double>();
-    static auto bench_chain  = cartan::benchmarks::make_abb_irb120_chain<double>();
+    static auto static_chain = cartan::fixtures::make_abb_irb120_static<double>();
+    static auto bench_chain  = cartan::fixtures::make_abb_irb120_chain<double>();
     static target_set<double, 6> ts(bench_chain, num_targets);
-    cartan::benchmarks::bm_closed_form_solver<
+    cartan::fixtures::bm_closed_form_solver<
         decltype(static_chain), decltype(bench_chain), solver_t>(
         state, static_chain, bench_chain, ts);
 }
@@ -190,9 +190,9 @@ void bm_abb_irb120_projected_lm(benchmark::State& state)
 {
     using chain_t  = cartan::kinematic_chain<double, 6>;
     using solver_t = cartan::ik::projected_lm<chain_t>;
-    static auto chain = cartan::benchmarks::make_abb_irb120_chain<double>();
+    static auto chain = cartan::fixtures::make_abb_irb120_chain<double>();
     static target_set<double, 6> ts(chain, num_targets);
-    cartan::benchmarks::bm_iterative_solver<chain_t, solver_t>(state, chain, ts);
+    cartan::fixtures::bm_iterative_solver<chain_t, solver_t>(state, chain, ts);
 }
 BENCHMARK(bm_abb_irb120_projected_lm)->Iterations(2000)->Unit(benchmark::kMicrosecond);
 
@@ -200,9 +200,9 @@ void bm_abb_irb120_builtin_lm(benchmark::State& state)
 {
     using chain_t  = cartan::kinematic_chain<double, 6>;
     using solver_t = cartan::ik::builtin_lm<chain_t>;
-    static auto chain = cartan::benchmarks::make_abb_irb120_chain<double>();
+    static auto chain = cartan::fixtures::make_abb_irb120_chain<double>();
     static target_set<double, 6> ts(chain, num_targets);
-    cartan::benchmarks::bm_iterative_solver<chain_t, solver_t>(state, chain, ts);
+    cartan::fixtures::bm_iterative_solver<chain_t, solver_t>(state, chain, ts);
 }
 BENCHMARK(bm_abb_irb120_builtin_lm)->Iterations(2000)->Unit(benchmark::kMicrosecond);
 
@@ -212,10 +212,10 @@ void bm_abb_irb120_coverage(benchmark::State& state)
         double,
         cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
         cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>;
-    static auto static_chain = cartan::benchmarks::make_abb_irb120_static<double>();
-    static auto bench_chain  = cartan::benchmarks::make_abb_irb120_chain<double>();
-    static cartan::benchmarks::bbox_target_set<double, 6> bbox_ts(bench_chain, bbox_targets);
-    cartan::benchmarks::bm_closed_form_coverage<
+    static auto static_chain = cartan::fixtures::make_abb_irb120_static<double>();
+    static auto bench_chain  = cartan::fixtures::make_abb_irb120_chain<double>();
+    static cartan::fixtures::bbox_target_set<double, 6> bbox_ts(bench_chain, bbox_targets);
+    cartan::fixtures::bm_closed_form_coverage<
         decltype(static_chain), solver_t>(state, static_chain, bbox_ts);
 }
 BENCHMARK(bm_abb_irb120_coverage)->Iterations(2000)->Unit(benchmark::kMicrosecond);
@@ -230,10 +230,10 @@ void bm_kr6_sixx_pieper_6r(benchmark::State& state)
         double,
         cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
         cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>;
-    static auto static_chain = cartan::benchmarks::make_kr6_sixx_static<double>();
-    static auto bench_chain  = cartan::benchmarks::make_kr6_sixx_chain<double>();
+    static auto static_chain = cartan::fixtures::make_kr6_sixx_static<double>();
+    static auto bench_chain  = cartan::fixtures::make_kr6_sixx_chain<double>();
     static target_set<double, 6> ts(bench_chain, num_targets);
-    cartan::benchmarks::bm_closed_form_solver<
+    cartan::fixtures::bm_closed_form_solver<
         decltype(static_chain), decltype(bench_chain), solver_t>(
         state, static_chain, bench_chain, ts);
 }
@@ -243,9 +243,9 @@ void bm_kr6_sixx_projected_lm(benchmark::State& state)
 {
     using chain_t  = cartan::kinematic_chain<double, 6>;
     using solver_t = cartan::ik::projected_lm<chain_t>;
-    static auto chain = cartan::benchmarks::make_kr6_sixx_chain<double>();
+    static auto chain = cartan::fixtures::make_kr6_sixx_chain<double>();
     static target_set<double, 6> ts(chain, num_targets);
-    cartan::benchmarks::bm_iterative_solver<chain_t, solver_t>(state, chain, ts);
+    cartan::fixtures::bm_iterative_solver<chain_t, solver_t>(state, chain, ts);
 }
 BENCHMARK(bm_kr6_sixx_projected_lm)->Iterations(2000)->Unit(benchmark::kMicrosecond);
 
@@ -253,9 +253,9 @@ void bm_kr6_sixx_builtin_lm(benchmark::State& state)
 {
     using chain_t  = cartan::kinematic_chain<double, 6>;
     using solver_t = cartan::ik::builtin_lm<chain_t>;
-    static auto chain = cartan::benchmarks::make_kr6_sixx_chain<double>();
+    static auto chain = cartan::fixtures::make_kr6_sixx_chain<double>();
     static target_set<double, 6> ts(chain, num_targets);
-    cartan::benchmarks::bm_iterative_solver<chain_t, solver_t>(state, chain, ts);
+    cartan::fixtures::bm_iterative_solver<chain_t, solver_t>(state, chain, ts);
 }
 BENCHMARK(bm_kr6_sixx_builtin_lm)->Iterations(2000)->Unit(benchmark::kMicrosecond);
 
@@ -265,10 +265,10 @@ void bm_kr6_sixx_coverage(benchmark::State& state)
         double,
         cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
         cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>;
-    static auto static_chain = cartan::benchmarks::make_kr6_sixx_static<double>();
-    static auto bench_chain  = cartan::benchmarks::make_kr6_sixx_chain<double>();
-    static cartan::benchmarks::bbox_target_set<double, 6> bbox_ts(bench_chain, bbox_targets);
-    cartan::benchmarks::bm_closed_form_coverage<
+    static auto static_chain = cartan::fixtures::make_kr6_sixx_static<double>();
+    static auto bench_chain  = cartan::fixtures::make_kr6_sixx_chain<double>();
+    static cartan::fixtures::bbox_target_set<double, 6> bbox_ts(bench_chain, bbox_targets);
+    cartan::fixtures::bm_closed_form_coverage<
         decltype(static_chain), solver_t>(state, static_chain, bbox_ts);
 }
 BENCHMARK(bm_kr6_sixx_coverage)->Iterations(2000)->Unit(benchmark::kMicrosecond);
@@ -282,9 +282,9 @@ void bm_abb_irb120_argmin_slsqp(benchmark::State& state)
 {
     using chain_t  = cartan::kinematic_chain<double, 6>;
     using solver_t = cartan::ik::argmin_slsqp<chain_t>;
-    static auto chain = cartan::benchmarks::make_abb_irb120_chain<double>();
+    static auto chain = cartan::fixtures::make_abb_irb120_chain<double>();
     static target_set<double, 6> ts(chain, num_targets);
-    cartan::benchmarks::bm_iterative_solver<chain_t, solver_t>(state, chain, ts);
+    cartan::fixtures::bm_iterative_solver<chain_t, solver_t>(state, chain, ts);
 }
 BENCHMARK(bm_abb_irb120_argmin_slsqp)->Iterations(2000)->Unit(benchmark::kMicrosecond);
 
@@ -292,9 +292,9 @@ void bm_kr6_sixx_argmin_slsqp(benchmark::State& state)
 {
     using chain_t  = cartan::kinematic_chain<double, 6>;
     using solver_t = cartan::ik::argmin_slsqp<chain_t>;
-    static auto chain = cartan::benchmarks::make_kr6_sixx_chain<double>();
+    static auto chain = cartan::fixtures::make_kr6_sixx_chain<double>();
     static target_set<double, 6> ts(chain, num_targets);
-    cartan::benchmarks::bm_iterative_solver<chain_t, solver_t>(state, chain, ts);
+    cartan::fixtures::bm_iterative_solver<chain_t, solver_t>(state, chain, ts);
 }
 BENCHMARK(bm_kr6_sixx_argmin_slsqp)->Iterations(2000)->Unit(benchmark::kMicrosecond);
 #endif

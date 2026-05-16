@@ -9,7 +9,7 @@
 /// exhaustive solver runs all restarts per target — each solve is ~50-100x
 /// more expensive than a single basic_ik_runner solve.
 
-#include "../profiling/chain_factories.h"
+#include "../tests/fixtures/chain_factories.h"
 
 #include <cartan/serial/ik/ik_validation.h>
 #include <cartan/serial/ik/solver/exhaustive_ik_runner.h>
@@ -90,8 +90,8 @@ struct target_set
         seeds.reserve(static_cast<std::size_t>(count));
         for (int i = 0; i < count; ++i)
         {
-            targets.push_back(cartan::benchmarks::random_reachable_target(chain, rng));
-            seeds.push_back(cartan::benchmarks::random_joint_config(chain, rng));
+            targets.push_back(cartan::fixtures::random_reachable_target(chain, rng));
+            seeds.push_back(cartan::fixtures::random_joint_config(chain, rng));
         }
     }
 };
@@ -249,7 +249,7 @@ inline cartan::exhaustive_options<double> exhaustive_opts_200()
                                                                                                        \
 static void bm_exhaustive_##ROBOT##_r50(benchmark::State& state)                                       \
 {                                                                                                      \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                               \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                     \
     bm_exhaustive<6, plm_policy<6>>(state, chain, ts, exhaustive_criteria(), exhaustive_opts_50());     \
 }                                                                                                      \
@@ -257,7 +257,7 @@ BENCHMARK(bm_exhaustive_##ROBOT##_r50)->Iterations(num_targets)->Unit(benchmark:
                                                                                                        \
 static void bm_exhaustive_##ROBOT##_r100(benchmark::State& state)                                      \
 {                                                                                                      \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                               \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                     \
     bm_exhaustive<6, plm_policy<6>>(state, chain, ts, exhaustive_criteria(), exhaustive_opts_100());    \
 }                                                                                                      \
@@ -265,7 +265,7 @@ BENCHMARK(bm_exhaustive_##ROBOT##_r100)->Iterations(num_targets)->Unit(benchmark
                                                                                                        \
 static void bm_exhaustive_##ROBOT##_r200(benchmark::State& state)                                      \
 {                                                                                                      \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                               \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                     \
     bm_exhaustive<6, plm_policy<6>>(state, chain, ts, exhaustive_criteria(), exhaustive_opts_200());    \
 }                                                                                                      \
@@ -279,7 +279,7 @@ BENCHMARK(bm_exhaustive_##ROBOT##_r200)->Iterations(num_targets)->Unit(benchmark
                                                                                                        \
 static void bm_exhaustive_##ROBOT##_r50(benchmark::State& state)                                       \
 {                                                                                                      \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                               \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                     \
     bm_exhaustive<7, plm_policy<7>>(state, chain, ts, exhaustive_criteria(), exhaustive_opts_50());     \
 }                                                                                                      \
@@ -287,7 +287,7 @@ BENCHMARK(bm_exhaustive_##ROBOT##_r50)->Iterations(num_targets)->Unit(benchmark:
                                                                                                        \
 static void bm_exhaustive_##ROBOT##_r100(benchmark::State& state)                                      \
 {                                                                                                      \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                               \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                     \
     bm_exhaustive<7, plm_policy<7>>(state, chain, ts, exhaustive_criteria(), exhaustive_opts_100());    \
 }                                                                                                      \
@@ -295,7 +295,7 @@ BENCHMARK(bm_exhaustive_##ROBOT##_r100)->Iterations(num_targets)->Unit(benchmark
                                                                                                        \
 static void bm_exhaustive_##ROBOT##_r200(benchmark::State& state)                                      \
 {                                                                                                      \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                               \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                               \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                     \
     bm_exhaustive<7, plm_policy<7>>(state, chain, ts, exhaustive_criteria(), exhaustive_opts_200());    \
 }                                                                                                      \

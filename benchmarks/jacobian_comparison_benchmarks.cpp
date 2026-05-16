@@ -22,7 +22,7 @@ namespace
 template <typename Scalar>
 auto make_3r_planar_static()
 {
-    auto kc = cartan::benchmarks::make_3r_planar_chain<Scalar>();
+    auto kc = cartan::fixtures::make_3r_planar_chain<Scalar>();
     return cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_z, cartan::revolute_z>(
         kc.home(), kc.axes(), kc.limits());
 }
@@ -30,7 +30,7 @@ auto make_3r_planar_static()
 template <typename Scalar>
 auto make_ur3e_static()
 {
-    auto kc = cartan::benchmarks::make_ur3e_chain<Scalar>();
+    auto kc = cartan::fixtures::make_ur3e_chain<Scalar>();
     return cartan::static_chain<Scalar,
         cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
         cartan::revolute_y, cartan::revolute_z, cartan::revolute_y>(
@@ -40,7 +40,7 @@ auto make_ur3e_static()
 template <typename Scalar>
 auto make_lbr_med14_static()
 {
-    auto kc = cartan::benchmarks::make_lbr_med14_chain<Scalar>();
+    auto kc = cartan::fixtures::make_lbr_med14_chain<Scalar>();
     return cartan::static_chain<Scalar,
         cartan::revolute_z, cartan::revolute_y, cartan::revolute_z, cartan::revolute_y,
         cartan::revolute_z, cartan::revolute_y, cartan::revolute_z>(
@@ -50,7 +50,7 @@ auto make_lbr_med14_static()
 template <typename Scalar>
 auto make_kr6_sixx_static()
 {
-    auto kc = cartan::benchmarks::make_kr6_sixx_chain<Scalar>();
+    auto kc = cartan::fixtures::make_kr6_sixx_chain<Scalar>();
     return cartan::static_chain<Scalar,
         cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
         cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>(
@@ -60,7 +60,7 @@ auto make_kr6_sixx_static()
 template <typename Scalar>
 auto make_panda_static()
 {
-    auto kc = cartan::benchmarks::make_panda_chain<Scalar>();
+    auto kc = cartan::fixtures::make_panda_chain<Scalar>();
     return cartan::static_chain<Scalar,
         cartan::revolute_z, cartan::revolute_y, cartan::revolute_z, cartan::revolute_y,
         cartan::revolute_z, cartan::revolute_y, cartan::revolute_z>(
@@ -70,7 +70,7 @@ auto make_panda_static()
 template <typename Scalar>
 auto make_abb_irb120_static()
 {
-    auto kc = cartan::benchmarks::make_abb_irb120_chain<Scalar>();
+    auto kc = cartan::fixtures::make_abb_irb120_chain<Scalar>();
     return cartan::static_chain<Scalar,
         cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
         cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>(
@@ -80,7 +80,7 @@ auto make_abb_irb120_static()
 template <typename Scalar>
 auto make_jaco2_static()
 {
-    auto kc = cartan::benchmarks::make_jaco2_chain<Scalar>();
+    auto kc = cartan::fixtures::make_jaco2_chain<Scalar>();
     return cartan::static_chain<Scalar,
         cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
         cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>(
@@ -90,7 +90,7 @@ auto make_jaco2_static()
 template <typename Scalar>
 auto make_fetch_static()
 {
-    auto kc = cartan::benchmarks::make_fetch_chain<Scalar>();
+    auto kc = cartan::fixtures::make_fetch_chain<Scalar>();
     return cartan::static_chain<Scalar,
         cartan::revolute_z, cartan::revolute_y, cartan::revolute_x, cartan::revolute_y,
         cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>(
@@ -100,7 +100,7 @@ auto make_fetch_static()
 template <typename Scalar>
 auto make_baxter_static()
 {
-    auto kc = cartan::benchmarks::make_baxter_chain<Scalar>();
+    auto kc = cartan::fixtures::make_baxter_chain<Scalar>();
     return cartan::static_chain<Scalar,
         cartan::revolute_z, cartan::revolute_y, cartan::revolute_x, cartan::revolute_y,
         cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>(
@@ -149,9 +149,9 @@ void fill_kdl_random(KDL::JntArray& q, int n, std::mt19937& rng)
 #define JAC_BENCHMARK_KINEMATIC_CHAIN(ROBOT, FACTORY)                    \
 static void bm_jac_##ROBOT##_kinematic_chain(benchmark::State& state)    \
 {                                                                        \
-    auto chain = cartan::benchmarks::FACTORY<double>();                    \
+    auto chain = cartan::fixtures::FACTORY<double>();                    \
     std::mt19937 rng(42);                                                \
-    auto q = cartan::benchmarks::random_joint_config(chain, rng);         \
+    auto q = cartan::fixtures::random_joint_config(chain, rng);         \
     auto fk = cartan::forward_kinematics(chain, q);                       \
     for (auto _ : state)                                                 \
     {                                                                    \
@@ -195,7 +195,7 @@ BENCHMARK(bm_jac_##ROBOT##_static_specialized)
 #define JAC_BENCHMARK_KDL(ROBOT, KDL_FACTORY, N_JOINTS)                  \
 static void bm_jac_##ROBOT##_kdl(benchmark::State& state)                \
 {                                                                        \
-    auto chain = cartan::benchmarks::KDL_FACTORY();                       \
+    auto chain = cartan::fixtures::KDL_FACTORY();                       \
     KDL::ChainJntToJacSolver jac_solver(chain);                          \
     std::mt19937 rng(42);                                                \
     KDL::JntArray q;                                                     \

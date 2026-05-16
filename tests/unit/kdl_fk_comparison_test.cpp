@@ -72,71 +72,71 @@ void compare_fk(MakeChain make_chain, MakeKdlChain make_kdl_chain,
 TEST_CASE("FK comparison: UR3e", "[kdl][fk]")
 {
     compare_fk<6>(
-        cartan::benchmarks::make_ur3e_chain<double>,
-        cartan::benchmarks::make_ur3e_kdl_chain,
+        cartan::fixtures::make_ur3e_chain<double>,
+        cartan::fixtures::make_ur3e_kdl_chain,
         "UR3e");
 }
 
 TEST_CASE("FK comparison: LBR Med 14", "[kdl][fk]")
 {
     compare_fk<7>(
-        cartan::benchmarks::make_lbr_med14_chain<double>,
-        cartan::benchmarks::make_lbr_med14_kdl_chain,
+        cartan::fixtures::make_lbr_med14_chain<double>,
+        cartan::fixtures::make_lbr_med14_kdl_chain,
         "LBR Med 14");
 }
 
 TEST_CASE("FK comparison: KR6 SIXX", "[kdl][fk]")
 {
     compare_fk<6>(
-        cartan::benchmarks::make_kr6_sixx_chain<double>,
-        cartan::benchmarks::make_kr6_sixx_kdl_chain,
+        cartan::fixtures::make_kr6_sixx_chain<double>,
+        cartan::fixtures::make_kr6_sixx_kdl_chain,
         "KR6 SIXX");
 }
 
 TEST_CASE("FK comparison: Panda", "[kdl][fk]")
 {
     compare_fk<7>(
-        cartan::benchmarks::make_panda_chain<double>,
-        cartan::benchmarks::make_panda_kdl_chain,
+        cartan::fixtures::make_panda_chain<double>,
+        cartan::fixtures::make_panda_kdl_chain,
         "Panda");
 }
 
 TEST_CASE("FK comparison: ABB IRB 120", "[kdl][fk]")
 {
     compare_fk<6>(
-        cartan::benchmarks::make_abb_irb120_chain<double>,
-        cartan::benchmarks::make_abb_irb120_kdl_chain,
+        cartan::fixtures::make_abb_irb120_chain<double>,
+        cartan::fixtures::make_abb_irb120_kdl_chain,
         "ABB IRB 120");
 }
 
 TEST_CASE("FK comparison: Jaco2", "[kdl][fk]")
 {
     compare_fk<6>(
-        cartan::benchmarks::make_jaco2_chain<double>,
-        cartan::benchmarks::make_jaco2_kdl_chain,
+        cartan::fixtures::make_jaco2_chain<double>,
+        cartan::fixtures::make_jaco2_kdl_chain,
         "Jaco2");
 }
 
 TEST_CASE("FK comparison: Fetch", "[kdl][fk]")
 {
     compare_fk<7>(
-        cartan::benchmarks::make_fetch_chain<double>,
-        cartan::benchmarks::make_fetch_kdl_chain,
+        cartan::fixtures::make_fetch_chain<double>,
+        cartan::fixtures::make_fetch_kdl_chain,
         "Fetch");
 }
 
 TEST_CASE("FK comparison: Baxter", "[kdl][fk]")
 {
     compare_fk<7>(
-        cartan::benchmarks::make_baxter_chain<double>,
-        cartan::benchmarks::make_baxter_kdl_chain,
+        cartan::fixtures::make_baxter_chain<double>,
+        cartan::fixtures::make_baxter_kdl_chain,
         "Baxter");
 }
 
 TEST_CASE("FK comparison: Kuka LWR4", "[kdl][fk]")
 {
     compare_fk<7>(
-        cartan::benchmarks::make_kuka_lwr4_chain<double>,
-        cartan::benchmarks::make_kuka_lwr4_kdl_chain,
+        cartan::fixtures::make_kuka_lwr4_chain<double>,
+        cartan::fixtures::make_kuka_lwr4_kdl_chain,
         "Kuka LWR4");
 }

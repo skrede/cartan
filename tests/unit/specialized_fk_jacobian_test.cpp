@@ -3,7 +3,7 @@
 ///        and generic FK/Jacobian paths for all 9 benchmark robot geometries,
 ///        plus near-zero and zero-angle edge cases.
 
-#include "../../profiling/chain_factories.h"
+#include "../fixtures/chain_factories.h"
 
 #include <cartan/serial/fk/forward_kinematics.h>
 #include <cartan/serial/fk/jacobian.h>
@@ -24,7 +24,7 @@ namespace spp = cartan;
 template <typename Scalar>
 auto make_3r_planar_static()
 {
-    auto kc = spp::benchmarks::make_3r_planar_chain<Scalar>();
+    auto kc = spp::fixtures::make_3r_planar_chain<Scalar>();
     return spp::static_chain<Scalar, spp::revolute_z, spp::revolute_z, spp::revolute_z>(
         kc.home(), kc.axes(), kc.limits());
 }
@@ -32,7 +32,7 @@ auto make_3r_planar_static()
 template <typename Scalar>
 auto make_ur3e_static()
 {
-    auto kc = spp::benchmarks::make_ur3e_chain<Scalar>();
+    auto kc = spp::fixtures::make_ur3e_chain<Scalar>();
     return spp::static_chain<Scalar,
         spp::revolute_z, spp::revolute_y, spp::revolute_y,
         spp::revolute_y, spp::revolute_z, spp::revolute_y>(
@@ -42,7 +42,7 @@ auto make_ur3e_static()
 template <typename Scalar>
 auto make_lbr_med14_static()
 {
-    auto kc = spp::benchmarks::make_lbr_med14_chain<Scalar>();
+    auto kc = spp::fixtures::make_lbr_med14_chain<Scalar>();
     return spp::static_chain<Scalar,
         spp::revolute_z, spp::revolute_y, spp::revolute_z, spp::revolute_y,
         spp::revolute_z, spp::revolute_y, spp::revolute_z>(
@@ -52,7 +52,7 @@ auto make_lbr_med14_static()
 template <typename Scalar>
 auto make_kr6_sixx_static()
 {
-    auto kc = spp::benchmarks::make_kr6_sixx_chain<Scalar>();
+    auto kc = spp::fixtures::make_kr6_sixx_chain<Scalar>();
     return spp::static_chain<Scalar,
         spp::revolute_z, spp::revolute_y, spp::revolute_y,
         spp::revolute_x, spp::revolute_y, spp::revolute_x>(
@@ -62,7 +62,7 @@ auto make_kr6_sixx_static()
 template <typename Scalar>
 auto make_panda_static()
 {
-    auto kc = spp::benchmarks::make_panda_chain<Scalar>();
+    auto kc = spp::fixtures::make_panda_chain<Scalar>();
     return spp::static_chain<Scalar,
         spp::revolute_z, spp::revolute_y, spp::revolute_z, spp::revolute_y,
         spp::revolute_z, spp::revolute_y, spp::revolute_z>(
@@ -72,7 +72,7 @@ auto make_panda_static()
 template <typename Scalar>
 auto make_abb_irb120_static()
 {
-    auto kc = spp::benchmarks::make_abb_irb120_chain<Scalar>();
+    auto kc = spp::fixtures::make_abb_irb120_chain<Scalar>();
     return spp::static_chain<Scalar,
         spp::revolute_z, spp::revolute_y, spp::revolute_y,
         spp::revolute_x, spp::revolute_y, spp::revolute_x>(
@@ -82,7 +82,7 @@ auto make_abb_irb120_static()
 template <typename Scalar>
 auto make_jaco2_static()
 {
-    auto kc = spp::benchmarks::make_jaco2_chain<Scalar>();
+    auto kc = spp::fixtures::make_jaco2_chain<Scalar>();
     return spp::static_chain<Scalar,
         spp::revolute_z, spp::revolute_y, spp::revolute_y,
         spp::revolute_x, spp::revolute_y, spp::revolute_x>(
@@ -92,7 +92,7 @@ auto make_jaco2_static()
 template <typename Scalar>
 auto make_fetch_static()
 {
-    auto kc = spp::benchmarks::make_fetch_chain<Scalar>();
+    auto kc = spp::fixtures::make_fetch_chain<Scalar>();
     return spp::static_chain<Scalar,
         spp::revolute_z, spp::revolute_y, spp::revolute_x, spp::revolute_y,
         spp::revolute_x, spp::revolute_y, spp::revolute_x>(
@@ -102,7 +102,7 @@ auto make_fetch_static()
 template <typename Scalar>
 auto make_baxter_static()
 {
-    auto kc = spp::benchmarks::make_baxter_chain<Scalar>();
+    auto kc = spp::fixtures::make_baxter_chain<Scalar>();
     return spp::static_chain<Scalar,
         spp::revolute_z, spp::revolute_y, spp::revolute_x, spp::revolute_y,
         spp::revolute_x, spp::revolute_y, spp::revolute_x>(

@@ -2,7 +2,7 @@
 /// @brief Standalone profiling tool for comparing native, argmin, and NLopt IK
 ///        solvers across all 9 robots. No external robot library dependencies.
 
-#include "chain_factories.h"
+#include "../tests/fixtures/chain_factories.h"
 
 #include <cartan/serial/ik/ik_status.h>
 #include <cartan/serial/ik/solver/lm.h>
@@ -53,8 +53,8 @@ struct target_set
         seeds.reserve(static_cast<std::size_t>(count));
         for (int i = 0; i < count; ++i)
         {
-            targets.push_back(cartan::benchmarks::random_reachable_target(chain, rng));
-            seeds.push_back(cartan::benchmarks::random_joint_config(chain, rng));
+            targets.push_back(cartan::fixtures::random_reachable_target(chain, rng));
+            seeds.push_back(cartan::fixtures::random_joint_config(chain, rng));
         }
     }
 };
@@ -90,7 +90,7 @@ void bm_full_solver(
         {
             ++successes;
             total_iterations += result->iterations;
-            auto [position_error, orientation_error] = cartan::benchmarks::compute_pose_errors(
+            auto [position_error, orientation_error] = cartan::fixtures::compute_pose_errors(
                 chain, result->solution.position, target);
             total_position_error += position_error;
             total_orientation_error += orientation_error;
@@ -176,7 +176,7 @@ inline cartan::convergence_criteria<double> nlopt_criteria()                { re
                                                                                                        \
 static void bm_profiling_##ROBOT##_cartan_speed(benchmark::State& state)                                      \
 {                                                                                                      \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                                \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                                \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                     \
     bm_full_solver<6, speed_ik_solver<6>>(state, chain, ts, speed_criteria());                       \
 }                                                                                                      \
@@ -184,7 +184,7 @@ BENCHMARK(bm_profiling_##ROBOT##_cartan_speed)->Iterations(1000)->Unit(benchmark
                                                                                                        \
 static void bm_profiling_##ROBOT##_cartan_convergence(benchmark::State& state)                                \
 {                                                                                                      \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                                \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                                \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                     \
     bm_full_solver<6, convergence_ik_solver<6>>(state, chain, ts, convergence_criteria_tuned());     \
 }                                                                                                      \
@@ -192,7 +192,7 @@ BENCHMARK(bm_profiling_##ROBOT##_cartan_convergence)->Iterations(1000)->Unit(ben
                                                                                                        \
 static void bm_profiling_##ROBOT##_cartan_restart_lm(benchmark::State& state)                                 \
 {                                                                                                      \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                                \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                                \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                     \
     bm_full_solver<6, restart_lm_ik_solver<6>>(state, chain, ts, restart_lm_criteria());             \
 }                                                                                                      \
@@ -200,7 +200,7 @@ BENCHMARK(bm_profiling_##ROBOT##_cartan_restart_lm)->Iterations(1000)->Unit(benc
                                                                                                        \
 static void bm_profiling_##ROBOT##_cartan_racing(benchmark::State& state)                                     \
 {                                                                                                      \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                                \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                                \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                     \
     bm_full_solver<6, racing_solver<6>>(state, chain, ts, convergence_criteria_tuned());             \
 }                                                                                                      \
@@ -211,7 +211,7 @@ BENCHMARK(bm_profiling_##ROBOT##_cartan_racing)->Iterations(1000)->Unit(benchmar
                                                                                                        \
 static void bm_profiling_##ROBOT##_argmin_slsqp(benchmark::State& state)                              \
 {                                                                                                      \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                                \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                                \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                     \
     bm_full_solver<6, argmin_slsqp_solver<6>>(state, chain, ts, argmin_criteria());                \
 }                                                                                                      \
@@ -226,7 +226,7 @@ BENCHMARK(bm_profiling_##ROBOT##_argmin_slsqp)->Iterations(1000)->Unit(benchmark
                                                                                                        \
 static void bm_profiling_##ROBOT##_nlopt_slsqp(benchmark::State& state)                                \
 {                                                                                                      \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                                \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                                \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                     \
     bm_full_solver<6, nlopt_slsqp_solver<6>>(state, chain, ts, nlopt_criteria());                    \
 }                                                                                                      \
@@ -240,7 +240,7 @@ BENCHMARK(bm_profiling_##ROBOT##_nlopt_slsqp)->Iterations(1000)->Unit(benchmark:
                                                                                                        \
 static void bm_profiling_##ROBOT##_cartan_speed(benchmark::State& state)                                      \
 {                                                                                                      \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                                \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                                \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                     \
     bm_full_solver<7, speed_ik_solver<7>>(state, chain, ts, speed_criteria());                       \
 }                                                                                                      \
@@ -248,7 +248,7 @@ BENCHMARK(bm_profiling_##ROBOT##_cartan_speed)->Iterations(1000)->Unit(benchmark
                                                                                                        \
 static void bm_profiling_##ROBOT##_cartan_convergence(benchmark::State& state)                                \
 {                                                                                                      \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                                \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                                \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                     \
     bm_full_solver<7, convergence_ik_solver<7>>(state, chain, ts, convergence_criteria_tuned());     \
 }                                                                                                      \
@@ -256,7 +256,7 @@ BENCHMARK(bm_profiling_##ROBOT##_cartan_convergence)->Iterations(1000)->Unit(ben
                                                                                                        \
 static void bm_profiling_##ROBOT##_cartan_restart_lm(benchmark::State& state)                                 \
 {                                                                                                      \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                                \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                                \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                     \
     bm_full_solver<7, restart_lm_ik_solver<7>>(state, chain, ts, restart_lm_criteria());             \
 }                                                                                                      \
@@ -264,7 +264,7 @@ BENCHMARK(bm_profiling_##ROBOT##_cartan_restart_lm)->Iterations(1000)->Unit(benc
                                                                                                        \
 static void bm_profiling_##ROBOT##_cartan_racing(benchmark::State& state)                                     \
 {                                                                                                      \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                                \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                                \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                     \
     bm_full_solver<7, racing_solver<7>>(state, chain, ts, convergence_criteria_tuned());             \
 }                                                                                                      \
@@ -275,7 +275,7 @@ BENCHMARK(bm_profiling_##ROBOT##_cartan_racing)->Iterations(1000)->Unit(benchmar
                                                                                                        \
 static void bm_profiling_##ROBOT##_argmin_slsqp(benchmark::State& state)                              \
 {                                                                                                      \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                                \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                                \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                     \
     bm_full_solver<7, argmin_slsqp_solver<7>>(state, chain, ts, argmin_criteria());                \
 }                                                                                                      \
@@ -290,7 +290,7 @@ BENCHMARK(bm_profiling_##ROBOT##_argmin_slsqp)->Iterations(1000)->Unit(benchmark
                                                                                                        \
 static void bm_profiling_##ROBOT##_nlopt_slsqp(benchmark::State& state)                                \
 {                                                                                                      \
-    auto chain = cartan::benchmarks::CHAIN_FN<double>();                                                \
+    auto chain = cartan::fixtures::CHAIN_FN<double>();                                                \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                     \
     bm_full_solver<7, nlopt_slsqp_solver<7>>(state, chain, ts, nlopt_criteria());                    \
 }                                                                                                      \
