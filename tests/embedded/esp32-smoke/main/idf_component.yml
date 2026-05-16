@@ -1,0 +1,12 @@
+## Component dependencies for the cartan ESP-IDF smoke test.
+##
+## Eigen is sourced from the ESP Component Registry mirror; if that path is
+## unavailable in your environment, set the CARTAN_EIGEN_DIR environment
+## variable before `idf.py reconfigure build` to point at a local Eigen
+## checkout — main/CMakeLists.txt picks that path up.
+
+dependencies:
+  idf: ">=5.1"
+  espressif/eigen:
+    version: "^3.4"
+    require: optional

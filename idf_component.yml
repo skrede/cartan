@@ -1,0 +1,52 @@
+# ESP-IDF Component Manager manifest for cartan.
+#
+# Register cartan as an ESP-IDF component for embedded use. Header-only;
+# consuming firmware projects add cartan to their component dependencies via
+# `idf.py add-dependency "skrede/cartan"` (or a pinned tag) and then use the
+# public headers from main/ or other components.
+#
+# Hardware deployment, Eigen alignment audit, memory + flash sweep, and a real
+# robot-arm demo are explicitly out of scope for the v0.4.1 manifest — those
+# land in a follow-on Embedded Targeting milestone. The smoke test under
+# tests/embedded/esp32-smoke/ verifies headers compile under xtensa-esp32-elf
+# at the language level only.
+
+version: "0.4.1"
+description: "C++20 Lie group / kinematics / inverse kinematics library for embedded robotics (header-only, Eigen-based)."
+url: "https://github.com/skrede/cartan"
+repository: "https://github.com/skrede/cartan.git"
+license: "Apache-2.0"
+issues: "https://github.com/skrede/cartan/issues"
+
+maintainers:
+  - "Aleksander Skrede <code@skrede.me>"
+
+tags:
+  - robotics
+  - kinematics
+  - inverse-kinematics
+  - lie-groups
+  - se3
+  - so3
+  - urdf
+
+dependencies:
+  idf: ">=5.1"
+
+files:
+  include:
+    - "lib/cartan-lie/include/**/*"
+    - "lib/cartan-serial-chain/include/**/*"
+    - "lib/cartan-analytical/include/**/*"
+    - "LICENSE"
+    - "README.md"
+  exclude:
+    - "build/**/*"
+    - "cmake-build-*/**/*"
+    - "tests/**/*"
+    - "benchmarks/**/*"
+    - "examples/**/*"
+    - "python/**/*"
+    - "profiling/**/*"
+    - "docs/**/*"
+    - ".planning/**/*"

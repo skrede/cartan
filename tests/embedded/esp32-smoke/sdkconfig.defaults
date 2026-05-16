@@ -1,0 +1,18 @@
+# ESP-IDF defaults for the cartan compile-only smoke. Production firmware
+# should tune these against its own real-time, power, and memory budget.
+
+# Optimize for size by default — cartan's templated Eigen instantiations are
+# the dominant flash contributor, and -Os reflects what an embedded user
+# would typically pick.
+CONFIG_COMPILER_OPTIMIZATION_SIZE=y
+
+# Enable C++ exceptions so std::is_constant_evaluated() in cartan-lie's
+# epsilon traits compiles under the C++20 evaluation rules used by
+# cartan::expected's value() throw path. Production firmware can tighten
+# this depending on the dispatch convention chosen.
+CONFIG_COMPILER_CXX_EXCEPTIONS=y
+CONFIG_COMPILER_CXX_RTTI=n
+
+# Float-only FPU — Eigen will use it; cartan templates default to float in
+# the smoke, so this matches the instantiation footprint.
+CONFIG_ESP_TASK_WDT_INIT=y
