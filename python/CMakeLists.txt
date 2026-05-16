@@ -33,3 +33,17 @@ if (TARGET cartan::urdf)
 endif ()
 
 install(TARGETS _core LIBRARY DESTINATION cartan)
+
+nanobind_add_stub(
+    _core_stub
+    MODULE _core
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/_core.pyi
+    PYTHON_PATH $<TARGET_FILE_DIR:_core>
+    DEPENDS _core
+)
+
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/_core.pyi
+    ${CMAKE_CURRENT_SOURCE_DIR}/cartan/py.typed
+    DESTINATION cartan
+)
