@@ -3,12 +3,12 @@
 #include <cartan/serial/ik/ik_status.h>
 #include <cartan/serial/ik/solver/lm.h>
 #include <cartan/serial/ik/solver/lbfgsb.h>
-#include <cartan/serial/ik/solver/filter_nw_sqp.h>
-#include <cartan/serial/ik/solver/filter_slsqp.h>
 #include <cartan/serial/ik/wrapper/restart_wrapper.h>
 #include <cartan/serial/ik/solver/detail/halton_seed_generator.h>
 
 #ifdef CARTAN_TEST_HAVE_ARGMIN
+#include <cartan/serial/ik/solver/filter_nw_sqp.h>
+#include <cartan/serial/ik/solver/filter_slsqp.h>
 #include <cartan/serial/ik/solver/argmin_slsqp.h>
 #include <cartan/serial/ik/solver/argmin_projected_gn.h>
 #include <cartan/serial/ik/solver/argmin_projected_gradient_gn.h>
@@ -98,10 +98,9 @@ using restart_lm = cartan::ik::restart_wrapper<chain_t,
 using restart_lbfgsb = cartan::ik::restart_wrapper<chain_t,
     cartan::ik::builtin_lbfgsb<chain_t, cartan::no_limits>, cartan::no_limits>;
 
+#ifdef CARTAN_TEST_HAVE_ARGMIN
 using filter_nw_sqp_solver = cartan::ik::filter_nw_sqp<chain_t>;
 using filter_slsqp_solver = cartan::ik::filter_slsqp<chain_t>;
-
-#ifdef CARTAN_TEST_HAVE_ARGMIN
 using argmin_slsqp_solver = cartan::ik::argmin_slsqp<chain_t>;
 using argmin_projected_gn_solver = cartan::ik::argmin_projected_gn<chain_t>;
 using argmin_projected_gradient_gn_solver = cartan::ik::argmin_projected_gradient_gn<chain_t>;
@@ -109,15 +108,16 @@ using argmin_projected_gradient_gn_solver = cartan::ik::argmin_projected_gradien
 
 TEMPLATE_TEST_CASE("continuous joint: IK roundtrip via builtin restart paths",
                    "[solver_continuous_joint]",
-                   restart_lm, restart_lbfgsb,
-                   filter_nw_sqp_solver, filter_slsqp_solver)
+                   restart_lm, restart_lbfgsb)
 {
     verify_continuous_wrist_roundtrip<TestType>(0);
 }
 
 #ifdef CARTAN_TEST_HAVE_ARGMIN
-TEMPLATE_TEST_CASE("continuous joint: IK roundtrip via argmin solvers",
+TEMPLATE_TEST_CASE("continuous joint: IK roundtrip via argmin-backed solvers",
                    "[solver_continuous_joint]",
+                   filter_nw_sqp_solver,
+                   filter_slsqp_solver,
                    argmin_slsqp_solver,
                    argmin_projected_gn_solver,
                    argmin_projected_gradient_gn_solver)
