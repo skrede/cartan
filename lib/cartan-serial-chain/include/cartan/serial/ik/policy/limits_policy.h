@@ -11,10 +11,12 @@
 
 #include "cartan/serial/chain/joint_state.h"
 #include "cartan/serial/fk/jacobian.h"
+#include "cartan/serial/chain/joint_limits.h"
 #include "cartan/serial/chain/chain_concept.h"
 
 #include <Eigen/SVD>
 
+#include <cmath>
 #include <concepts>
 #include <algorithm>
 
@@ -118,7 +120,18 @@ struct null_space_limits
                           + limits[static_cast<std::size_t>(i)].position_max) / Scalar(2);
             Scalar q_range = limits[static_cast<std::size_t>(i)].position_max
                            - limits[static_cast<std::size_t>(i)].position_min;
-            dq_null(i) = -gain * (q(i) - q_mid) / (q_range * q_range);
+            // Unbounded angular joints have no meaningful midpoint or range
+            // for null-space centering. Skip their contribution by writing
+            // zero into the per-joint slot; the surrounding accumulator and
+            // projection math continues to run over the remaining joints.
+            if (std::isfinite(q_range))
+            {
+                dq_null(i) = -gain * (q(i) - q_mid) / (q_range * q_range);
+            }
+            else
+            {
+                dq_null(i) = Scalar(0);
+            }
         }
 
         // Null-space projector from SVD: V_null * V_null^T

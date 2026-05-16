@@ -107,8 +107,18 @@ public:
         {
             Scalar h = halton_element<Scalar>(halton_index, bases[static_cast<std::size_t>(j)]);
             auto lim = m_chain->limits()[static_cast<std::size_t>(j)];
-            // Scale [0,1] -> [q_min, q_max]
-            q[j] = lim.position_min + h * (lim.position_max - lim.position_min);
+            // Scale [0,1] -> [q_min, q_max] for finite-range joints; for an
+            // unbounded angular joint, fall back to one principal revolution
+            // centered at zero so the seed remains finite.
+            const Scalar range = lim.position_max - lim.position_min;
+            if (std::isfinite(range))
+            {
+                q[j] = lim.position_min + h * range;
+            }
+            else
+            {
+                q[j] = (h - Scalar(0.5)) * cartan::detail::k_unbounded_angular_range_v<Scalar>;
+            }
         }
         return q;
     }

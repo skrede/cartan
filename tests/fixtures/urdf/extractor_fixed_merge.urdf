@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<robot name="extractor_fixed_merge">
+
+  <link name="base_link"/>
+  <link name="link_1"/>
+  <link name="link_1_post"/>
+  <link name="link_2"/>
+  <link name="tool"/>
+
+  <joint name="shoulder" type="revolute">
+    <parent link="base_link"/>
+    <child link="link_1"/>
+    <origin xyz="0 0 0.1" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.14159" upper="3.14159" velocity="2.0" effort="50.0"/>
+  </joint>
+
+  <joint name="sensor_mount" type="fixed">
+    <parent link="link_1"/>
+    <child link="link_1_post"/>
+    <origin xyz="0.1 0.0 0.2" rpy="0 0 0.5235987755982988"/>
+  </joint>
+
+  <joint name="elbow" type="revolute">
+    <parent link="link_1_post"/>
+    <child link="link_2"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-2.5" upper="2.5" velocity="2.0" effort="50.0"/>
+  </joint>
+
+  <joint name="tool_mount" type="fixed">
+    <parent link="link_2"/>
+    <child link="tool"/>
+    <origin xyz="0 0 0.05" rpy="0 0 0"/>
+  </joint>
+
+</robot>

@@ -11,6 +11,7 @@
 #include "cartan/serial/ik/solver/detail/analytical_gradient.h"
 
 #include "cartan/lie/se3.h"
+#include "cartan/serial/chain/joint_limits.h"
 #include "cartan/serial/chain/chain_concept.h"
 
 #include <Eigen/Core>
@@ -84,12 +85,19 @@ public:
     void constraints(const Eigen::MatrixBase<DerivedIn>& x, Eigen::MatrixBase<DerivedOut>& c) const
     {
         int n = m_chain->num_joints();
+        // Substitute a finite half-range fallback when either bound is
+        // non-finite. The trivially-satisfied constraint value would
+        // otherwise be +infinity, which destabilizes argmin's active-set QP
+        // for the filter_nw_sqp policy on unbounded angular joints.
+        constexpr Scalar half_fallback =
+            cartan::detail::k_unbounded_angular_range_v<Scalar> / Scalar(2);
         for (int i = 0; i < n; ++i)
         {
-            c[i] = x[i] - static_cast<double>(
-                m_chain->limits()[static_cast<std::size_t>(i)].position_min);
-            c[n + i] = static_cast<double>(
-                m_chain->limits()[static_cast<std::size_t>(i)].position_max) - x[i];
+            const auto& lim = m_chain->limits()[static_cast<std::size_t>(i)];
+            const Scalar lo = cartan::detail::finite_lower_or(lim.position_min, half_fallback);
+            const Scalar hi = cartan::detail::finite_upper_or(lim.position_max, half_fallback);
+            c[i] = x[i] - static_cast<double>(lo);
+            c[n + i] = static_cast<double>(hi) - x[i];
         }
     }
 

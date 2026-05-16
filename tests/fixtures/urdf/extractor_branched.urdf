@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<robot name="extractor_branched">
+
+  <link name="base_link"/>
+  <link name="shoulder_link"/>
+  <link name="arm_a"/>
+  <link name="arm_b"/>
+  <link name="sensor"/>
+
+  <joint name="shoulder" type="revolute">
+    <parent link="base_link"/>
+    <child link="shoulder_link"/>
+    <origin xyz="0 0 0.1" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.14" upper="3.14" velocity="2.0" effort="50.0"/>
+  </joint>
+
+  <joint name="branch_a" type="revolute">
+    <parent link="shoulder_link"/>
+    <child link="arm_a"/>
+    <origin xyz="0.2 0 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-2.0" upper="2.0" velocity="2.0" effort="50.0"/>
+  </joint>
+
+  <joint name="branch_b" type="revolute">
+    <parent link="shoulder_link"/>
+    <child link="arm_b"/>
+    <origin xyz="-0.2 0 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-2.0" upper="2.0" velocity="2.0" effort="50.0"/>
+  </joint>
+
+  <joint name="sensor_attach" type="fixed">
+    <parent link="shoulder_link"/>
+    <child link="sensor"/>
+    <origin xyz="0 0 0.1" rpy="0 0 0"/>
+  </joint>
+
+</robot>

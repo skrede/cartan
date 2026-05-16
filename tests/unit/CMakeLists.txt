@@ -97,4 +97,30 @@ if (CARTAN_BUILD_URDF)
     target_link_libraries(urdf_parser_test PRIVATE cartan::urdf)
     target_compile_definitions(urdf_parser_test PRIVATE
         CARTAN_TESTS_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures")
+
+    cartan_add_test(urdf_chain_extractor_test urdf_chain_extractor_test.cpp)
+    target_link_libraries(urdf_chain_extractor_test PRIVATE cartan::urdf)
+    target_compile_definitions(urdf_chain_extractor_test PRIVATE
+        CARTAN_TESTS_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures")
+
+    cartan_add_test(solver_continuous_joint_test solver_continuous_joint_test.cpp)
+    target_link_libraries(solver_continuous_joint_test PRIVATE cartan::urdf)
+    target_compile_definitions(solver_continuous_joint_test PRIVATE
+        CARTAN_TESTS_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures")
+    if (CARTAN_BUILD_ARGMIN)
+        target_link_libraries(solver_continuous_joint_test PRIVATE argmin::argmin)
+        target_compile_definitions(solver_continuous_joint_test PRIVATE CARTAN_TEST_HAVE_ARGMIN)
+    endif ()
+
+    if (CARTAN_BUILD_ARGMIN)
+        cartan_add_test(continuous_joint_fallback_sweep continuous_joint_fallback_sweep.cpp)
+        target_link_libraries(continuous_joint_fallback_sweep PRIVATE cartan::urdf argmin::argmin)
+        target_compile_definitions(continuous_joint_fallback_sweep PRIVATE
+            CARTAN_TESTS_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures")
+        # Exclude from the default ctest run; invoke directly via
+        #   ctest -R continuous_joint_fallback_sweep
+        # or run the binary at tests/unit/continuous_joint_fallback_sweep.
+        set_tests_properties(continuous_joint_fallback_sweep
+            PROPERTIES LABELS "manual" DISABLED TRUE)
+    endif ()
 endif ()

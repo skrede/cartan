@@ -283,7 +283,9 @@ private:
         for (int i = 0; i < n; ++i)
         {
             auto idx = static_cast<std::size_t>(i);
-            auto range = limits[idx].position_max - limits[idx].position_min;
+            const auto raw_range = limits[idx].position_max - limits[idx].position_min;
+            const auto range = cartan::detail::finite_range_or(raw_range,
+                cartan::detail::k_unbounded_angular_range_v<scalar_type>);
             auto perturbation = static_cast<scalar_type>(dist(m_rng)) * m_options.restart_scale * range;
             q_new[i] = std::clamp(
                 q[i] + perturbation,
