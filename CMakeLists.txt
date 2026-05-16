@@ -49,12 +49,22 @@ include(CMakePackageConfigHelpers)
 
 add_subdirectory(lib)
 
+# enable_testing() must be invoked before any add_subdirectory() call that
+# registers CTest entries, otherwise CMake will not generate the
+# per-subdirectory CTestTestfile.cmake needed for ctest discovery. The gate is
+# widened to include CARTAN_BUILD_EXAMPLES so the tutorial smoke tests
+# registered under examples/tutorials/ are discoverable without also turning on
+# CARTAN_BUILD_TESTS. The tests/ subdirectory itself stays gated on the test
+# flags only.
+if (CARTAN_BUILD_TESTS OR CARTAN_BUILD_FUZZ_TESTS OR CARTAN_BUILD_PROPERTY_TESTS OR CARTAN_BUILD_EXAMPLES)
+    enable_testing()
+endif ()
+
 if (CARTAN_BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif ()
 
 if (CARTAN_BUILD_TESTS OR CARTAN_BUILD_FUZZ_TESTS OR CARTAN_BUILD_PROPERTY_TESTS)
-    enable_testing()
     add_subdirectory(tests)
 endif ()
 

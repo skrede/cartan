@@ -25,3 +25,5 @@ if (CARTAN_BUILD_ARGMIN)
     target_compile_definitions(argmin_solvers PRIVATE CARTAN_BUILD_ARGMIN)
     target_link_libraries(argmin_solvers PRIVATE argmin::argmin)
 endif ()
+
+add_subdirectory(tutorials)
