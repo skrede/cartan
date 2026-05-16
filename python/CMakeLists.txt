@@ -18,8 +18,14 @@ find_package(nanobind CONFIG REQUIRED)
 nanobind_add_module(
     _core
     NB_STATIC
-    src/cartan_bindings.cpp
+    src/_core.cpp
+    src/bindings/lie_bindings.cpp
+    src/bindings/chain_bindings.cpp
+    src/bindings/fk_bindings.cpp
+    src/bindings/urdf_bindings.cpp
 )
+
+target_include_directories(_core PRIVATE src/bindings)
 
 target_link_libraries(_core
     PRIVATE
