@@ -13,6 +13,7 @@ function(cartan_add_test TEST_NAME TEST_SOURCE)
 endfunction()
 
 cartan_add_test(version_test version_test.cpp)
+cartan_add_test(expected_test expected_test.cpp)
 cartan_add_test(types_test types_test.cpp)
 cartan_add_test(hat_vee_test hat_vee_test.cpp)
 cartan_add_test(so2_test so2_test.cpp)
