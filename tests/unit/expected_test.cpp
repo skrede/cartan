@@ -238,3 +238,103 @@ TEST_CASE("expected: emplace replaces current alternative with new value", "[exp
     REQUIRE(err.has_value());
     REQUIRE(*err == 42);
 }
+
+#if CARTAN_HAS_STD_EXPECTED
+#include <expected>
+
+TEST_CASE("unexpected: explicit conversion to std::unexpected", "[expected][std-interop]")
+{
+    cartan::unexpected<std::string> ce("boom");
+    auto su = static_cast<std::unexpected<std::string>>(ce);
+    REQUIRE(su.error() == "boom");
+}
+
+TEST_CASE("unexpected: construct from std::unexpected", "[expected][std-interop]")
+{
+    std::unexpected<std::string> su("from-std");
+    cartan::unexpected<std::string> ce(su);
+    REQUIRE(ce.error() == "from-std");
+}
+
+TEST_CASE("expected: explicit conversion to std::expected preserves value", "[expected][std-interop]")
+{
+    cartan::expected<int, std::string> ce(42);
+    auto se = static_cast<std::expected<int, std::string>>(ce);
+    REQUIRE(se.has_value());
+    REQUIRE(*se == 42);
+}
+
+TEST_CASE("expected: explicit conversion to std::expected preserves error", "[expected][std-interop]")
+{
+    cartan::expected<int, std::string> ce(cartan::unexpect, "fail");
+    auto se = static_cast<std::expected<int, std::string>>(ce);
+    REQUIRE_FALSE(se.has_value());
+    REQUIRE(se.error() == "fail");
+}
+
+TEST_CASE("expected: construct from std::expected preserves value", "[expected][std-interop]")
+{
+    std::expected<int, std::string> se(42);
+    cartan::expected<int, std::string> ce(se);
+    REQUIRE(ce.has_value());
+    REQUIRE(*ce == 42);
+}
+
+TEST_CASE("expected: construct from std::expected preserves error", "[expected][std-interop]")
+{
+    std::expected<int, std::string> se(std::unexpect, "boom");
+    cartan::expected<int, std::string> ce(se);
+    REQUIRE_FALSE(ce.has_value());
+    REQUIRE(ce.error() == "boom");
+}
+
+TEST_CASE("expected: round-trip cartan -> std -> cartan preserves state", "[expected][std-interop]")
+{
+    cartan::expected<int, std::string> original(7);
+    auto std_form = static_cast<std::expected<int, std::string>>(original);
+    cartan::expected<int, std::string> back(std_form);
+    REQUIRE(back.has_value());
+    REQUIRE(*back == 7);
+
+    cartan::expected<int, std::string> err_orig(cartan::unexpect, "err");
+    auto std_err = static_cast<std::expected<int, std::string>>(err_orig);
+    cartan::expected<int, std::string> err_back(std_err);
+    REQUIRE_FALSE(err_back.has_value());
+    REQUIRE(err_back.error() == "err");
+}
+
+TEST_CASE("expected<void, E>: explicit conversion to std::expected<void, G>", "[expected][std-interop]")
+{
+    cartan::expected<void, std::string> ok;
+    auto se_ok = static_cast<std::expected<void, std::string>>(ok);
+    REQUIRE(se_ok.has_value());
+
+    cartan::expected<void, std::string> err(cartan::unexpect, "boom");
+    auto se_err = static_cast<std::expected<void, std::string>>(err);
+    REQUIRE_FALSE(se_err.has_value());
+    REQUIRE(se_err.error() == "boom");
+}
+
+TEST_CASE("expected<void, E>: construct from std::expected<void, G>", "[expected][std-interop]")
+{
+    std::expected<void, std::string> se_ok;
+    cartan::expected<void, std::string> ok(se_ok);
+    REQUIRE(ok.has_value());
+
+    std::expected<void, std::string> se_err(std::unexpect, "from-std");
+    cartan::expected<void, std::string> err(se_err);
+    REQUIRE_FALSE(err.has_value());
+    REQUIRE(err.error() == "from-std");
+}
+
+TEST_CASE("expected: cross-type conversion (different but constructible scalar types)", "[expected][std-interop]")
+{
+    // Demonstrates that std::expected<int64_t, ...> can be constructed from
+    // a cartan::expected<int32_t, ...> via the templated U conversion.
+    cartan::expected<std::int32_t, std::string> ce(42);
+    auto se = static_cast<std::expected<std::int64_t, std::string>>(ce);
+    REQUIRE(se.has_value());
+    REQUIRE(*se == 42);
+}
+
+#endif // CARTAN_HAS_STD_EXPECTED

@@ -22,6 +22,14 @@
 #include <memory>
 #include <type_traits>
 #include <utility>
+#include <version>
+
+#if defined(__cpp_lib_expected) && __cpp_lib_expected >= 202211L
+#  include <expected>
+#  define CARTAN_HAS_STD_EXPECTED 1
+#else
+#  define CARTAN_HAS_STD_EXPECTED 0
+#endif
 
 namespace cartan
 {
@@ -133,6 +141,40 @@ public:
     {
         return lhs.error() == rhs.error();
     }
+
+#if CARTAN_HAS_STD_EXPECTED
+    /// Convert to std::unexpected<G>. Explicit: cartan and std unexpected
+    /// have distinct type identity even when G == E; the conversion
+    /// makes that identity change visible at the call site.
+    template <typename G = E>
+        requires std::is_constructible_v<G, const E&>
+    constexpr explicit operator std::unexpected<G>() const&
+    {
+        return std::unexpected<G>(m_error);
+    }
+
+    template <typename G = E>
+        requires std::is_constructible_v<G, E>
+    constexpr explicit operator std::unexpected<G>() &&
+    {
+        return std::unexpected<G>(std::move(m_error));
+    }
+
+    /// Construct from std::unexpected<G>.
+    template <typename G>
+        requires std::is_constructible_v<E, const G&>
+    constexpr explicit unexpected(const std::unexpected<G>& other)
+        : m_error(other.error())
+    {
+    }
+
+    template <typename G>
+        requires std::is_constructible_v<E, G>
+    constexpr explicit unexpected(std::unexpected<G>&& other)
+        : m_error(std::move(other).error())
+    {
+    }
+#endif
 
 private:
     E m_error;
@@ -650,6 +692,56 @@ public:
         return !lhs.has_value() && lhs.error() == u.error();
     }
 
+#if CARTAN_HAS_STD_EXPECTED
+    /// Convert to std::expected<U, G>. Explicit because cartan::expected and
+    /// std::expected have distinct type identity even when (U, G) == (T, E);
+    /// the cast site documents the type-boundary crossing.
+    template <typename U = T, typename G = E>
+        requires std::is_constructible_v<U, const T&>
+                 && std::is_constructible_v<G, const E&>
+    constexpr explicit operator std::expected<U, G>() const&
+    {
+        if (m_has_value)
+            return std::expected<U, G>(std::in_place, m_value);
+        return std::expected<U, G>(std::unexpect, m_error);
+    }
+
+    template <typename U = T, typename G = E>
+        requires std::is_constructible_v<U, T>
+                 && std::is_constructible_v<G, E>
+    constexpr explicit operator std::expected<U, G>() &&
+    {
+        if (m_has_value)
+            return std::expected<U, G>(std::in_place, std::move(m_value));
+        return std::expected<U, G>(std::unexpect, std::move(m_error));
+    }
+
+    /// Construct from std::expected<U, G>.
+    template <typename U, typename G>
+        requires std::is_constructible_v<T, const U&>
+                 && std::is_constructible_v<E, const G&>
+    constexpr explicit expected(const std::expected<U, G>& other)
+        : m_has_value(other.has_value())
+    {
+        if (m_has_value)
+            std::construct_at(std::addressof(m_value), *other);
+        else
+            std::construct_at(std::addressof(m_error), other.error());
+    }
+
+    template <typename U, typename G>
+        requires std::is_constructible_v<T, U>
+                 && std::is_constructible_v<E, G>
+    constexpr explicit expected(std::expected<U, G>&& other)
+        : m_has_value(other.has_value())
+    {
+        if (m_has_value)
+            std::construct_at(std::addressof(m_value), std::move(*other));
+        else
+            std::construct_at(std::addressof(m_error), std::move(other.error()));
+    }
+#endif
+
 private:
     bool m_has_value;
     union
@@ -930,6 +1022,46 @@ public:
     {
         return !lhs.has_value() && lhs.error() == u.error();
     }
+
+#if CARTAN_HAS_STD_EXPECTED
+    /// Convert to std::expected<void, G>. Explicit cast site documents the
+    /// type-boundary crossing — cartan::expected<void, E> and
+    /// std::expected<void, G> are distinct types even when G == E.
+    template <typename G = E>
+        requires std::is_constructible_v<G, const E&>
+    constexpr explicit operator std::expected<void, G>() const&
+    {
+        if (m_has_value) return std::expected<void, G>();
+        return std::expected<void, G>(std::unexpect, m_error);
+    }
+
+    template <typename G = E>
+        requires std::is_constructible_v<G, E>
+    constexpr explicit operator std::expected<void, G>() &&
+    {
+        if (m_has_value) return std::expected<void, G>();
+        return std::expected<void, G>(std::unexpect, std::move(m_error));
+    }
+
+    /// Construct from std::expected<void, G>.
+    template <typename G>
+        requires std::is_constructible_v<E, const G&>
+    constexpr explicit expected(const std::expected<void, G>& other)
+        : m_has_value(other.has_value())
+    {
+        if (!m_has_value)
+            std::construct_at(std::addressof(m_error), other.error());
+    }
+
+    template <typename G>
+        requires std::is_constructible_v<E, G>
+    constexpr explicit expected(std::expected<void, G>&& other)
+        : m_has_value(other.has_value())
+    {
+        if (!m_has_value)
+            std::construct_at(std::addressof(m_error), std::move(other.error()));
+    }
+#endif
 
 private:
     bool m_has_value;
