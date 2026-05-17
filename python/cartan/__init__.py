@@ -12,6 +12,7 @@ from ._core import (
     KinematicChain,
     IkTerminationReason,
     __version__,
+    analytical,
     solve_ik,
     body_jacobian,
     solve_ik_speed,
@@ -19,6 +20,9 @@ from ._core import (
     space_jacobian,
     forward_kinematics,
 )
+
+AnalyticalStatus = analytical.AnalyticalStatus
+AnalyticalResult = analytical.AnalyticalResult
 
 __all__ = [
     "SE3",
@@ -31,7 +35,10 @@ __all__ = [
     "ScrewAxis",
     "KinematicChain",
     "IkTerminationReason",
+    "AnalyticalStatus",
+    "AnalyticalResult",
     "__version__",
+    "analytical",
     "solve_ik",
     "body_jacobian",
     "solve_ik_speed",
