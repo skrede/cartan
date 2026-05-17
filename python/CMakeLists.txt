@@ -23,6 +23,7 @@ nanobind_add_module(
     src/bindings/chain_bindings.cpp
     src/bindings/fk_bindings.cpp
     src/bindings/urdf_bindings.cpp
+    src/bindings/ik_bindings.cpp
 )
 
 target_include_directories(_core PRIVATE src/bindings)
