@@ -8,8 +8,10 @@
 #include "cartan/analytical/detail/fk_verification.h"
 #include "cartan/analytical/detail/wrist_center.h"
 
-#include "cartan/serial/chain/static_chain.h"
 #include "cartan/serial/chain/joint_tags.h"
+#include "cartan/serial/chain/chain_concept.h"
+#include "cartan/serial/chain/static_chain.h"
+#include "cartan/serial/chain/kinematic_chain.h"
 
 #include "cartan/lie/se3.h"
 #include "cartan/lie/so3.h"
@@ -19,7 +21,6 @@
 #include <cmath>
 #include "cartan/expected.h"
 #include <numbers>
-#include <tuple>
 
 namespace cartan
 {
@@ -38,21 +39,32 @@ namespace cartan
 ///
 /// Reference: Lynch & Park, Modern Robotics, Section 6.1.1.
 ///            Murray, Li and Sastry (1994), Section 3.3.
-template <typename Scalar, joint_tag... Joints>
+template <chain Chain>
 class pieper_6r_solver
 {
-    static_assert(sizeof...(Joints) == 6, "6R solver requires exactly 6 joints");
-    static_assert((Joints::is_revolute && ...), "6R solver requires all revolute joints");
-
 public:
-    using chain_type = static_chain<Scalar, Joints...>;
-    using scalar_type = Scalar;
+    using chain_type = Chain;
+    using scalar_type = typename Chain::scalar_type;
     static constexpr int joints = 6;
     static constexpr int max_solutions = 8;
 
-    explicit pieper_6r_solver(const chain_type& chain)
+    explicit pieper_6r_solver(const Chain& chain)
         : m_chain(chain)
     {
+        if (chain.num_joints() != 6)
+        {
+            m_valid = false;
+            return;
+        }
+        for (int i = 0; i < 6; ++i)
+        {
+            if (!chain.axis(i).is_revolute())
+            {
+                m_valid = false;
+                return;
+            }
+        }
+
         for (std::size_t i = 0; i < 6; ++i)
         {
             const auto& s = chain.axis(static_cast<int>(i));
@@ -73,7 +85,7 @@ public:
 
         // Tool offset: vector from wrist center to EE in home config,
         // expressed in the home rotation frame (body frame).
-        vector3<Scalar> tool_offset_world =
+        vector3<scalar_type> tool_offset_world =
             chain.home().translation() - m_wrist_center_home;
         m_tool_offset = chain.home().rotation().inverse().act(tool_offset_world);
 
@@ -81,48 +93,48 @@ public:
     }
 
     [[nodiscard]] cartan::expected<
-        analytical_result<Scalar, 6, 8>,
-        analytical_error<Scalar>>
-    solve(const se3<Scalar>& target) const
+        analytical_result<scalar_type, 6, 8>,
+        analytical_error<scalar_type>>
+    solve(const se3<scalar_type>& target) const
     {
         if (!m_valid)
         {
-            return cartan::unexpected(analytical_error<Scalar>{
-                analytical_failure::degenerate_geometry, Scalar(0)});
+            return cartan::unexpected(analytical_error<scalar_type>{
+                analytical_failure::degenerate_geometry, scalar_type(0)});
         }
 
         // Step 1: Compute wrist center position from target pose
-        vector3<Scalar> p_wrist = detail::compute_wrist_center(target, m_tool_offset);
+        vector3<scalar_type> p_wrist = detail::compute_wrist_center(target, m_tool_offset);
 
         // Step 2: Inverse position -- find joints 1-3 from wrist center.
         // Same SP3+SP2 decomposition as the 3R solver.
 
         // Reference point: intersection of axes 1 and 2
-        vector3<Scalar> r = find_axes_reference(
+        vector3<scalar_type> r = find_axes_reference(
             m_omega[0], m_q[0], m_omega[1], m_q[1]);
 
         // SP3: find theta3 such that rotating wrist_center_home about axis 3
         // gives a point at distance ||p_wrist - r|| from r.
-        Scalar delta = (p_wrist - r).norm();
+        scalar_type delta = (p_wrist - r).norm();
 
         auto sp3_result = paden_kahan_3(
             m_omega[2], m_q[2], m_wrist_center_home, r, delta);
 
         if (!sp3_result)
         {
-            return cartan::unexpected(analytical_error<Scalar>{
+            return cartan::unexpected(analytical_error<scalar_type>{
                 sp3_result.error(),
                 (p_wrist - m_p_ee).norm()});
         }
 
-        analytical_result<Scalar, 6, 8> result;
+        analytical_result<scalar_type, 6, 8> result;
 
         // For each theta3 candidate, find theta1/theta2 and then wrist angles
         for (int i = 0; i < sp3_result->count; ++i)
         {
-            Scalar theta3 = sp3_result->solutions[static_cast<std::size_t>(i)];
+            scalar_type theta3 = sp3_result->solutions[static_cast<std::size_t>(i)];
 
-            vector3<Scalar> p_prime = rotate_point_about_axis(
+            vector3<scalar_type> p_prime = rotate_point_about_axis(
                 m_omega[2], m_q[2], m_wrist_center_home, theta3);
 
             // SP2: find (theta1, theta2) via two successive rotations
@@ -150,7 +162,7 @@ public:
                     auto [theta4, theta5, theta6] =
                         euler_solutions.solutions[static_cast<std::size_t>(k)];
 
-                    Eigen::Vector<Scalar, 6> q_candidate;
+                    Eigen::Vector<scalar_type, 6> q_candidate;
                     q_candidate << theta1, theta2, theta3, theta4, theta5, theta6;
 
                     if (detail::verify_analytical_solution(
@@ -169,12 +181,17 @@ public:
         if (result.count > 0)
             return result;
 
-        return cartan::unexpected(analytical_error<Scalar>{
+        return cartan::unexpected(analytical_error<scalar_type>{
             analytical_failure::unreachable,
             (p_wrist - m_wrist_center_home).norm()});
     }
 
 private:
+    /// Alias for the chain's floating-point type, used throughout the private
+    /// helpers below. Keeps the body verbatim after the class template was
+    /// re-shaped from <typename Scalar, joint_tag... Joints> to <chain Chain>.
+    using Scalar = scalar_type;
+
     /// Rotate a point about a screw axis by theta (Rodrigues).
     [[nodiscard]] static vector3<Scalar> rotate_point_about_axis(
         const vector3<Scalar>& omega,
@@ -271,23 +288,16 @@ private:
         auto R = R_wrist_input * m_chain.home().rotation().inverse();
         matrix3<Scalar> M = R.matrix();
 
-        using joint_tuple = std::tuple<Joints...>;
-        using J3 = std::tuple_element_t<3, joint_tuple>;
-        using J4 = std::tuple_element_t<4, joint_tuple>;
-        using J5 = std::tuple_element_t<5, joint_tuple>;
-
-        return extract_euler_dispatch<J3, J4, J5>(M);
+        return extract_euler_dispatch(M);
     }
 
-    /// Dispatch to the correct Euler angle extraction based on wrist axis types.
-    template <typename J3, typename J4, typename J5>
+    /// Dispatch to the correct Euler angle extraction. The runtime axis-pattern
+    /// detection lives in extract_euler_general; the wrist-axis dispatch used
+    /// to be parameterized on the joint tags but those parameters were dropped
+    /// when the solver was re-templated against the chain concept.
     [[nodiscard]] euler_result extract_euler_dispatch(
         const matrix3<Scalar>& R) const
     {
-        // Determine the wrist axis pattern from the joint tags.
-        // We use the actual screw axis omega directions stored at construction.
-        // Common patterns: ZYZ, ZYX, etc.
-        // For general 3-axis Euler angles, use the stored omega directions.
         return extract_euler_general(R);
     }
 
@@ -581,13 +591,15 @@ private:
     bool m_valid{false};
 };
 
-template <typename Scalar, joint_tag... Joints>
-pieper_6r_solver(const static_chain<Scalar, Joints...>&)
-    -> pieper_6r_solver<Scalar, Joints...>;
+template <chain Chain>
+pieper_6r_solver(const Chain&) -> pieper_6r_solver<Chain>;
 
-static_assert(analytical_solver<pieper_6r_solver<double,
-    revolute_z, revolute_y, revolute_y, revolute_z, revolute_y, revolute_z>>,
+static_assert(analytical_solver<pieper_6r_solver<static_chain<double,
+    revolute_z, revolute_y, revolute_y, revolute_z, revolute_y, revolute_z>>>,
     "pieper_6r_solver must satisfy analytical_solver concept");
+
+static_assert(analytical_solver<pieper_6r_solver<kinematic_chain<double, dynamic>>>,
+    "pieper_6r_solver must also satisfy analytical_solver concept against dynamic chain");
 
 template <typename Scalar, joint_tag... Joints>
 [[nodiscard]] auto solve_6r(

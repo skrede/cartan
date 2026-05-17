@@ -132,10 +132,7 @@ int main()
     // the no_limits policy (the closed-form path itself imposes no joint
     // limits on its decomposition, so we make the iterative comparison
     // apples-to-apples by also dropping the box projection for this race).
-    cartan::pieper_6r_solver<double,
-        cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
-        cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>
-        analytical(chain);
+    cartan::pieper_6r_solver<chain_t> analytical(chain);
 
     cartan::basic_ik_runner<
         cartan::ik::projected_lm<chain_t, cartan::no_limits>>

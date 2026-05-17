@@ -6,8 +6,10 @@
 #include "cartan/analytical/paden_kahan.h"
 #include "cartan/analytical/detail/fk_verification.h"
 
-#include "cartan/serial/chain/static_chain.h"
 #include "cartan/serial/chain/joint_tags.h"
+#include "cartan/serial/chain/chain_concept.h"
+#include "cartan/serial/chain/static_chain.h"
+#include "cartan/serial/chain/kinematic_chain.h"
 
 #include "cartan/lie/se3.h"
 #include "cartan/detail/epsilon.h"
@@ -32,21 +34,32 @@ namespace cartan
 ///
 /// Reference: Murray, Li and Sastry, A Mathematical Introduction to Robotic
 ///            Manipulation (1994), Section 3.3.
-template <typename Scalar, joint_tag... Joints>
+template <chain Chain>
 class spatial_3r_solver
 {
-    static_assert(sizeof...(Joints) == 3, "3R solver requires exactly 3 joints");
-    static_assert((Joints::is_revolute && ...), "3R solver requires all revolute joints");
-
 public:
-    using chain_type = static_chain<Scalar, Joints...>;
-    using scalar_type = Scalar;
+    using chain_type = Chain;
+    using scalar_type = typename Chain::scalar_type;
     static constexpr int joints = 3;
     static constexpr int max_solutions = 4;
 
-    explicit spatial_3r_solver(const chain_type& chain)
+    explicit spatial_3r_solver(const Chain& chain)
         : m_chain(chain)
     {
+        if (chain.num_joints() != 3)
+        {
+            m_valid = false;
+            return;
+        }
+        for (int i = 0; i < 3; ++i)
+        {
+            if (!chain.axis(i).is_revolute())
+            {
+                m_valid = false;
+                return;
+            }
+        }
+
         for (std::size_t i = 0; i < 3; ++i)
         {
             const auto& s = chain.axis(static_cast<int>(i));
@@ -54,13 +67,20 @@ public:
             m_q[i] = s.omega().cross(s.v());
         }
         m_p_ee = chain.home().translation();
+        m_valid = true;
     }
 
     [[nodiscard]] cartan::expected<
-        analytical_result<Scalar, 3, 4>,
-        analytical_error<Scalar>>
-    solve(const se3<Scalar>& target) const
+        analytical_result<scalar_type, 3, 4>,
+        analytical_error<scalar_type>>
+    solve(const se3<scalar_type>& target) const
     {
+        if (!m_valid)
+        {
+            return cartan::unexpected(analytical_error<scalar_type>{
+                analytical_failure::degenerate_geometry, scalar_type(0)});
+        }
+
         vector3<Scalar> p_target = target.translation();
 
         // Axes 1 and 2 intersect at m_q[0] (for chains where q0 = q1, the
@@ -125,6 +145,11 @@ public:
     }
 
 private:
+    /// Alias for the chain's floating-point type. Keeps the private helpers and
+    /// solve() body verbatim after the class template was re-shaped from
+    /// <typename Scalar, joint_tag... Joints> to <chain Chain>.
+    using Scalar = scalar_type;
+
     [[nodiscard]] static vector3<Scalar> rotate_point_about_axis(
         const vector3<Scalar>& omega,
         const vector3<Scalar>& q,
@@ -167,15 +192,19 @@ private:
     }
 
     chain_type m_chain;
-    std::array<vector3<Scalar>, 3> m_omega;
-    std::array<vector3<Scalar>, 3> m_q;
-    vector3<Scalar> m_p_ee;
+    std::array<vector3<Scalar>, 3> m_omega{};
+    std::array<vector3<Scalar>, 3> m_q{};
+    vector3<Scalar> m_p_ee{vector3<Scalar>::Zero()};
+    bool m_valid{false};
 };
 
-template <typename Scalar, joint_tag... Joints>
-spatial_3r_solver(const static_chain<Scalar, Joints...>&) -> spatial_3r_solver<Scalar, Joints...>;
+template <chain Chain>
+spatial_3r_solver(const Chain&) -> spatial_3r_solver<Chain>;
 
-static_assert(analytical_solver<spatial_3r_solver<double, revolute_z, revolute_y, revolute_z>>);
+static_assert(analytical_solver<spatial_3r_solver<static_chain<double, revolute_z, revolute_y, revolute_z>>>);
+
+static_assert(analytical_solver<spatial_3r_solver<kinematic_chain<double, dynamic>>>,
+    "spatial_3r_solver must also satisfy analytical_solver concept against dynamic chain");
 
 template <typename Scalar, joint_tag... Joints>
 [[nodiscard]] auto solve_3r(

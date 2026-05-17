@@ -8,7 +8,9 @@
 #include "cartan/analytical/detail/fk_verification.h"
 
 #include "cartan/serial/chain/joint_tags.h"
+#include "cartan/serial/chain/chain_concept.h"
 #include "cartan/serial/chain/static_chain.h"
+#include "cartan/serial/chain/kinematic_chain.h"
 
 #include "cartan/lie/se3.h"
 
@@ -27,21 +29,32 @@ namespace cartan
 ///
 /// Reference: Lynch & Park, Modern Robotics, Section 6.1.2 (planar
 ///            two-link inverse kinematics).
-template <typename Scalar, joint_tag... Joints>
+template <chain Chain>
 class planar_2r_solver
 {
-    static_assert(sizeof...(Joints) == 2, "2R solver requires exactly 2 joints");
-    static_assert((Joints::is_revolute && ...), "2R solver requires all revolute joints");
-
 public:
-    using chain_type = static_chain<Scalar, Joints...>;
-    using scalar_type = Scalar;
+    using chain_type = Chain;
+    using scalar_type = typename Chain::scalar_type;
     static constexpr int joints = 2;
     static constexpr int max_solutions = 2;
 
-    explicit planar_2r_solver(const chain_type& chain)
+    explicit planar_2r_solver(const Chain& chain)
         : m_chain(chain)
     {
+        if (chain.num_joints() != 2)
+        {
+            m_valid = false;
+            return;
+        }
+        for (int i = 0; i < 2; ++i)
+        {
+            if (!chain.axis(i).is_revolute())
+            {
+                m_valid = false;
+                return;
+            }
+        }
+
         const auto& s0 = chain.axis(0);
         const auto& s1 = chain.axis(1);
 
@@ -77,13 +90,20 @@ public:
         m_basis_u = (q1 - q0).normalized();
         // Second in-plane basis: complete the right-handed frame
         m_basis_v = m_plane_normal.cross(m_basis_u);
+        m_valid = true;
     }
 
     [[nodiscard]] cartan::expected<
-        analytical_result<Scalar, 2, 2>,
-        analytical_error<Scalar>>
-    solve(const se3<Scalar>& target) const
+        analytical_result<scalar_type, 2, 2>,
+        analytical_error<scalar_type>>
+    solve(const se3<scalar_type>& target) const
     {
+        if (!m_valid)
+        {
+            return cartan::unexpected(analytical_error<scalar_type>{
+                analytical_failure::degenerate_geometry, scalar_type(0)});
+        }
+
         vector3<Scalar> p_target = target.translation() - m_base_point;
 
         // Project target onto the mechanism plane using the 2D basis
@@ -167,21 +187,29 @@ public:
     }
 
 private:
+    /// Alias for the chain's floating-point type. Keeps the constructor and
+    /// solve() body verbatim after the class template was re-shaped from
+    /// <typename Scalar, joint_tag... Joints> to <chain Chain>.
+    using Scalar = scalar_type;
+
     chain_type m_chain;
-    Scalar m_link_length_1;
-    Scalar m_link_length_2;
-    vector3<Scalar> m_base_point;
-    vector3<Scalar> m_plane_normal;
-    vector3<Scalar> m_basis_u;
-    vector3<Scalar> m_basis_v;
+    Scalar m_link_length_1{};
+    Scalar m_link_length_2{};
+    vector3<Scalar> m_base_point{vector3<Scalar>::Zero()};
+    vector3<Scalar> m_plane_normal{vector3<Scalar>::Zero()};
+    vector3<Scalar> m_basis_u{vector3<Scalar>::Zero()};
+    vector3<Scalar> m_basis_v{vector3<Scalar>::Zero()};
+    bool m_valid{false};
 };
 
-template <typename Scalar, joint_tag... Joints>
-planar_2r_solver(const static_chain<Scalar, Joints...>&)
-    -> planar_2r_solver<Scalar, Joints...>;
+template <chain Chain>
+planar_2r_solver(const Chain&) -> planar_2r_solver<Chain>;
 
-static_assert(analytical_solver<planar_2r_solver<double, revolute_z, revolute_z>>,
+static_assert(analytical_solver<planar_2r_solver<static_chain<double, revolute_z, revolute_z>>>,
     "planar_2r_solver must satisfy analytical_solver concept");
+
+static_assert(analytical_solver<planar_2r_solver<kinematic_chain<double, dynamic>>>,
+    "planar_2r_solver must also satisfy analytical_solver concept against dynamic chain");
 
 /// Convenience wrapper around planar_2r_solver: constructs a solver from the
 /// given static_chain and immediately solves for the target pose.
