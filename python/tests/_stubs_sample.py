@@ -134,6 +134,149 @@ except UrdfError as e:
     detail: str = cast("str", getattr(e, "detail"))
 
 
+# ---------------------------------------------------------------------------
+# Iterative IK surface (IkConfig, IkResult, enums, solve_ik trio)
+#
+# IkConfig is kwargs-only at the binding boundary; every field is exposed
+# both as a getter and as a setter on the bound class. solve_ik / _speed /
+# _robust share the (chain, target, q_seed, config=None) signature and
+# return cartan.IkResult.
+# ---------------------------------------------------------------------------
+
+ik_chain: cartan.KinematicChain = cartan.KinematicChain(
+    cartan.SE3.identity(),
+    [cartan.ScrewAxis.revolute(np.array([0.0, 0.0, 1.0], dtype=np.float64),
+                                np.zeros(3, dtype=np.float64))],
+    [cartan.JointLimits(-3.14, 3.14)],
+)
+
+ik_config: cartan.IkConfig = cartan.IkConfig(
+    position_tol=1e-7,
+    orientation_tol=1e-7,
+    objective=cartan.IkObjective.speed,
+)
+ik_pos_tol: float = ik_config.position_tol
+ik_obj: cartan.IkObjective = ik_config.objective
+
+ik_q_seed = np.zeros(ik_chain.num_joints(), dtype=np.float64)
+ik_target: cartan.SE3 = cartan.SE3.identity()
+
+ik_result: cartan.IkResult = cartan.solve_ik(ik_chain, ik_target, ik_q_seed, ik_config)
+ik_converged: bool = ik_result.converged
+ik_iterations: int = ik_result.iterations
+ik_error: float = ik_result.error_norm
+ik_failure_reason: str = ik_result.failure_reason
+ik_termination: cartan.IkTerminationReason = ik_result.termination_reason
+ik_near_singular: bool = ik_result.near_singular
+ik_condition_number: float = ik_result.condition_number
+
+ik_result_speed: cartan.IkResult = cartan.solve_ik_speed(ik_chain, ik_target, ik_q_seed)
+ik_result_robust: cartan.IkResult = cartan.solve_ik_robust(ik_chain, ik_target, ik_q_seed)
+
+# Spot-check the IkFailure enum so the strict-mode gate sees the binding.
+ik_failure_enum: cartan.IkFailure = cartan.IkFailure.unreachable
+
+
+# ---------------------------------------------------------------------------
+# Analytical surface (cartan.analytical.*)
+#
+# The submodule attribute is re-exported from cartan._core, so all twelve
+# names land at module path `cartan.analytical.<name>`. AnalyticalStatus and
+# AnalyticalResult are also aliased on the top-level cartan namespace by
+# __init__.py for ergonomic call-site access.
+# ---------------------------------------------------------------------------
+
+analytical_result: cartan.AnalyticalResult = cartan.analytical.solve_pieper_6r(
+    ik_chain, ik_target,
+)
+analytical_status: cartan.AnalyticalStatus = analytical_result.status
+analytical_error_metric: float = analytical_result.error_metric
+analytical_solutions = analytical_result.solutions
+
+closest_solution = cartan.analytical.closest_to_seed(analytical_result, ik_q_seed)
+
+analytical_valid: bool = cartan.analytical.verify_solution(
+    ik_chain, ik_q_seed, ik_target, 1e-6,
+)
+analytical_filtered: cartan.AnalyticalResult = cartan.analytical.filter_valid_solutions(
+    ik_chain, analytical_result, ik_target, 1e-6,
+)
+analytical_ranked: cartan.AnalyticalResult = cartan.analytical.solve_all(
+    ik_chain, ik_target, q_seed=ik_q_seed,
+)
+
+# planar_2R and spatial_3R follow the same (chain, target) -> AnalyticalResult
+# signature; included so the strict gate covers all three closed-form solvers.
+analytical_planar: cartan.AnalyticalResult = cartan.analytical.solve_planar_2r(
+    ik_chain, ik_target,
+)
+analytical_spatial: cartan.AnalyticalResult = cartan.analytical.solve_3r(
+    ik_chain, ik_target,
+)
+
+# Paden-Kahan subproblem 1 / 2 / 3 free functions.
+pk_omega = np.array([0.0, 0.0, 1.0], dtype=np.float64)
+pk_q = np.array([1.0, 0.0, 0.0], dtype=np.float64)
+pk_p = np.array([0.0, 1.0, 0.0], dtype=np.float64)
+pk_p_prime = np.zeros(3, dtype=np.float64)
+
+pk1_theta: float | None = cartan.analytical.paden_kahan_1(
+    pk_omega, pk_q, pk_p, pk_p_prime,
+)
+pk2_pairs: list[tuple[float, float]] = cartan.analytical.paden_kahan_2(
+    pk_omega, pk_omega, pk_q, pk_p, pk_p_prime,
+)
+pk3_thetas: list[float] = cartan.analytical.paden_kahan_3(
+    pk_omega, pk_q, pk_p, pk_p_prime, 1.0,
+)
+
+
+# ---------------------------------------------------------------------------
+# Exhaustive multi-start runner.
+#
+# Constructor is keyword-only after the chain argument. .solve takes a target
+# SE3 and the same keyword-only knobs as the C++ exhaustive_ik_runner.
+# ---------------------------------------------------------------------------
+
+exhaustive_runner: cartan.ExhaustiveIKRunner = cartan.ExhaustiveIKRunner(
+    ik_chain, policy=cartan.IkPolicy.speed,
+)
+exhaustive_policy: cartan.IkPolicy = cartan.IkPolicy.speed
+exhaustive_ranking: cartan.RankingStrategy = cartan.RankingStrategy.distance_to_seed
+exhaustive_solutions: list[cartan.IkResult] = exhaustive_runner.solve(
+    ik_target,
+    max_restarts=10,
+    ranking=exhaustive_ranking,
+)
+
+
+# ---------------------------------------------------------------------------
+# argmin-backed iterative IK trio.
+#
+# The three solve_ik_argmin_* symbols are only present when the wheel was
+# built with CARTAN_BUILD_ARGMIN=ON; cartan.has_argmin reports the build
+# flag. The has_argmin attribute is always present (its value differs across
+# builds). The getattr + cast indirection here mirrors the URDF block above:
+# strict mode sees the symbol come back as the correct callable signature
+# whether the build is ON or OFF, so the sample stays stub-portable.
+# ---------------------------------------------------------------------------
+
+has_argmin: bool = cartan.has_argmin
+
+SolverFn = Callable[
+    [cartan.KinematicChain, cartan.SE3, np.ndarray, cartan.IkConfig | None],
+    cartan.IkResult,
+]
+
+if has_argmin:
+    argmin_slsqp: SolverFn = cast(SolverFn, getattr(cartan, "solve_ik_argmin_slsqp"))
+    argmin_lm: SolverFn = cast(SolverFn, getattr(cartan, "solve_ik_argmin_lm"))
+    argmin_lbfgsb: SolverFn = cast(SolverFn, getattr(cartan, "solve_ik_argmin_lbfgsb"))
+    argmin_result_slsqp: cartan.IkResult = argmin_slsqp(ik_chain, ik_target, ik_q_seed, None)
+    argmin_result_lm: cartan.IkResult = argmin_lm(ik_chain, ik_target, ik_q_seed, None)
+    argmin_result_lbfgsb: cartan.IkResult = argmin_lbfgsb(ik_chain, ik_target, ik_q_seed, None)
+
+
 if __name__ == "__main__":
     # Allow direct invocation as a smoke check; the real gate is the
     # subprocess pyright/mypy run in test_stubs.py.

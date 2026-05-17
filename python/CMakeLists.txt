@@ -55,8 +55,22 @@ nanobind_add_stub(
     DEPENDS _core
 )
 
+# Separate stub for the cartan.analytical submodule. nanobind_add_stub on the
+# parent module emits `from . import analytical as analytical` in _core.pyi but
+# does not recurse into the submodule's symbol table, so a dedicated invocation
+# is required for pyright / mypy to resolve cartan.analytical.solve_pieper_6r
+# and the other 11 names registered in analytical_bindings.cpp.
+nanobind_add_stub(
+    _analytical_stub
+    MODULE _core.analytical
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/analytical.pyi
+    PYTHON_PATH $<TARGET_FILE_DIR:_core>
+    DEPENDS _core
+)
+
 install(FILES
     ${CMAKE_CURRENT_BINARY_DIR}/_core.pyi
+    ${CMAKE_CURRENT_BINARY_DIR}/analytical.pyi
     ${CMAKE_CURRENT_SOURCE_DIR}/cartan/py.typed
     DESTINATION cartan
 )
