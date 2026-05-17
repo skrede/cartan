@@ -21,4 +21,6 @@ NB_MODULE(_core, m)
 #ifdef CARTAN_PY_HAS_URDF
     cartan::python::register_urdf(m);
 #endif
+
+    cartan::python::register_ik(m);
 }
