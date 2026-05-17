@@ -232,8 +232,8 @@ TEST_CASE("6R Pieper: CTAD deduction guide works")
     pieper_6r_solver solver(chain);
     static_assert(std::same_as<
         decltype(solver),
-        pieper_6r_solver<double, revolute_z, revolute_y, revolute_y,
-                         revolute_z, revolute_y, revolute_z>>);
+        pieper_6r_solver<static_chain<double, revolute_z, revolute_y, revolute_y,
+                                      revolute_z, revolute_y, revolute_z>>>);
 }
 
 TEST_CASE("6R Pieper: non-Pieper chain fails gracefully")

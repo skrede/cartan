@@ -165,5 +165,5 @@ TEST_CASE("3R solver: CTAD deduction guide works")
     spatial_3r_solver solver(chain);
     static_assert(std::same_as<
         decltype(solver),
-        spatial_3r_solver<double, revolute_z, revolute_y, revolute_z>>);
+        spatial_3r_solver<static_chain<double, revolute_z, revolute_y, revolute_z>>>);
 }
