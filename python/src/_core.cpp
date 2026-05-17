@@ -24,4 +24,5 @@ NB_MODULE(_core, m)
 
     cartan::python::register_ik(m);
     cartan::python::register_analytical(m);
+    cartan::python::register_exhaustive(m);
 }
