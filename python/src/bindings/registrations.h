@@ -10,6 +10,7 @@ void register_lie(nanobind::module_& m);
 void register_chain(nanobind::module_& m);
 void register_fk(nanobind::module_& m);
 void register_ik(nanobind::module_& m);
+void register_analytical(nanobind::module_& m);
 
 #ifdef CARTAN_PY_HAS_URDF
 void register_urdf(nanobind::module_& m);

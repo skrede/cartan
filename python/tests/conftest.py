@@ -52,3 +52,67 @@ def ur3e_chain() -> cartan.KinematicChain:
     if chain is None:
         pytest.skip("UR3e URDF fixture not available")
     return chain
+
+
+@pytest.fixture(scope="session")
+def ur5e_chain() -> cartan.KinematicChain:
+    chain = _maybe_load_extended("ur5e.urdf")
+    if chain is None:
+        pytest.skip("UR5e URDF fixture not available")
+    return chain
+
+
+@pytest.fixture(scope="session")
+def ur10_chain() -> cartan.KinematicChain:
+    chain = _maybe_load_extended("ur10.urdf")
+    if chain is None:
+        pytest.skip("UR10 URDF fixture not available")
+    return chain
+
+
+@pytest.fixture(scope="session")
+def ur16_chain() -> cartan.KinematicChain:
+    chain = _maybe_load_extended("ur16.urdf")
+    if chain is None:
+        pytest.skip("UR16 URDF fixture not available")
+    return chain
+
+
+@pytest.fixture(scope="session")
+def kr6_chain() -> cartan.KinematicChain:
+    chain = _maybe_load_extended("kr6_sixx_r900.urdf")
+    if chain is None:
+        pytest.skip("KR6 URDF fixture not available (vendoring required for Pieper coverage)")
+    return chain
+
+
+@pytest.fixture(scope="session")
+def irb120_chain() -> cartan.KinematicChain:
+    chain = _maybe_load_extended("irb120.urdf")
+    if chain is None:
+        pytest.skip("IRB120 URDF fixture not available (vendoring required for Pieper coverage)")
+    return chain
+
+
+@pytest.fixture(scope="session")
+def iiwa7_chain() -> cartan.KinematicChain:
+    chain = _maybe_load_extended("iiwa7.urdf")
+    if chain is None:
+        pytest.skip("iiwa7 URDF fixture not available")
+    return chain
+
+
+@pytest.fixture(scope="session")
+def iiwa14_chain() -> cartan.KinematicChain:
+    chain = _maybe_load_extended("iiwa14.urdf")
+    if chain is None:
+        pytest.skip("iiwa14 URDF fixture not available")
+    return chain
+
+
+@pytest.fixture(scope="session")
+def panda_chain() -> cartan.KinematicChain:
+    chain = _maybe_load_extended("panda.urdf")
+    if chain is None:
+        pytest.skip("Panda URDF fixture not available")
+    return chain
