@@ -28,7 +28,6 @@
 #include <argmin/solver/convergence.h>
 #include <argmin/solver/basic_solver.h>
 #include <argmin/solver/kraft_slsqp_policy.h>
-#include <argmin/solver/sqp_mode.h>
 
 #include <Eigen/Core>
 
@@ -62,10 +61,18 @@ namespace cartan::ik
 /// `argmin/solver/convergence.h`. The relative thresholds are configured
 /// via `options::objective_threshold_rel` and `options::step_threshold_rel`
 /// when the alternative policy is used.
+///
+/// Note: argmin's `kraft_slsqp_policy` once carried a per-Mode NTTP that
+/// distinguished `sqp_mode::accurate` and `sqp_mode::fast`. Upstream
+/// (commit 18ab9463 in the FetchContent-pinned argmin checkout) removed
+/// the strictly-worse `fast` mode, and the surviving per-knob defaults
+/// match the former `accurate` values. The Mode parameter is therefore
+/// gone from this wrapper as well; the `argmin_slsqp_fast` alias survives
+/// as a documentation-only synonym (no behavioral difference vs the
+/// unprefixed `argmin_slsqp`).
 template <chain Chain,
           typename LimitsPolicy = clamp_limits,
-          typename Convergence = argmin::default_convergence,
-          argmin::sqp_mode Mode = argmin::sqp_mode::accurate>
+          typename Convergence = argmin::default_convergence>
 class argmin_slsqp
 {
 public:
@@ -128,11 +135,12 @@ public:
         /// can experiment with k > 1 should kraft_slsqp's KKT-leg behavior
         /// change in a future argmin revision.
         ///
-        /// Default tracks argmin's per-Mode constexpr:
-        /// `kraft_slsqp_policy<joints, Mode>::default_multiplier_reest_every_k`,
-        /// which is `1` for `sqp_mode::accurate` and `5` for `sqp_mode::fast`.
+        /// Default tracks argmin's per-policy constexpr:
+        /// `kraft_slsqp_policy<joints>::default_multiplier_reest_every_k`
+        /// (currently `1`; the per-Mode `5` default disappeared with the
+        /// removal of `sqp_mode::fast` from kraft's NTTP slot upstream).
         std::size_t multiplier_reest_every_k{
-            argmin::kraft_slsqp_policy<joints, Mode>::default_multiplier_reest_every_k};
+            argmin::kraft_slsqp_policy<joints>::default_multiplier_reest_every_k};
     };
 
     argmin_slsqp() = default;
@@ -175,7 +183,7 @@ public:
 
         build_argmin_opts(m_nab_opts);
 
-        typename argmin::kraft_slsqp_policy<joints, Mode>::options_type policy_opts{};
+        typename argmin::kraft_slsqp_policy<joints>::options_type policy_opts{};
         policy_opts.line_search.c1 = m_options.line_search_c1;
         policy_opts.multiplier_reest_every_k = m_options.multiplier_reest_every_k;
 
@@ -361,7 +369,7 @@ public:
 
 private:
     using argmin_solver = argmin::basic_solver<
-        argmin::kraft_slsqp_policy<joints, Mode>, joints, cartan::detail::argmin_ik_problem<Chain>>;
+        argmin::kraft_slsqp_policy<joints>, joints, cartan::detail::argmin_ik_problem<Chain>>;
     using argmin_opts_type = argmin::solver_options<Convergence>;
 
     position_type perturb_solution(const position_type& q, const Chain& chain)
@@ -493,18 +501,17 @@ template <chain Chain, typename LimitsPolicy = clamp_limits>
 using argmin_slsqp_nlopt_compat =
     argmin_slsqp<Chain, LimitsPolicy, argmin::slsqp_compatible_convergence>;
 
-/// Fast-mode variant of argmin_slsqp.
+/// Former fast-mode variant of argmin_slsqp.
 ///
-/// Threads argmin::sqp_mode::fast into kraft_slsqp_policy's NTTP slot.
-/// Fast mode selects looser per-knob tolerances + dead-branch-stripped
-/// per-knob defaults sized to a per-call NMPC-style budget (SOC retry
-/// short-circuited, shorter line-search budget, LS-exhaustion retry
-/// disabled). See argmin/solver/sqp_mode.h for the precedent and
-/// rationale, and kraft_slsqp_policy's per-Mode tolerance scaling for
-/// the exact constants.
+/// Upstream (argmin commit 18ab9463 in the FetchContent-pinned checkout)
+/// removed the strictly-worse `sqp_mode::fast` branch from
+/// `kraft_slsqp_policy`'s NTTP slot; the surviving per-knob defaults
+/// match the former `accurate` values. The alias survives as a
+/// documentation-only synonym so existing benchmark / example call sites
+/// can resolve the name; there is no behavioral difference between
+/// `argmin_slsqp_fast<Chain>` and `argmin_slsqp<Chain>` after this change.
 template <chain Chain, typename LimitsPolicy = clamp_limits>
-using argmin_slsqp_fast =
-    argmin_slsqp<Chain, LimitsPolicy, argmin::default_convergence, argmin::sqp_mode::fast>;
+using argmin_slsqp_fast = argmin_slsqp<Chain, LimitsPolicy>;
 
 }
 

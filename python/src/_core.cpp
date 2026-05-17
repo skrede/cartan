@@ -25,4 +25,10 @@ NB_MODULE(_core, m)
     cartan::python::register_ik(m);
     cartan::python::register_analytical(m);
     cartan::python::register_exhaustive(m);
+
+#ifdef CARTAN_BUILD_ARGMIN
+    m.attr("has_argmin") = true;
+#else
+    m.attr("has_argmin") = false;
+#endif
 }
