@@ -3,7 +3,15 @@
 #include "cartan/serial/ik/ik_result.h"
 #include "cartan/serial/ik/ik_status.h"
 #include "cartan/serial/ik/basic_ik_runner.h"
+#include "cartan/serial/ik/policy/limits_policy.h"
+#include "cartan/serial/ik/wrapper/restart_wrapper.h"
 #include "cartan/serial/chain/kinematic_chain.h"
+
+#ifdef CARTAN_BUILD_ARGMIN
+#include "cartan/serial/ik/solver/argmin_slsqp.h"
+#include "cartan/serial/ik/solver/argmin_lm.h"
+#include "cartan/serial/ik/solver/argmin_lbfgsb.h"
+#endif
 
 #include "registrations.h"
 #include "detail/ik_python_helpers.h"
@@ -34,6 +42,34 @@ using VectorXd         = Eigen::Matrix<double, Eigen::Dynamic, 1>;
 using py_speed_runner  = cartan::basic_ik_runner<cartan::speed_ik_runner<KC>>;
 using py_robust_runner = cartan::basic_ik_runner<cartan::robust_ik_runner<KC>>;
 using py_dual_runner   = cartan::dual_ik_runner<KC>;
+
+#ifdef CARTAN_BUILD_ARGMIN
+// argmin-backed iterative IK runners. The LimitsPolicy per inner solver
+// follows the C++ default for each solver class -- LM cannot tolerate
+// post-step clamping because the trust-region step would no longer be the
+// step computed (post-clamp truncation breaks the Cauchy-point / dogleg
+// guarantees); SLSQP and L-BFGS-B both natively handle box constraints
+// inside the inner QP / projected line search, so clamp_limits matches
+// the inner policy's own bound-projection cadence. Each inner solver is
+// wrapped in restart_wrapper for parity with the speed/robust runners
+// above (Halton multi-start on stall / divergence / iteration_limit).
+using py_argmin_slsqp_inner =
+    cartan::ik::restart_wrapper<KC,
+        cartan::ik::argmin_slsqp<KC, cartan::clamp_limits>,
+        cartan::clamp_limits>;
+using py_argmin_lm_inner =
+    cartan::ik::restart_wrapper<KC,
+        cartan::ik::argmin_lm<KC, cartan::no_limits>,
+        cartan::no_limits>;
+using py_argmin_lbfgsb_inner =
+    cartan::ik::restart_wrapper<KC,
+        cartan::ik::argmin_lbfgsb<KC, cartan::clamp_limits>,
+        cartan::clamp_limits>;
+
+using py_argmin_slsqp_runner  = cartan::basic_ik_runner<py_argmin_slsqp_inner>;
+using py_argmin_lm_runner     = cartan::basic_ik_runner<py_argmin_lm_inner>;
+using py_argmin_lbfgsb_runner = cartan::basic_ik_runner<py_argmin_lbfgsb_inner>;
+#endif
 
 /// Validate target finiteness + q_seed.size() == chain.num_joints().
 /// Raises Python ValueError on failure (per the iterative IK hard-fail contract).
@@ -300,6 +336,82 @@ void register_ik(nb::module_& m)
         nb::arg("q_seed").noconvert(),
         nb::arg("config") = nb::none(),
         nb::call_guard<nb::gil_scoped_release>());
+
+#ifdef CARTAN_BUILD_ARGMIN
+    // ------------------------------------------------------------------
+    // argmin-backed iterative IK free functions. Only compiled when the
+    // wheel is built with CARTAN_BUILD_ARGMIN=ON; cartan.has_argmin
+    // exposes the build configuration as a module-level bool. Each
+    // solver shares the IkResult / IkConfig contract above; per-solver
+    // LimitsPolicy matches the C++ default for the inner solver class.
+    // ------------------------------------------------------------------
+
+    m.def("solve_ik_argmin_slsqp",
+        [](const KC& chain,
+           const SE3d& target,
+           const nb::DRef<const VectorXd>& q_seed,
+           std::optional<IkConfig> config) -> IkResult
+        {
+            validate_ik_inputs("solve_ik_argmin_slsqp", chain, target, q_seed);
+            const IkConfig cfg = config.value_or(IkConfig{});
+            return run_ik<py_argmin_slsqp_runner>(chain, target, q_seed, cfg);
+        },
+        "argmin-backed SLSQP iterative IK: restart-wrapped argmin_slsqp "
+        "policy with clamp_limits (native box-constraint handling in the "
+        "inner SQP QP). Same input/output contract as solve_ik. Only "
+        "available when the wheel is built with CARTAN_BUILD_ARGMIN=ON; "
+        "check cartan.has_argmin before calling.",
+        nb::arg("chain"),
+        nb::arg("target").noconvert(),
+        nb::arg("q_seed").noconvert(),
+        nb::arg("config") = nb::none(),
+        nb::call_guard<nb::gil_scoped_release>());
+
+    m.def("solve_ik_argmin_lm",
+        [](const KC& chain,
+           const SE3d& target,
+           const nb::DRef<const VectorXd>& q_seed,
+           std::optional<IkConfig> config) -> IkResult
+        {
+            validate_ik_inputs("solve_ik_argmin_lm", chain, target, q_seed);
+            const IkConfig cfg = config.value_or(IkConfig{});
+            return run_ik<py_argmin_lm_runner>(chain, target, q_seed, cfg);
+        },
+        "argmin-backed Levenberg-Marquardt iterative IK: restart-wrapped "
+        "argmin_lm policy with no_limits (LM trust-region semantics break "
+        "when joint values are clamped after a step, so the limits policy "
+        "is left as no_limits to match the C++ default). Same "
+        "input/output contract as solve_ik. Only available when the wheel "
+        "is built with CARTAN_BUILD_ARGMIN=ON; check cartan.has_argmin "
+        "before calling.",
+        nb::arg("chain"),
+        nb::arg("target").noconvert(),
+        nb::arg("q_seed").noconvert(),
+        nb::arg("config") = nb::none(),
+        nb::call_guard<nb::gil_scoped_release>());
+
+    m.def("solve_ik_argmin_lbfgsb",
+        [](const KC& chain,
+           const SE3d& target,
+           const nb::DRef<const VectorXd>& q_seed,
+           std::optional<IkConfig> config) -> IkResult
+        {
+            validate_ik_inputs("solve_ik_argmin_lbfgsb", chain, target, q_seed);
+            const IkConfig cfg = config.value_or(IkConfig{});
+            return run_ik<py_argmin_lbfgsb_runner>(chain, target, q_seed, cfg);
+        },
+        "argmin-backed L-BFGS-B iterative IK: restart-wrapped "
+        "argmin_lbfgsb policy with clamp_limits (native box-constraint "
+        "handling in the inner projected line search). Same input/output "
+        "contract as solve_ik. Only available when the wheel is built "
+        "with CARTAN_BUILD_ARGMIN=ON; check cartan.has_argmin before "
+        "calling.",
+        nb::arg("chain"),
+        nb::arg("target").noconvert(),
+        nb::arg("q_seed").noconvert(),
+        nb::arg("config") = nb::none(),
+        nb::call_guard<nb::gil_scoped_release>());
+#endif
 }
 
 }
