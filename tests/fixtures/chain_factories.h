@@ -1275,6 +1275,163 @@ auto make_lbr_iiwa7_chain_extended() -> cartan::kinematic_chain<Scalar, cartan::
     return chain_static.to_dynamic();
 }
 
+/// Hand-coded ground-truth chain matching the vendored
+/// tests/fixtures/urdf/extended/kr6_sixx_r900.urdf.
+///
+/// The KR6 R900 SIXX upstream URDF (ros-industrial/kuka_experimental,
+/// kuka_kr6_support/urdf/kr6r900sixx.xacro) declares all six joint origins
+/// with rpy="0 0 0" and integer-decimal xyz triplets, so the world-frame
+/// screw axes are bit-clean (no xacro half-pi noise on the omegas). The
+/// home pose carries the trailing flange->tool0 fixed rotation rpy="0 pi/2 0"
+/// which composes through the cumulative T_acc as a quaternion-multiplied
+/// SO(3) rotation; the resulting matrix has cos(pi/2) noise on the diagonal
+/// at ~2.22e-16 (machine epsilon, reproduced verbatim below so the 1e-12
+/// parity gate holds).
+///
+/// This factory mirrors the URDF-loader output of cartan::load_urdf on the
+/// vendored URDF; it does NOT match the idealized make_kr6_sixx_chain
+/// (which uses simplified D-H-derived integer offsets and identity home
+/// rotation). Both factories are kept: the idealized one for analytical
+/// IK closed-form tests, this one for URDF parity.
+template <typename Scalar = double>
+auto make_kr6_sixx_chain_extended() -> cartan::kinematic_chain<Scalar, cartan::dynamic>
+{
+    using vec3 = cartan::vector3<Scalar>;
+    using mat3 = cartan::matrix3<Scalar>;
+
+    // Joint origins accumulated through the kinematic tree:
+    // base_link[0,0,0] -- joint_a1 [0,0,0.400] -> link_1 [axis: 0 0 -1]
+    // link_1           -- joint_a2 [0.025,0,0] -> link_2 [axis: 0 1 0]
+    // link_2           -- joint_a3 [0.455,0,0] -> link_3 [axis: 0 1 0]
+    // link_3           -- joint_a4 [0,0,0.035] -> link_4 [axis: -1 0 0]
+    // link_4           -- joint_a5 [0.420,0,0] -> link_5 [axis: 0 1 0]
+    // link_5           -- joint_a6 [0.080,0,0] -> link_6 [axis: -1 0 0]
+    // link_6 -> flange [0,0,0] -> tool0 (rpy="0 pi/2 0"): folded into home.
+    auto s1 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(0), Scalar(-1.0)),
+        vec3(Scalar(0), Scalar(0), Scalar(0)));
+    auto s2 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(1.0), Scalar(0)),
+        vec3(Scalar(0.025), Scalar(0), Scalar(0.400)));
+    auto s3 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(1.0), Scalar(0)),
+        vec3(Scalar(0.480), Scalar(0), Scalar(0.400)));
+    auto s4 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(-1.0), Scalar(0), Scalar(0)),
+        vec3(Scalar(0.480), Scalar(0), Scalar(0.435)));
+    auto s5 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(1.0), Scalar(0)),
+        vec3(Scalar(0.900), Scalar(0), Scalar(0.435)));
+    auto s6 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(-1.0), Scalar(0), Scalar(0)),
+        vec3(Scalar(0.980), Scalar(0), Scalar(0.435)));
+
+    // Home: tool0 reached via fixed-leaf chain flange (identity offset) ->
+    // tool0 (rotY(pi/2)). The y-rotation quaternion-composes through T_acc;
+    // its matrix carries cos(pi/2) noise at ~2.22e-16 (machine epsilon).
+    mat3 R_home;
+    R_home << Scalar(2.220446049250313e-16), Scalar(0), Scalar(1.0),
+              Scalar(0),                     Scalar(1.0), Scalar(0),
+              Scalar(-1.0),                  Scalar(0), Scalar(2.220446049250313e-16);
+    vec3 p_home(Scalar(0.980), Scalar(0), Scalar(0.435));
+    auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::from_matrix(R_home).value(), p_home);
+
+    // Per-joint limits as declared in the vendored URDF (joint_a1..a6).
+    cartan::joint_limits<Scalar> lim_a1{
+        Scalar(-2.9670597283903604), Scalar(+2.9670597283903604)};
+    cartan::joint_limits<Scalar> lim_a2{
+        Scalar(-3.3161255787892263), Scalar(+0.7853981633974483)};
+    cartan::joint_limits<Scalar> lim_a3{
+        Scalar(-2.0943951023931953), Scalar(+2.7227136331111540)};
+    cartan::joint_limits<Scalar> lim_a4{
+        Scalar(-3.2288591161895095), Scalar(+3.2288591161895095)};
+    cartan::joint_limits<Scalar> lim_a5{
+        Scalar(-2.0943951023931953), Scalar(+2.0943951023931953)};
+    cartan::joint_limits<Scalar> lim_a6{
+        Scalar(-6.1086523819801535), Scalar(+6.1086523819801535)};
+
+    auto chain_static = cartan::kinematic_chain<Scalar, 6>(
+        home,
+        {s1, s2, s3, s4, s5, s6},
+        {lim_a1, lim_a2, lim_a3, lim_a4, lim_a5, lim_a6});
+    return chain_static.to_dynamic();
+}
+
+/// Hand-coded ground-truth chain matching the vendored
+/// tests/fixtures/urdf/extended/irb120.urdf.
+///
+/// The IRB120 (3.58 reach) upstream URDF (ros-industrial/abb,
+/// abb_irb120_support/urdf/irb120_3_58.xacro) declares all six joint
+/// origins with rpy="0 0 0" and integer-decimal xyz triplets, so the
+/// world-frame screw axes are bit-clean. The home pose carries the
+/// trailing tool0 fixed rotation rpy="0 pi/2 0" composed through the
+/// cumulative T_acc, leaving cos(pi/2) noise at ~2.22e-16 on the diagonal.
+///
+/// This factory mirrors cartan::load_urdf's output on the vendored URDF;
+/// it does NOT match the idealized make_abb_irb120_chain (which uses
+/// simplified geometry and identity home rotation). Both factories are
+/// kept for distinct purposes.
+template <typename Scalar = double>
+auto make_abb_irb120_chain_extended() -> cartan::kinematic_chain<Scalar, cartan::dynamic>
+{
+    using vec3 = cartan::vector3<Scalar>;
+    using mat3 = cartan::matrix3<Scalar>;
+
+    // Joint origins accumulated through the kinematic tree:
+    // base_link[0,0,0] -- joint_1 [0,0,0]     -> link_1 [axis: 0 0 1]
+    // link_1           -- joint_2 [0,0,0.290] -> link_2 [axis: 0 1 0]
+    // link_2           -- joint_3 [0,0,0.270] -> link_3 [axis: 0 1 0]
+    // link_3           -- joint_4 [0,0,0.070] -> link_4 [axis: 1 0 0]
+    // link_4           -- joint_5 [0.302,0,0] -> link_5 [axis: 0 1 0]
+    // link_5           -- joint_6 [0.072,0,0] -> link_6 [axis: 1 0 0]
+    // link_6 -> tool0 (rpy="0 pi/2 0"): folded into home.
+    auto s1 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(0), Scalar(1.0)),
+        vec3(Scalar(0), Scalar(0), Scalar(0)));
+    auto s2 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(1.0), Scalar(0)),
+        vec3(Scalar(0), Scalar(0), Scalar(0.290)));
+    auto s3 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(1.0), Scalar(0)),
+        vec3(Scalar(0), Scalar(0), Scalar(0.560)));
+    auto s4 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(1.0), Scalar(0), Scalar(0)),
+        vec3(Scalar(0), Scalar(0), Scalar(0.630)));
+    auto s5 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(1.0), Scalar(0)),
+        vec3(Scalar(0.302), Scalar(0), Scalar(0.630)));
+    auto s6 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(1.0), Scalar(0), Scalar(0)),
+        vec3(Scalar(0.374), Scalar(0), Scalar(0.630)));
+
+    mat3 R_home;
+    R_home << Scalar(2.220446049250313e-16), Scalar(0), Scalar(1.0),
+              Scalar(0),                     Scalar(1.0), Scalar(0),
+              Scalar(-1.0),                  Scalar(0), Scalar(2.220446049250313e-16);
+    vec3 p_home(Scalar(0.374), Scalar(0), Scalar(0.630));
+    auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::from_matrix(R_home).value(), p_home);
+
+    // Per-joint limits as declared in the vendored URDF (joint_1..joint_6).
+    cartan::joint_limits<Scalar> lim_j1{
+        Scalar(-2.87979), Scalar(+2.87979)};
+    cartan::joint_limits<Scalar> lim_j2{
+        Scalar(-1.91986), Scalar(+1.91986)};
+    cartan::joint_limits<Scalar> lim_j3{
+        Scalar(-1.91986), Scalar(+1.22173)};
+    cartan::joint_limits<Scalar> lim_j4{
+        Scalar(-2.79253), Scalar(+2.79253)};
+    cartan::joint_limits<Scalar> lim_j5{
+        Scalar(-2.094395), Scalar(+2.094395)};
+    cartan::joint_limits<Scalar> lim_j6{
+        Scalar(-6.98132), Scalar(+6.98132)};
+
+    auto chain_static = cartan::kinematic_chain<Scalar, 6>(
+        home,
+        {s1, s2, s3, s4, s5, s6},
+        {lim_j1, lim_j2, lim_j3, lim_j4, lim_j5, lim_j6});
+    return chain_static.to_dynamic();
+}
+
 #endif
 
 }
