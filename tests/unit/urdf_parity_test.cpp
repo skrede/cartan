@@ -142,4 +142,18 @@ TEST_CASE("urdf parity: iiwa7 URDF matches make_lbr_iiwa7_chain_extended at 1e-1
     check_parity(urdf_path, truth, 201ULL);
 }
 
+TEST_CASE("urdf parity: KR6 R900 SIXX URDF matches make_kr6_sixx_chain_extended at 1e-12", "[urdf_parity][extended]")
+{
+    const fs::path urdf_path = fs::path{CARTAN_TESTS_FIXTURE_DIR} / "urdf" / "extended" / "kr6_sixx_r900.urdf";
+    auto truth = cartan::fixtures::make_kr6_sixx_chain_extended<double>();
+    check_parity(urdf_path, truth, 300ULL);
+}
+
+TEST_CASE("urdf parity: ABB IRB 120 URDF matches make_abb_irb120_chain_extended at 1e-12", "[urdf_parity][extended]")
+{
+    const fs::path urdf_path = fs::path{CARTAN_TESTS_FIXTURE_DIR} / "urdf" / "extended" / "irb120.urdf";
+    auto truth = cartan::fixtures::make_abb_irb120_chain_extended<double>();
+    check_parity(urdf_path, truth, 301ULL);
+}
+
 #endif
