@@ -35,6 +35,7 @@ wheel.packages = ["python/cartan"]
 [tool.scikit-build.cmake.define]
 CARTAN_BUILD_PYTHON = "ON"
 CARTAN_BUILD_URDF = "ON"
+CARTAN_BUILD_ARGMIN = { env = "CARTAN_BUILD_ARGMIN", default = "OFF" }
 
 [tool.pytest.ini_options]
 markers = [
