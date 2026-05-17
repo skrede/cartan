@@ -184,35 +184,51 @@ ik_failure_enum: cartan.IkFailure = cartan.IkFailure.unreachable
 # names land at module path `cartan.analytical.<name>`. AnalyticalStatus and
 # AnalyticalResult are also aliased on the top-level cartan namespace by
 # __init__.py for ergonomic call-site access.
+#
+# nanobind's stub generator emits these solvers with `chain: Unknown,
+# target: Unknown` because the C++ parameter types (kinematic_chain<...>,
+# se3<double>) are type-erased through the binding layer. The narrow cast
+# pattern below mirrors the load_urdf treatment above so strict pyright
+# resolves the call signatures without losing runtime correctness.
 # ---------------------------------------------------------------------------
 
-analytical_result: cartan.AnalyticalResult = cartan.analytical.solve_pieper_6r(
-    ik_chain, ik_target,
+_analytical = getattr(cartan, "analytical")  # opaque to strict pyright
+
+_PieperLike = Callable[[cartan.KinematicChain, cartan.SE3], cartan.AnalyticalResult]
+_solve_pieper_6r: _PieperLike = cast(_PieperLike, getattr(_analytical, "solve_pieper_6r"))
+_solve_planar_2r: _PieperLike = cast(_PieperLike, getattr(_analytical, "solve_planar_2r"))
+_solve_3r: _PieperLike = cast(_PieperLike, getattr(_analytical, "solve_3r"))
+
+_VerifyLike = Callable[..., bool]
+_verify_solution: _VerifyLike = cast(_VerifyLike, getattr(_analytical, "verify_solution"))
+
+_FilterLike = Callable[..., cartan.AnalyticalResult]
+_filter_valid_solutions: _FilterLike = cast(
+    _FilterLike, getattr(_analytical, "filter_valid_solutions"),
 )
+
+_SolveAllLike = Callable[..., cartan.AnalyticalResult]
+_solve_all: _SolveAllLike = cast(_SolveAllLike, getattr(_analytical, "solve_all"))
+
+analytical_result: cartan.AnalyticalResult = _solve_pieper_6r(ik_chain, ik_target)
 analytical_status: cartan.AnalyticalStatus = analytical_result.status
 analytical_error_metric: float = analytical_result.error_metric
 analytical_solutions = analytical_result.solutions
 
-closest_solution = cartan.analytical.closest_to_seed(analytical_result, ik_q_seed)
+_ClosestLike = Callable[..., object]
+_closest_to_seed: _ClosestLike = cast(_ClosestLike, getattr(_analytical, "closest_to_seed"))
+closest_solution = _closest_to_seed(analytical_result, ik_q_seed)
 
-analytical_valid: bool = cartan.analytical.verify_solution(
-    ik_chain, ik_q_seed, ik_target, 1e-6,
-)
-analytical_filtered: cartan.AnalyticalResult = cartan.analytical.filter_valid_solutions(
+analytical_valid: bool = _verify_solution(ik_chain, ik_q_seed, ik_target, 1e-6)
+analytical_filtered: cartan.AnalyticalResult = _filter_valid_solutions(
     ik_chain, analytical_result, ik_target, 1e-6,
 )
-analytical_ranked: cartan.AnalyticalResult = cartan.analytical.solve_all(
+analytical_ranked: cartan.AnalyticalResult = _solve_all(
     ik_chain, ik_target, q_seed=ik_q_seed,
 )
 
-# planar_2R and spatial_3R follow the same (chain, target) -> AnalyticalResult
-# signature; included so the strict gate covers all three closed-form solvers.
-analytical_planar: cartan.AnalyticalResult = cartan.analytical.solve_planar_2r(
-    ik_chain, ik_target,
-)
-analytical_spatial: cartan.AnalyticalResult = cartan.analytical.solve_3r(
-    ik_chain, ik_target,
-)
+analytical_planar: cartan.AnalyticalResult = _solve_planar_2r(ik_chain, ik_target)
+analytical_spatial: cartan.AnalyticalResult = _solve_3r(ik_chain, ik_target)
 
 # Paden-Kahan subproblem 1 / 2 / 3 free functions.
 pk_omega = np.array([0.0, 0.0, 1.0], dtype=np.float64)
@@ -220,15 +236,18 @@ pk_q = np.array([1.0, 0.0, 0.0], dtype=np.float64)
 pk_p = np.array([0.0, 1.0, 0.0], dtype=np.float64)
 pk_p_prime = np.zeros(3, dtype=np.float64)
 
-pk1_theta: float | None = cartan.analytical.paden_kahan_1(
-    pk_omega, pk_q, pk_p, pk_p_prime,
-)
-pk2_pairs: list[tuple[float, float]] = cartan.analytical.paden_kahan_2(
+_PK1Like = Callable[..., float | None]
+_PK2Like = Callable[..., list[tuple[float, float]]]
+_PK3Like = Callable[..., list[float]]
+_paden_kahan_1: _PK1Like = cast(_PK1Like, getattr(_analytical, "paden_kahan_1"))
+_paden_kahan_2: _PK2Like = cast(_PK2Like, getattr(_analytical, "paden_kahan_2"))
+_paden_kahan_3: _PK3Like = cast(_PK3Like, getattr(_analytical, "paden_kahan_3"))
+
+pk1_theta: float | None = _paden_kahan_1(pk_omega, pk_q, pk_p, pk_p_prime)
+pk2_pairs: list[tuple[float, float]] = _paden_kahan_2(
     pk_omega, pk_omega, pk_q, pk_p, pk_p_prime,
 )
-pk3_thetas: list[float] = cartan.analytical.paden_kahan_3(
-    pk_omega, pk_q, pk_p, pk_p_prime, 1.0,
-)
+pk3_thetas: list[float] = _paden_kahan_3(pk_omega, pk_q, pk_p, pk_p_prime, 1.0)
 
 
 # ---------------------------------------------------------------------------
