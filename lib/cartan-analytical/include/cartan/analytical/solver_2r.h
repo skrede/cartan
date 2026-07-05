@@ -93,6 +93,67 @@ public:
         m_valid = true;
     }
 
+    /// Construction-time validation of the planar-2R straight-home assumption.
+    /// This closed form measures the base angle from the first-link direction
+    /// and applies the law of cosines about a single mechanism plane; that only
+    /// holds when the two links are collinear in the home configuration. A bent
+    /// home (second link not aligned with the first) silently mis-solves, so it
+    /// is rejected here with `degenerate_geometry` rather than being solved
+    /// wrong.
+    ///
+    /// This is VALIDATION ONLY: the closed form for a bent-home 2R is deferred
+    /// feature work and intentionally not implemented. `collinearity_tolerance`
+    /// gates sin(angle) between the two link directions (dimensionless), so the
+    /// default rejects any home bend beyond numerical noise while admitting a
+    /// genuinely straight arm.
+    [[nodiscard]] static cartan::expected<planar_2r_solver, analytical_error<scalar_type>>
+    make(const Chain& chain,
+         scalar_type collinearity_tolerance = scalar_type(1e-6))
+    {
+        if (chain.num_joints() != 2)
+        {
+            return cartan::unexpected(analytical_error<scalar_type>{
+                analytical_failure::degenerate_geometry, scalar_type(0)});
+        }
+        for (int i = 0; i < 2; ++i)
+        {
+            if (!chain.axis(i).is_revolute())
+            {
+                return cartan::unexpected(analytical_error<scalar_type>{
+                    analytical_failure::degenerate_geometry, scalar_type(0)});
+            }
+        }
+
+        const auto& s0 = chain.axis(0);
+        const auto& s1 = chain.axis(1);
+        vector3<scalar_type> q0 = s0.omega().cross(s0.v());
+        vector3<scalar_type> q1 = s1.omega().cross(s1.v());
+        vector3<scalar_type> p_ee = chain.home().translation();
+
+        vector3<scalar_type> link1 = q1 - q0;
+        vector3<scalar_type> link2 = p_ee - q1;
+        scalar_type n1 = link1.norm();
+        scalar_type n2 = link2.norm();
+        if (n1 < detail::sqrt_epsilon_v<scalar_type>
+            || n2 < detail::sqrt_epsilon_v<scalar_type>)
+        {
+            return cartan::unexpected(analytical_error<scalar_type>{
+                analytical_failure::degenerate_geometry, scalar_type(0)});
+        }
+
+        // sin(angle) between the two link directions; zero iff the home arm is
+        // straight (links collinear and same sense).
+        scalar_type bend = link1.cross(link2).norm() / (n1 * n2);
+        bool anti_parallel = link1.dot(link2) < scalar_type(0);
+        if (bend > collinearity_tolerance || anti_parallel)
+        {
+            return cartan::unexpected(analytical_error<scalar_type>{
+                analytical_failure::degenerate_geometry, bend});
+        }
+
+        return planar_2r_solver(chain);
+    }
+
     [[nodiscard]] cartan::expected<
         analytical_result<scalar_type, 2, 2>,
         analytical_error<scalar_type>>

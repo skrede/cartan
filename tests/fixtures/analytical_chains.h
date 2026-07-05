@@ -72,6 +72,96 @@ auto make_anti_parallel_wrist_puma()
         home, {s0, s1, s2, s3, s4, s5}, limits);
 }
 
+/// PUMA-type 6R chain (Z, Y, Y | Z, Y, Z) with an OFFSET SHOULDER: axis 2 is
+/// shifted by `a1` along x, so shoulder axes 1 and 2 no longer intersect (their
+/// closest-approach distance is `a1`). The spherical wrist is intact. This is
+/// the opw-class geometry the Pieper decomposition cannot solve; a valid
+/// factory must reject it at construction rather than mis-report a per-pose
+/// `unreachable`.
+template <typename Scalar>
+auto make_offset_shoulder_puma()
+    -> cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y,
+                            cartan::revolute_y, cartan::revolute_z,
+                            cartan::revolute_y, cartan::revolute_z>
+{
+    using vec3 = cartan::vector3<Scalar>;
+
+    const Scalar d1(0.5), a1(0.15), a2(0.4), a3(0.3), d6(0.1);
+    vec3 wrist_point(a1 + a2 + a3, Scalar(0), d1);
+    vec3 ee_point(a1 + a2 + a3 + d6, Scalar(0), d1);
+
+    auto s0 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(0), Scalar(1)), vec3(Scalar(0), Scalar(0), Scalar(0)));
+    // Shoulder offset: axis 2 passes through (a1, 0, d1), off the axis-1 line.
+    auto s1 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(1), Scalar(0)), vec3(a1, Scalar(0), d1));
+    auto s2 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(1), Scalar(0)), vec3(a1 + a2, Scalar(0), d1));
+    auto s3 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(0), Scalar(1)), wrist_point);
+    auto s4 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(1), Scalar(0)), wrist_point);
+    auto s5 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(0), Scalar(1)), wrist_point);
+
+    auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::identity(), ee_point);
+    cartan::joint_limits<Scalar> lim{
+        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
+    std::array<cartan::joint_limits<Scalar>, 6> limits = {
+        lim, lim, lim, lim, lim, lim};
+
+    return cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y,
+                                cartan::revolute_y, cartan::revolute_z,
+                                cartan::revolute_y, cartan::revolute_z>(
+        home, {s0, s1, s2, s3, s4, s5}, limits);
+}
+
+/// PUMA-type 6R chain (Z, Y, Y | Z, Y, Z) with a NEAR-SPHERICAL wrist: axis 4
+/// (direction y) is shifted by `wrist_offset` along x (perpendicular to its own
+/// direction), so wrist axes 4, 5, 6 miss the common center by that distance.
+/// With a `wrist_offset` between the old loose 1e-3 gate and the solve
+/// tolerance, the chain passes the legacy sphericity check yet is not solvable
+/// to the acceptance tolerance -- a valid factory must reject it at
+/// construction.
+template <typename Scalar>
+auto make_near_spherical_wrist_puma(Scalar wrist_offset)
+    -> cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y,
+                            cartan::revolute_y, cartan::revolute_z,
+                            cartan::revolute_y, cartan::revolute_z>
+{
+    using vec3 = cartan::vector3<Scalar>;
+
+    const Scalar d1(0.5), a2(0.4), a3(0.3), d6(0.1);
+    vec3 wrist_point(a2 + a3, Scalar(0), d1);
+    vec3 ee_point(a2 + a3 + d6, Scalar(0), d1);
+
+    auto s0 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(0), Scalar(1)), vec3(Scalar(0), Scalar(0), Scalar(0)));
+    auto s1 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(1), Scalar(0)), vec3(Scalar(0), Scalar(0), d1));
+    auto s2 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(1), Scalar(0)), vec3(a2, Scalar(0), d1));
+    auto s3 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(0), Scalar(1)), wrist_point);
+    // Perpendicular offset: axis 4 (dir y) shifted along x, breaking sphericity.
+    auto s4 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(1), Scalar(0)),
+        vec3(wrist_point.x() + wrist_offset, Scalar(0), d1));
+    auto s5 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(0), Scalar(1)), wrist_point);
+
+    auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::identity(), ee_point);
+    cartan::joint_limits<Scalar> lim{
+        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
+    std::array<cartan::joint_limits<Scalar>, 6> limits = {
+        lim, lim, lim, lim, lim, lim};
+
+    return cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y,
+                                cartan::revolute_y, cartan::revolute_z,
+                                cartan::revolute_y, cartan::revolute_z>(
+        home, {s0, s1, s2, s3, s4, s5}, limits);
+}
+
 /// PUMA-type 6R chain (Z, Y, Y | Z, Y, Z) with realistic [-pi, pi] joint
 /// limits. Geometry matches the canonical zero-offset PUMA; only the limits
 /// differ so that un-wrapped / duplicate solutions become observable.

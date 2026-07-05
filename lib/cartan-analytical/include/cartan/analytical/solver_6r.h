@@ -48,8 +48,17 @@ public:
     static constexpr int joints = 6;
     static constexpr int max_solutions = 8;
 
-    explicit pieper_6r_solver(const Chain& chain)
-        : m_chain(chain)
+    /// Default acceptance tolerance for the FK position back-check, mirroring
+    /// detail::verify_analytical_solution. The construction-time geometry gate
+    /// (see make()) and the shoulder-singularity detector are both anchored to
+    /// this value so that a constructed solver is always solvable to the same
+    /// tolerance it verifies against.
+    static constexpr scalar_type default_position_tolerance = scalar_type(1e-6);
+
+    explicit pieper_6r_solver(
+        const Chain& chain,
+        scalar_type position_tolerance = default_position_tolerance)
+        : m_chain(chain), m_position_tolerance(position_tolerance)
     {
         if (chain.num_joints() != 6)
         {
@@ -92,6 +101,71 @@ public:
         m_p_ee = chain.home().translation();
     }
 
+    /// Construction-time geometry validation. Returns a ready solver only when
+    /// the chain satisfies the Pieper preconditions this closed form relies on;
+    /// otherwise fails loudly with `degenerate_geometry` rather than deferring
+    /// to a misleading per-pose `unreachable`. Validated:
+    ///   1. exactly 6 revolute joints;
+    ///   2. axes 1 and 2 intersect (their closest-approach distance is below the
+    ///      acceptance tolerance) -- an offset shoulder breaks the SP2 reference
+    ///      point and cannot be solved by this decomposition;
+    ///   3. the wrist is spherical: axes 4, 5, 6 meet at a common center within
+    ///      the acceptance tolerance.
+    ///
+    /// The intersection/sphericity gate is anchored to `position_tolerance`
+    /// (the same tolerance the FK back-check uses), not the loose 1e-3 default
+    /// of find_wrist_intersection. Rationale (empirically swept, see the 6R
+    /// solver test suite): a wrist whose axes miss each other by a distance d
+    /// propagates to an end-effector position error of ~0.9*d, so any chain
+    /// admitted with d < position_tolerance is guaranteed FK-solvable to
+    /// position_tolerance, while near-spherical-but-unsolvable wrists (which
+    /// pass the old 1e-3 gate yet miss the solve tolerance by orders of
+    /// magnitude) are rejected at construction. The sub-unit factor keeps the
+    /// gate free of false accepts; the swept transition sits between
+    /// d = position_tolerance (solvable) and d = 5*position_tolerance
+    /// (unsolvable).
+    [[nodiscard]] static cartan::expected<pieper_6r_solver, analytical_error<scalar_type>>
+    make(const Chain& chain,
+         scalar_type position_tolerance = default_position_tolerance)
+    {
+        if (chain.num_joints() != 6)
+        {
+            return cartan::unexpected(analytical_error<scalar_type>{
+                analytical_failure::degenerate_geometry, scalar_type(0)});
+        }
+        for (int i = 0; i < 6; ++i)
+        {
+            if (!chain.axis(i).is_revolute())
+            {
+                return cartan::unexpected(analytical_error<scalar_type>{
+                    analytical_failure::degenerate_geometry, scalar_type(0)});
+            }
+        }
+
+        // Assumption (2): shoulder axes 1 and 2 must intersect.
+        const auto& a0 = chain.axis(0);
+        const auto& a1 = chain.axis(1);
+        scalar_type shoulder_gap = detail::closest_approach_distance<scalar_type>(
+            a0.omega().cross(a0.v()), a0.omega(),
+            a1.omega().cross(a1.v()), a1.omega());
+        if (shoulder_gap > position_tolerance)
+        {
+            return cartan::unexpected(analytical_error<scalar_type>{
+                analytical_failure::degenerate_geometry, shoulder_gap});
+        }
+
+        // Assumption (3): spherical wrist at the acceptance tolerance.
+        auto wrist = detail::find_wrist_intersection(
+            chain.axis(3), chain.axis(4), chain.axis(5), position_tolerance);
+        if (!wrist)
+        {
+            return cartan::unexpected(analytical_error<scalar_type>{
+                analytical_failure::degenerate_geometry, scalar_type(0)});
+        }
+
+        return pieper_6r_solver(chain, position_tolerance);
+    }
+
     [[nodiscard]] cartan::expected<
         analytical_result<scalar_type, 6, 8>,
         analytical_error<scalar_type>>
@@ -105,6 +179,25 @@ public:
 
         // Step 1: Compute wrist center position from target pose
         vector3<scalar_type> p_wrist = detail::compute_wrist_center(target, m_tool_offset);
+
+        // Shoulder singularity: when the wrist center lies on the axis-1 line,
+        // joint 1 is undetermined (the arm can spin about axis 1 without moving
+        // the wrist center). The target IS reachable, but the configuration is
+        // singular -- so this is signaled out of band with the error channel,
+        // NOT as a false `unreachable` and NEVER by writing a representative
+        // into `result.solutions`. A success-channel sentinel (0 / NaN / inf)
+        // would flow into the exhaustive runner's seed-selection and could be
+        // executed as a real solution (jump-to-zero at a singularity).
+        {
+            vector3<scalar_type> to_wrist = p_wrist - m_q[0];
+            vector3<scalar_type> radial =
+                to_wrist - m_omega[0].dot(to_wrist) * m_omega[0];
+            if (radial.norm() < m_position_tolerance)
+            {
+                return cartan::unexpected(analytical_error<scalar_type>{
+                    analytical_failure::singular_configuration, scalar_type(0)});
+            }
+        }
 
         // Step 2: Inverse position -- find joints 1-3 from wrist center.
         // Same SP3+SP2 decomposition as the 3R solver.
@@ -653,6 +746,7 @@ private:
     vector3<Scalar> m_wrist_center_home;
     vector3<Scalar> m_tool_offset;
     vector3<Scalar> m_p_ee;
+    Scalar m_position_tolerance{default_position_tolerance};
     bool m_valid{false};
 };
 

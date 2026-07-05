@@ -130,6 +130,45 @@ TEST_CASE("2R solver: CTAD deduction guide works")
     REQUIRE(result.has_value());
 }
 
+// 2R chain with a BENT home: the second link is perpendicular to the first at
+// the home configuration, so the planar law-of-cosines about a single plane
+// mis-measures the base angle. The straight-home closed form does not apply.
+static auto make_bent_home_2r_chain(double L1, double L2)
+{
+    auto s0 = screw_axis<double>::revolute({0, 1, 0}, {0, 0, 0});
+    auto s1 = screw_axis<double>::revolute({0, 1, 0}, {L1, 0, 0});
+    // Home end-effector bent out of the first-link direction (along +z).
+    auto home = se3<double>(
+        so3<double>::identity(),
+        Eigen::Vector3d(L1, 0, L2));
+    joint_limits<double> no_limits{-10.0, 10.0};
+    return static_chain<double, revolute_y, revolute_y>(
+        home, {s0, s1}, {no_limits, no_limits});
+}
+
+TEST_CASE("2R solver: factory validates a straight-home chain")
+{
+    auto chain = make_2r_chain(1.0, 1.0);
+    auto solver = planar_2r_solver<decltype(chain)>::make(chain);
+
+    REQUIRE(solver.has_value());
+
+    auto result = solver->solve(target_at(1.0, 0, 0));
+    REQUIRE(result.has_value());
+    CHECK(result->count == 2);
+}
+
+TEST_CASE("2R solver: bent home is rejected at construction")
+{
+    // Validation only: the bent-home 2R closed form is deferred feature work.
+    // The factory must reject the bent geometry rather than mis-solve it.
+    auto chain = make_bent_home_2r_chain(1.0, 1.0);
+    auto solver = planar_2r_solver<decltype(chain)>::make(chain);
+
+    REQUIRE_FALSE(solver.has_value());
+    CHECK(solver.error().reason == analytical_failure::degenerate_geometry);
+}
+
 TEST_CASE("2R solver: different link lengths")
 {
     auto chain = make_2r_chain(1.5, 0.7);
