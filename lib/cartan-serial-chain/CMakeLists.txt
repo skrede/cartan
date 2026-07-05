@@ -40,6 +40,16 @@ if (CARTAN_BUILD_ARGMIN)
     )
 endif ()
 
+set_target_properties(cartan_serial_chain PROPERTIES EXPORT_NAME serial_chain)
+
+if (CARTAN_ENABLE_INSTALL)
+    install(TARGETS cartan_serial_chain EXPORT cartanTargets)
+    install(
+        DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    )
+endif ()
+
 # --- NLopt solver backend (optional) ---
 if (CARTAN_BUILD_NLOPT)
     FetchContent_Declare(

@@ -31,3 +31,13 @@ target_link_libraries(cartan_urdf
     cartan::serial_chain
     pugixml::pugixml
 )
+
+set_target_properties(cartan_urdf PROPERTIES EXPORT_NAME urdf)
+
+if (CARTAN_ENABLE_INSTALL)
+    install(TARGETS cartan_urdf EXPORT cartanTargets)
+    install(
+        DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    )
+endif ()

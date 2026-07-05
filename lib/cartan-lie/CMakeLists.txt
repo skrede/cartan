@@ -52,7 +52,18 @@ target_link_libraries(cartan_lie
     Eigen3::Eigen
 )
 
-install(
-    FILES ${CMAKE_CURRENT_BINARY_DIR}/include/cartan/version.h
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/cartan
-)
+target_compile_features(cartan_lie INTERFACE cxx_std_20)
+
+set_target_properties(cartan_lie PROPERTIES EXPORT_NAME lie)
+
+if (CARTAN_ENABLE_INSTALL)
+    install(TARGETS cartan_lie EXPORT cartanTargets)
+    install(
+        DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    )
+    install(
+        FILES ${CMAKE_CURRENT_BINARY_DIR}/include/cartan/version.h
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/cartan
+    )
+endif ()

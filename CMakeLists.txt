@@ -48,7 +48,48 @@ include(FetchContent)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
+# The install/export layer is only coherent when every exported target links
+# imported dependencies that the generated package config can re-resolve. Under
+# FetchContent the local eigen_headers/pugixml aliases are not installable, and
+# the Argmin/NLopt backends drag in FetchContent-only link edges; any of these
+# would poison install(EXPORT). Gate the whole install surface on a single
+# variable so the module files and the root config block stay in lockstep.
+if (NOT CARTAN_CMAKE_FETCH_DEPS AND NOT CARTAN_BUILD_ARGMIN AND NOT CARTAN_BUILD_NLOPT)
+    set(CARTAN_ENABLE_INSTALL ON)
+else ()
+    set(CARTAN_ENABLE_INSTALL OFF)
+endif ()
+
 add_subdirectory(lib)
+
+if (CARTAN_ENABLE_INSTALL)
+    set(CARTAN_INSTALL_CMAKEDIR ${CMAKE_INSTALL_LIBDIR}/cmake/cartan)
+
+    install(EXPORT cartanTargets
+        FILE cartanTargets.cmake
+        NAMESPACE cartan::
+        DESTINATION ${CARTAN_INSTALL_CMAKEDIR}
+    )
+
+    configure_package_config_file(
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/cartanConfig.cmake.in
+        ${CMAKE_CURRENT_BINARY_DIR}/cartanConfig.cmake
+        INSTALL_DESTINATION ${CARTAN_INSTALL_CMAKEDIR}
+    )
+
+    write_basic_package_version_file(
+        ${CMAKE_CURRENT_BINARY_DIR}/cartanConfigVersion.cmake
+        VERSION ${PROJECT_VERSION}
+        COMPATIBILITY SameMinorVersion
+    )
+
+    install(
+        FILES
+        ${CMAKE_CURRENT_BINARY_DIR}/cartanConfig.cmake
+        ${CMAKE_CURRENT_BINARY_DIR}/cartanConfigVersion.cmake
+        DESTINATION ${CARTAN_INSTALL_CMAKEDIR}
+    )
+endif ()
 
 # enable_testing() must be invoked before any add_subdirectory() call that
 # registers CTest entries, otherwise CMake will not generate the

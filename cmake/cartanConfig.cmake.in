@@ -6,6 +6,11 @@ if (Eigen3_VERSION VERSION_LESS "3.4")
     message(FATAL_ERROR "cartan requires Eigen >= 3.4, found ${Eigen3_VERSION}")
 endif ()
 
+set(CARTAN_WITH_URDF @CARTAN_BUILD_URDF@)
+if (CARTAN_WITH_URDF)
+    find_dependency(pugixml 1.14)
+endif ()
+
 include("${CMAKE_CURRENT_LIST_DIR}/cartanTargets.cmake")
 
 check_required_components(cartan)
