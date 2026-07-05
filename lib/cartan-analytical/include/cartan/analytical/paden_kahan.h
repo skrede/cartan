@@ -43,6 +43,16 @@ paden_kahan_1(
         return cartan::unexpected(analytical_failure::unreachable);
     }
 
+    // A point lying on the rotation axis has a vanishing perpendicular
+    // component, so the trigonometric ratios below would divide 0/0 and yield
+    // NaN. The rotation angle is undefined in that case; signal the degenerate
+    // geometry on the error channel rather than returning a NaN success.
+    if (u_norm < detail::sqrt_epsilon_v<Scalar>
+        || u_prime_norm < detail::sqrt_epsilon_v<Scalar>)
+    {
+        return cartan::unexpected(analytical_failure::degenerate_geometry);
+    }
+
     Scalar cos_theta = u_perp.dot(u_prime_perp) / (u_norm * u_prime_norm);
     Scalar sin_theta = omega.dot(u_perp.cross(u_prime_perp)) / (u_norm * u_prime_norm);
 

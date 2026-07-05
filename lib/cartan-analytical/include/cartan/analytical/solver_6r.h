@@ -168,8 +168,17 @@ public:
                     if (detail::verify_analytical_solution(
                             m_chain, q_candidate, target, true))
                     {
+                        // Return a single canonical representative per physical
+                        // configuration: wrap to (-pi, pi] and drop duplicates
+                        // that coincide modulo 2*pi (including pi/-pi boundary
+                        // aliases).
+                        Eigen::Vector<scalar_type, 6> q_wrapped =
+                            wrap_config(q_candidate);
+                        if (is_duplicate_config(result, q_wrapped))
+                            continue;
+
                         result.solutions[static_cast<std::size_t>(result.count)]
-                            = q_candidate;
+                            = q_wrapped;
                         ++result.count;
                         if (result.count >= max_solutions)
                             return result;
@@ -191,6 +200,53 @@ private:
     /// helpers below. Keeps the body verbatim after the class template was
     /// re-shaped from <typename Scalar, joint_tag... Joints> to <chain Chain>.
     using Scalar = scalar_type;
+
+    /// Wrap a joint angle to the half-open interval (-pi, pi]. std::remainder
+    /// maps into [-pi, pi]; the boundary is nudged so the interval is
+    /// half-open, giving a single canonical representative per angle.
+    [[nodiscard]] static Scalar wrap_angle(Scalar theta)
+    {
+        Scalar w = std::remainder(theta, Scalar(2) * std::numbers::pi_v<Scalar>);
+        if (w <= -std::numbers::pi_v<Scalar>)
+            w += Scalar(2) * std::numbers::pi_v<Scalar>;
+        return w;
+    }
+
+    /// Wrap every component of a joint configuration to (-pi, pi].
+    [[nodiscard]] static Eigen::Vector<Scalar, 6> wrap_config(
+        const Eigen::Vector<Scalar, 6>& q)
+    {
+        Eigen::Vector<Scalar, 6> w;
+        for (int i = 0; i < 6; ++i)
+            w(i) = wrap_angle(q(i));
+        return w;
+    }
+
+    /// Return true when q coincides, joint-by-joint modulo 2*pi, with a
+    /// configuration already stored in result. Comparing the wrapped difference
+    /// also collapses boundary duplicates (a joint at +pi versus -pi).
+    [[nodiscard]] static bool is_duplicate_config(
+        const analytical_result<Scalar, 6, 8>& result,
+        const Eigen::Vector<Scalar, 6>& q)
+    {
+        for (int i = 0; i < result.count; ++i)
+        {
+            const auto& other = result.solutions[static_cast<std::size_t>(i)];
+            bool same = true;
+            for (int j = 0; j < 6; ++j)
+            {
+                if (std::abs(wrap_angle(q(j) - other(j)))
+                    > detail::sqrt_epsilon_v<Scalar>)
+                {
+                    same = false;
+                    break;
+                }
+            }
+            if (same)
+                return true;
+        }
+        return false;
+    }
 
     /// Rotate a point about a screw axis by theta (Rodrigues).
     [[nodiscard]] static vector3<Scalar> rotate_point_about_axis(
@@ -340,8 +396,10 @@ private:
         if (is_symmetric)
         {
             // Symmetric Euler angles (like ZYZ, XYX, etc.)
-            // theta5 from the diagonal element along the common axis direction
-            return extract_symmetric_euler(R, w4, w5);
+            // theta5 from the diagonal element along the common axis direction.
+            // w6 is passed so the extractor can correct the theta6 sign when the
+            // outer wrist axis opposes the inner one (w4 anti-parallel to w6).
+            return extract_symmetric_euler(R, w4, w5, w6);
         }
 
         // Asymmetric Euler angles (like ZYX, XYZ, etc.)
@@ -353,9 +411,16 @@ private:
     [[nodiscard]] euler_result extract_symmetric_euler(
         const matrix3<Scalar>& R,
         const vector3<Scalar>& w_outer,
-        const vector3<Scalar>& w_middle) const
+        const vector3<Scalar>& w_middle,
+        const vector3<Scalar>& w6) const
     {
         euler_result result;
+
+        // The extraction below expresses both outer rotations about w_outer.
+        // When joint 6 rotates about an axis anti-parallel to w_outer, the
+        // recovered angle is about w_outer, i.e. the negative of the actual
+        // joint-6 angle; flip its sign so the returned theta6 is about w6.
+        const Scalar t6_sign = (w_outer.dot(w6) < Scalar(0)) ? Scalar(-1) : Scalar(1);
 
         // Build a frame: w_outer is one axis, w_middle is perpendicular
         // Express R in this frame to get standard Euler angles.
@@ -423,7 +488,7 @@ private:
                 w_outer.dot(R * w_cross) / st5);
 
             result.solutions[static_cast<std::size_t>(result.count)] =
-                {t4, t5, t6};
+                {t4, t5, t6_sign * t6};
             ++result.count;
         }
 

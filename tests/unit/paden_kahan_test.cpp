@@ -61,6 +61,23 @@ TEST_CASE("paden_kahan_1: negative angle")
     CHECK_THAT(*result, WithinAbs(-std::numbers::pi / 2, tolerance));
 }
 
+TEST_CASE("paden_kahan_1: point on axis returns error (no NaN in success)")
+{
+    // A point lying ON the rotation axis has zero perpendicular component:
+    // both u_perp and u_prime_perp vanish, so the raw formula divides 0/0 and
+    // yields NaN. The equidistance gate passes (0 ~= 0), so a NaN must not leak
+    // out through the success channel -- the degenerate geometry must be
+    // signalled on the error channel instead.
+    vector3<double> omega{0, 0, 1};
+    vector3<double> q{0, 0, 0};
+    vector3<double> p{0, 0, 2};
+    vector3<double> p_prime{0, 0, 2};
+
+    auto result = paden_kahan_1(omega, q, p, p_prime);
+    REQUIRE_FALSE(result.has_value());
+    CHECK(result.error() == analytical_failure::degenerate_geometry);
+}
+
 TEST_CASE("paden_kahan_2: two rotations mapping a known point")
 {
     vector3<double> omega1{0, 0, 1};
