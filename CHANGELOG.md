@@ -58,6 +58,9 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   anti-parallel outer-wrist sign selection), plus construction-time geometry
   validation and an explicit shoulder-singularity error channel for the
   closed-form solvers.
+- The first Paden-Kahan subproblem returned a not-a-number inside a success
+  result when the query point lay on the rotation axis; it now reports the
+  degenerate case through the error channel instead.
 - Kinematic-chain axis access is now bounds-checked and chain sizes are validated
   at runtime, turning previously out-of-range access into a reported error.
 
