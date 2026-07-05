@@ -9,6 +9,7 @@
 /// dispatch and specialization in FK/Jacobian/IK while retaining full
 /// runtime flexibility for link geometry.
 
+#include "cartan/serial/chain/joint_kind.h"
 #include "cartan/serial/chain/joint_tags.h"
 #include "cartan/serial/chain/screw_axis.h"
 #include "cartan/serial/chain/joint_limits.h"
@@ -17,11 +18,33 @@
 #include "cartan/lie/se3.h"
 
 #include <array>
+#include <tuple>
+#include <cassert>
 #include <cstddef>
+#include <utility>
+#include <concepts>
 #include <type_traits>
 
 namespace cartan
 {
+
+namespace detail
+{
+
+/// Map a compile-time joint tag to the runtime joint_kind it describes. Used to
+/// check that a static_chain's stored screw axes agree with their tags.
+template <joint_tag Tag>
+[[nodiscard]] constexpr joint_kind tag_joint_kind()
+{
+    if constexpr (std::same_as<Tag, revolute_x>) return joint_kind::revolute_x;
+    else if constexpr (std::same_as<Tag, revolute_y>) return joint_kind::revolute_y;
+    else if constexpr (std::same_as<Tag, revolute_z>) return joint_kind::revolute_z;
+    else if constexpr (std::same_as<Tag, prismatic_x>) return joint_kind::prismatic_x;
+    else if constexpr (std::same_as<Tag, prismatic_y>) return joint_kind::prismatic_y;
+    else return joint_kind::prismatic_z;
+}
+
+}
 
 /// Compile-time parameterized serial kinematic chain.
 ///
@@ -51,7 +74,26 @@ public:
         : m_home(home)
         , m_axes(std::move(axes))
         , m_limits(std::move(limits))
-    {}
+    {
+        assert(axes_match_tags(m_axes)
+               && "static_chain screw axis contradicts its compile-time joint tag");
+    }
+
+    /// True when every stored screw axis classifies to the joint_kind implied
+    /// by its compile-time tag. A tag/axis mismatch (e.g. a y-axis revolute
+    /// screw under a revolute_z tag) would otherwise be silently mis-evaluated
+    /// by the tag-dispatched FK/Jacobian fast paths, so the constructor asserts
+    /// on this predicate in debug builds.
+    [[nodiscard]] static bool axes_match_tags(const axes_storage& axes)
+    {
+        return [&]<std::size_t... Is>(std::index_sequence<Is...>)
+        {
+            using joint_tuple = std::tuple<Joints...>;
+            return (... && (detect_joint_kind(axes[Is])
+                            == detail::tag_joint_kind<
+                                   std::tuple_element_t<Is, joint_tuple>>()));
+        }(std::make_index_sequence<sizeof...(Joints)>{});
+    }
 
     /// Home configuration (M matrix): end-effector pose at zero joint angles.
     [[nodiscard]] const se3<Scalar>& home() const { return m_home; }

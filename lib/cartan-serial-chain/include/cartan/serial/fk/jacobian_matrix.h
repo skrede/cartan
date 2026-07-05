@@ -65,20 +65,12 @@ inline void jacobian_column_matrix(
         col.template head<3>() = R_omega;
         col.template tail<3>() = p.cross(R_omega) + R_v;
     }
-    else if constexpr (std::same_as<JointTag, prismatic_x>)
+    else if constexpr (std::same_as<JointTag, prismatic_x>
+                       || std::same_as<JointTag, prismatic_y>
+                       || std::same_as<JointTag, prismatic_z>)
     {
         col.template head<3>().setZero();
-        col.template tail<3>() = R.col(0);
-    }
-    else if constexpr (std::same_as<JointTag, prismatic_y>)
-    {
-        col.template head<3>().setZero();
-        col.template tail<3>() = R.col(1);
-    }
-    else if constexpr (std::same_as<JointTag, prismatic_z>)
-    {
-        col.template head<3>().setZero();
-        col.template tail<3>() = R.col(2);
+        col.template tail<3>() = R * axis.v();
     }
 }
 
@@ -127,16 +119,10 @@ inline void jacobian_column_matrix(
             return;
         }
         case joint_kind::prismatic_x:
-            col.template head<3>().setZero();
-            col.template tail<3>() = R.col(0);
-            return;
         case joint_kind::prismatic_y:
-            col.template head<3>().setZero();
-            col.template tail<3>() = R.col(1);
-            return;
         case joint_kind::prismatic_z:
             col.template head<3>().setZero();
-            col.template tail<3>() = R.col(2);
+            col.template tail<3>() = R * axis.v();
             return;
         case joint_kind::general:
         default:
@@ -168,6 +154,11 @@ template <typename Scalar, int N>
     if constexpr (N == dynamic)
     {
         J.resize(6, n);
+    }
+
+    if (n == 0)
+    {
+        return J;
     }
 
     detail::jacobian_column_identity_runtime(chain.kind(0), J.col(0), axes[0]);

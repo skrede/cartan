@@ -308,3 +308,82 @@ TEST_CASE("Float Jacobian compiles and passes", "[jacobian]")
         REQUIRE(J_s(i, 0) == Approx(s1_vec(i)).margin(1e-5f));
     }
 }
+
+// ============================================================================
+// Generic chain-concept path on a dynamic chain must not write out of bounds
+//
+// generic_chain_wrapper<kinematic_chain<double, dynamic>> forces the generic
+// chain-concept FK/Jacobian overloads. For a dynamic chain those overloads
+// must size the intermediate storage and the 6xN Jacobian before writing;
+// otherwise they index an empty vector / a 6x0 matrix. The results must also
+// match the specialized dynamic-chain path.
+// ============================================================================
+
+TEST_CASE("Generic dynamic-chain FK/Jacobian stays in bounds", "[jacobian][dynamic]")
+{
+    auto dyn = make_3r_chain().to_dynamic();
+    spp::detail::generic_chain_wrapper<spp::kinematic_chain<double, spp::dynamic>>
+        wrapped{dyn};
+
+    Eigen::VectorXd q(3);
+    q << 0.3, -0.5, 0.7;
+
+    auto fk_gen = spp::forward_kinematics(wrapped, q);
+    REQUIRE(fk_gen.num_joints() == 3);
+
+    auto J_gen = spp::space_jacobian(wrapped, fk_gen);
+    REQUIRE(J_gen.rows() == 6);
+    REQUIRE(J_gen.cols() == 3);
+
+    auto fk_ref = spp::forward_kinematics(dyn, q);
+    auto J_ref = spp::space_jacobian(dyn, fk_ref);
+    REQUIRE((J_gen - J_ref).norm() < 1e-12);
+
+    auto diff = (fk_gen.end_effector.inverse() * fk_ref.end_effector).log();
+    REQUIRE(diff.norm() < 1e-12);
+}
+
+// ============================================================================
+// Zero-joint dynamic chain: space Jacobian is 6x0, not a crash
+// ============================================================================
+
+TEST_CASE("Zero-joint dynamic chain space Jacobian is 6x0", "[jacobian][dynamic]")
+{
+    auto home = spp::se3<double>::identity();
+    spp::kinematic_chain<double, spp::dynamic> zero_chain(
+        home,
+        std::vector<spp::screw_axis<double>>{},
+        std::vector<spp::joint_limits<double>>{});
+
+    REQUIRE(zero_chain.num_joints() == 0);
+
+    spp::fk_result<double, spp::dynamic> fk;
+    auto J = spp::space_jacobian(zero_chain, fk);
+
+    REQUIRE(J.rows() == 6);
+    REQUIRE(J.cols() == 0);
+}
+
+// ============================================================================
+// static_chain rejects a screw axis that contradicts its compile-time tag
+//
+// The constructor asserts on axes_match_tags in debug builds; the predicate is
+// exercised directly here so the check is observable without aborting the test
+// process.
+// ============================================================================
+
+TEST_CASE("static_chain rejects axis contradicting its joint tag", "[static_chain][validation]")
+{
+    using chain_t = spp::static_chain<double, spp::revolute_z>;
+
+    // A revolute screw about +y classifies as revolute_y, contradicting the
+    // revolute_z tag.
+    std::array<spp::screw_axis<double>, 1> bad_axes{
+        spp::screw_axis<double>::revolute({0.0, 1.0, 0.0}, {0.0, 0.0, 0.0})};
+    // A revolute screw about +z (or -z) agrees with the revolute_z tag.
+    std::array<spp::screw_axis<double>, 1> good_axes{
+        spp::screw_axis<double>::revolute({0.0, 0.0, 1.0}, {0.0, 0.0, 0.0})};
+
+    REQUIRE_FALSE(chain_t::axes_match_tags(bad_axes));
+    REQUIRE(chain_t::axes_match_tags(good_axes));
+}

@@ -4,9 +4,12 @@
 ///        plus near-zero and zero-angle edge cases.
 
 #include "../fixtures/chain_factories.h"
+#include "../fixtures/prismatic_chains.h"
 
-#include <cartan/serial/fk/forward_kinematics.h>
 #include <cartan/serial/fk/jacobian.h>
+#include <cartan/serial/fk/jacobian_matrix.h>
+#include <cartan/serial/fk/forward_kinematics.h>
+#include <cartan/serial/fk/forward_kinematics_matrix.h>
 #include <cartan/serial/fk/detail/axis_specializations.h>
 #include <cartan/serial/chain/static_chain.h>
 
@@ -389,5 +392,91 @@ TEST_CASE("Specialized FK at zero config", "[specialized][edge]")
         auto rot_diff = (fk.end_effector.rotation().inverse()
                          * sc.home().rotation()).log();
         REQUIRE(rot_diff.norm() < 1e-14);
+    }
+}
+
+// ============================================================================
+// Test 5: Signed-direction prismatic FK/Jacobian against the se3::exp oracle
+//
+// The generic chain wrapper drives the se3::exp(axis.to_vector() * q) Product-
+// of-Exponentials path, which carries the prismatic direction sign correctly
+// and serves as the oracle. The specialized (static_chain, compile-time tag)
+// and runtime (kinematic_chain, cached joint_kind) fast paths must match it on
+// a chain whose prismatic joints point along -z and -x.
+// ============================================================================
+
+TEST_CASE("Prismatic sign FK matches se3::exp oracle", "[specialized][prismatic]")
+{
+    auto sc = spp::fixtures::make_rppr_signed_static<double>();
+    verify_fk_parity_specialized<decltype(sc), 4>(sc, 16, 1234);
+
+    // Runtime (kinematic_chain) path against the same generic oracle.
+    auto kc = spp::fixtures::make_rppr_signed_chain<double>();
+    spp::detail::generic_chain_wrapper<decltype(kc)> wrapped{kc};
+
+    std::mt19937 rng(1234);
+    std::uniform_real_distribution<double> dist(-1.0, 1.0);
+    for (int c = 0; c < 16; ++c)
+    {
+        Eigen::Vector<double, 4> q;
+        for (int j = 0; j < 4; ++j)
+            q(j) = dist(rng);
+
+        auto fk_rt = spp::forward_kinematics(kc, q);
+        auto fk_or = spp::forward_kinematics(wrapped, q);
+        REQUIRE((fk_rt.end_effector.translation()
+                 - fk_or.end_effector.translation()).norm() < 1e-12);
+    }
+}
+
+TEST_CASE("Prismatic sign Jacobian matches adjoint-screw oracle",
+          "[specialized][prismatic][jacobian]")
+{
+    auto sc = spp::fixtures::make_rppr_signed_static<double>();
+
+    // Quaternion-path specialized Jacobian against the generic wrapper oracle.
+    verify_jacobian_parity_specialized<decltype(sc), 4>(sc, 16, 4321);
+
+    // Build the explicit oracle J from the generic PoE intermediates and check
+    // BOTH the quaternion path and the matrix path, BOTH the identity column
+    // (col 0) and the adjoint columns (col i > 0).
+    spp::detail::generic_chain_wrapper<decltype(sc)> wrapped{sc};
+
+    std::mt19937 rng(4321);
+    std::uniform_real_distribution<double> dist(-1.0, 1.0);
+    for (int c = 0; c < 16; ++c)
+    {
+        Eigen::Vector<double, 4> q;
+        for (int j = 0; j < 4; ++j)
+            q(j) = dist(rng);
+
+        auto fk_gen = spp::forward_kinematics(wrapped, q);
+
+        Eigen::Matrix<double, 6, 4> J_oracle;
+        J_oracle.col(0) = sc.axis(0).to_vector();
+        for (int i = 1; i < 4; ++i)
+        {
+            J_oracle.col(i) =
+                fk_gen.intermediates[static_cast<std::size_t>(i - 1)].adjoint()
+                * sc.axis(i).to_vector();
+        }
+
+        auto fk_quat = spp::forward_kinematics(sc, q);
+        auto Js_quat = spp::space_jacobian(sc, fk_quat);
+        REQUIRE((Js_quat - J_oracle).norm() < 1e-10);
+
+        auto fk_mat = spp::forward_kinematics_matrix(sc, q);
+        auto Js_mat = spp::space_jacobian(sc, fk_mat);
+        REQUIRE((Js_mat - J_oracle).norm() < 1e-10);
+
+        // Runtime (kinematic_chain) matrix and quaternion paths.
+        auto kc = spp::fixtures::make_rppr_signed_chain<double>();
+        auto fk_kc = spp::forward_kinematics(kc, q);
+        auto Js_kc = spp::space_jacobian(kc, fk_kc);
+        REQUIRE((Js_kc - J_oracle).norm() < 1e-10);
+
+        auto fk_kc_mat = spp::forward_kinematics_matrix(kc, q);
+        auto Js_kc_mat = spp::space_jacobian(kc, fk_kc_mat);
+        REQUIRE((Js_kc_mat - J_oracle).norm() < 1e-10);
     }
 }

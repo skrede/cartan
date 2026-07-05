@@ -37,8 +37,10 @@ enum class joint_kind : std::uint8_t
 /// Detect the joint_kind of a screw axis.
 ///
 /// Recognizes axes whose omega (revolute) or v (prismatic) is exactly ±e_x,
-/// ±e_y, or ±e_z within sqrt-epsilon. The sign is irrelevant: the
-/// downstream specializations read the magnitude from the axis itself.
+/// ±e_y, or ±e_z within sqrt-epsilon. A ±e_k axis and its negation map to the
+/// same joint_kind; the downstream specializations recover the sign from the
+/// axis itself -- the signed component for revolute joints, and the signed
+/// screw_axis::v() direction for prismatic joints.
 /// All other axes return joint_kind::general.
 template <typename Scalar>
 [[nodiscard]] inline joint_kind detect_joint_kind(const screw_axis<Scalar>& axis)

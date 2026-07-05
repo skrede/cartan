@@ -134,22 +134,11 @@ template <joint_tag JointTag, typename Scalar>
 
         return se3<Scalar>(rot, t);
     }
-    else if constexpr (std::same_as<JointTag, prismatic_x>)
+    else if constexpr (std::same_as<JointTag, prismatic_x>
+                       || std::same_as<JointTag, prismatic_y>
+                       || std::same_as<JointTag, prismatic_z>)
     {
-        vector3<Scalar> t = vector3<Scalar>::Zero();
-        t(0) = q;
-        return se3<Scalar>(so3<Scalar>::identity(), t);
-    }
-    else if constexpr (std::same_as<JointTag, prismatic_y>)
-    {
-        vector3<Scalar> t = vector3<Scalar>::Zero();
-        t(1) = q;
-        return se3<Scalar>(so3<Scalar>::identity(), t);
-    }
-    else if constexpr (std::same_as<JointTag, prismatic_z>)
-    {
-        vector3<Scalar> t = vector3<Scalar>::Zero();
-        t(2) = q;
+        vector3<Scalar> t = axis.v() * q;
         return se3<Scalar>(so3<Scalar>::identity(), t);
     }
 }
@@ -171,12 +160,7 @@ void jacobian_column_identity(
     else
     {
         col.template head<3>().setZero();
-        if constexpr (std::same_as<JointTag, prismatic_x>)
-            col.template tail<3>() = vector3<Scalar>(Scalar(1), Scalar(0), Scalar(0));
-        else if constexpr (std::same_as<JointTag, prismatic_y>)
-            col.template tail<3>() = vector3<Scalar>(Scalar(0), Scalar(1), Scalar(0));
-        else
-            col.template tail<3>() = vector3<Scalar>(Scalar(0), Scalar(0), Scalar(1));
+        col.template tail<3>() = axis.v();
     }
 }
 
@@ -232,23 +216,13 @@ void jacobian_column(
         vector3<Scalar> R_v = v(0) * R.col(0) + v(1) * R.col(1) + v(2) * R.col(2);
         col.template tail<3>() = p.cross(R_omega) + R_v;
     }
-    else if constexpr (std::same_as<JointTag, prismatic_x>)
+    else if constexpr (std::same_as<JointTag, prismatic_x>
+                       || std::same_as<JointTag, prismatic_y>
+                       || std::same_as<JointTag, prismatic_z>)
     {
         matrix3<Scalar> R = T_prev.rotation().matrix();
         col.template head<3>().setZero();
-        col.template tail<3>() = R.col(0);
-    }
-    else if constexpr (std::same_as<JointTag, prismatic_y>)
-    {
-        matrix3<Scalar> R = T_prev.rotation().matrix();
-        col.template head<3>().setZero();
-        col.template tail<3>() = R.col(1);
-    }
-    else if constexpr (std::same_as<JointTag, prismatic_z>)
-    {
-        matrix3<Scalar> R = T_prev.rotation().matrix();
-        col.template head<3>().setZero();
-        col.template tail<3>() = R.col(2);
+        col.template tail<3>() = R * axis.v();
     }
 }
 
@@ -379,23 +353,12 @@ inline void exp_joint_matrix(
         t(1) = sinc * rho(1) - omcc * rho(2);
         t(2) = omcc * rho(1) + sinc * rho(2);
     }
-    else if constexpr (std::same_as<JointTag, prismatic_x>)
+    else if constexpr (std::same_as<JointTag, prismatic_x>
+                       || std::same_as<JointTag, prismatic_y>
+                       || std::same_as<JointTag, prismatic_z>)
     {
         R.setIdentity();
-        t.setZero();
-        t(0) = q;
-    }
-    else if constexpr (std::same_as<JointTag, prismatic_y>)
-    {
-        R.setIdentity();
-        t.setZero();
-        t(1) = q;
-    }
-    else if constexpr (std::same_as<JointTag, prismatic_z>)
-    {
-        R.setIdentity();
-        t.setZero();
-        t(2) = q;
+        t = axis.v() * q;
     }
 }
 

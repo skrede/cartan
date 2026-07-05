@@ -199,6 +199,12 @@ forward_kinematics(
         se3<Scalar>::identity(), trusted_unit);
     int n = chain.num_joints();
 
+    if constexpr (N == dynamic)
+    {
+        result.intermediates.resize(
+            static_cast<std::size_t>(n), se3<Scalar>::identity());
+    }
+
     for (int i = 0; i < n; ++i)
     {
         accum = accum.compose_trusted(

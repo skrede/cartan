@@ -53,6 +53,11 @@ jacobian_matrix<Scalar, N> space_jacobian_loop(
         J.resize(6, n);
     }
 
+    if (n == 0)
+    {
+        return J;
+    }
+
     // Column 0: J_s0 = S_0 (Ad_{T_{-1}} = Ad_I = I)
     detail::jacobian_column_identity_runtime(chain.kind(0), J.col(0), axes[0]);
 
@@ -221,6 +226,15 @@ space_jacobian(
     int n = chain.num_joints();
 
     jacobian_matrix<Scalar, N> J;
+    if constexpr (N == dynamic)
+    {
+        J.resize(6, n);
+    }
+
+    if (n == 0)
+    {
+        return J;
+    }
 
     J.col(0) = chain.axis(0).to_vector();
 

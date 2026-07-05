@@ -1,9 +1,12 @@
 #include "cartan/serial_chain.h"
 
+#include "../fixtures/prismatic_chains.h"
+
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
+#include <random>
 #include <numbers>
 
 namespace spp = cartan;
@@ -200,4 +203,55 @@ TEST_CASE("FK with float scalar", "[forward_kinematics]")
     REQUIRE(fk.end_effector.translation()(0) == Approx(3.0f).margin(1e-5f));
     REQUIRE(fk.end_effector.translation()(1) == Approx(0.0f).margin(1e-5f));
     REQUIRE(fk.end_effector.translation()(2) == Approx(0.0f).margin(1e-5f));
+}
+
+// ============================================================================
+// FK on signed-direction prismatic joints matches the se3::exp PoE oracle
+//
+// A prismatic joint pointing along -z with q = 0.45 must translate the frame
+// by -0.45 along z, not +0.45. The single-joint check pins the sign directly;
+// the multi-joint check compares the runtime fast path against the generic
+// se3::exp(axis.to_vector() * q) oracle over random configurations.
+// ============================================================================
+
+TEST_CASE("FK prismatic negative-z single joint", "[forward_kinematics][prismatic]")
+{
+    auto s1 = spp::screw_axis<double>::prismatic({0.0, 0.0, -1.0});
+    spp::joint_limits<double> lim{-1.0, 1.0};
+
+    auto home = spp::se3<double>::identity();
+    spp::kinematic_chain<double, 1> chain(home, {s1}, {lim});
+
+    Eigen::Vector<double, 1> q;
+    q << 0.45;
+
+    auto fk = spp::forward_kinematics(chain, q);
+
+    // -z prismatic: translation must be (0, 0, -0.45), not (0, 0, +0.45).
+    REQUIRE(fk.end_effector.translation()(0) == Approx(0.0).margin(1e-12));
+    REQUIRE(fk.end_effector.translation()(1) == Approx(0.0).margin(1e-12));
+    REQUIRE(fk.end_effector.translation()(2) == Approx(-0.45).margin(1e-12));
+}
+
+TEST_CASE("FK signed prismatic chain matches se3::exp oracle",
+          "[forward_kinematics][prismatic]")
+{
+    auto kc = spp::fixtures::make_rppr_signed_chain<double>();
+    spp::detail::generic_chain_wrapper<decltype(kc)> wrapped{kc};
+
+    std::mt19937 rng(7);
+    std::uniform_real_distribution<double> dist(-1.0, 1.0);
+    for (int c = 0; c < 16; ++c)
+    {
+        Eigen::Vector<double, 4> q;
+        for (int j = 0; j < 4; ++j)
+            q(j) = dist(rng);
+
+        auto fk_fast = spp::forward_kinematics(kc, q);
+        auto fk_oracle = spp::forward_kinematics(wrapped, q);
+
+        auto diff = (fk_fast.end_effector.inverse()
+                     * fk_oracle.end_effector).log();
+        REQUIRE(diff.norm() < 1e-12);
+    }
 }
