@@ -148,6 +148,22 @@ public:
 
             position_type dq = A.ldlt().solve(g);
 
+            // Guard against a diverged trust region. When the achievable pose
+            // residual floors above the requested tolerance (common in float),
+            // no trial step reduces the error, so every step is rejected and
+            // the Nielsen update grows lambda without bound until it overflows
+            // to a non-finite value. A non-finite damping parameter yields a
+            // non-finite increment, which would push a non-finite rotation
+            // vector into the exponential map. Terminate the attempt as a clean
+            // divergence (the error channel) rather than stepping into
+            // undefined behavior on a solve that can never converge.
+            if (!std::isfinite(m_lambda) || !dq.allFinite())
+            {
+                m_error_norm = m_V_b.norm();
+                m_status = ik_status::diverged;
+                break;
+            }
+
             position_type q_trial = m_q + dq;
             auto fk_trial = forward_kinematics(chain, q_trial);
             auto V_b_trial = (fk_trial.end_effector.inverse() * m_target).log();
