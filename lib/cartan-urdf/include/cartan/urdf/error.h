@@ -18,9 +18,16 @@ namespace cartan::urdf
 ///
 /// Parse-time failures (malformed_xml, unsupported_joint_type,
 /// unknown_link_reference, unknown_parent_link, mimic_joint_unsupported,
-/// inertial_singular) fill urdf_error::location when they can be tied to a
+/// inertial_singular, cyclic_kinematic_tree, non_finite_value, duplicate_name,
+/// multi_parent_link) fill urdf_error::location when they can be tied to a
 /// specific element. Post-parse failures (branched_kinematic_tree,
-/// link_not_found, sdf_not_supported) leave location unset.
+/// link_not_found, sdf_not_supported, missing_joint_limit, zero_axis,
+/// tool_link_unreachable) leave location unset.
+///
+/// The loader is the library's only untrusted-input surface, so every spec
+/// violation is a strict rejection whose detail names the offending joint or
+/// link. A continuous joint without a <limit> is not a violation (it is
+/// unbounded by definition) and loads normally.
 enum class urdf_failure
 {
     malformed_xml,             ///< XML was not well-formed; pugixml reports the offset.
@@ -32,6 +39,13 @@ enum class urdf_failure
     mimic_joint_unsupported,   ///< Joint declares a mimic relation; coupled-joint kinematics is deferred.
     inertial_singular,         ///< Inertial declares a non-physical mass or inertia matrix.
     sdf_not_supported,         ///< SDF loading is not implemented; only URDF is currently supported.
+    cyclic_kinematic_tree,     ///< A joint is a self-loop (parent == child) or the tree contains a cycle.
+    missing_joint_limit,       ///< A revolute or prismatic joint omits the required <limit lower upper>.
+    zero_axis,                 ///< A joint <axis> has zero magnitude and cannot be normalized.
+    non_finite_value,          ///< A numeric attribute parsed to NaN or infinity.
+    duplicate_name,            ///< A link or joint name is declared more than once.
+    multi_parent_link,         ///< A link is the child of more than one joint (non-tree topology).
+    tool_link_unreachable,     ///< The requested tool link is not reached by the serial walk.
     unknown_error              ///< Catch-all default; should not occur in normal operation.
 };
 

@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+<!-- Kinematic cycle with a genuine root: base -> link_a -> link_b -> link_a.
+     link_a is the child of two joints, so the walk from base would revisit it
+     forever. Rejected at parse time (multi-parent) or by the bounded walk. -->
+<robot name="adversarial_cycle">
+
+  <link name="base_link"/>
+  <link name="link_a"/>
+  <link name="link_b"/>
+
+  <joint name="root_joint" type="revolute">
+    <parent link="base_link"/>
+    <child link="link_a"/>
+    <origin xyz="0 0 0.1" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.14159" upper="3.14159" velocity="2.0" effort="50.0"/>
+  </joint>
+
+  <joint name="forward_joint" type="revolute">
+    <parent link="link_a"/>
+    <child link="link_b"/>
+    <origin xyz="0 0 0.2" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.14159" upper="3.14159" velocity="2.0" effort="50.0"/>
+  </joint>
+
+  <joint name="closing_joint" type="revolute">
+    <parent link="link_b"/>
+    <child link="link_a"/>
+    <origin xyz="0 0 0.3" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.14159" upper="3.14159" velocity="2.0" effort="50.0"/>
+  </joint>
+
+</robot>

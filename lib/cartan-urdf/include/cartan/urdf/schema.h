@@ -53,14 +53,15 @@ struct parsed_link
     std::optional<parsed_inertial<Scalar>> inertial{};
 };
 
-/// A joint as parsed from URDF. axis defaults to +Z (URDF default when the
-/// <axis> element is absent on a revolute or prismatic joint). origin is the
-/// transform from parent to joint frame at zero joint position. position_min
-/// and position_max are unset when the URDF omits <limit lower upper>; the
-/// chain extractor is responsible for filling +/-infinity for continuous
-/// joints. velocity_max and effort_max mirror <limit velocity> and
-/// <limit effort> and are preserved on the model for forward compatibility
-/// with the dynamics module.
+/// A joint as parsed from URDF. axis defaults to +X, matching the URDF spec
+/// default of (1,0,0) when the <axis> element is absent on a revolute or
+/// prismatic joint. origin is the transform from parent to joint frame at zero
+/// joint position. position_min and position_max are unset when the URDF omits
+/// <limit lower upper>; the chain extractor fills +/-infinity for continuous
+/// joints and rejects a revolute or prismatic joint that leaves them unset.
+/// velocity_max and effort_max mirror <limit velocity> and <limit effort> and
+/// are preserved on the model for forward compatibility with the dynamics
+/// module.
 template <typename Scalar = double>
 struct parsed_joint
 {
@@ -68,7 +69,7 @@ struct parsed_joint
     parsed_joint_kind kind{parsed_joint_kind::fixed};
     std::string parent_link;
     std::string child_link;
-    vector3<Scalar> axis{vector3<Scalar>::UnitZ()};
+    vector3<Scalar> axis{vector3<Scalar>::UnitX()};
     se3<Scalar> origin{se3<Scalar>::identity()};
     std::optional<Scalar> position_min{};
     std::optional<Scalar> position_max{};

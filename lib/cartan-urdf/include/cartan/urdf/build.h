@@ -193,8 +193,24 @@ build_chain(const parsed_model<Scalar>& model, const load_options& opts = {})
             return child == expected;
         };
 
+    // Bound the walk against a malicious or malformed tree. A strictly-serial
+    // walk visits each joint at most once, so it can take no more than
+    // model.joints.size() productive steps; one extra step lets a legitimate
+    // trailing tool-offset fold terminate cleanly. Exceeding the bound means
+    // the walk is revisiting a link, i.e. the input encodes a cycle.
+    const std::size_t max_steps = model.joints.size() + 1;
+    std::size_t steps = 0;
+
     while (true)
     {
+        if (steps++ > max_steps)
+        {
+            return cartan::unexpected(urdf_error{
+                .kind = urdf_failure::cyclic_kinematic_tree,
+                .detail = "kinematic cycle detected while walking through link '"
+                    + current + "'",
+                .location = std::nullopt});
+        }
         if (!opts.tool_link.empty() && current == opts.tool_link)
         {
             break;
@@ -297,6 +313,15 @@ build_chain(const parsed_model<Scalar>& model, const load_options& opts = {})
         // R(T_acc * j.origin).act(axis). The point on the axis (origin of the
         // joint frame in world coords) is (T_acc * j.origin).translation().
         se3<Scalar> T_acc_after_joint = T_acc * j.origin;
+        // A zero-magnitude axis normalizes to NaN and would silently poison the
+        // kinematics; reject it before normalization.
+        if (!(j.axis.norm() > Scalar(0)))
+        {
+            return cartan::unexpected(urdf_error{
+                .kind = urdf_failure::zero_axis,
+                .detail = "joint '" + j.name + "' has a zero-magnitude <axis>",
+                .location = std::nullopt});
+        }
         const vector3<Scalar> axis_world =
             T_acc_after_joint.rotation().act(j.axis.normalized());
         const vector3<Scalar> point_world = T_acc_after_joint.translation();
@@ -318,8 +343,22 @@ build_chain(const parsed_model<Scalar>& model, const load_options& opts = {})
         }
         else
         {
-            jl.position_min = j.position_min.value_or(Scalar(0));
-            jl.position_max = j.position_max.value_or(Scalar(0));
+            // Revolute and prismatic joints are bounded; a missing <limit
+            // lower upper> is malformed (freezing it to [0,0] would silently
+            // pin the joint). A continuous joint is the only unbounded case.
+            if (!j.position_min.has_value() || !j.position_max.has_value())
+            {
+                return cartan::unexpected(urdf_error{
+                    .kind = urdf_failure::missing_joint_limit,
+                    .detail = "joint '" + j.name + "' is "
+                        + (j.kind == parsed_joint_kind::prismatic
+                               ? std::string("prismatic")
+                               : std::string("revolute"))
+                        + " but omits the required <limit lower upper>",
+                    .location = std::nullopt});
+            }
+            jl.position_min = *j.position_min;
+            jl.position_max = *j.position_max;
         }
         jl.velocity_max = j.velocity_max;
         jl.effort_max = j.effort_max;
@@ -331,6 +370,18 @@ build_chain(const parsed_model<Scalar>& model, const load_options& opts = {})
 
         T_acc = T_acc_after_joint;
         current = j.child_link;
+    }
+
+    // When the caller pinned a tool link, the walk must have terminated on it.
+    // A leaf reached before the requested tool link means the tool link is off
+    // the serial walk path (e.g. on a sibling branch) and cannot be honored.
+    if (!opts.tool_link.empty() && current != opts.tool_link)
+    {
+        return cartan::unexpected(urdf_error{
+            .kind = urdf_failure::tool_link_unreachable,
+            .detail = "tool link '" + opts.tool_link
+                + "' is not on the serial walk path (walk ended at '" + current + "')",
+            .location = std::nullopt});
     }
 
     // Populate metadata. base_link_name and tool_link_name reflect the walk's

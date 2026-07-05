@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<!-- Self-loop: a joint whose parent and child link are the same. The bounded
+     walk would spin on link_a forever; rejected at parse time. -->
+<robot name="adversarial_self_loop">
+
+  <link name="base_link"/>
+  <link name="link_a"/>
+
+  <joint name="root_joint" type="revolute">
+    <parent link="base_link"/>
+    <child link="link_a"/>
+    <origin xyz="0 0 0.1" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.14159" upper="3.14159" velocity="2.0" effort="50.0"/>
+  </joint>
+
+  <joint name="self_loop_joint" type="revolute">
+    <parent link="link_a"/>
+    <child link="link_a"/>
+    <origin xyz="0 0 0.2" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.14159" upper="3.14159" velocity="2.0" effort="50.0"/>
+  </joint>
+
+</robot>

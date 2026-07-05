@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<!-- Zero-magnitude joint axis. Normalizing a zero vector yields NaN kinematics;
+     rejected as zero_axis. -->
+<robot name="adversarial_zero_axis">
+
+  <link name="base_link"/>
+  <link name="tip"/>
+
+  <joint name="zero_axis_joint" type="revolute">
+    <parent link="base_link"/>
+    <child link="tip"/>
+    <origin xyz="0 0 0.1" rpy="0 0 0"/>
+    <axis xyz="0 0 0"/>
+    <limit lower="-3.14159" upper="3.14159" velocity="2.0" effort="50.0"/>
+  </joint>
+
+</robot>

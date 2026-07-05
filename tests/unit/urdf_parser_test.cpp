@@ -103,3 +103,57 @@ TEST_CASE("parser: mimic joint reports mimic_joint_unsupported", "[urdf_parser]"
     REQUIRE_FALSE(result.has_value());
     CHECK(result.error().kind == cartan::urdf::urdf_failure::mimic_joint_unsupported);
 }
+
+// --- Adversarial / strict-reject cases (parse-time, no kinematic walk) ---
+//
+// These exercise the untrusted-input surface. Each malformed input must be
+// rejected with a typed error whose detail names the offending joint or link.
+// parse_urdf_file never walks the tree, so none of these hang even pre-fix;
+// the pre-fix defect is silent acceptance, which the REQUIRE_FALSE catches.
+
+TEST_CASE("parser: self-loop joint (parent == child) is rejected", "[urdf_parser][urdf_strict]")
+{
+    auto result = cartan::urdf::parse_urdf_file<double>(fixture_path("adversarial_self_loop.urdf"));
+
+    REQUIRE_FALSE(result.has_value());
+    CHECK(result.error().kind == cartan::urdf::urdf_failure::cyclic_kinematic_tree);
+    CHECK(result.error().detail.find("self_loop_joint") != std::string::npos);
+}
+
+TEST_CASE("parser: kinematic cycle (link revisited) is rejected", "[urdf_parser][urdf_strict]")
+{
+    auto result = cartan::urdf::parse_urdf_file<double>(fixture_path("adversarial_cycle.urdf"));
+
+    REQUIRE_FALSE(result.has_value());
+    // link_a is the child of two joints, so the cycle surfaces as a
+    // multi-parent (non-tree) rejection that names the offending link.
+    CHECK(result.error().kind == cartan::urdf::urdf_failure::multi_parent_link);
+    CHECK(result.error().detail.find("link_a") != std::string::npos);
+}
+
+TEST_CASE("parser: multi-parent link is rejected", "[urdf_parser][urdf_strict]")
+{
+    auto result = cartan::urdf::parse_urdf_file<double>(fixture_path("adversarial_multi_parent.urdf"));
+
+    REQUIRE_FALSE(result.has_value());
+    CHECK(result.error().kind == cartan::urdf::urdf_failure::multi_parent_link);
+    CHECK(result.error().detail.find("tip") != std::string::npos);
+}
+
+TEST_CASE("parser: duplicate link name is rejected", "[urdf_parser][urdf_strict]")
+{
+    auto result = cartan::urdf::parse_urdf_file<double>(fixture_path("adversarial_duplicate_name.urdf"));
+
+    REQUIRE_FALSE(result.has_value());
+    CHECK(result.error().kind == cartan::urdf::urdf_failure::duplicate_name);
+    CHECK(result.error().detail.find("link_1") != std::string::npos);
+}
+
+TEST_CASE("parser: non-finite numeric attribute is rejected", "[urdf_parser][urdf_strict]")
+{
+    auto result = cartan::urdf::parse_urdf_file<double>(fixture_path("adversarial_non_finite.urdf"));
+
+    REQUIRE_FALSE(result.has_value());
+    CHECK(result.error().kind == cartan::urdf::urdf_failure::non_finite_value);
+    CHECK(result.error().detail.find("nan_limit_joint") != std::string::npos);
+}

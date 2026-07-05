@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<!-- Revolute joint with no <axis> element. The URDF spec default is (1,0,0),
+     not (0,0,1); the extracted screw axis must point along world +X. -->
+<robot name="semantic_axis_omitted">
+
+  <link name="base_link"/>
+  <link name="tip"/>
+
+  <joint name="default_axis_joint" type="revolute">
+    <parent link="base_link"/>
+    <child link="tip"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <limit lower="-3.14159" upper="3.14159" velocity="2.0" effort="50.0"/>
+  </joint>
+
+</robot>

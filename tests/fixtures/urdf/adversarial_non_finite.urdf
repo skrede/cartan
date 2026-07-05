@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<!-- Non-finite numeric attribute: the lower limit parses to NaN through the
+     strtod-backed attribute reader. Rejected as non_finite_value. -->
+<robot name="adversarial_non_finite">
+
+  <link name="base_link"/>
+  <link name="tip"/>
+
+  <joint name="nan_limit_joint" type="revolute">
+    <parent link="base_link"/>
+    <child link="tip"/>
+    <origin xyz="0 0 0.1" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="nan" upper="1.0" velocity="2.0" effort="50.0"/>
+  </joint>
+
+</robot>

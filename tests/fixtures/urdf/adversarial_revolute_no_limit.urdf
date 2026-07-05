@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<!-- Revolute joint without the required <limit lower upper>. A bounded
+     revolute joint must declare its range; rejected as missing_joint_limit. -->
+<robot name="adversarial_revolute_no_limit">
+
+  <link name="base_link"/>
+  <link name="tip"/>
+
+  <joint name="unbounded_revolute" type="revolute">
+    <parent link="base_link"/>
+    <child link="tip"/>
+    <origin xyz="0 0 0.1" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+  </joint>
+
+</robot>

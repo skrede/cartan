@@ -80,6 +80,21 @@ namespace detail
     return text;
 }
 
+/// Read a numeric XML attribute, rejecting non-finite (NaN or infinity)
+/// values. The strtod-backed pugixml reader accepts "nan"/"inf" tokens, so
+/// this is the single choke point every numeric attribute passes through; an
+/// empty optional signals the caller to raise urdf_failure::non_finite_value
+/// naming the offending element.
+[[nodiscard]] inline std::optional<double> as_finite_double(const pugi::xml_attribute& attr)
+{
+    const double raw = attr.as_double();
+    if (!std::isfinite(raw))
+    {
+        return std::nullopt;
+    }
+    return raw;
+}
+
 /// Parse a whitespace-separated triple ("x y z") into a vector3. Returns
 /// false on parse failure; the caller is responsible for raising the
 /// appropriate urdf_failure.
@@ -168,7 +183,15 @@ parse_inertial(const pugi::xml_node& inertial_node,
             .detail = "link '" + link_name + "': <inertial> missing <mass> child",
             .location = urdf_source_location{file_path, 0, "inertial"}});
     }
-    out.mass = mass_node.attribute("value").as_double(0.0);
+    auto mass_val = as_finite_double(mass_node.attribute("value"));
+    if (!mass_val.has_value())
+    {
+        return cartan::unexpected(urdf_error{
+            .kind = urdf_failure::non_finite_value,
+            .detail = "link '" + link_name + "': inertial mass is not finite",
+            .location = urdf_source_location{file_path, 0, "inertial"}});
+    }
+    out.mass = static_cast<Scalar>(*mass_val);
     if (!(out.mass > Scalar(0)))
     {
         return cartan::unexpected(urdf_error{
@@ -200,12 +223,25 @@ parse_inertial(const pugi::xml_node& inertial_node,
             .detail = "link '" + link_name + "': <inertial> missing <inertia> child",
             .location = urdf_source_location{file_path, 0, "inertial"}});
     }
-    const Scalar ixx = static_cast<Scalar>(inertia.attribute("ixx").as_double(0.0));
-    const Scalar ixy = static_cast<Scalar>(inertia.attribute("ixy").as_double(0.0));
-    const Scalar ixz = static_cast<Scalar>(inertia.attribute("ixz").as_double(0.0));
-    const Scalar iyy = static_cast<Scalar>(inertia.attribute("iyy").as_double(0.0));
-    const Scalar iyz = static_cast<Scalar>(inertia.attribute("iyz").as_double(0.0));
-    const Scalar izz = static_cast<Scalar>(inertia.attribute("izz").as_double(0.0));
+    Scalar ixx{}, ixy{}, ixz{}, iyy{}, iyz{}, izz{};
+    for (const auto& [name, slot] : {
+             std::pair<const char*, Scalar*>{"ixx", &ixx},
+             std::pair<const char*, Scalar*>{"ixy", &ixy},
+             std::pair<const char*, Scalar*>{"ixz", &ixz},
+             std::pair<const char*, Scalar*>{"iyy", &iyy},
+             std::pair<const char*, Scalar*>{"iyz", &iyz},
+             std::pair<const char*, Scalar*>{"izz", &izz}})
+    {
+        auto v = as_finite_double(inertia.attribute(name));
+        if (!v.has_value())
+        {
+            return cartan::unexpected(urdf_error{
+                .kind = urdf_failure::non_finite_value,
+                .detail = "link '" + link_name + "': inertia entry '" + name + "' is not finite",
+                .location = urdf_source_location{file_path, 0, "inertial"}});
+        }
+        *slot = static_cast<Scalar>(*v);
+    }
     if (ixx < Scalar(0) || iyy < Scalar(0) || izz < Scalar(0))
     {
         return cartan::unexpected(urdf_error{
@@ -284,6 +320,13 @@ parse_urdf_file(const std::filesystem::path& path)
                 .detail = "<link> missing required name attribute",
                 .location = urdf_source_location{path_str, 0, "link"}});
         }
+        if (!link_names.insert(link.name).second)
+        {
+            return cartan::unexpected(urdf_error{
+                .kind = urdf_failure::duplicate_name,
+                .detail = "link '" + link.name + "' is declared more than once",
+                .location = urdf_source_location{path_str, 0, "link"}});
+        }
         if (auto inertial = link_node.child("inertial"); inertial)
         {
             auto parsed = detail::parse_inertial<Scalar>(inertial, link.name, path_str);
@@ -293,11 +336,15 @@ parse_urdf_file(const std::filesystem::path& path)
             }
             link.inertial = std::move(parsed.value());
         }
-        link_names.insert(link.name);
         model.links.push_back(std::move(link));
     }
 
     // Pass 2: joints. Cross-references against link_names collected in pass 1.
+    // joint_names guards against duplicate joint declarations; child_links
+    // guards against a link that is the child of more than one joint (a
+    // non-tree, multi-parent topology).
+    std::unordered_set<std::string> joint_names;
+    std::unordered_set<std::string> child_links;
     for (pugi::xml_node joint_node : robot.children("joint"))
     {
         parsed_joint<Scalar> joint{};
@@ -307,6 +354,13 @@ parse_urdf_file(const std::filesystem::path& path)
             return cartan::unexpected(urdf_error{
                 .kind = urdf_failure::malformed_xml,
                 .detail = "<joint> missing required name attribute",
+                .location = urdf_source_location{path_str, 0, "joint"}});
+        }
+        if (!joint_names.insert(joint.name).second)
+        {
+            return cartan::unexpected(urdf_error{
+                .kind = urdf_failure::duplicate_name,
+                .detail = "joint '" + joint.name + "' is declared more than once",
                 .location = urdf_source_location{path_str, 0, "joint"}});
         }
         const std::string type_token = joint_node.attribute("type").as_string();
@@ -353,6 +407,21 @@ parse_urdf_file(const std::filesystem::path& path)
                 .detail = "joint '" + joint.name + "' references unknown child link '" + joint.child_link + "'",
                 .location = urdf_source_location{path_str, 0, "joint"}});
         }
+        if (joint.parent_link == joint.child_link)
+        {
+            return cartan::unexpected(urdf_error{
+                .kind = urdf_failure::cyclic_kinematic_tree,
+                .detail = "joint '" + joint.name + "' forms a self-loop: parent and child link are both '"
+                    + joint.parent_link + "'",
+                .location = urdf_source_location{path_str, 0, "joint"}});
+        }
+        if (!child_links.insert(joint.child_link).second)
+        {
+            return cartan::unexpected(urdf_error{
+                .kind = urdf_failure::multi_parent_link,
+                .detail = "link '" + joint.child_link + "' is the child of more than one joint",
+                .location = urdf_source_location{path_str, 0, "joint"}});
+        }
 
         if (auto origin = joint_node.child("origin"); origin)
         {
@@ -385,22 +454,27 @@ parse_urdf_file(const std::filesystem::path& path)
 
         if (auto limit = joint_node.child("limit"); limit)
         {
-            if (auto attr = limit.attribute("lower"); attr)
-            {
-                joint.position_min = static_cast<Scalar>(attr.as_double());
-            }
-            if (auto attr = limit.attribute("upper"); attr)
-            {
-                joint.position_max = static_cast<Scalar>(attr.as_double());
-            }
-            if (auto attr = limit.attribute("velocity"); attr)
-            {
-                joint.velocity_max = static_cast<Scalar>(attr.as_double());
-            }
-            if (auto attr = limit.attribute("effort"); attr)
-            {
-                joint.effort_max = static_cast<Scalar>(attr.as_double());
-            }
+            auto read_limit_attr = [&](const char* attr_name,
+                                       std::optional<Scalar>& slot)
+                -> std::optional<urdf_error> {
+                auto attr = limit.attribute(attr_name);
+                if (!attr) { return std::nullopt; }
+                auto v = detail::as_finite_double(attr);
+                if (!v.has_value())
+                {
+                    return urdf_error{
+                        .kind = urdf_failure::non_finite_value,
+                        .detail = "joint '" + joint.name + "' has a non-finite <limit "
+                            + attr_name + ">",
+                        .location = urdf_source_location{path_str, 0, "limit"}};
+                }
+                slot = static_cast<Scalar>(*v);
+                return std::nullopt;
+            };
+            if (auto err = read_limit_attr("lower", joint.position_min)) { return cartan::unexpected(std::move(*err)); }
+            if (auto err = read_limit_attr("upper", joint.position_max)) { return cartan::unexpected(std::move(*err)); }
+            if (auto err = read_limit_attr("velocity", joint.velocity_max)) { return cartan::unexpected(std::move(*err)); }
+            if (auto err = read_limit_attr("effort", joint.effort_max)) { return cartan::unexpected(std::move(*err)); }
         }
 
         model.joints.push_back(std::move(joint));

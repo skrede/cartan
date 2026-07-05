@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<!-- The link "tip" is the child of two joints (arm_joint and shortcut_joint),
+     making the tree non-serial. Rejected as multi_parent_link. -->
+<robot name="adversarial_multi_parent">
+
+  <link name="base_link"/>
+  <link name="mid"/>
+  <link name="tip"/>
+
+  <joint name="base_joint" type="revolute">
+    <parent link="base_link"/>
+    <child link="mid"/>
+    <origin xyz="0 0 0.1" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.14159" upper="3.14159" velocity="2.0" effort="50.0"/>
+  </joint>
+
+  <joint name="arm_joint" type="revolute">
+    <parent link="mid"/>
+    <child link="tip"/>
+    <origin xyz="0 0 0.2" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.14159" upper="3.14159" velocity="2.0" effort="50.0"/>
+  </joint>
+
+  <joint name="shortcut_joint" type="revolute">
+    <parent link="base_link"/>
+    <child link="tip"/>
+    <origin xyz="0 0 0.3" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.14159" upper="3.14159" velocity="2.0" effort="50.0"/>
+  </joint>
+
+</robot>

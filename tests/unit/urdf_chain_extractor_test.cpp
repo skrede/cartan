@@ -195,3 +195,154 @@ TEST_CASE("load_urdf: unsupported joint type composes through",
     REQUIRE_FALSE(result.has_value());
     CHECK(result.error().kind == cartan::urdf_failure::unsupported_joint_type);
 }
+
+// --- Strict-reject semantic-gap cases (build-time, valid serial tree) ---
+//
+// These fixtures form a single valid chain, so the extractor terminates; the
+// pre-fix defect is a silently-wrong chain (frozen limits, NaN axis, or the
+// wrong default axis), which the assertions below catch. None of these hang.
+
+TEST_CASE("extractor: revolute joint without <limit> is rejected", "[urdf_chain_extractor][urdf_strict]")
+{
+    auto result = cartan::load_urdf<double>(fixture_path("adversarial_revolute_no_limit.urdf"));
+
+    REQUIRE_FALSE(result.has_value());
+    CHECK(result.error().kind == cartan::urdf_failure::missing_joint_limit);
+    CHECK(result.error().detail.find("unbounded_revolute") != std::string::npos);
+}
+
+TEST_CASE("extractor: prismatic joint without <limit> is rejected", "[urdf_chain_extractor][urdf_strict]")
+{
+    auto result = cartan::load_urdf<double>(fixture_path("adversarial_prismatic_no_limit.urdf"));
+
+    REQUIRE_FALSE(result.has_value());
+    CHECK(result.error().kind == cartan::urdf_failure::missing_joint_limit);
+    CHECK(result.error().detail.find("unbounded_prismatic") != std::string::npos);
+}
+
+TEST_CASE("extractor: zero-magnitude axis is rejected", "[urdf_chain_extractor][urdf_strict]")
+{
+    auto result = cartan::load_urdf<double>(fixture_path("adversarial_zero_axis.urdf"));
+
+    REQUIRE_FALSE(result.has_value());
+    CHECK(result.error().kind == cartan::urdf_failure::zero_axis);
+    CHECK(result.error().detail.find("zero_axis_joint") != std::string::npos);
+}
+
+TEST_CASE("extractor: omitted <axis> defaults to world +X, not +Z", "[urdf_chain_extractor][urdf_strict]")
+{
+    auto result = cartan::load_urdf<double>(fixture_path("semantic_axis_omitted.urdf"));
+
+    REQUIRE(result.has_value());
+    const auto& chain = result->chain;
+    REQUIRE(chain.num_joints() == 1);
+
+    const auto& s = chain.axes()[0];
+    CHECK(s.is_revolute());
+    // URDF spec default axis is (1,0,0). The joint origin is identity, so the
+    // world-frame screw axis must be exactly world +X.
+    CHECK(s.omega()(0) == Approx(1.0).margin(1e-12));
+    CHECK(s.omega()(1) == Approx(0.0).margin(1e-12));
+    CHECK(s.omega()(2) == Approx(0.0).margin(1e-12));
+}
+
+TEST_CASE("extractor: continuous joint without <limit> stays valid (unlimited)", "[urdf_chain_extractor][urdf_strict]")
+{
+    auto result = cartan::load_urdf<double>(fixture_path("semantic_continuous_no_limit.urdf"));
+
+    REQUIRE(result.has_value());
+    const auto& chain = result->chain;
+    REQUIRE(chain.num_joints() == 1);
+
+    const auto& lim = chain.limits()[0];
+    CHECK(lim.position_min == -std::numeric_limits<double>::infinity());
+    CHECK(lim.position_max == +std::numeric_limits<double>::infinity());
+}
+
+// --- Kinematic-cycle DoS (build-time walk) ---
+//
+// These cases would hang the unbounded pre-fix walk, so they are tagged
+// [urdf_dos] and excluded from the pre-fix red run. Post-fix the walk is
+// bounded and the parser rejects the cycle before the walk is even reached.
+
+TEST_CASE("extractor: kinematic cycle does not hang and is rejected", "[urdf_chain_extractor][urdf_strict][urdf_dos]")
+{
+    auto result = cartan::load_urdf<double>(fixture_path("adversarial_cycle.urdf"));
+
+    REQUIRE_FALSE(result.has_value());
+    CHECK(!result.error().detail.empty());
+}
+
+TEST_CASE("extractor: bounded walk rejects a cyclic parsed_model", "[urdf_chain_extractor][urdf_strict][urdf_dos]")
+{
+    // Hand-built cyclic model that bypasses the parser's non-tree guard: the
+    // walk base -> a -> b -> a would loop forever without the step bound.
+    using namespace cartan::urdf;
+    parsed_model<double> model{};
+    model.robot_name = "cyclic";
+    model.links.push_back(parsed_link<double>{"base_link", {}});
+    model.links.push_back(parsed_link<double>{"link_a", {}});
+    model.links.push_back(parsed_link<double>{"link_b", {}});
+
+    auto make_joint = [](const char* name, const char* parent, const char* child) {
+        parsed_joint<double> j{};
+        j.name = name;
+        j.kind = parsed_joint_kind::revolute;
+        j.parent_link = parent;
+        j.child_link = child;
+        j.position_min = -3.14159;
+        j.position_max = 3.14159;
+        return j;
+    };
+    model.joints.push_back(make_joint("root_joint", "base_link", "link_a"));
+    model.joints.push_back(make_joint("forward_joint", "link_a", "link_b"));
+    model.joints.push_back(make_joint("closing_joint", "link_b", "link_a"));
+
+    auto result = build_chain<double>(model);
+
+    REQUIRE_FALSE(result.has_value());
+    CHECK(result.error().kind == urdf_failure::cyclic_kinematic_tree);
+    CHECK(!result.error().detail.empty());
+}
+
+TEST_CASE("extractor: tool_link off the serial walk path is rejected", "[urdf_chain_extractor][urdf_strict]")
+{
+    // Valid serial chain base -> a -> tip, plus a fixed-leaf world-frame marker
+    // hanging off base that the walk elides. Requesting the marker as the tool
+    // link cannot be honored: the walk never reaches it.
+    using namespace cartan::urdf;
+    parsed_model<double> model{};
+    model.robot_name = "off_path_tool";
+    model.links.push_back(parsed_link<double>{"base_link", {}});
+    model.links.push_back(parsed_link<double>{"link_a", {}});
+    model.links.push_back(parsed_link<double>{"tip", {}});
+    model.links.push_back(parsed_link<double>{"marker", {}});
+
+    auto revolute = [](const char* name, const char* parent, const char* child) {
+        parsed_joint<double> j{};
+        j.name = name;
+        j.kind = parsed_joint_kind::revolute;
+        j.parent_link = parent;
+        j.child_link = child;
+        j.position_min = -1.0;
+        j.position_max = 1.0;
+        return j;
+    };
+    parsed_joint<double> marker_joint{};
+    marker_joint.name = "marker_mount";
+    marker_joint.kind = parsed_joint_kind::fixed;
+    marker_joint.parent_link = "base_link";
+    marker_joint.child_link = "marker";
+
+    model.joints.push_back(revolute("base_joint", "base_link", "link_a"));
+    model.joints.push_back(revolute("arm_joint", "link_a", "tip"));
+    model.joints.push_back(marker_joint);
+
+    load_options opts{};
+    opts.tool_link = "marker";
+    auto result = build_chain<double>(model, opts);
+
+    REQUIRE_FALSE(result.has_value());
+    CHECK(result.error().kind == urdf_failure::tool_link_unreachable);
+    CHECK(result.error().detail.find("marker") != std::string::npos);
+}
