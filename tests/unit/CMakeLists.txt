@@ -82,6 +82,7 @@ endif()
 cartan_add_test(fk_sweep_test fk_sweep_test.cpp)
 cartan_add_test(jacobian_sweep_test jacobian_sweep_test.cpp)
 cartan_add_test(ik_sweep_test ik_sweep_test.cpp)
+cartan_add_test(ik_float_tolerance_sweep_test ik_float_tolerance_sweep_test.cpp)
 
 if(CARTAN_BUILD_NLOPT)
     target_link_libraries(bobyqa_solve_policy_test PRIVATE cartan::nlopt)
