@@ -9,7 +9,37 @@
 
 #include <cmath>
 #include <string>
+#include <type_traits>
 #include "cartan/expected.h"
+
+namespace cartan::detail
+{
+
+/// Magnitude of |omega| below which se2::exp / se2::log switch from the
+/// closed-form coefficients to their Taylor limits. The closed forms
+/// sin(omega)/omega, 2 sin^2(omega/2)/omega and (omega/2) cot(omega/2) stay
+/// accurate to machine precision for every omega != 0, so this guard exists
+/// only to avoid the literal 0/0 at omega == 0. Recorded from a small-omega
+/// sweep against a long-double oracle: the closed and Taylor limbs agree to
+/// machine eps at these magnitudes, which sit well below sqrt(epsilon) (the
+/// short-circuit threshold used previously). Mirrors epsilon_traits.
+template <typename Scalar>
+struct se2_sinc_guard_traits
+{
+    static_assert(std::is_floating_point_v<Scalar>);
+    static constexpr Scalar value = Scalar(1e-9);
+};
+
+template <>
+struct se2_sinc_guard_traits<float>
+{
+    static constexpr float value = 1e-6f;
+};
+
+template <typename Scalar>
+inline constexpr Scalar se2_sinc_guard_v = se2_sinc_guard_traits<Scalar>::value;
+
+}
 
 namespace cartan
 {
@@ -29,8 +59,12 @@ public:
     }
 
     /// Exponential map: se(2) twist -> SE(2) transform.
-    /// Twist V = (omega, vx, vy) uses omega-first convention (D-11).
-    /// Handles omega~0 via Taylor expansion to avoid division by zero (Pitfall 6).
+    /// Twist V = (omega, vx, vy) uses omega-first convention.
+    /// The rotation is always produced by so2::exp (cos/sin), which is
+    /// well-conditioned at any omega, so no rotation is dropped for small omega.
+    /// The translation coupling uses the cancellation-free
+    /// b = 2 sin^2(omega/2) / omega instead of (1 - cos(omega)) / omega; the
+    /// only branch is the literal-0/0 guard at omega == 0.
     /// Reference: Lynch & Park, Modern Robotics, Def. 3.14, p. 88.
     [[nodiscard]] static se2 exp(const vector3<Scalar>& v)
     {
@@ -38,26 +72,27 @@ public:
         Scalar vx = v(1);
         Scalar vy = v(2);
 
-        if (std::abs(omega) < detail::sqrt_epsilon_v<Scalar>)
-        {
-            // Taylor branch: pure translation (or near-zero rotation)
-            // When omega -> 0: sin(omega)/omega -> 1, (1-cos(omega))/omega -> 0
-            // Reference: Lynch & Park, p. 88, limiting case.
-            return se2(
-                so2<Scalar, Policy>::identity(),
-                vector2<Scalar>(vx, vy));
-        }
-
-        // General case
-        // Reference: Lynch & Park, Modern Robotics, Eq. 3.77-3.78, p. 88.
+        // Rotation is always routed through SO(2); cos/sin is exact at any omega.
         auto rot = so2<Scalar, Policy>::exp(omega);
 
-        Scalar s = std::sin(omega);
-        Scalar c = std::cos(omega);
-
-        // V matrix coefficients: [[sin/omega, -(1-cos)/omega], [(1-cos)/omega, sin/omega]]
-        Scalar a = s / omega;
-        Scalar b = (Scalar(1) - c) / omega;
+        // V-matrix coefficients [[a, -b], [b, a]].
+        Scalar a;
+        Scalar b;
+        if (std::abs(omega) < detail::se2_sinc_guard_v<Scalar>)
+        {
+            // Taylor limits, used only to dodge the 0/0 at omega == 0.
+            // sin(omega)/omega -> 1 - omega^2/6; 2 sin^2(omega/2)/omega -> omega/2.
+            a = Scalar(1) - omega * omega / Scalar(6);
+            b = omega / Scalar(2);
+        }
+        else
+        {
+            // a = sin(omega)/omega does not cancel; b avoids the catastrophic
+            // cancellation of (1 - cos(omega))/omega via the half-angle identity.
+            Scalar sh = std::sin(omega / Scalar(2));
+            a = std::sin(omega) / omega;
+            b = Scalar(2) * sh * sh / omega;
+        }
 
         vector2<Scalar> trans;
         trans(0) = a * vx - b * vy;
@@ -68,7 +103,10 @@ public:
 
     /// Logarithmic map: SE(2) transform -> se(2) twist.
     /// Returns V = (omega, vx, vy) in omega-first convention.
-    /// Handles omega~0 via Taylor expansion.
+    /// omega always comes from so2::log (atan2), which is well-conditioned; the
+    /// V-inverse off-diagonal (omega/2) term is always applied. The half-angle
+    /// term (omega/2) cot(omega/2) is well-conditioned, so the only branch is
+    /// the literal-0/0 guard at omega == 0.
     /// Reference: Lynch & Park, Modern Robotics, p. 89-90.
     [[nodiscard]] vector3<Scalar> log() const
     {
@@ -76,28 +114,24 @@ public:
         vector3<Scalar> result;
         result(0) = omega;
 
-        if (std::abs(omega) < detail::sqrt_epsilon_v<Scalar>)
-        {
-            // Taylor branch: V^{-1} -> I when omega -> 0
-            // Reference: Lynch & Park, p. 89, limiting case.
-            result(1) = m_translation(0);
-            result(2) = m_translation(1);
-            return result;
-        }
-
-        // General case: compute V^{-1} * translation
-        // V = [[sin/omega, -(1-cos)/omega], [(1-cos)/omega, sin/omega]]
-        // V^{-1} = (1/det) * [[sin/omega, (1-cos)/omega], [-(1-cos)/omega, sin/omega]]
-        // where det = sin^2/omega^2 + (1-cos)^2/omega^2 = 1/omega^2 * (sin^2 + (1-cos)^2)
-        //           = 1/omega^2 * 2*(1-cos) = 2*(1-cos)/omega^2
-        // Simplification: V^{-1} = (1/2) * [[omega*sin/(1-cos), omega], [-omega, omega*sin/(1-cos)]]
-        // Using half-angle: omega*sin/(2*(1-cos)) = omega/(2*tan(omega/2)) = omega/2 * cot(omega/2)
+        // V^{-1} = [[half_cot, half_omega], [-half_omega, half_cot]], with
+        // half_cot = (omega/2) cot(omega/2). The off-diagonal half_omega term is
+        // always applied -- it is not dropped for small omega.
+        // Derivation: V = [[sin/omega, -(1-cos)/omega], [(1-cos)/omega, sin/omega]];
+        // det V = 2*(1-cos)/omega^2, and omega*sin/(2*(1-cos)) = (omega/2) cot(omega/2).
         // Reference: Lynch & Park, p. 89-90 (adapted for 2D).
         Scalar half_omega = omega / Scalar(2);
-        Scalar half_cot = half_omega / std::tan(half_omega);
+        Scalar half_cot;
+        if (std::abs(omega) < detail::se2_sinc_guard_v<Scalar>)
+        {
+            // Taylor limit of (omega/2) cot(omega/2), used only to dodge 0/0.
+            half_cot = Scalar(1) - omega * omega / Scalar(12);
+        }
+        else
+        {
+            half_cot = half_omega / std::tan(half_omega);
+        }
 
-        // V^{-1} = [[half_cot, half_omega], [-half_omega, half_cot]]
-        // But we multiply by (1): V^{-1} * t
         result(1) = half_cot * m_translation(0) + half_omega * m_translation(1);
         result(2) = -half_omega * m_translation(0) + half_cot * m_translation(1);
 

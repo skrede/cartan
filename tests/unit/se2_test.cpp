@@ -1,10 +1,12 @@
 #include <cartan/lie/se2.h>
+#include <cartan/detail/epsilon.h>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_template_test_macros.hpp>
 
 #include <cmath>
+#include <limits>
 #include <numbers>
 
 using Catch::Approx;
@@ -266,4 +268,138 @@ TEST_CASE("se2: mixed-policy compose returns strict result", "[se2][policy]")
     // Just verify it's a valid transform
     auto matrix_product = (strict_T.matrix() * fast_T.matrix()).eval();
     REQUIRE((result.matrix() - matrix_product).norm() == Approx(0.0).margin(1e-13));
+}
+
+// ============================================================================
+// Small-omega rotation preservation
+//
+// exp/log must route rotation through SO(2) at every omega. so2::exp (cos/sin)
+// and so2::log (atan2) are well-conditioned everywhere, so no special-case is
+// justified. The historical short-circuit at |omega| < sqrt(epsilon) returned
+// identity rotation, silently discarding up to 0.0198 deg in float, and its log
+// mirror dropped the V-inverse (omega/2) off-diagonal term. These cases pin the
+// rotation-preserving contract.
+// ============================================================================
+
+TEMPLATE_TEST_CASE("se2: small-omega exp/log round-trip preserves rotation",
+                   "[se2][sinc]", double, float)
+{
+    using S = TestType;
+
+    // Fixed translation part of the twist.
+    const S vx = S(1.5);
+    const S vy = S(-0.7);
+
+    // Omega grid straddling the historical sqrt(epsilon) short-circuit
+    // (float ~3.45e-4, double ~1.49e-8): the small end used to collapse to
+    // identity rotation and lose omega entirely.
+    for (S omega : {S(1e-6), S(1e-5), S(1e-4), S(3e-4)})
+    {
+        cartan::vector3<S> v;
+        v << omega, vx, vy;
+
+        auto T = cartan::se2<S>::exp(v);
+        auto recovered = T.log();
+
+        // Rotation must be recovered, not dropped to zero. On the pre-fix code
+        // recovered(0) is 0 for omega below the short-circuit -> 100% rel error.
+        REQUIRE(std::abs(recovered(0) - omega) <= S(1e-5) * omega);
+
+        // Translation part round-trips too.
+        REQUIRE(std::abs(recovered(1) - vx) <= S(1e-4) * (S(1) + std::abs(vx)));
+        REQUIRE(std::abs(recovered(2) - vy) <= S(1e-4) * (S(1) + std::abs(vy)));
+    }
+}
+
+TEST_CASE("se2: float rotation just below sqrt(epsilon) is not collapsed",
+          "[se2][sinc][float]")
+{
+    using S = float;
+
+    // omega ~ 0.0172 deg, just below sqrt(epsilon(float)) ~ 3.45e-4 where the
+    // historical branch fired and returned identity rotation.
+    const S omega = S(3e-4);
+    REQUIRE(omega < cartan::detail::sqrt_epsilon_v<S>);
+
+    cartan::vector3<S> v;
+    v << omega, S(1.0), S(2.0);
+
+    auto T = cartan::se2<S>::exp(v);
+
+    // The embedded rotation must carry omega, not identity. sin_angle ~ omega.
+    REQUIRE(T.rotation().sin_angle() == Approx(std::sin(omega)).margin(S(1e-7)));
+    REQUIRE(T.rotation().log() == Approx(omega).epsilon(S(1e-4)));
+
+    // Explicitly reject the pre-fix collapse-to-identity behavior.
+    REQUIRE(std::abs(T.rotation().sin_angle()) > S(1e-6));
+}
+
+// ============================================================================
+// Coefficient stability sweep + recorded guard
+//
+// Oracle is a long-double evaluation of the closed forms using the RAW
+// long-double epsilon (std::numeric_limits<long double>::epsilon()), NOT the
+// sqrt_epsilon trait -- the trait's long-double branch is unreliable. The
+// cancellation-free b = 2 sin^2(omega/2)/omega matches the oracle to machine
+// eps across the whole small-omega grid, whereas the naive (1-cos(omega))/omega
+// blows up (~13% relative error near omega=1.6e-8 in double). The guard trait
+// se2_sinc_guard_v marks the switch to the Taylor limbs; it exists only to
+// dodge the literal 0/0 at omega==0 and sits far below sqrt(epsilon), because
+// the closed forms stay exact for every omega != 0.
+// ============================================================================
+
+TEMPLATE_TEST_CASE("se2: small-omega coefficient stability and recorded guard",
+                   "[se2][sinc]", double, float)
+{
+    using S = TestType;
+
+    const S s_eps = std::numeric_limits<S>::epsilon();
+
+    // Stable closed b matches the long-double oracle to a few eps across the
+    // grid; the recorded guard sits below sqrt(epsilon) yet both the closed and
+    // Taylor limbs agree to eps there (validated pointwise below).
+    REQUIRE(cartan::detail::se2_sinc_guard_v<S> < cartan::detail::sqrt_epsilon_v<S>);
+
+    for (int e = -8; e <= -2; ++e)
+    {
+        S w = S(std::pow(10.0, double(e)));
+
+        // Oracle: long double, raw long-double epsilon (not the trait).
+        long double lw = static_cast<long double>(w);
+        long double b_oracle = 2.0L * std::sin(lw / 2.0L) * std::sin(lw / 2.0L) / lw;
+
+        // Stable closed form in Scalar precision.
+        S sh = std::sin(w / S(2));
+        S b_closed = S(2) * sh * sh / w;
+
+        long double b_re =
+            std::abs((static_cast<long double>(b_closed) - b_oracle) / b_oracle);
+        REQUIRE(b_re <= 8.0L * static_cast<long double>(s_eps));
+
+        // Naive (1-cos)/omega loses accuracy near zero -- documents the defect
+        // the stable form fixes (blow-up cited above). Not used in production.
+        S b_naive = (S(1) - std::cos(w)) / w;
+        (void)b_naive;
+    }
+
+    // At the recorded guard the Taylor limbs and the closed limbs agree to eps,
+    // so switching to Taylor below the guard introduces no discontinuity.
+    const S g = cartan::detail::se2_sinc_guard_v<S>;
+    {
+        long double lg = static_cast<long double>(g);
+        long double a_oracle = std::sin(lg) / lg;
+        long double b_oracle = 2.0L * std::sin(lg / 2.0L) * std::sin(lg / 2.0L) / lg;
+        long double hc_oracle = (lg / 2.0L) / std::tan(lg / 2.0L);
+
+        S a_taylor = S(1) - g * g / S(6);
+        S b_taylor = g / S(2);
+        S hc_taylor = S(1) - g * g / S(12);
+
+        REQUIRE(std::abs((static_cast<long double>(a_taylor) - a_oracle) / a_oracle)
+                <= 4.0L * static_cast<long double>(s_eps));
+        REQUIRE(std::abs((static_cast<long double>(b_taylor) - b_oracle) / b_oracle)
+                <= 4.0L * static_cast<long double>(s_eps));
+        REQUIRE(std::abs((static_cast<long double>(hc_taylor) - hc_oracle) / hc_oracle)
+                <= 4.0L * static_cast<long double>(s_eps));
+    }
 }
