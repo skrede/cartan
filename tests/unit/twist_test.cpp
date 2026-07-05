@@ -8,6 +8,7 @@
 #include <catch2/catch_template_test_macros.hpp>
 
 #include <cmath>
+#include <random>
 #include <numbers>
 
 using Catch::Approx;
@@ -206,6 +207,75 @@ TEST_CASE("from_screw_motion roundtrip: pure translation", "[twist]")
     auto tw_back = cartan::from_screw_motion(sm);
 
     REQUIRE((tw_back.to_vector() - tw.to_vector()).norm() < 1e-10);
+}
+
+// ============================================================================
+// to_screw_motion / to_screw_params: non-unit-norm sweep against the
+// Modern Robotics screw-parameter oracle (Lynch & Park, Def. 3.24).
+//
+// For a twist V = (omega, v) with omega_norm = ||omega|| and
+// omega_hat = omega / omega_norm, the screw parameters are:
+//     pitch    h = (omega_hat . v) / omega_norm
+//     point    q = (omega_hat x v) / omega_norm
+//     angle    theta = omega_norm
+//     distance d = h * theta
+// At omega_norm == 1 every term collapses onto the unit-twist formulas, so the
+// sweep deliberately drives ||omega|| through {0.3, 0.7, 2.0, 5.0}, where the
+// 1/omega_norm factor on the pitch (and on axis_angle's point q) is observable.
+// ============================================================================
+
+TEST_CASE("to_screw_motion / to_screw_params: non-unit-norm MR oracle sweep", "[twist][screw]")
+{
+    std::mt19937 rng(0xC0FFEEu);
+    std::uniform_real_distribution<double> dist(-1.0, 1.0);
+
+    constexpr double scalar_margin = 1e-13;
+    constexpr double vector_margin = 1e-12;
+
+    for (double omega_norm : {0.3, 0.7, 2.0, 5.0})
+    {
+        for (int sample = 0; sample < 32; ++sample)
+        {
+            cartan::vector3<double> omega_dir;
+            omega_dir << dist(rng), dist(rng), dist(rng);
+            // Guard against a near-zero direction (ill-defined omega_hat).
+            if (omega_dir.norm() < 1e-3)
+                omega_dir = cartan::vector3<double>::UnitZ();
+            omega_dir.normalize();
+
+            cartan::twist<double> tw;
+            tw.omega = omega_norm * omega_dir;
+            tw.v << dist(rng), dist(rng), dist(rng);
+
+            const cartan::vector3<double> omega_hat = tw.omega / omega_norm;
+
+            // Modern Robotics oracle (Def. 3.24).
+            const double oracle_h = omega_hat.dot(tw.v) / omega_norm;
+            const cartan::vector3<double> oracle_q =
+                omega_hat.cross(tw.v) / omega_norm;
+            const double oracle_theta = omega_norm;
+            const double oracle_d = oracle_h * oracle_theta;
+
+            // twist.h: to_screw_motion must match the oracle at non-unit norm.
+            auto sm = cartan::to_screw_motion(tw);
+            REQUIRE(sm.theta == Approx(oracle_theta).margin(scalar_margin));
+            REQUIRE(sm.axis.h == Approx(oracle_h).margin(scalar_margin));
+            REQUIRE(sm.d == Approx(oracle_d).margin(scalar_margin));
+            REQUIRE((sm.axis.q - oracle_q).norm() < vector_margin);
+            REQUIRE((sm.axis.s_hat - omega_hat).norm() < vector_margin);
+
+            // axis_angle.h: to_screw_params must agree with the same oracle.
+            auto sp = cartan::to_screw_params(tw.omega, tw.v);
+            REQUIRE(sp.h == Approx(oracle_h).margin(scalar_margin));
+            REQUIRE((sp.q - oracle_q).norm() < vector_margin);
+            REQUIRE((sp.s_hat - omega_hat).norm() < vector_margin);
+
+            // Round-trip must reproduce the original twist exactly.
+            auto tw_back = cartan::from_screw_motion(sm);
+            REQUIRE((tw_back.omega - tw.omega).norm() < vector_margin);
+            REQUIRE((tw_back.v - tw.v).norm() < vector_margin);
+        }
+    }
 }
 
 // ============================================================================

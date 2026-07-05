@@ -111,9 +111,10 @@ template <typename Scalar>
         };
     }
 
-    // Rotation (possibly with translation along axis)
+    // Rotation (possibly with translation along axis).
+    // Modern Robotics Def. 3.24: pitch h = (omega_hat . v)/|omega|.
     vector3<Scalar> omega_hat = tw.omega / omega_norm;
-    Scalar h = omega_hat.dot(tw.v);
+    Scalar h = omega_hat.dot(tw.v) / omega_norm;
     Scalar theta = omega_norm;
     Scalar d = h * theta;
 
@@ -129,15 +130,15 @@ template <typename Scalar>
     };
 }
 
-/// Reconstruct a twist from screw motion parameters.
-/// For rotation: omega = theta * s_hat, v = (s_hat x q) * theta + h * theta * s_hat.
-/// Wait -- reconstruct the original twist, not a unit twist times theta.
-/// Original twist: omega = theta * s_hat (or if we stored the twist as unit * theta).
-/// Actually, the twist stores omega and v directly. From screw_motion:
+/// Reconstruct a twist from screw motion parameters (inverse of to_screw_motion).
+/// For rotation (theta = |omega| > 0):
 ///   omega = theta * s_hat
-///   v = -s_hat.cross(q) * theta + h * theta * s_hat (for finite pitch)
-/// For pure translation (theta=0): omega = 0, v = d * s_hat.
-/// Reference: Lynch & Park, Modern Robotics, Section 3.3.2, p. 95-102.
+///   v = h * theta * s_hat - theta * (s_hat x q)
+/// The parallel term h * theta * s_hat carries the pitch (v_parallel =
+/// (s_hat . v) s_hat = h * theta * s_hat), and the perpendicular term
+/// -theta * (s_hat x q) inverts the point relation q = (s_hat x v)/|omega|.
+/// For pure translation (theta = 0): omega = 0, v = d * s_hat.
+/// Reference: Lynch & Park, Modern Robotics, Def. 3.24, p. 102.
 template <typename Scalar>
 [[nodiscard]] twist<Scalar> from_screw_motion(const screw_motion<Scalar>& sm)
 {
@@ -151,70 +152,10 @@ template <typename Scalar>
         return tw;
     }
 
-    // Rotation case: reconstruct omega and v
+    // Rotation case: omega = theta * s_hat, and v splits into the pitch-aligned
+    // parallel component and the axis-offset perpendicular component.
     tw.omega = sm.theta * sm.axis.s_hat;
-
-    // v = omega_hat x (omega_hat x q) * omega_norm + h * omega
-    // Simpler: v = -omega_hat x q * omega_norm + h * omega
-    // Actually from the forward direction:
-    //   omega_hat = omega / |omega|
-    //   h = omega_hat . v
-    //   q = omega_hat x v / |omega|
-    // So: omega_hat x v = q * |omega|
-    // And: v = omega_hat x (q * |omega|) + h * omega_hat * |omega|
-    //        = |omega| * (omega_hat x q) + h * omega
-    // Wait, cross product: omega_hat x v = |omega| * q
-    // So v = ? Let's derive directly:
-    //   v has component along omega_hat: h (pitch)
-    //   v has component perpendicular: omega_hat x (|omega| * q) = ...
-    // Actually: v = h * omega_hat * |omega| + |omega| * omega_hat x q
-    //           = |omega| * (h * omega_hat + omega_hat x q)
-    // But |omega| = theta here, and omega_hat = s_hat
-    Scalar omega_norm = sm.theta;
-    tw.v = sm.axis.h * sm.axis.s_hat * omega_norm
-         + omega_norm * sm.axis.s_hat.cross(sm.axis.q);
-
-    // Simplify: v = theta * (h * s_hat + s_hat x q)
-    // But we need to verify: omega_hat x v / |omega| = q
-    // omega_hat x v = omega_hat x [theta * (h * s_hat + s_hat x q)]
-    //               = theta * (h * s_hat x s_hat + s_hat x (s_hat x q))
-    //               = theta * (0 + (s_hat . q) s_hat - q)
-    //               = theta * ((s_hat . q) s_hat - q)
-    // Hmm, this doesn't simplify nicely. Let me use the direct formula:
-    // From the forward path:
-    //   q = omega_hat.cross(v) / omega_norm
-    //   h = omega_hat.dot(v)
-    // The vector v decomposes as:
-    //   v = h * omega_hat + omega_hat.cross(q * omega_norm)
-    //     = h * omega_hat + omega_norm * omega_hat.cross(q)
-    // But this would give us:
-    //   omega_hat.cross(v) = omega_hat.cross(omega_norm * omega_hat.cross(q))
-    //                      = omega_norm * ((omega_hat . q) omega_hat - q)  [BAC-CAB]
-    // If q is perpendicular to omega_hat (which it should be since q = omega_hat x v / |omega|),
-    // then omega_hat . q = 0, so:
-    //   omega_hat.cross(v) = -omega_norm * q
-    // Then q = omega_hat.cross(v) / omega_norm = -q ??? That's wrong.
-    //
-    // Let me re-derive. From to_screw_motion:
-    //   q = omega_hat.cross(v) / omega_norm
-    // And omega_norm = |omega| = theta (since omega = theta * s_hat for unit s_hat).
-    // Wait no: the twist stores omega directly, so |omega| could be anything.
-    //
-    // Actually in to_screw_motion, omega_norm = tw.omega.norm(), and
-    //   q = omega_hat.cross(tw.v) / omega_norm
-    // So tw.v can be reconstructed: we know h and q.
-    //   tw.v_parallel = h * omega_hat     (component along omega)
-    //   tw.v_perp = tw.v - tw.v_parallel  (perpendicular component)
-    // q = omega_hat.cross(tw.v_perp) / omega_norm  (since omega_hat.cross(tw.v_parallel) = 0)
-    //   = omega_hat.cross(tw.v_perp) / omega_norm
-    // So tw.v_perp = -omega_norm * omega_hat.cross(q)  (from BAC-CAB: a x (a x b) = (a.b)a - b for unit a)
-    // Wait: omega_hat x (omega_hat x v_perp) = (omega_hat . v_perp) omega_hat - v_perp = -v_perp
-    // And: omega_hat x (q * omega_norm) = omega_norm * omega_hat x q
-    // We need: omega_hat x v_perp = omega_norm * q
-    // So: v_perp = -omega_hat x (omega_norm * q) = -omega_norm * (omega_hat x q)
-    // (Using the identity: if a x b = c, then b = -(a x c) when a is unit and b perp to a)
-    // Therefore: tw.v = h * omega_hat - omega_norm * (omega_hat x q)
-    tw.v = sm.axis.h * sm.axis.s_hat
+    tw.v = sm.axis.h * sm.theta * sm.axis.s_hat
          - sm.theta * sm.axis.s_hat.cross(sm.axis.q);
 
     return tw;

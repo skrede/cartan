@@ -85,7 +85,8 @@ template <typename Scalar>
 }
 
 /// Extract screw parameters from twist components (omega, v).
-/// For rotation (|omega| ~= 1): s_hat = omega, q = omega x v, h = omega . v.
+/// For rotation (|omega| > 0): s_hat = omega/|omega|,
+///   pitch h = (s_hat . v)/|omega|, point q = (s_hat x v)/|omega|.
 /// For pure translation (|omega| ~= 0): s_hat = v/|v|, q = zero, h = infinity.
 /// Reference: Lynch & Park, Modern Robotics, Def. 3.24, p. 102.
 template <typename Scalar>
@@ -109,10 +110,11 @@ template <typename Scalar>
         };
     }
 
-    // Rotation (possibly with translation along axis)
+    // Rotation (possibly with translation along axis).
+    // Modern Robotics Def. 3.24: h = (s_hat . v)/|omega|, q = (s_hat x v)/|omega|.
     vector3<Scalar> omega_hat = omega / omega_norm;
-    Scalar h = omega_hat.dot(v);
-    vector3<Scalar> q = omega_hat.cross(v);
+    Scalar h = omega_hat.dot(v) / omega_norm;
+    vector3<Scalar> q = omega_hat.cross(v) / omega_norm;
 
     return screw_params<Scalar>{q, omega_hat, h};
 }
