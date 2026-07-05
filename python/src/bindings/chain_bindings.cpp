@@ -87,13 +87,34 @@ void register_chain(nb::module_& m)
         .def("contains", &JointLimitsd::contains, nb::arg("position"));
 
     nb::class_<KinematicChaind>(m, "KinematicChain", "PoE serial kinematic chain (dynamic N)")
-        .def(nb::init<const SE3d&,
-                      std::vector<ScrewAxisd>,
-                      std::vector<JointLimitsd>>(),
+        .def("__init__",
+             [](KinematicChaind* self, const SE3d& home,
+                std::vector<ScrewAxisd> axes, std::vector<JointLimitsd> limits) {
+                 // Validate the size invariant at the FFI boundary. The C++
+                 // ctor also enforces it, but checking here yields a clean
+                 // Python ValueError before construction and does not rely on
+                 // debug asserts that vanish under -DNDEBUG (Release wheels).
+                 if (axes.size() != limits.size())
+                 {
+                     throw nb::value_error(
+                         "KinematicChain: axes and limits must have the same length");
+                 }
+                 new (self) KinematicChaind{home, std::move(axes), std::move(limits)};
+             },
              nb::arg("home"), nb::arg("axes"), nb::arg("limits"))
         .def("home", &KinematicChaind::home, nb::rv_policy::reference_internal)
         .def("num_joints", &KinematicChaind::num_joints)
-        .def("axis", &KinematicChaind::axis,
+        .def("axis",
+             [](const KinematicChaind& c, int i) -> const ScrewAxisd& {
+                 // Guard the raw index before it reaches native container
+                 // access; reference_internal on an out-of-range index would
+                 // otherwise hand back a reference to out-of-bounds memory.
+                 if (i < 0 || i >= c.num_joints())
+                 {
+                     throw nb::index_error("joint index out of range");
+                 }
+                 return c.axis(i);
+             },
              nb::arg("i"), nb::rv_policy::reference_internal)
         .def("axes", &KinematicChaind::axes, nb::rv_policy::reference_internal,
              "Space-frame screw axes (list view; lifetime tied to chain).")

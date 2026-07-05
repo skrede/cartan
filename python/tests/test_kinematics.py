@@ -162,3 +162,66 @@ def test_body_jacobian_dtype_mismatch_raises(
     q32 = np.zeros(cartanbot_chain.num_joints(), dtype=np.float32)
     with pytest.raises(TypeError):
         cartan.body_jacobian(cartanbot_chain, q32)
+
+
+# ---------------------------------------------------------------------------
+# FFI memory-safety negative tests: raw integer indices and constructor
+# argument lengths cross the binding boundary into native container access.
+# An out-of-range axis index must raise a Python exception rather than read
+# out of bounds, and a size-mismatched chain must be rejected even in a
+# Release (-DNDEBUG) build where debug assertions are compiled out.
+# ---------------------------------------------------------------------------
+
+
+def _make_planar_2r() -> cartan.KinematicChain:
+    z = np.array([0.0, 0.0, 1.0])
+    s1 = cartan.ScrewAxis.revolute(z, np.array([0.0, 0.0, 0.0]))
+    s2 = cartan.ScrewAxis.revolute(z, np.array([1.0, 0.0, 0.0]))
+    home = cartan.SE3.exp(np.array([0.0, 0.0, 0.0, 2.0, 0.0, 0.0]))
+    limits = [cartan.JointLimits(-np.pi, np.pi)] * 2
+    return cartan.KinematicChain(home, [s1, s2], limits)
+
+
+def test_axis_negative_index_raises(planar_2r_chain: cartan.KinematicChain) -> None:
+    with pytest.raises(IndexError):
+        planar_2r_chain.axis(-1)
+
+
+def test_axis_oversized_index_raises(planar_2r_chain: cartan.KinematicChain) -> None:
+    n = planar_2r_chain.num_joints()
+    with pytest.raises(IndexError):
+        planar_2r_chain.axis(n)
+
+
+def test_axis_far_out_of_bounds_index_raises(
+    planar_2r_chain: cartan.KinematicChain,
+) -> None:
+    with pytest.raises(IndexError):
+        planar_2r_chain.axis(1_000_000)
+
+
+def test_axis_valid_indices_still_work(
+    planar_2r_chain: cartan.KinematicChain,
+) -> None:
+    # The bounds guard must not break the valid path (0 <= i < num_joints).
+    for i in range(planar_2r_chain.num_joints()):
+        axis = planar_2r_chain.axis(i)
+        assert axis.to_vector().shape == (6,)
+
+
+def test_kinematic_chain_mismatched_sizes_raises() -> None:
+    # Two axes but a single joint-limit entry: the size invariant must be
+    # enforced with a real runtime check that survives -DNDEBUG, not a debug
+    # assert that is elided from a shipped Release wheel.
+    z = np.array([0.0, 0.0, 1.0])
+    s1 = cartan.ScrewAxis.revolute(z, np.array([0.0, 0.0, 0.0]))
+    s2 = cartan.ScrewAxis.revolute(z, np.array([1.0, 0.0, 0.0]))
+    home = cartan.SE3.exp(np.array([0.0, 0.0, 0.0, 2.0, 0.0, 0.0]))
+    with pytest.raises((ValueError, RuntimeError)):
+        cartan.KinematicChain(home, [s1, s2], [cartan.JointLimits(-1.0, 1.0)])
+
+
+def test_kinematic_chain_matched_sizes_still_construct() -> None:
+    # The ctor validation must not reject a well-formed chain.
+    chain = _make_planar_2r()
+    assert chain.num_joints() == 2

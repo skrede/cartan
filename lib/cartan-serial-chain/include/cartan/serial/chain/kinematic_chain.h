@@ -21,8 +21,8 @@
 #include "cartan/lie/se3.h"
 
 #include <vector>
-#include <cassert>
 #include <cstddef>
+#include <stdexcept>
 #include <type_traits>
 
 namespace cartan
@@ -55,7 +55,15 @@ public:
         , m_axes(std::move(axes))
         , m_limits(std::move(limits))
     {
-        assert(m_axes.size() == m_limits.size());
+        // Real runtime invariant: the screw-axis count must match the
+        // joint-limit count. A debug-only assert would be compiled out under
+        // -DNDEBUG (Release), letting a malformed chain construct silently in
+        // a shipped build; a thrown exception fails loudly in every build.
+        if (m_axes.size() != m_limits.size())
+        {
+            throw std::invalid_argument(
+                "kinematic_chain: screw-axis count must match joint-limit count");
+        }
         if constexpr (N == dynamic)
         {
             m_kinds.resize(m_axes.size());
@@ -81,9 +89,15 @@ public:
         return static_cast<int>(m_axes.size());
     }
 
-    /// Access a single screw axis by index.
+    /// Access a single screw axis by index (bounds-checked, `.at()` semantics).
+    /// Throws std::out_of_range for negative or too-large indices so a bad
+    /// index can never read outside the underlying storage.
     [[nodiscard]] const screw_axis<Scalar>& axis(int i) const
     {
+        if (i < 0 || static_cast<std::size_t>(i) >= m_axes.size())
+        {
+            throw std::out_of_range("kinematic_chain::axis: joint index out of range");
+        }
         return m_axes[static_cast<std::size_t>(i)];
     }
 
