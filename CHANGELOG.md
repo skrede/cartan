@@ -5,26 +5,61 @@ All notable user-facing changes to this project are documented in this file.
 The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] — 0.4.0
+## [Unreleased] — 0.4.1
 
 ### Added
 - Apache License 2.0 stamped at repo root; `CONTRIBUTING.md` covering issue
-  filing, PR workflow, build/test instructions, C++23 coding conventions, commit
-  message format, and the master/develop/milestone branching model.
+  filing, PR workflow, build/test instructions, coding conventions, commit
+  message format, and the project's branching model.
 - `cartan::version()`, `cartan::version_major()`, `cartan::version_minor()`,
   `cartan::version_patch()` runtime accessors in `cartan/version.h`, plus
   `CARTAN_VERSION_{MAJOR,MINOR,PATCH,STRING}` compile-time macros generated
   from the CMake project version.
-- This `CHANGELOG.md` covering v0.1.0 through v0.4.0.
+- URDF loading module (`cartan-urdf`) — a pugixml-based URDF parser that builds
+  product-of-exponentials kinematic chains, exposed through the `<cartan/urdf.h>`
+  umbrella header. Gated behind `CARTAN_BUILD_URDF` (OFF by default).
+- Python bindings (`cartan._core`) built with nanobind and packaged via
+  scikit-build-core, exposing the `cartan` and `cartan.analytical` submodules.
+  Gated behind `CARTAN_BUILD_PYTHON`.
+- Embedded packaging manifests — an `idf_component.yml` (ESP-IDF Component
+  Manager) and a `library.properties` (Arduino) at the repository root, plus a
+  compile-only ESP32 smoke scaffold that checks the public headers build under
+  the Espressif xtensa and riscv32 toolchains.
+- Install/export layer — `find_package(cartan CONFIG REQUIRED)` now works: a
+  full export set (`cartan::cartan` alongside the per-module targets), installed
+  public headers, and generated `cartanConfig.cmake` / `cartanConfigVersion.cmake`
+  files that re-discover Eigen3 (and pugixml for URDF-inclusive installs) through
+  `find_dependency`. The interface targets declare a `cxx_std_20` compile feature,
+  so a consumer building against an older standard receives a clear requirement
+  error instead of a wall of header diagnostics.
+- This `CHANGELOG.md` covering the 0.1.0 through 0.4.1 history.
 
 ### Changed
 - README license badge and footer corrected from MIT to Apache 2.0 (the
   `LICENSE` file at repo root has always carried Apache 2.0 text; the badge
   and footer were the inconsistency).
-- CMake `project(cartan VERSION ...)` bumped from `0.1.0` to `0.4.0` with
-  explicit `LANGUAGES CXX`. `cartan-lie` now installs the generated
-  `cartan/version.h` header so `find_package(cartan)` consumers can include it
-  alongside the rest of the public API.
+- CMake `project(cartan VERSION ...)` is now the single source of the library
+  version at `0.4.1`, with explicit `LANGUAGES CXX`. `cartan-lie` installs the
+  generated `cartan/version.h` header so `find_package(cartan)` consumers can
+  include it alongside the rest of the public API.
+
+### Fixed
+- Prismatic joint axis sign was dropped in the fast-path forward-kinematics and
+  Jacobian specializations, so forward kinematics was off by `2q` for
+  negative-axis prismatic joints; several latent dynamic-chain FK/Jacobian
+  defects on the same path were closed alongside it.
+- The thin-SVD null-space projection was wrong for dynamic redundant chains, and
+  the low-discrepancy restart-seed generator read out of bounds above ten joints.
+- The URDF loader is hardened against kinematic cycles and malformed or untrusted
+  input instead of walking them unbounded.
+- Screw-pitch parameterization was corrected for non-unit twists, matching the
+  standard product-of-exponentials pitch convention.
+- Analytical 6R solution output hygiene (angle wrapping, duplicate removal, and
+  anti-parallel outer-wrist sign selection), plus construction-time geometry
+  validation and an explicit shoulder-singularity error channel for the
+  closed-form solvers.
+- Kinematic-chain axis access is now bounds-checked and chain sizes are validated
+  at runtime, turning previously out-of-range access into a reported error.
 
 ## [0.3.0] — 2026-05-13
 
@@ -225,13 +260,3 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   backend, seven presets.
 - CI pipeline with GCC-14 / Clang-18 matrix, ASan + UBSan + MSan sanitizer
   jobs, clang-tidy adapted for spatialpp headers.
-
-[Unreleased]: https://github.com/skrede/cartan/compare/v0.3.0...HEAD
-[0.3.0]: https://github.com/skrede/cartan/compare/v0.2.2...v0.3.0
-[0.2.2]: https://github.com/skrede/cartan/compare/v0.2.1...v0.2.2
-[0.2.1]: https://github.com/skrede/cartan/compare/v0.2.0...v0.2.1
-[0.2.0]: https://github.com/skrede/cartan/compare/v0.1.3...v0.2.0
-[0.1.3]: https://github.com/skrede/cartan/compare/v0.1.2...v0.1.3
-[0.1.2]: https://github.com/skrede/cartan/compare/v0.1.1...v0.1.2
-[0.1.1]: https://github.com/skrede/cartan/compare/v0.1.0...v0.1.1
-[0.1.0]: https://github.com/skrede/cartan/releases/tag/v0.1.0

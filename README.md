@@ -143,7 +143,7 @@ include(FetchContent)
 FetchContent_Declare(
     cartan
     GIT_REPOSITORY https://github.com/skrede/cartan.git
-    GIT_TAG        main
+    GIT_TAG        master
 )
 FetchContent_MakeAvailable(cartan)
 
@@ -169,7 +169,7 @@ Registry, or pin a Git revision directly:
 dependencies:
   skrede/cartan:
     git: https://github.com/skrede/cartan.git
-    version: "main"
+    version: "master"
 ```
 
 A compile-only smoke test under `tests/embedded/esp32-smoke/` verifies the

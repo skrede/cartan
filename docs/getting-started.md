@@ -15,7 +15,7 @@ include(FetchContent)
 FetchContent_Declare(
     cartan
     GIT_REPOSITORY https://github.com/skrede/cartan.git
-    GIT_TAG        main
+    GIT_TAG        master
 )
 FetchContent_MakeAvailable(cartan)
 
@@ -66,7 +66,7 @@ include(FetchContent)
 FetchContent_Declare(
     cartan
     GIT_REPOSITORY https://github.com/skrede/cartan.git
-    GIT_TAG        main
+    GIT_TAG        master
 )
 FetchContent_MakeAvailable(cartan)
 
