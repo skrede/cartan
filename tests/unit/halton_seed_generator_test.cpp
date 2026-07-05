@@ -1,3 +1,5 @@
+#include "../fixtures/redundant_chains.h"
+
 #include <cartan/serial/ik/solver/detail/halton_seed_generator.h>
 
 #include <cartan/lie/se3.h>
@@ -113,6 +115,32 @@ TEST_CASE("halton_seed_generator seeds have low discrepancy", "[halton][generato
         {
             double dist = (seeds[i] - seeds[j]).norm();
             CHECK(dist > 0.01);
+        }
+    }
+}
+
+TEST_CASE("halton_seed_generator handles more than ten joints", "[halton][generator][highdof]")
+{
+    // The prime base table historically held exactly ten entries, so a chain
+    // with more than ten joints read past the end of the table. Driving a
+    // 12-DOF chain across several restart indices triggers that access; under
+    // ASan / _GLIBCXX_ASSERTIONS the pre-fix out-of-bounds read aborts here,
+    // and after the fix every seed lands within its joint limits.
+    auto chain = spp::fixtures::make_highdof_12r_chain_dynamic<double>();
+    const int n = chain.num_joints();
+    REQUIRE(n == 12);
+
+    spp::halton_seed_generator<spp::kinematic_chain<double, spp::dynamic>> gen(chain);
+
+    for (int i = 0; i < 32; ++i)
+    {
+        auto seed = gen(i);
+        REQUIRE(static_cast<int>(seed.size()) == n);
+        for (int j = 0; j < n; ++j)
+        {
+            auto lim = chain.limits()[static_cast<std::size_t>(j)];
+            CHECK(seed[j] >= lim.position_min);
+            CHECK(seed[j] <= lim.position_max);
         }
     }
 }

@@ -1,14 +1,19 @@
+#include "../fixtures/redundant_chains.h"
+
 #include <cartan/serial/ik/solver/projected_lm.h>
 
 #include <cartan/types.h>
 
 #include <cartan/lie/se3.h>
 #include <cartan/lie/so3.h>
+#include <cartan/serial/fk/jacobian.h>
 #include <cartan/serial/chain/screw_axis.h>
 #include <cartan/serial/chain/joint_state.h>
 #include <cartan/serial/chain/joint_limits.h>
 #include <cartan/serial/chain/kinematic_chain.h>
 #include <cartan/serial/fk/forward_kinematics.h>
+#include <cartan/serial/ik/policy/limits_policy.h>
+#include <cartan/serial/ik/detail/limit_enforcement.h>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -80,6 +85,43 @@ spp::ik_status run_stepper(
         status = stepper.step(chain, 1).status;
     }
     return status;
+}
+
+// ============================================================================
+// Null-space limit enforcement stays in the Jacobian kernel (redundant chain)
+// ============================================================================
+
+TEST_CASE("null-space limit step stays in the Jacobian kernel", "[ik][limits][nullspace][redundant]")
+{
+    // A 7-DOF chain has a 6x7 body Jacobian with a one-dimensional null space.
+    // The null-space limit-enforcement step must move the joints only along
+    // that kernel, so the induced first-order end-effector velocity J_b * dq
+    // is at machine-noise level. A thin-V SVD hands back a row-space direction
+    // instead, giving a per-unit residual ||J_b . v_hat|| ~ O(0.1).
+    auto chain = spp::fixtures::make_redundant_7r_chain_dynamic<double>();
+    const int n = chain.num_joints();
+    REQUIRE(n == 7);
+
+    // A configuration well inside the joint limits so the trailing safety
+    // clamp in enforce_limits is a no-op and dq is purely the null-space step.
+    Eigen::VectorXd q(n);
+    q << 0.35, -0.55, 0.42, 0.90, -0.30, 0.65, -0.50;
+
+    auto fk = spp::forward_kinematics(chain, q);
+    auto J_b = spp::body_jacobian(chain, fk);
+
+    Eigen::VectorXd q_before = q;
+    spp::detail::enforce_limits<spp::null_space_limits>(q, chain);
+    Eigen::VectorXd dq = q - q_before;
+
+    // The off-center configuration yields a non-zero midpoint gradient, so the
+    // projected step must be a real motion for the residual test to have teeth.
+    REQUIRE(dq.norm() > 1e-6);
+
+    // The step must lie in the Jacobian kernel: the per-unit task velocity is
+    // the residual we gate on.
+    const double residual = (J_b * dq).norm() / dq.norm();
+    REQUIRE(residual < 1e-10);
 }
 
 // ============================================================================

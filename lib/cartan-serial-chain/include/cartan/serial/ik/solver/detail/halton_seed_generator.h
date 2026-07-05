@@ -79,8 +79,22 @@ class halton_seed_generator
 public:
     using position_type = typename joint_state<Scalar, N>::position_type;
 
-    /// First 10 primes for Halton bases (supports up to 10 joints).
-    static constexpr std::array<int, 10> bases = {2, 3, 5, 7, 11, 13, 17, 19, 23, 29};
+    /// Prime bases for the per-joint Halton sequences.
+    ///
+    /// The table holds the first 32 primes. Thirty-two comfortably exceeds the
+    /// joint count of any physical serial manipulator (industrial arms are at
+    /// most seven or eight DOF, and even hyper-redundant research arms rarely
+    /// pass twenty), so every realistic chain gets a distinct prime base. The
+    /// per-joint lookup wraps modulo the table size, which guarantees an
+    /// in-bounds access for any joint count: a chain longer than the table
+    /// simply reuses bases. That reuse correlates the affected seed
+    /// dimensions, but raw Halton already decorrelates poorly beyond roughly
+    /// ten dimensions, and these are multi-start IK seeds rather than a
+    /// precision quasi-random sample, so bounded reuse is preferable to either
+    /// an out-of-bounds read or an unbounded table.
+    static constexpr std::array<int, 32> bases = {
+        2,  3,  5,  7,  11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53,
+        59, 61, 67, 71, 73, 79, 83, 89, 97, 101, 103, 107, 109, 113, 127, 131};
 
     /// Drop first 20 entries to reduce initial correlation between dimensions.
     static constexpr int skip_count = 20;
@@ -105,7 +119,10 @@ public:
 
         for (int j = 0; j < n; ++j)
         {
-            Scalar h = halton_element<Scalar>(halton_index, bases[static_cast<std::size_t>(j)]);
+            // Wrap the base index modulo the table size so any joint count is
+            // in-bounds; see the `bases` documentation for the reuse tradeoff.
+            const std::size_t base_index = static_cast<std::size_t>(j) % bases.size();
+            Scalar h = halton_element<Scalar>(halton_index, bases[base_index]);
             auto lim = m_chain->limits()[static_cast<std::size_t>(j)];
             // Scale [0,1] -> [q_min, q_max] for finite-range joints; for an
             // unbounded angular joint, fall back to one principal revolution

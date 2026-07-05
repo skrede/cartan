@@ -46,8 +46,15 @@ void enforce_limits(
         auto fk = forward_kinematics(chain, q);
         auto J_b = body_jacobian(chain, fk);
 
+        // V must be full: matrixV() is then n x n and V.rightCols(n - rank)
+        // spans the true Jacobian kernel. A thin V is only n x min(m, n), so
+        // for a wide (redundant) Jacobian it omits the kernel columns and hands
+        // back row-space directions instead, corrupting the null-space step.
+        // U may stay thin for a dynamic matrix (thin U is illegal for a
+        // fixed-size one, hence the branch), and its 6 rows make thin and full
+        // U identical in size regardless.
         constexpr unsigned int svd_options = (N == dynamic)
-            ? (Eigen::ComputeThinU | Eigen::ComputeThinV)
+            ? (Eigen::ComputeThinU | Eigen::ComputeFullV)
             : (Eigen::ComputeFullU | Eigen::ComputeFullV);
         Eigen::JacobiSVD<jacobian_matrix<Scalar, N>> svd(J_b, svd_options);
 
