@@ -40,7 +40,7 @@ struct analytical_result
 {
     using position_type = Eigen::Vector<Scalar, N>;
 
-    std::array<position_type, MaxSolutions> solutions;
+    std::array<position_type, static_cast<std::size_t>(MaxSolutions)> solutions;
     int count{0};
 
     [[nodiscard]] auto begin() const { return solutions.begin(); }

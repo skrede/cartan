@@ -102,7 +102,7 @@ public:
         argmin::solver_options<> nab_opts;
         // Per-attempt cap; argmin's setup-time cap is generous because the
         // per-call budget is now threaded through step_n(N) from the runner.
-        nab_opts.max_iterations = m_criteria.max_iterations_per_attempt;
+        nab_opts.max_iterations = static_cast<std::uint32_t>(m_criteria.max_iterations_per_attempt);
         nab_opts.set_gradient_threshold(1e-14);
         nab_opts.set_objective_threshold(1e-16);
         nab_opts.set_step_threshold(1e-16);
