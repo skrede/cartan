@@ -374,7 +374,7 @@ private:
     convergence_criteria<scalar_type> m_criteria{};
     error_weight<scalar_type> m_weight{};
     options m_options{};
-    std::vector<scalar_type> m_error_history;
+    cartan::detail::error_ring<scalar_type> m_error_history;
     std::vector<position_type> m_s_history;
     std::vector<position_type> m_y_history;
     std::vector<scalar_type> m_rho_history;

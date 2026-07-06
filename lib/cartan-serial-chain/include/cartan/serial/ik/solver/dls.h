@@ -200,7 +200,7 @@ private:
     position_type m_q{};
     convergence_criteria<scalar_type> m_criteria{};
     options m_options{};
-    std::vector<scalar_type> m_error_history;
+    cartan::detail::error_ring<scalar_type> m_error_history;
     scalar_type m_manipulability_value{};
     scalar_type m_condition_number{};
     scalar_type m_initial_error{};

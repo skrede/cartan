@@ -364,7 +364,7 @@ private:
     convergence_criteria<scalar_type> m_criteria{};
     options m_options{};
     position_type m_q{};
-    std::vector<scalar_type> m_error_history;
+    cartan::detail::error_ring<scalar_type> m_error_history;
     scalar_type m_initial_error{};
     scalar_type m_error_norm{std::numeric_limits<scalar_type>::max()};
     int m_iterations{};

@@ -503,7 +503,7 @@ private:
     error_weight<scalar_type> m_weight{};
     options m_options{};
     std::optional<halton_seed_generator<Chain>> m_seed_gen{};
-    std::vector<scalar_type> m_error_history;
+    cartan::detail::error_ring<scalar_type> m_error_history;
     scalar_type m_initial_error{};
     scalar_type m_error_norm{};
     scalar_type m_lambda{};

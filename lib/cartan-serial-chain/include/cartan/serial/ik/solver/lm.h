@@ -240,7 +240,7 @@ private:
     vector6<scalar_type> m_V_b{vector6<scalar_type>::Zero()};
     convergence_criteria<scalar_type> m_criteria{};
     options m_options{};
-    std::vector<scalar_type> m_error_history;
+    cartan::detail::error_ring<scalar_type> m_error_history;
     scalar_type m_initial_error{};
     scalar_type m_error_norm{};
     scalar_type m_lambda{};
