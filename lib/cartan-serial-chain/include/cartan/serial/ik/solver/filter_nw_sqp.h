@@ -94,6 +94,9 @@ public:
         m_termination_reason = ik_termination_reason::unknown;
         m_error_history.clear();
         m_restart_count = 0;
+        m_best_q_error = std::numeric_limits<scalar_type>::max();
+        m_best_feasible = false;
+        m_best_valid = false;
         if (m_options.rng_seed)
             m_rng.seed(*m_options.rng_seed);
 
@@ -136,6 +139,7 @@ public:
             auto fk = forward_kinematics(chain, m_q);
             auto V_b = (m_target.inverse() * fk.end_effector).log();
             m_error_norm = V_b.norm();
+            update_best(chain);
 
             if (cartan::detail::is_converged_unweighted(V_b, m_criteria))
             {
@@ -199,8 +203,10 @@ public:
     }
 
     [[nodiscard]] bool converged() const { return m_status == ik_status::converged; }
-    [[nodiscard]] const position_type& solution() const { return m_q; }
-    [[nodiscard]] scalar_type error_norm() const { return m_error_norm; }
+    // Report the feasibility-first best-so-far iterate across restarts, not the
+    // last perturbed attempt, so a terminal solve still surfaces its best result.
+    [[nodiscard]] const position_type& solution() const { return m_best_valid ? m_best_q : m_q; }
+    [[nodiscard]] scalar_type error_norm() const { return m_best_valid ? m_best_q_error : m_error_norm; }
     [[nodiscard]] int iterations() const { return m_iterations; }
     [[nodiscard]] ik_status status() const { return m_status; }
     [[nodiscard]] ik_termination_reason termination_reason() const { return m_termination_reason; }
@@ -325,12 +331,35 @@ private:
             m_q[i] = static_cast<scalar_type>(x[i]);
     }
 
+    // Retain the feasibility-first best-so-far iterate: a feasible iterate always
+    // beats an infeasible one, and among equally-feasible iterates the lower pose
+    // error wins. Consulted every synced iteration so the best survives restarts.
+    void update_best(const Chain& chain)
+    {
+        bool feasible = cartan::detail::within_limits(
+            m_q, chain, cartan::detail::default_feasibility_tol<scalar_type>());
+        bool better = !m_best_valid
+            || (feasible && !m_best_feasible)
+            || (feasible == m_best_feasible && m_error_norm < m_best_q_error);
+        if (better)
+        {
+            m_best_q = m_q;
+            m_best_q_error = m_error_norm;
+            m_best_feasible = feasible;
+            m_best_valid = true;
+        }
+    }
+
     const Chain* m_chain{nullptr};
     se3<scalar_type> m_target{se3<scalar_type>::identity()};
     convergence_criteria<scalar_type> m_criteria{};
     error_weight<scalar_type> m_weight{};
     options m_options{};
     position_type m_q{};
+    position_type m_best_q{};
+    scalar_type m_best_q_error{std::numeric_limits<scalar_type>::max()};
+    bool m_best_feasible{false};
+    bool m_best_valid{false};
     cartan::detail::error_ring<scalar_type> m_error_history;
     scalar_type m_initial_error{};
     scalar_type m_error_norm{std::numeric_limits<scalar_type>::max()};

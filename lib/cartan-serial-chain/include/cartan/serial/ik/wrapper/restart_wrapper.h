@@ -15,6 +15,7 @@
 #include "cartan/serial/ik/ik_status.h"
 #include "cartan/serial/ik/policy/error_weight.h"
 #include "cartan/serial/ik/concepts/solve_concept.h"
+#include "cartan/serial/ik/detail/limit_enforcement.h"
 #include "cartan/serial/ik/solver/detail/halton_seed_generator.h"
 #include "cartan/serial/ik/solver/projected_lm.h"
 
@@ -111,6 +112,9 @@ public:
         m_total_iterations = 0;
         m_best_lambda = scalar_type(0);
         m_best_error = std::numeric_limits<scalar_type>::max();
+        m_best_q_error = std::numeric_limits<scalar_type>::max();
+        m_best_feasible = false;
+        m_best_valid = false;
         m_aborted = false;
 
         m_inner.setup(chain, target, q0, criteria);
@@ -132,6 +136,9 @@ public:
         m_total_iterations = 0;
         m_best_lambda = scalar_type(0);
         m_best_error = std::numeric_limits<scalar_type>::max();
+        m_best_q_error = std::numeric_limits<scalar_type>::max();
+        m_best_feasible = false;
+        m_best_valid = false;
         m_aborted = false;
 
         if constexpr (requires { m_inner.setup(chain, target, q0, criteria, weight); })
@@ -195,8 +202,25 @@ public:
     }
 
     [[nodiscard]] bool converged() const { return m_inner.converged(); }
-    [[nodiscard]] position_type solution() const { return m_inner.solution(); }
-    [[nodiscard]] scalar_type error_norm() const { return m_inner.error_norm(); }
+    // On a converged solve the live inner iterate is the answer; on a terminal
+    // solve report the feasibility-first best-so-far captured across restarts
+    // rather than the last (discarded) attempt.
+    [[nodiscard]] position_type solution() const
+    {
+        if (m_inner.converged() || !m_best_valid)
+        {
+            return m_inner.solution();
+        }
+        return m_best_q;
+    }
+    [[nodiscard]] scalar_type error_norm() const
+    {
+        if (m_inner.converged() || !m_best_valid)
+        {
+            return m_inner.error_norm();
+        }
+        return m_best_q_error;
+    }
     [[nodiscard]] int iterations() const { return m_total_iterations; }
 
     void abort()
@@ -216,6 +240,28 @@ private:
             {
                 m_best_lambda = m_inner.lambda();
             }
+        }
+        update_best_q(current_error);
+    }
+
+    // Feasibility-first best-so-far retention, independent of the warm-start
+    // lambda bookkeeping above: a feasible attempt always beats an infeasible
+    // one, and among equally-feasible attempts the lower pose error wins.
+    void update_best_q(scalar_type current_error)
+    {
+        bool feasible = m_chain != nullptr
+            && cartan::detail::within_limits(
+                m_inner.solution(), *m_chain,
+                cartan::detail::default_feasibility_tol<scalar_type>());
+        bool better = !m_best_valid
+            || (feasible && !m_best_feasible)
+            || (feasible == m_best_feasible && current_error < m_best_q_error);
+        if (better)
+        {
+            m_best_q = m_inner.solution();
+            m_best_q_error = current_error;
+            m_best_feasible = feasible;
+            m_best_valid = true;
         }
     }
 
@@ -241,6 +287,10 @@ private:
     int m_total_iterations{};
     scalar_type m_best_lambda{};
     scalar_type m_best_error{std::numeric_limits<scalar_type>::max()};
+    position_type m_best_q{};
+    scalar_type m_best_q_error{std::numeric_limits<scalar_type>::max()};
+    bool m_best_feasible{false};
+    bool m_best_valid{false};
     bool m_aborted{false};
 };
 

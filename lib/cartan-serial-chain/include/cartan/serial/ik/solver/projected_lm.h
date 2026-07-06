@@ -160,6 +160,8 @@ public:
         m_restart_count = 0;
         m_total_iterations = 0;
         m_best_error = std::numeric_limits<scalar_type>::max();
+        m_best_feasible = false;
+        m_best_valid = false;
         m_aborted = false;
 
         initialize_attempt(chain, target, q0, criteria, weight);
@@ -181,6 +183,7 @@ public:
             if (inner_status == ik_status::converged)
             {
                 m_status = ik_status::converged;
+                update_best(chain);
                 break;
             }
             if (inner_status == ik_status::running)
@@ -188,10 +191,9 @@ public:
                 continue;
             }
 
-            if (m_error_norm < m_best_error)
-            {
-                m_best_error = m_error_norm;
-            }
+            // Terminal attempt: fold its final iterate into the feasibility-first
+            // best-so-far before discarding it for a fresh seed.
+            update_best(chain);
 
             if (m_restart_count >= m_options.max_restarts)
             {
@@ -210,8 +212,10 @@ public:
     }
 
     [[nodiscard]] bool converged() const { return m_status == ik_status::converged; }
-    [[nodiscard]] const position_type& solution() const { return m_q; }
-    [[nodiscard]] scalar_type error_norm() const { return m_error_norm; }
+    // Report the feasibility-first best-so-far iterate, not the last attempt's
+    // final configuration, so a terminal solve still surfaces its best result.
+    [[nodiscard]] const position_type& solution() const { return m_best_valid ? m_best_q : m_q; }
+    [[nodiscard]] scalar_type error_norm() const { return m_best_valid ? m_best_error : m_error_norm; }
     [[nodiscard]] int iterations() const { return m_total_iterations; }
     void abort() { m_aborted = true; }
     [[nodiscard]] scalar_type lambda() const { return m_lambda; }
@@ -219,6 +223,25 @@ public:
     [[nodiscard]] ik_status status() const { return m_status; }
 
 private:
+    // Retain the best-so-far iterate lexicographically: a feasible iterate always
+    // beats an infeasible one, and among equally-feasible iterates the lower pose
+    // error wins. Uses the shared feasibility predicate.
+    void update_best(const Chain& chain)
+    {
+        bool feasible = cartan::detail::within_limits(
+            m_q, chain, cartan::detail::default_feasibility_tol<scalar_type>());
+        bool better = !m_best_valid
+            || (feasible && !m_best_feasible)
+            || (feasible == m_best_feasible && m_error_norm < m_best_error);
+        if (better)
+        {
+            m_best_q = m_q;
+            m_best_error = m_error_norm;
+            m_best_feasible = feasible;
+            m_best_valid = true;
+        }
+    }
+
     void initialize_attempt(
         const Chain& chain,
         const se3<scalar_type>& target,
@@ -572,6 +595,7 @@ private:
 
     se3<scalar_type> m_target{se3<scalar_type>::identity()};
     position_type m_q{};
+    position_type m_best_q{};
     position_type m_q_min{};
     position_type m_q_max{};
     vector6<scalar_type> m_V_b{vector6<scalar_type>::Zero()};
@@ -590,6 +614,8 @@ private:
     int m_total_iterations{};
     int m_restart_count{};
     ik_status m_status{ik_status::running};
+    bool m_best_feasible{false};
+    bool m_best_valid{false};
     bool m_aborted{false};
 };
 

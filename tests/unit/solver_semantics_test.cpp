@@ -9,9 +9,14 @@
 #include <cartan/serial/ik/solver/lbfgsb.h>
 #include <cartan/serial/ik/solver/projected_lm.h>
 #include <cartan/serial/ik/solver/newton_raphson.h>
+#include <cartan/serial/ik/wrapper/restart_wrapper.h>
 #ifdef CARTAN_BUILD_ARGMIN
 #include <cartan/serial/ik/solver/argmin_lm.h>
+#include <cartan/serial/ik/solver/argmin_slsqp.h>
 #endif
+
+#include <limits>
+#include <algorithm>
 
 #include <cartan/types.h>
 #include <cartan/lie/se3.h>
@@ -214,3 +219,69 @@ TEST_CASE("projected_lm convergence is unaffected by error_weight", "[ik][semant
 {
     assert_weight_does_not_block_convergence<spp::projected_lm<spp::kinematic_chain<double, 2>>>();
 }
+
+// ============================================================================
+// D-07: restarting solvers retain the feasibility-first best-so-far iterate
+// ============================================================================
+
+// On a target the solver cannot reach it exhausts its restarts and terminates
+// non-converged. The reported result must be the lowest-error iterate seen
+// across all attempts (feasibility-first), never the last perturbed attempt. We
+// drive the solver step-by-step, tracking the minimum error it ever reports;
+// the final reported error must equal that minimum, and the returned q must be
+// feasible.
+template <typename Solver>
+static void assert_retains_best_iterate()
+{
+    auto chain = make_bounded_2r_chain(std::numbers::pi);
+
+    // Unreachable: the 2R arm reaches ~2 m, this target sits at 5 m.
+    spp::vector3<double> far_trans;
+    far_trans << 5.0, 0.0, 0.0;
+    auto target = spp::se3<double>(spp::so3<double>::identity(), far_trans);
+
+    Eigen::Vector<double, 2> q0;
+    q0 << 0.1, 0.1;
+
+    spp::convergence_criteria<double> criteria{};
+    criteria.max_iterations_per_attempt = 30;
+    criteria.max_total_work_units = 600;
+
+    Solver solver;
+    solver.setup(chain, target, q0, criteria);
+
+    double running_min = std::numeric_limits<double>::max();
+    spp::ik_status status = spp::ik_status::running;
+    for (int i = 0; i < 4000 && status == spp::ik_status::running; ++i)
+    {
+        status = solver.step(chain, 1).status;
+        running_min = std::min(running_min, solver.error_norm());
+    }
+
+    REQUIRE_FALSE(solver.converged());
+    // The final reported error is the best (minimum) seen, not the last attempt.
+    REQUIRE(solver.error_norm() <= running_min + 1e-9);
+    // Feasibility-first retention returns a configuration inside the joint box.
+    REQUIRE(spp::detail::within_limits(
+        solver.solution(), chain, spp::detail::default_feasibility_tol<double>()));
+}
+
+TEST_CASE("projected_lm returns the best-so-far iterate on a terminal solve",
+          "[ik][semantics][retention]")
+{
+    assert_retains_best_iterate<spp::projected_lm<spp::kinematic_chain<double, 2>>>();
+}
+
+TEST_CASE("restart_wrapper returns the best-so-far iterate on a terminal solve",
+          "[ik][semantics][retention]")
+{
+    assert_retains_best_iterate<spp::restart_wrapper<spp::kinematic_chain<double, 2>>>();
+}
+
+#ifdef CARTAN_BUILD_ARGMIN
+TEST_CASE("argmin_slsqp returns the best-so-far iterate on a terminal solve",
+          "[ik][semantics][retention]")
+{
+    assert_retains_best_iterate<spp::argmin_slsqp<spp::kinematic_chain<double, 2>>>();
+}
+#endif
