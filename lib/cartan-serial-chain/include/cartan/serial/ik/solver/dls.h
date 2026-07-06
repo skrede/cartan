@@ -119,7 +119,15 @@ public:
             if (cartan::detail::is_converged_unweighted(V_b, m_criteria))
             {
                 m_error_norm = V_b.norm();
-                m_status = ik_status::converged;
+                // Converged implies feasible: a pose that is only reachable at an
+                // out-of-range configuration is reported as a joint-limit failure,
+                // never silently returned as a trustworthy solution. This is a
+                // check, not a clamp -- clamping the step would destroy the
+                // trust-region geometry.
+                m_status = cartan::detail::within_limits(
+                        m_q, chain, cartan::detail::default_feasibility_tol<scalar_type>())
+                    ? ik_status::converged
+                    : ik_status::joint_limit_hit;
                 // Pre-step convergence check is itself one algorithmic-work
                 // unit: the FK + body-twist + tolerance test that just fired
                 // is the work performed this iteration. Billing zero here

@@ -16,12 +16,60 @@
 
 #include <Eigen/SVD>
 
+#include <cmath>
+#include <limits>
 #include <concepts>
+#include <cstddef>
 
 namespace cartan
 {
 namespace detail
 {
+
+/// Default tolerance for the feasibility check. Set to sqrt(machine epsilon):
+/// the joint value only needs to sit within a half-precision-scale band of the
+/// finite bound, so a configuration that is exactly at (or a rounding step past)
+/// a limit still reads as feasible while one that has genuinely drifted out of
+/// range does not. This is the boundary tolerance for within_limits and is a
+/// candidate for an empirical sweep should a bound-hugging solver need slack.
+template <typename Scalar>
+[[nodiscard]] inline Scalar default_feasibility_tol() noexcept
+{
+    return std::sqrt(std::numeric_limits<Scalar>::epsilon());
+}
+
+/// Feasibility predicate: true iff every finitely-bounded joint of q lies within
+/// [position_min - tol, position_max + tol]. Joints whose bound is non-finite
+/// (unbounded / continuous joints using +/-infinity) are skipped on that side,
+/// so a joint with one finite and one infinite bound is still checked against
+/// the finite side. This is a CHECK only -- it never mutates q. It is the gate a
+/// no_limits trust-region solver consults before declaring convergence so that a
+/// pose-converged but out-of-range configuration is reported as a joint-limit
+/// failure rather than a trustworthy solution.
+template <chain Chain>
+[[nodiscard]] bool within_limits(
+    const typename joint_state<typename Chain::scalar_type, Chain::joints>::position_type& q,
+    const Chain& chain,
+    typename Chain::scalar_type tol)
+{
+    const auto& limits = chain.limits();
+    int n = chain.num_joints();
+    for (int i = 0; i < n; ++i)
+    {
+        auto idx = static_cast<std::size_t>(i);
+        auto lo = limits[idx].position_min;
+        auto hi = limits[idx].position_max;
+        if (std::isfinite(lo) && q(i) < lo - tol)
+        {
+            return false;
+        }
+        if (std::isfinite(hi) && q(i) > hi + tol)
+        {
+            return false;
+        }
+    }
+    return true;
+}
 
 /// Apply limit enforcement to joint configuration q using the given LimitsPolicy.
 ///

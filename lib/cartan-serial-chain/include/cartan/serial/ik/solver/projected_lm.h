@@ -279,7 +279,7 @@ private:
         auto fk = forward_kinematics(chain, m_q);
         m_V_b = (fk.end_effector.inverse() * m_target).log();
 
-        if (auto s = check_convergence_and_limits(); s != ik_status::running)
+        if (auto s = check_convergence_and_limits(chain); s != ik_status::running)
         {
             return s;
         }
@@ -311,12 +311,19 @@ private:
         return m_status;
     }
 
-    ik_status check_convergence_and_limits()
+    ik_status check_convergence_and_limits(const Chain& chain)
     {
         if (cartan::detail::is_converged(m_V_b, m_weight, m_criteria))
         {
             m_error_norm = m_V_b.norm();
-            m_status = ik_status::converged;
+            // Converged implies feasible. The active-set projection keeps m_q
+            // inside the box, so this check passes structurally; it is applied
+            // for uniformity with the unconstrained trust-region solvers and to
+            // stay correct should the projection ever be relaxed. Check only.
+            m_status = cartan::detail::within_limits(
+                    m_q, chain, cartan::detail::default_feasibility_tol<scalar_type>())
+                ? ik_status::converged
+                : ik_status::joint_limit_hit;
             return m_status;
         }
 

@@ -116,7 +116,13 @@ public:
             if (cartan::detail::is_converged_unweighted(m_V_b, m_criteria))
             {
                 m_error_norm = m_V_b.norm();
-                m_status = ik_status::converged;
+                // Converged implies feasible: downgrade a pose-converged but
+                // out-of-range configuration to a joint-limit failure instead of
+                // returning it as trustworthy. Check only, never a clamp.
+                m_status = cartan::detail::within_limits(
+                        m_q, chain, cartan::detail::default_feasibility_tol<scalar_type>())
+                    ? ik_status::converged
+                    : ik_status::joint_limit_hit;
                 break;
             }
 
