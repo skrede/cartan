@@ -456,7 +456,7 @@ TEST_CASE("6R Pieper: shoulder singularity returns the error channel")
     auto result = pieper_6r_solver(chain).solve(fk.end_effector);
 
     REQUIRE_FALSE(result.has_value());
-    // The reason is asserted, never a joint value (D-03).
+    // The reason is asserted, never a joint value.
     CHECK(result.error().reason == analytical_failure::singular_configuration);
     CHECK(result.error().reason != analytical_failure::unreachable);
 }

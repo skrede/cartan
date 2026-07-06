@@ -168,7 +168,7 @@ struct Arbitrary<cartan::se3<double>>
     }
 };
 
-} // namespace rc
+}
 
 // ============================================================================
 // SO(2) Group Axioms
@@ -642,7 +642,7 @@ cartan::so3<double> gen_over_pi_so3()
     return cartan::so3<double>::exp(gen_over_pi_angle() * gen_unit_axis());
 }
 
-} // namespace
+}
 
 TEST_CASE("so3: double-cover exp/log roundtrip theta in (pi, 2pi] (property-based)",
     "[so3][property]")

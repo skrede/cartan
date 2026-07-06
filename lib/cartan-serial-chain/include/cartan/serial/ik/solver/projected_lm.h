@@ -11,7 +11,7 @@
 ///
 /// On stall / divergence / per-attempt iteration_limit, the solver
 /// internally re-seeds the joint configuration from a deterministic Halton
-/// sequence and continues. Phase-30 H2 falsification confirmed that for
+/// sequence and continues. Empirical falsification confirmed that for
 /// projected LM the load-bearing recovery mechanism is the fresh
 /// low-discrepancy seed, not warm-start lambda preservation; the restart
 /// loop therefore lives inside the solver rather than in a separate

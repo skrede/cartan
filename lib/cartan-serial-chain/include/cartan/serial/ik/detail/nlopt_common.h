@@ -9,7 +9,7 @@
 ///
 /// All functions live in cartan::detail and are guarded by CARTAN_HAS_NLOPT.
 ///
-/// Reference: Decision D-17 (extract shared NLopt boilerplate).
+/// Rationale: extract shared NLopt boilerplate.
 
 #ifdef CARTAN_HAS_NLOPT
 

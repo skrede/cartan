@@ -8,8 +8,6 @@
 /// 0.5 * ||V_b||^2 without gradient information.
 ///
 /// Guarded by CARTAN_HAS_NLOPT: only available when NLopt is linked.
-///
-/// Reference: Decisions D-04, D-07, D-10.
 
 #ifdef CARTAN_HAS_NLOPT
 
@@ -40,7 +38,7 @@ namespace cartan
 /// bounds. Each step() call runs budget_per_step NLopt evaluations,
 /// allowing cooperative scheduling with other solvers.
 ///
-/// Reference: D-07 (BOBYQA provides diversity), D-10 (renamed from sqp_stepper).
+/// BOBYQA provides solver diversity; renamed from sqp_stepper.
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 class nlopt_bobyqa
 {

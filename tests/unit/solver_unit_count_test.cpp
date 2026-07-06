@@ -376,7 +376,7 @@ TEMPLATE_TEST_CASE("runner.iterations() lands in [cap-1, cap] on unreachable tar
 // argmin_slsqp, argmin_projected_gn, argmin_projected_gradient_gn), drive the
 // solver against an unreachable target with a tight per-attempt cap so the
 // inner attempt fires a restart. Sum per-step units_consumed in a step(chain, 1)
-// loop and assert it equals solver.iterations() (D-13 pass-through aggregation:
+// loop and assert it equals solver.iterations() (pass-through aggregation:
 // cumulative units across attempts equal the sum of per-attempt inner
 // iterations, with restart events themselves billing zero).
 

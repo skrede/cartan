@@ -142,7 +142,7 @@ void accumulate_cell(
     ori.insert(ori.end(), cell_ori.begin(), cell_ori.end());
 }
 
-} // namespace
+}
 
 // ----------------------------------------------------------------------------
 // FK round-off sweep + preset sufficiency + double-unchanged pin.
@@ -368,7 +368,7 @@ void convergence_contrast(
     }
 }
 
-} // namespace
+}
 
 TEST_CASE("float IK: swept preset terminates where a 1e-6 gate cannot",
     "[ik][float][convergence]")

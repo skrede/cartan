@@ -68,7 +68,7 @@ public:
     }
 
     /// Group composition: R1 * R2 via angle-addition formulas.
-    /// Result uses the stricter of the two policies (D-08).
+    /// Result uses the stricter of the two policies.
     /// Reference: Lynch & Park, Modern Robotics, rotation composition, p. 68.
     template <typename P2>
     [[nodiscard]] auto operator*(const so2<Scalar, P2>& rhs) const
@@ -112,7 +112,7 @@ public:
         return so2(Scalar(1), Scalar(0));
     }
 
-    /// Construct from 2x2 rotation matrix with validation (D-09).
+    /// Construct from 2x2 rotation matrix with validation.
     /// Checks orthogonality (R^T * R ~= I) and det(R) ~= 1.
     /// Returns cartan::unexpected with a lie_failure code on failure.
     /// Reference: Rotation matrix properties, Lynch & Park, p. 23-24.

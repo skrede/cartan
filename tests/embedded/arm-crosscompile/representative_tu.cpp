@@ -96,7 +96,7 @@ namespace
     return fk_x + jac_trace + ik_error + pk1_theta;
 }
 
-} // namespace
+}
 
 /// Trivial entry point. Continuous integration compiles this file with `-c`
 /// (no link step), so this never pulls in a runtime; it exists only to ODR-use

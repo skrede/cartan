@@ -150,7 +150,7 @@ TEST_CASE("lbfgsb with tight limits", "[ik][lbfgsb]")
 }
 
 // ============================================================================
-// Iterations count (one per step() call, per D-06)
+// Iterations count (one per step() call)
 // ============================================================================
 
 TEST_CASE("lbfgsb iterations count", "[ik][lbfgsb]")

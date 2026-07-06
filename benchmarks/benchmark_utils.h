@@ -5,8 +5,8 @@
 ///        generation, error decomposition, and KDL frame conversion.
 ///
 /// All robot geometries expressed as Product of Exponentials screw parameters.
-/// This file is standalone from test infrastructure (D-14).
-/// Chain factories cover ~10 robots in both cartan PoE and KDL representations (D-11, D-12).
+/// This file is standalone from test infrastructure.
+/// Chain factories cover ~10 robots in both cartan PoE and KDL representations.
 
 #include "../tests/fixtures/chain_factories.h"
 
@@ -20,7 +20,7 @@ namespace cartan::fixtures
 {
 
 // ===========================================================================
-// KDL chain factories (D-12)
+// KDL chain factories
 // ===========================================================================
 
 namespace detail

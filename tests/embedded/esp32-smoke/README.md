@@ -5,7 +5,7 @@ the xtensa-esp32-elf and riscv32-esp-elf toolchains. The smoke proves the
 language-level compatibility added in the v0.4.1 C++20 downgrade (PR migrating
 `std::expected` to `cartan::expected`); it does NOT prove hardware-level
 correctness, memory footprint, Eigen alignment safety, or any deployment
-characteristic. Those land in a follow-on Embedded Targeting milestone.
+characteristic. Those land in a future embedded-targeting effort.
 
 ## What this smoke does
 
@@ -49,7 +49,7 @@ header-only mean the same source compiles unchanged on:
 - ESP32-C6 (RISC-V)
 - ESP32-H2 (RISC-V)
 
-## Out of scope here (deferred to Embedded Targeting milestone)
+## Out of scope here (deferred to a future embedded-targeting effort)
 
 - Flashing and running on real hardware
 - Memory + flash footprint sweep across the cartan public surface

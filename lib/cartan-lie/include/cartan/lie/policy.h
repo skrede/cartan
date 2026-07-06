@@ -32,7 +32,7 @@ struct trusted_unit_t {};
 inline constexpr trusted_unit_t trusted_unit{};
 
 /// Selects the stricter of two policies: if either normalizes, the result normalizes.
-/// Used for mixed-policy compose operations (D-08).
+/// Used for mixed-policy compose operations.
 template <typename P1, typename P2>
 using stricter_policy = std::conditional_t<
     P1::normalize_on_construct || P2::normalize_on_construct,

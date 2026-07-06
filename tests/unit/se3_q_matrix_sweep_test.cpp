@@ -122,7 +122,7 @@ long double rel_err(Scalar approx, long double truth)
 // The log-spaced phi grid spans both sides of the float and double crossovers.
 constexpr double kPhiGrid[] = {3e-4, 1e-3, 4e-3, 1e-2, 2e-2, 4e-2, 0.1, 0.2, 0.3};
 
-} // namespace
+}
 
 // ----------------------------------------------------------------------------
 // (a) Recorded coefficient crossover table: series vs closed, each precision.

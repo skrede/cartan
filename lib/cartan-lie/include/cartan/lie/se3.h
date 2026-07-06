@@ -16,7 +16,7 @@ namespace cartan
 {
 
 /// 3D rigid body transformation group SE(3), parameterized by scalar type and policy.
-/// Internal representation: SO(3) rotation + R^3 translation (D-05 pattern).
+/// Internal representation: SO(3) rotation + R^3 translation.
 /// 7 Scalars total (4 quaternion + 3 translation).
 /// Reference: Lynch & Park, Modern Robotics, Ch. 3.3, p. 86-106.
 ///            Barfoot, State Estimation for Robotics, Ch. 8, p. 280-300.
@@ -66,7 +66,7 @@ public:
     }
 
     /// Exponential map: se(3) twist -> SE(3) transform.
-    /// Twist V = (omega, rho) uses omega-first convention (D-11).
+    /// Twist V = (omega, rho) uses omega-first convention.
     /// Ref: Lynch & Park, Modern Robotics, Prop. 3.25/Eq. 3.88, p. 103.
     ///      Barfoot, State Estimation for Robotics, Eq. 8.33, p. 289.
     [[nodiscard]] static se3 exp(const vector6<Scalar>& v)
@@ -97,7 +97,7 @@ public:
     }
 
     /// Group composition: T1 * T2.
-    /// Result uses the stricter of the two policies (D-08).
+    /// Result uses the stricter of the two policies.
     /// Ref: Lynch & Park, Modern Robotics, homogeneous transform composition.
     template <typename P2>
     [[nodiscard]] auto operator*(const se3<Scalar, P2>& rhs) const
@@ -179,7 +179,7 @@ public:
         return se3(so3<Scalar, Policy>::identity(), vector3<Scalar>::Zero());
     }
 
-    /// Construct from 4x4 homogeneous matrix with validation (D-09).
+    /// Construct from 4x4 homogeneous matrix with validation.
     /// Validates rotation block is SO(3) and bottom row is (0,0,0,1).
     /// Ref: SE(3) matrix structure, Lynch & Park, Modern Robotics, p. 86.
     [[nodiscard]] static cartan::expected<se3, lie_failure>

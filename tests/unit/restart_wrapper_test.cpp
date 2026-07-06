@@ -254,7 +254,7 @@ TEST_CASE("restart_wrapper iterations is cumulative", "[ik][restart]")
     run_stepper(stepper, chain, 5000);
 
     // Cumulative billing: iterations() aggregates inner units across all restart
-    // attempts (D-13). When the wrapper triggered at least one restart and the
+    // attempts. When the wrapper triggered at least one restart and the
     // second attempt billed additional inner units, the total exceeds the
     // per-attempt cap. criteria.max_iterations_per_attempt is per-attempt, not global.
     REQUIRE(stepper.iterations() > criteria.max_iterations_per_attempt);

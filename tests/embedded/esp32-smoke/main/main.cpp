@@ -39,7 +39,7 @@ constexpr const char* TAG = "cartan_smoke";
         {limits{-3.14f, 3.14f}, limits{-3.14f, 3.14f}, limits{-3.14f, 3.14f}}};
 }
 
-} // namespace
+}
 
 extern "C" void app_main()
 {

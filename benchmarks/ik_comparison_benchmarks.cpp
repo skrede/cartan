@@ -864,7 +864,7 @@ BENCHMARK(bm_comparison_kuka_lwr4_cartan_racing)->Iterations(1000)->Unit(benchma
 
 #ifdef CARTAN_BUILD_ARGMIN
 // ============================================================================
-// argmin comparison benchmarks (three D-10 axes)
+// argmin comparison benchmarks (three axes)
 // ============================================================================
 
 /// Generic argmin-backed solver comparison benchmark.

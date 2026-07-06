@@ -68,7 +68,7 @@ spp::ik_status run_stepper(
 }
 
 // ============================================================================
-// D-05: converged implies feasible (no_limits trust-region family)
+// converged implies feasible (no_limits trust-region family)
 // ============================================================================
 
 TEST_CASE("within_limits skips unbounded joints and flags out-of-range joints",
@@ -315,7 +315,7 @@ TEST_CASE("helical DOF is not wrapped by canonicalization", "[ik][semantics][fea
 }
 
 // ============================================================================
-// D-06: the convergence gate tests raw (unweighted) component norms
+// the convergence gate tests raw (unweighted) component norms
 // ============================================================================
 
 TEST_CASE("convergence gate ignores error_weight", "[ik][semantics][gate]")
@@ -379,7 +379,7 @@ TEST_CASE("projected_lm convergence is unaffected by error_weight", "[ik][semant
 }
 
 // ============================================================================
-// D-07: restarting solvers retain the feasibility-first best-so-far iterate
+// restarting solvers retain the feasibility-first best-so-far iterate
 // ============================================================================
 
 // On a target the solver cannot reach it exhausts its restarts and terminates

@@ -1187,7 +1187,7 @@ REGISTER_7DOF_NLOPT(kuka_lwr4,      make_kuka_lwr4_chain)
 REGISTER_7DOF_ARGMIN(kuka_lwr4,    make_kuka_lwr4_chain)
 
 // ============================================================================
-// D-11: Dynamic vs fixed-size dimension benchmarks
+// Dynamic vs fixed-size dimension benchmarks
 // ============================================================================
 //
 // Paired benchmarks comparing fixed-size chain_t<6> (compile-time N) against

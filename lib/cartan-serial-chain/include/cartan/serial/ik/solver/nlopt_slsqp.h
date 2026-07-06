@@ -11,8 +11,6 @@
 /// optimization path.
 ///
 /// Guarded by CARTAN_HAS_NLOPT: only available when NLopt is linked.
-///
-/// Reference: Decisions D-04, D-08, D-11.
 
 #ifdef CARTAN_HAS_NLOPT
 
@@ -44,7 +42,7 @@ namespace cartan
 /// Each step() call runs budget_per_step NLopt evaluations, allowing
 /// cooperative scheduling with other solvers.
 ///
-/// Reference: D-04 (NLopt LD_SLSQP), D-11 (gradient via log Jacobian).
+/// Uses NLopt LD_SLSQP; gradient via log Jacobian.
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 class nlopt_slsqp
 {

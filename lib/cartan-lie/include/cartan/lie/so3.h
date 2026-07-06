@@ -184,7 +184,7 @@ public:
     }
 
     /// Group composition via Hamilton quaternion product.
-    /// Result uses stricter of two policies (D-08).
+    /// Result uses stricter of two policies.
     /// Ref: Lynch & Park, Modern Robotics, rotation composition, p. 70.
     template <typename P2>
     [[nodiscard]] auto operator*(const so3<Scalar, P2>& rhs) const
@@ -275,7 +275,7 @@ public:
                    trusted_unit);
     }
 
-    /// Construct from 3x3 rotation matrix with validation (D-09).
+    /// Construct from 3x3 rotation matrix with validation.
     /// Checks R^T*R ~= I and det(R) ~= 1.
     /// Ref: Rotation matrix properties, Lynch & Park, Modern Robotics, p. 23-24.
     [[nodiscard]] static cartan::expected<so3, lie_failure>
@@ -298,7 +298,7 @@ public:
         return so3(q);
     }
 
-    /// Construct from quaternion with validation (D-09).
+    /// Construct from quaternion with validation.
     /// Checks ||q|| ~= 1.
     [[nodiscard]] static cartan::expected<so3, lie_failure>
     from_quaternion(const quaternion<Scalar>& q)

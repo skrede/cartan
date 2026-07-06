@@ -2,7 +2,7 @@
 /// @brief LM stepper IK benchmarks for 3/6/7-DOF chains.
 ///
 /// Reports custom counters: success_rate, avg_iterations,
-/// avg_position_error, avg_orientation_error per D-08.
+/// avg_position_error, avg_orientation_error.
 
 #include <cartan/serial/ik/basic_ik_runner.h>
 #include <cartan/serial/ik/solver/lm.h>

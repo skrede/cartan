@@ -120,7 +120,7 @@ public:
         /// Stride that gates the post-step active-set Lagrange multiplier
         /// re-estimation call on argmin's line-search SQP policies. `k = 1`
         /// re-estimates the multipliers on every SQP iteration (the
-        /// pre-Phase-41 behavior on argmin's N&W lineage); `k > 1` reuses
+        /// earlier behavior on argmin's Nocedal & Wright lineage); `k > 1` reuses
         /// stale multipliers on (k-1)/k of steps and only refreshes the
         /// active-set estimate every k-th step. Reference: Bertsekas 1996
         /// §4.2 (stale-multiplier reuse).

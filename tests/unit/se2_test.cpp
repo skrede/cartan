@@ -248,7 +248,7 @@ TEST_CASE("se2: float scalar operations", "[se2][float]")
 }
 
 // ============================================================================
-// Mixed-policy compose (D-08)
+// Mixed-policy compose
 // ============================================================================
 
 TEST_CASE("se2: mixed-policy compose returns strict result", "[se2][policy]")

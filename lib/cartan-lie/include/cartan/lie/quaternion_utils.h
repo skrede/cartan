@@ -57,7 +57,7 @@ template <typename Scalar>
 }
 
 /// Named quaternion constructor: w-first order (w, x, y, z).
-/// This matches the ctrlpp external API convention (D-12).
+/// This matches the ctrlpp external API convention.
 /// Eigen's quaternion constructor is also w-first: Quaternion(w, x, y, z).
 /// Reference: Hamilton convention; Barfoot, Section 8.1.
 template <typename Scalar>
@@ -76,7 +76,7 @@ template <typename Scalar>
     return quaternion<Scalar>(w, x, y, z);
 }
 
-/// Serialize quaternion to [w, x, y, z] 4-vector per ctrlpp convention (D-12).
+/// Serialize quaternion to [w, x, y, z] 4-vector per ctrlpp convention.
 /// Reference: Hamilton convention output format.
 template <typename Scalar>
 [[nodiscard]] vector<Scalar, 4> to_wxyz(const quaternion<Scalar>& q)

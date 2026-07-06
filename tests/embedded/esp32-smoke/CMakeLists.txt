@@ -13,8 +13,8 @@
 #   - cartan-analytical compiles (paden_kahan subproblems)
 # Hardware deployment, Eigen alignment audit (Xtensa LX6/LX7 stack alignment
 # vs Eigen's vectorization assumptions), memory + flash sweep, and an actual
-# robot-arm demo are out of scope for this smoke; those land in a follow-on
-# Embedded Targeting milestone.
+# robot-arm demo are out of scope for this smoke; those land in a future
+# embedded-targeting effort.
 
 cmake_minimum_required(VERSION 3.16)
 

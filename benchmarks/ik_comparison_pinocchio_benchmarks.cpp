@@ -123,7 +123,7 @@ constexpr int projected_lm_total_units = 400;
 // max_iter; each solver's internal m_iterations counter checks against this.
 constexpr int per_family_per_attempt = 100;
 
-}  // namespace cartan::bench
+}
 
 namespace
 {
@@ -1077,7 +1077,7 @@ CARTAN_KREEST_SWEEP_ROW(kuka_lwr4,  make_kuka_lwr4_chain,  7, 5);
 CARTAN_KREEST_SWEEP_ROW(kuka_lwr4,  make_kuka_lwr4_chain,  7, 10);
 
 // Spot-check accurate-mode at k=1 on a single robot (UR3e) — confirms the
-// pre-Phase-41 baseline path on the wrapper's other Mode. Not part of the
+// earlier baseline path on the wrapper's other Mode. Not part of the
 // k-sweep aggregate; reported in the cross-repo reply as a sanity probe.
 IK_BENCH_ARGMIN_SLSQP_KREEST_VARIANTS(ur3e, make_ur3e_chain, 6, argmin_slsqp,
     cartan::argmin_slsqp, cartan::bench::sqp_family_total_units, 1);

@@ -45,7 +45,7 @@ namespace cartan
 {
 
 /// 2D rigid body transformation group SE(2), parameterized by scalar type and policy.
-/// Internal representation: SO(2) rotation + R^2 translation (D-05 pattern).
+/// Internal representation: SO(2) rotation + R^2 translation.
 /// Reference: Lynch & Park, Modern Robotics, Ch. 3.3.1, p. 86-90.
 template <typename Scalar, typename Policy = strict_policy>
 class se2
@@ -156,7 +156,7 @@ public:
     }
 
     /// Group composition: T1 * T2.
-    /// Result uses the stricter of the two policies (D-08).
+    /// Result uses the stricter of the two policies.
     /// Reference: Lynch & Park, Modern Robotics, homogeneous transform composition.
     template <typename P2>
     [[nodiscard]] auto operator*(const se2<Scalar, P2>& rhs) const
@@ -223,7 +223,7 @@ public:
         return se2(so2<Scalar, Policy>::identity(), vector2<Scalar>::Zero());
     }
 
-    /// Construct from 3x3 homogeneous matrix with validation (D-09).
+    /// Construct from 3x3 homogeneous matrix with validation.
     /// Validates rotation block is SO(2) and bottom row is [0, 0, 1].
     /// Reference: SE(2) matrix structure, Lynch & Park, p. 86.
     [[nodiscard]] static cartan::expected<se2, lie_failure>
