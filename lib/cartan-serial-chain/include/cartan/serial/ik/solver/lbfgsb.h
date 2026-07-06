@@ -134,7 +134,10 @@ public:
         int units = 0;
         while (units < N && m_status == ik_status::running)
         {
-            if (cartan::detail::is_converged(m_body_error, m_weight, m_criteria))
+            // Raw (unweighted) stopping test: error_weight biases the objective
+            // and step, but the convergence tolerance is checked on the
+            // unweighted body error so it matches every other solver's gate.
+            if (cartan::detail::is_converged_unweighted(m_body_error, m_criteria))
             {
                 m_status = ik_status::converged;
                 break;

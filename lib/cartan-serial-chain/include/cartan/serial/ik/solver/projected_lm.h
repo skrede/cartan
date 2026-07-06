@@ -313,7 +313,9 @@ private:
 
     ik_status check_convergence_and_limits(const Chain& chain)
     {
-        if (cartan::detail::is_converged(m_V_b, m_weight, m_criteria))
+        // Raw (unweighted) stopping test for cross-solver uniformity; m_weight
+        // continues to shape the objective and step, not the tolerance gate.
+        if (cartan::detail::is_converged_unweighted(m_V_b, m_criteria))
         {
             m_error_norm = m_V_b.norm();
             // Converged implies feasible. The active-set projection keeps m_q

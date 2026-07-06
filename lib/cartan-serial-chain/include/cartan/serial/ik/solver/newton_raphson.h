@@ -121,7 +121,10 @@ public:
             auto& grad = result.gradient;
             auto& body_error = result.info.body_error;
 
-            if (cartan::detail::is_converged(body_error, m_weight, m_criteria))
+            // The stopping test uses the raw (unweighted) body error so every
+            // solver agrees on what "converged" means; error_weight steers the
+            // objective and step direction only, not the tolerance gate.
+            if (cartan::detail::is_converged_unweighted(body_error, m_criteria))
             {
                 m_error_norm = body_error.norm();
                 m_status = ik_status::converged;

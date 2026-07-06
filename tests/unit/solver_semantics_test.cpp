@@ -2,9 +2,13 @@
 // gate, and feasibility-first best-iterate retention.
 
 #include <cartan/serial/ik/detail/limit_enforcement.h>
+#include <cartan/serial/ik/detail/convergence.h>
+#include <cartan/serial/ik/policy/error_weight.h>
 #include <cartan/serial/ik/solver/dls.h>
 #include <cartan/serial/ik/solver/lm.h>
+#include <cartan/serial/ik/solver/lbfgsb.h>
 #include <cartan/serial/ik/solver/projected_lm.h>
+#include <cartan/serial/ik/solver/newton_raphson.h>
 #ifdef CARTAN_BUILD_ARGMIN
 #include <cartan/serial/ik/solver/argmin_lm.h>
 #endif
@@ -145,4 +149,68 @@ TEST_CASE("projected_lm converged solutions are feasible", "[ik][semantics][feas
         REQUIRE(spp::detail::within_limits(
             solver.solution(), chain, spp::detail::default_feasibility_tol<double>()));
     }
+}
+
+// ============================================================================
+// D-06: the convergence gate tests raw (unweighted) component norms
+// ============================================================================
+
+TEST_CASE("convergence gate ignores error_weight", "[ik][semantics][gate]")
+{
+    // A body error whose raw component norms sit just below the tolerance, but
+    // whose weighted norms are pushed above it by a non-unit weight. The gate
+    // the solvers now use must key off the raw norms.
+    cartan::convergence_criteria<double> criteria{};
+    criteria.orientation_tol = 1e-3;
+    criteria.position_tol = 1e-3;
+
+    Eigen::Vector<double, 6> body_error;
+    body_error << 8e-4, 0.0, 0.0,   // angular (head<3>): raw norm 8e-4 < 1e-3
+                  8e-4, 0.0, 0.0;   // linear  (tail<3>): raw norm 8e-4 < 1e-3
+
+    cartan::error_weight<double> heavy;
+    heavy.weights << 5.0, 5.0, 5.0, 5.0, 5.0, 5.0;  // weighted norm 4e-3 > 1e-3
+
+    REQUIRE(cartan::detail::is_converged_unweighted(body_error, criteria));
+    REQUIRE_FALSE(cartan::detail::is_converged(body_error, heavy, criteria));
+}
+
+// A solver carrying a heavy error_weight still declares convergence on a
+// reachable in-limit target, because the stopping test no longer weights the
+// body error. Seeding at the exact solution makes the gate fire on entry.
+template <typename Solver>
+static void assert_weight_does_not_block_convergence()
+{
+    auto chain = make_bounded_2r_chain(std::numbers::pi);
+
+    Eigen::Vector<double, 2> q_known;
+    q_known << 0.4, -0.6;
+    auto target = spp::forward_kinematics(chain, q_known).end_effector;
+
+    spp::convergence_criteria<double> criteria{};
+    criteria.max_iterations_per_attempt = 200;
+
+    cartan::error_weight<double> heavy;
+    heavy.weights << 8.0, 8.0, 8.0, 8.0, 8.0, 8.0;
+
+    Solver solver;
+    solver.setup(chain, target, q_known, criteria, heavy);
+    run_stepper(solver, chain, 400);
+
+    REQUIRE(solver.converged());
+}
+
+TEST_CASE("newton_raphson convergence is unaffected by error_weight", "[ik][semantics][gate]")
+{
+    assert_weight_does_not_block_convergence<spp::newton_raphson<spp::kinematic_chain<double, 2>>>();
+}
+
+TEST_CASE("lbfgsb convergence is unaffected by error_weight", "[ik][semantics][gate]")
+{
+    assert_weight_does_not_block_convergence<spp::builtin_lbfgsb<spp::kinematic_chain<double, 2>>>();
+}
+
+TEST_CASE("projected_lm convergence is unaffected by error_weight", "[ik][semantics][gate]")
+{
+    assert_weight_does_not_block_convergence<spp::projected_lm<spp::kinematic_chain<double, 2>>>();
 }
