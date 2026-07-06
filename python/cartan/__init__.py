@@ -1,4 +1,4 @@
-"""Python bindings for cartan — C++23 Lie group, kinematics, and IK library."""
+"""Python bindings for cartan — C++20 Lie group, kinematics, and IK library."""
 
 from ._core import (
     SE3,

@@ -5,7 +5,7 @@ Standalone benchmark suite for Cartan Lie group operations, forward kinematics, 
 ## Prerequisites
 
 - CMake >= 3.28
-- C++23 compiler (GCC >= 14, Clang >= 18)
+- C++20 compiler: GCC 10+, Clang 13+, MSVC 17.x+
 - Eigen >= 3.4
 
 ### For TRAC-IK comparison benchmarks
