@@ -26,6 +26,7 @@
 #include <limits>
 #include <concepts>
 #include <optional>
+#include <functional>
 #include <type_traits>
 
 namespace cartan
@@ -103,7 +104,7 @@ public:
         const position_type& q0,
         const convergence_criteria<scalar_type>& criteria)
     {
-        m_chain = &chain;
+        m_chain = std::cref(chain);
         m_target = target;
         m_criteria = criteria;
         m_weight.reset();
@@ -127,7 +128,7 @@ public:
         const convergence_criteria<scalar_type>& criteria,
         const error_weight<scalar_type>& weight)
     {
-        m_chain = &chain;
+        m_chain = std::cref(chain);
         m_target = target;
         m_criteria = criteria;
         m_weight = weight;
@@ -150,6 +151,25 @@ public:
             m_inner.setup(chain, target, q0, criteria);
         }
     }
+
+    /// Deleted rvalue overloads: the wrapper borrows the chain for its whole
+    /// lifetime without owning it, so a temporary bound here would dangle the
+    /// moment setup() returns. A plain `const Chain&` parameter would silently
+    /// bind an rvalue, so the temporary is rejected at the call boundary
+    /// instead -- effectively `setup(Chain&&) = delete` (borrowed-not-owned:
+    /// the chain must outlive the wrapper).
+    void setup(
+        Chain&&,
+        const se3<scalar_type>&,
+        const position_type&,
+        const convergence_criteria<scalar_type>&) = delete;
+
+    void setup(
+        Chain&&,
+        const se3<scalar_type>&,
+        const position_type&,
+        const convergence_criteria<scalar_type>&,
+        const error_weight<scalar_type>&) = delete;
 
     step_result<scalar_type> step(const Chain& chain, int N)
     {
@@ -256,9 +276,9 @@ private:
         // chain is bound the class cannot be evaluated, so the raw solution is
         // retained as before.
         position_type q_canon = m_inner.solution();
-        bool feasible = m_chain != nullptr
+        bool feasible = m_chain.has_value()
             && cartan::detail::feasible_after_canonicalization(
-                q_canon, *m_chain,
+                q_canon, m_chain->get(),
                 cartan::detail::default_feasibility_tol<scalar_type>());
         bool better = !m_best_valid
             || (feasible && !m_best_feasible)
@@ -285,7 +305,7 @@ private:
 
     InnerPolicy m_inner{};
     options m_options{};
-    const Chain* m_chain{nullptr};
+    std::optional<std::reference_wrapper<const Chain>> m_chain{};
     se3<scalar_type> m_target{se3<scalar_type>::identity()};
     convergence_criteria<scalar_type> m_criteria{};
     std::optional<error_weight<scalar_type>> m_weight{};

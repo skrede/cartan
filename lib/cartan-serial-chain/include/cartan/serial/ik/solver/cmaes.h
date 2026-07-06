@@ -30,6 +30,7 @@
 #include <Eigen/Core>
 
 #include <cmath>
+#include <cstdint>
 #include <limits>
 #include <optional>
 #include <vector>
@@ -62,6 +63,10 @@ public:
         scalar_type divergence_factor{scalar_type(10)};
         int stall_window{10};
         scalar_type initial_sigma{scalar_type(0.3)};
+        // Optional RNG seed for the underlying evolution strategy. Empty leaves
+        // the sampler seeded from std::random_device (nondeterministic); a value
+        // makes the search reproducible run-to-run.
+        std::optional<std::uint64_t> seed{};
     };
 
     cmaes() = default;
@@ -108,6 +113,7 @@ public:
 
         typename argmin::cmaes_policy<joints>::options_type policy_opts;
         policy_opts.initial_sigma = static_cast<double>(m_options.initial_sigma);
+        policy_opts.seed = m_options.seed;
 
         m_solver.emplace(argmin::cmaes_policy<joints>{}, *m_problem, x0, nab_opts, policy_opts);
     }
