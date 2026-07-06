@@ -58,11 +58,19 @@ public:
         // Real runtime invariant: the screw-axis count must match the
         // joint-limit count. A debug-only assert would be compiled out under
         // -DNDEBUG (Release), letting a malformed chain construct silently in
-        // a shipped build; a thrown exception fails loudly in every build.
+        // a shipped build. With exceptions enabled we fail loudly by throwing;
+        // on exceptions-off targets (bare-metal and ESP-IDF default) a bare
+        // throw would not even compile, so we fail-stop deterministically via a
+        // trap instruction instead. Either way a malformed chain never
+        // constructs silently.
         if (m_axes.size() != m_limits.size())
         {
+#if defined(__cpp_exceptions)
             throw std::invalid_argument(
                 "kinematic_chain: screw-axis count must match joint-limit count");
+#else
+            __builtin_trap();
+#endif
         }
         if constexpr (N == dynamic)
         {

@@ -172,26 +172,23 @@ dependencies:
     version: "master"
 ```
 
-A compile-only smoke test under `tests/embedded/esp32-smoke/` verifies the
-public headers build under xtensa-esp32-elf and riscv32-esp-elf; see that
-directory's README for the `idf.py build` recipe.
-
-### Arduino IDE (manual install)
-
-Cartan ships a `library.properties` at the repo root. Clone or copy the
-repository into your Arduino `libraries/` directory (typically
-`~/Documents/Arduino/libraries/cartan/`), then `#include <cartan/lie.h>` from
-a sketch targeted at ESP32, Teensy 4.x, or RP2040. Classic Arduino AVR boards
-(Uno, Mega, Nano) are unsupported — cartan requires a modern C++20 compiler
-and Eigen, neither of which fit on an AVR.
+Continuous integration cross-compiles a representative translation unit —
+forward kinematics, the body Jacobian, an allocation-free projected
+Levenberg-Marquardt IK step, and a Paden-Kahan subproblem — with C++
+exceptions disabled (`-fno-exceptions`) for four target families: esp32
+(xtensa) and esp32c3 (riscv32) via ESP-IDF, and Cortex-M7 and Cortex-M4F via
+arm-none-eabi. This proves the public headers compile for those targets
+exceptions-off; it does not run them on hardware. The compile-only sources
+live under `tests/embedded/esp32-smoke/` (see that directory's README for the
+`idf.py build` recipe) and `tests/embedded/arm-crosscompile/`.
 
 ## Requirements
 
 - C++20 compiler: GCC 10+, Clang 13+, MSVC 17.x+
 - CMake 3.28+
 - Eigen 3.4+ (auto-fetched via FetchContent)
-- For embedded targets: ESP-IDF 5.1+, or any Arduino board package whose
-  toolchain offers a C++20 GCC backend (esp32, teensy, rp2040).
+- For embedded targets: an exceptions-off C++20 GCC backend — ESP-IDF 5.1+
+  (esp32, esp32c3) or arm-none-eabi (cortex-m7, cortex-m4f).
 
 ## Documentation
 
