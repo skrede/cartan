@@ -44,7 +44,7 @@ struct ik_se3_objective
     using position_type = typename joint_state<Scalar, N>::position_type;
 
     /// Evaluate objective only (no gradient computation).
-    [[nodiscard]] static gradient_result<Scalar> evaluate(
+    static gradient_result<Scalar> evaluate(
         const Chain& chain,
         const se3<Scalar>& target,
         const position_type& q,
@@ -60,7 +60,7 @@ struct ik_se3_objective
     }
 
     /// Evaluate objective and analytical gradient w.r.t. q.
-    [[nodiscard]] static auto evaluate_with_gradient(
+    static auto evaluate_with_gradient(
         const Chain& chain,
         const se3<Scalar>& target,
         const position_type& q,

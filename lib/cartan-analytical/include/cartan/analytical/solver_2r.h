@@ -106,7 +106,7 @@ public:
     /// gates sin(angle) between the two link directions (dimensionless), so the
     /// default rejects any home bend beyond numerical noise while admitting a
     /// genuinely straight arm.
-    [[nodiscard]] static cartan::expected<planar_2r_solver, analytical_error<scalar_type>>
+    static cartan::expected<planar_2r_solver, analytical_error<scalar_type>>
     make(const Chain& chain,
          scalar_type collinearity_tolerance = scalar_type(1e-6))
     {
@@ -154,7 +154,7 @@ public:
         return planar_2r_solver(chain);
     }
 
-    [[nodiscard]] cartan::expected<
+    cartan::expected<
         analytical_result<scalar_type, 2, 2>,
         analytical_error<scalar_type>>
     solve(const se3<scalar_type>& target) const
@@ -275,7 +275,7 @@ static_assert(analytical_solver<planar_2r_solver<kinematic_chain<double, dynamic
 /// Convenience wrapper around planar_2r_solver: constructs a solver from the
 /// given static_chain and immediately solves for the target pose.
 template <typename Scalar, joint_tag... Joints>
-[[nodiscard]] auto solve_2r(
+auto solve_2r(
     const static_chain<Scalar, Joints...>& chain,
     const se3<Scalar>& target)
 {

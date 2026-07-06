@@ -80,10 +80,10 @@ public:
     {
     }
 
-    [[nodiscard]] E& error() & noexcept { return m_error; }
-    [[nodiscard]] const E& error() const& noexcept { return m_error; }
-    [[nodiscard]] E&& error() && noexcept { return std::move(m_error); }
-    [[nodiscard]] const E&& error() const&& noexcept { return std::move(m_error); }
+    E& error() & noexcept { return m_error; }
+    const E& error() const& noexcept { return m_error; }
+    E&& error() && noexcept { return std::move(m_error); }
+    const E&& error() const&& noexcept { return std::move(m_error); }
 
 private:
     E m_error;
@@ -148,10 +148,10 @@ public:
     constexpr unexpected& operator=(const unexpected&) = default;
     constexpr unexpected& operator=(unexpected&&) = default;
 
-    [[nodiscard]] constexpr E& error() & noexcept { return m_error; }
-    [[nodiscard]] constexpr const E& error() const& noexcept { return m_error; }
-    [[nodiscard]] constexpr E&& error() && noexcept { return std::move(m_error); }
-    [[nodiscard]] constexpr const E&& error() const&& noexcept { return std::move(m_error); }
+    constexpr E& error() & noexcept { return m_error; }
+    constexpr const E& error() const& noexcept { return m_error; }
+    constexpr E&& error() && noexcept { return std::move(m_error); }
+    constexpr const E&& error() const&& noexcept { return std::move(m_error); }
 
     constexpr void swap(unexpected& other) noexcept(std::is_nothrow_swappable_v<E>)
     {
@@ -510,23 +510,23 @@ public:
 
     // ----- observers -----
 
-    [[nodiscard]] constexpr const T* operator->() const noexcept
+    constexpr const T* operator->() const noexcept
     {
         return std::addressof(m_value);
     }
 
-    [[nodiscard]] constexpr T* operator->() noexcept
+    constexpr T* operator->() noexcept
     {
         return std::addressof(m_value);
     }
 
-    [[nodiscard]] constexpr const T& operator*() const& noexcept { return m_value; }
-    [[nodiscard]] constexpr T& operator*() & noexcept { return m_value; }
-    [[nodiscard]] constexpr const T&& operator*() const&& noexcept { return std::move(m_value); }
-    [[nodiscard]] constexpr T&& operator*() && noexcept { return std::move(m_value); }
+    constexpr const T& operator*() const& noexcept { return m_value; }
+    constexpr T& operator*() & noexcept { return m_value; }
+    constexpr const T&& operator*() const&& noexcept { return std::move(m_value); }
+    constexpr T&& operator*() && noexcept { return std::move(m_value); }
 
-    [[nodiscard]] constexpr bool has_value() const noexcept { return m_has_value; }
-    [[nodiscard]] constexpr explicit operator bool() const noexcept { return m_has_value; }
+    constexpr bool has_value() const noexcept { return m_has_value; }
+    constexpr explicit operator bool() const noexcept { return m_has_value; }
 
     constexpr T& value() &
     {
@@ -580,31 +580,31 @@ public:
         return std::move(m_value);
     }
 
-    [[nodiscard]] constexpr E& error() & noexcept { return m_error; }
-    [[nodiscard]] constexpr const E& error() const& noexcept { return m_error; }
-    [[nodiscard]] constexpr E&& error() && noexcept { return std::move(m_error); }
-    [[nodiscard]] constexpr const E&& error() const&& noexcept { return std::move(m_error); }
+    constexpr E& error() & noexcept { return m_error; }
+    constexpr const E& error() const& noexcept { return m_error; }
+    constexpr E&& error() && noexcept { return std::move(m_error); }
+    constexpr const E&& error() const&& noexcept { return std::move(m_error); }
 
     template <typename U>
-    [[nodiscard]] constexpr T value_or(U&& default_value) const&
+    constexpr T value_or(U&& default_value) const&
     {
         return m_has_value ? m_value : static_cast<T>(std::forward<U>(default_value));
     }
 
     template <typename U>
-    [[nodiscard]] constexpr T value_or(U&& default_value) &&
+    constexpr T value_or(U&& default_value) &&
     {
         return m_has_value ? std::move(m_value) : static_cast<T>(std::forward<U>(default_value));
     }
 
     template <typename G = E>
-    [[nodiscard]] constexpr E error_or(G&& default_error) const&
+    constexpr E error_or(G&& default_error) const&
     {
         return m_has_value ? static_cast<E>(std::forward<G>(default_error)) : m_error;
     }
 
     template <typename G = E>
-    [[nodiscard]] constexpr E error_or(G&& default_error) &&
+    constexpr E error_or(G&& default_error) &&
     {
         return m_has_value ? static_cast<E>(std::forward<G>(default_error)) : std::move(m_error);
     }
@@ -961,8 +961,8 @@ public:
         other.m_has_value = true;
     }
 
-    [[nodiscard]] constexpr bool has_value() const noexcept { return m_has_value; }
-    [[nodiscard]] constexpr explicit operator bool() const noexcept { return m_has_value; }
+    constexpr bool has_value() const noexcept { return m_has_value; }
+    constexpr explicit operator bool() const noexcept { return m_has_value; }
 
     constexpr void operator*() const noexcept {}
 
@@ -990,19 +990,19 @@ public:
         }
     }
 
-    [[nodiscard]] constexpr E& error() & noexcept { return m_error; }
-    [[nodiscard]] constexpr const E& error() const& noexcept { return m_error; }
-    [[nodiscard]] constexpr E&& error() && noexcept { return std::move(m_error); }
-    [[nodiscard]] constexpr const E&& error() const&& noexcept { return std::move(m_error); }
+    constexpr E& error() & noexcept { return m_error; }
+    constexpr const E& error() const& noexcept { return m_error; }
+    constexpr E&& error() && noexcept { return std::move(m_error); }
+    constexpr const E&& error() const&& noexcept { return std::move(m_error); }
 
     template <typename G = E>
-    [[nodiscard]] constexpr E error_or(G&& default_error) const&
+    constexpr E error_or(G&& default_error) const&
     {
         return m_has_value ? static_cast<E>(std::forward<G>(default_error)) : m_error;
     }
 
     template <typename G = E>
-    [[nodiscard]] constexpr E error_or(G&& default_error) &&
+    constexpr E error_or(G&& default_error) &&
     {
         return m_has_value ? static_cast<E>(std::forward<G>(default_error)) : std::move(m_error);
     }

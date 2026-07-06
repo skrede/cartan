@@ -36,7 +36,7 @@ struct joint_state
     std::optional<velocity_type> velocity{};  ///< Joint velocities (optional)
 
     /// Create a joint state from position only (no velocity).
-    [[nodiscard]] static joint_state from_position(const position_type& q)
+    static joint_state from_position(const position_type& q)
     {
         joint_state js;
         js.position = q;
@@ -44,7 +44,7 @@ struct joint_state
     }
 
     /// Number of joints in this state.
-    [[nodiscard]] int num_joints() const
+    int num_joints() const
     {
         return static_cast<int>(position.size());
     }

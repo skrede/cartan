@@ -23,7 +23,7 @@ namespace
 namespace fs = std::filesystem;
 
 template <typename Scalar>
-[[nodiscard]] auto random_within_limits(
+auto random_within_limits(
     const cartan::kinematic_chain<Scalar, cartan::dynamic>& chain,
     std::mt19937& rng) -> Eigen::Matrix<Scalar, Eigen::Dynamic, 1>
 {
@@ -46,7 +46,7 @@ template <typename Scalar>
 }
 
 template <typename Scalar>
-[[nodiscard]] auto pose_error_norm(
+auto pose_error_norm(
     const cartan::se3<Scalar>& a,
     const cartan::se3<Scalar>& b) -> std::pair<Scalar, Scalar>
 {

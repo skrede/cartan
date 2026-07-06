@@ -21,7 +21,7 @@ namespace cartan
 /// Reference: Shoemake, "Animating rotation with quaternion curves",
 ///            SIGGRAPH 1985.
 template <typename Scalar>
-[[nodiscard]] quaternion<Scalar> quat_slerp(
+quaternion<Scalar> quat_slerp(
     const quaternion<Scalar>& q1,
     const quaternion<Scalar>& q2,
     Scalar t)
@@ -33,7 +33,7 @@ template <typename Scalar>
 /// Delegates to Eigen's normalized().
 /// Reference: Unit quaternion constraint ||q|| = 1 for rotation representation.
 template <typename Scalar>
-[[nodiscard]] quaternion<Scalar> quat_normalize(const quaternion<Scalar>& q)
+quaternion<Scalar> quat_normalize(const quaternion<Scalar>& q)
 {
     return q.normalized();
 }
@@ -42,7 +42,7 @@ template <typename Scalar>
 /// Delegates to Eigen's toRotationMatrix().
 /// Reference: Barfoot, State Estimation for Robotics, Eq. 8.3, p. 281.
 template <typename Scalar>
-[[nodiscard]] matrix3<Scalar> quat_to_matrix(const quaternion<Scalar>& q)
+matrix3<Scalar> quat_to_matrix(const quaternion<Scalar>& q)
 {
     return q.toRotationMatrix();
 }
@@ -51,7 +51,7 @@ template <typename Scalar>
 /// Delegates to Eigen's quaternion constructor from rotation matrix.
 /// Reference: Barfoot, State Estimation for Robotics, Eq. 8.3 (inverse).
 template <typename Scalar>
-[[nodiscard]] quaternion<Scalar> matrix_to_quat(const matrix3<Scalar>& R)
+quaternion<Scalar> matrix_to_quat(const matrix3<Scalar>& R)
 {
     return quaternion<Scalar>(R);
 }
@@ -61,7 +61,7 @@ template <typename Scalar>
 /// Eigen's quaternion constructor is also w-first: Quaternion(w, x, y, z).
 /// Reference: Hamilton convention; Barfoot, Section 8.1.
 template <typename Scalar>
-[[nodiscard]] quaternion<Scalar> from_wxyz(Scalar w, Scalar x, Scalar y, Scalar z)
+quaternion<Scalar> from_wxyz(Scalar w, Scalar x, Scalar y, Scalar z)
 {
     return quaternion<Scalar>(w, x, y, z);
 }
@@ -71,7 +71,7 @@ template <typename Scalar>
 /// Reorders to Eigen's constructor which expects (w, x, y, z).
 /// Reference: Eigen documentation on quaternion storage layout.
 template <typename Scalar>
-[[nodiscard]] quaternion<Scalar> from_xyzw(Scalar x, Scalar y, Scalar z, Scalar w)
+quaternion<Scalar> from_xyzw(Scalar x, Scalar y, Scalar z, Scalar w)
 {
     return quaternion<Scalar>(w, x, y, z);
 }
@@ -79,7 +79,7 @@ template <typename Scalar>
 /// Serialize quaternion to [w, x, y, z] 4-vector per ctrlpp convention.
 /// Reference: Hamilton convention output format.
 template <typename Scalar>
-[[nodiscard]] vector<Scalar, 4> to_wxyz(const quaternion<Scalar>& q)
+vector<Scalar, 4> to_wxyz(const quaternion<Scalar>& q)
 {
     vector<Scalar, 4> v;
     v << q.w(), q.x(), q.y(), q.z();
@@ -90,7 +90,7 @@ template <typename Scalar>
 /// Delegates to Eigen's operator* which uses Hamilton convention.
 /// Reference: Hamilton, "On quaternions" (1843); Barfoot, Eq. 8.6, p. 282.
 template <typename Scalar>
-[[nodiscard]] quaternion<Scalar> quat_hamilton_product(
+quaternion<Scalar> quat_hamilton_product(
     const quaternion<Scalar>& q1,
     const quaternion<Scalar>& q2)
 {

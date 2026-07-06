@@ -19,7 +19,7 @@ namespace cartan::detail
 /// the two by constructing a runtime-sized copy of q when the chain is
 /// dynamic, and forwarding directly otherwise.
 template <chain Chain, int N>
-[[nodiscard]] bool verify_analytical_solution(
+bool verify_analytical_solution(
     const Chain& chain,
     const Eigen::Vector<typename Chain::scalar_type, N>& q,
     const se3<typename Chain::scalar_type>& target,

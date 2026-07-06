@@ -47,7 +47,7 @@ struct screw_params
 /// Reference: Lynch & Park, Modern Robotics, Section 3.2.3, p. 77-86.
 ///            Barfoot, State Estimation for Robotics, Eq. 8.22, p. 284.
 template <typename Scalar, typename Policy>
-[[nodiscard]] axis_angle<Scalar> to_axis_angle(const so3<Scalar, Policy>& r)
+axis_angle<Scalar> to_axis_angle(const so3<Scalar, Policy>& r)
 {
     vector3<Scalar> phi = r.log();
     Scalar theta = phi.norm();
@@ -63,7 +63,7 @@ template <typename Scalar, typename Policy>
 /// Convert axis-angle representation to SO(3) via the exp map.
 /// Reference: Lynch & Park, Modern Robotics, Prop. 3.11, p. 82.
 template <typename Scalar>
-[[nodiscard]] so3<Scalar> from_axis_angle(const axis_angle<Scalar>& aa)
+so3<Scalar> from_axis_angle(const axis_angle<Scalar>& aa)
 {
     return so3<Scalar>::exp(aa.angle * aa.axis);
 }
@@ -72,7 +72,7 @@ template <typename Scalar>
 /// Equivalent to extracting components from the log map output.
 /// Reference: Lynch & Park, Modern Robotics, Section 3.2.3, p. 77-86.
 template <typename Scalar>
-[[nodiscard]] axis_angle<Scalar> from_angle_axis_vector(const vector3<Scalar>& phi)
+axis_angle<Scalar> from_angle_axis_vector(const vector3<Scalar>& phi)
 {
     Scalar theta = phi.norm();
 
@@ -90,7 +90,7 @@ template <typename Scalar>
 /// For pure translation (|omega| ~= 0): s_hat = v/|v|, q = zero, h = infinity.
 /// Reference: Lynch & Park, Modern Robotics, Def. 3.24, p. 102.
 template <typename Scalar>
-[[nodiscard]] screw_params<Scalar> to_screw_params(
+screw_params<Scalar> to_screw_params(
     const vector3<Scalar>& omega,
     const vector3<Scalar>& v)
 {

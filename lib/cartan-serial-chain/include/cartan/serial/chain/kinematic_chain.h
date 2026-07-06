@@ -83,16 +83,16 @@ public:
     }
 
     /// Home configuration (M matrix): end-effector pose at zero joint angles.
-    [[nodiscard]] const se3<Scalar>& home() const { return m_home; }
+    const se3<Scalar>& home() const { return m_home; }
 
     /// Space-frame screw axes.
-    [[nodiscard]] const screw_storage& axes() const { return m_axes; }
+    const screw_storage& axes() const { return m_axes; }
 
     /// Joint limits.
-    [[nodiscard]] const limits_storage& limits() const { return m_limits; }
+    const limits_storage& limits() const { return m_limits; }
 
     /// Number of joints in the chain.
-    [[nodiscard]] int num_joints() const
+    int num_joints() const
     {
         return static_cast<int>(m_axes.size());
     }
@@ -102,7 +102,7 @@ public:
     /// exceptions enabled it throws std::out_of_range; on exceptions-off targets
     /// (bare-metal and ESP-IDF default) a bare throw would not compile, so it
     /// fail-stops deterministically via a trap instruction instead.
-    [[nodiscard]] const screw_axis<Scalar>& axis(int i) const
+    const screw_axis<Scalar>& axis(int i) const
     {
         if (i < 0 || static_cast<std::size_t>(i) >= m_axes.size())
         {
@@ -116,17 +116,17 @@ public:
     }
 
     /// Cached joint_kind for joint i, used by FK/Jacobian fast-path dispatch.
-    [[nodiscard]] joint_kind kind(int i) const
+    joint_kind kind(int i) const
     {
         return m_kinds[static_cast<std::size_t>(i)];
     }
 
     /// All cached joint_kinds.
-    [[nodiscard]] const kind_storage& kinds() const { return m_kinds; }
+    const kind_storage& kinds() const { return m_kinds; }
 
     /// Convert a fixed-size chain to a dynamic chain.
     /// Only available when N is a fixed (non-dynamic) value.
-    [[nodiscard]] kinematic_chain<Scalar, dynamic> to_dynamic() const
+    kinematic_chain<Scalar, dynamic> to_dynamic() const
         requires (N != dynamic)
     {
         std::vector<screw_axis<Scalar>> dyn_axes(m_axes.begin(), m_axes.end());

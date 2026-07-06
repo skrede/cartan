@@ -17,25 +17,25 @@ struct framed_twist
     twist<Scalar> m_value;
 
     /// Access angular velocity component.
-    [[nodiscard]] const vector3<Scalar>& omega() const
+    const vector3<Scalar>& omega() const
     {
         return m_value.omega;
     }
 
     /// Access linear velocity component.
-    [[nodiscard]] const vector3<Scalar>& v() const
+    const vector3<Scalar>& v() const
     {
         return m_value.v;
     }
 
     /// Convert to 6-vector (omega-first).
-    [[nodiscard]] vector6<Scalar> to_vector() const
+    vector6<Scalar> to_vector() const
     {
         return m_value.to_vector();
     }
 
     /// Construct from 6-vector (omega-first).
-    [[nodiscard]] static framed_twist from_vector(const vector6<Scalar>& vec)
+    static framed_twist from_vector(const vector6<Scalar>& vec)
     {
         return framed_twist{twist<Scalar>::from_vector(vec)};
     }
@@ -46,7 +46,7 @@ struct framed_twist
 /// is mapped to be expressed in From.
 /// Frame enforcement is structural: twist Frame must match transform's To.
 template <typename From, typename To, typename Scalar, lie_group_policy Policy>
-[[nodiscard]] framed_twist<From, Scalar>
+framed_twist<From, Scalar>
 adjoint_map(const transform<From, To, Scalar, Policy>& T,
             const framed_twist<To, Scalar>& tw)
 {

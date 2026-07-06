@@ -32,7 +32,7 @@ struct twist
 
     /// Construct from 6-vector (omega-first).
     /// Reference: Lynch & Park, Modern Robotics, Eq. 3.82, p. 103.
-    [[nodiscard]] static twist from_vector(const vector6<Scalar>& vec)
+    static twist from_vector(const vector6<Scalar>& vec)
     {
         twist tw;
         tw.omega = vec.template head<3>();
@@ -42,7 +42,7 @@ struct twist
 
     /// Convert to 6-vector (omega-first).
     /// Reference: Lynch & Park, Modern Robotics, Eq. 3.82, p. 103.
-    [[nodiscard]] vector6<Scalar> to_vector() const
+    vector6<Scalar> to_vector() const
     {
         vector6<Scalar> vec;
         vec.template head<3>() = omega;
@@ -55,7 +55,7 @@ struct twist
 /// Returns se3::exp(theta * twist_vector).
 /// Reference: Lynch & Park, Modern Robotics, Prop. 3.22, p. 99.
 template <typename Scalar>
-[[nodiscard]] se3<Scalar> twist_to_se3(const twist<Scalar>& tw, Scalar theta)
+se3<Scalar> twist_to_se3(const twist<Scalar>& tw, Scalar theta)
 {
     return se3<Scalar>::exp(theta * tw.to_vector());
 }
@@ -66,7 +66,7 @@ template <typename Scalar>
 /// Reference: Lynch & Park, Modern Robotics, Eq. 3.91-3.92, p. 104.
 ///            Barfoot, State Estimation for Robotics, Eq. 8.35, p. 290.
 template <typename Scalar, typename Policy>
-[[nodiscard]] twist<Scalar> se3_to_twist(const se3<Scalar, Policy>& T)
+twist<Scalar> se3_to_twist(const se3<Scalar, Policy>& T)
 {
     return twist<Scalar>::from_vector(T.log());
 }
@@ -88,7 +88,7 @@ struct screw_motion
 /// For pure translation (|omega| ~ 0): theta = 0, d = |v|.
 /// Reference: Lynch & Park, Modern Robotics, Def. 3.24, p. 102.
 template <typename Scalar>
-[[nodiscard]] screw_motion<Scalar> to_screw_motion(const twist<Scalar>& tw)
+screw_motion<Scalar> to_screw_motion(const twist<Scalar>& tw)
 {
     Scalar omega_norm = tw.omega.norm();
 
@@ -140,7 +140,7 @@ template <typename Scalar>
 /// For pure translation (theta = 0): omega = 0, v = d * s_hat.
 /// Reference: Lynch & Park, Modern Robotics, Def. 3.24, p. 102.
 template <typename Scalar>
-[[nodiscard]] twist<Scalar> from_screw_motion(const screw_motion<Scalar>& sm)
+twist<Scalar> from_screw_motion(const screw_motion<Scalar>& sm)
 {
     twist<Scalar> tw;
 

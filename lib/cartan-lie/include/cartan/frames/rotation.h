@@ -22,7 +22,7 @@ struct rotation
     /// Compose with another rotation whose From frame matches our To frame.
     /// Structural frame matching: operator* only accepts rotation<To, C, ...>.
     template <typename C, lie_group_policy P2>
-    [[nodiscard]] auto operator*(const rotation<To, C, Scalar, P2>& rhs) const
+    auto operator*(const rotation<To, C, Scalar, P2>& rhs) const
         -> rotation<From, C, Scalar, stricter_policy<Policy, P2>>
     {
         return rotation<From, C, Scalar, stricter_policy<Policy, P2>>{
@@ -31,43 +31,43 @@ struct rotation
     }
 
     /// Inverse flips frame tags: rotation<A,B>.inverse() -> rotation<B,A>.
-    [[nodiscard]] rotation<To, From, Scalar, Policy> inverse() const
+    rotation<To, From, Scalar, Policy> inverse() const
     {
         return rotation<To, From, Scalar, Policy>{m_value.inverse()};
     }
 
     /// Convert to 3x3 rotation matrix.
-    [[nodiscard]] matrix3<Scalar> matrix() const
+    matrix3<Scalar> matrix() const
     {
         return m_value.matrix();
     }
 
     /// Access the internal quaternion (read-only).
-    [[nodiscard]] const quaternion<Scalar>& quaternion_ref() const
+    const quaternion<Scalar>& quaternion_ref() const
     {
         return m_value.quaternion_ref();
     }
 
     /// Logarithmic map: SO(3) -> so(3).
-    [[nodiscard]] vector3<Scalar> log() const
+    vector3<Scalar> log() const
     {
         return m_value.log();
     }
 
     /// Rotate a 3D vector.
-    [[nodiscard]] vector3<Scalar> act(const vector3<Scalar>& v) const
+    vector3<Scalar> act(const vector3<Scalar>& v) const
     {
         return m_value.act(v);
     }
 
     /// Identity rotation (no rotation).
-    [[nodiscard]] static rotation identity()
+    static rotation identity()
     {
         return rotation{so3<Scalar, Policy>::identity()};
     }
 
     /// Construct from 3x3 rotation matrix with validation.
-    [[nodiscard]] static cartan::expected<rotation, lie_failure>
+    static cartan::expected<rotation, lie_failure>
     from_matrix(const matrix3<Scalar>& R)
     {
         auto result = so3<Scalar, Policy>::from_matrix(R);
@@ -79,7 +79,7 @@ struct rotation
     }
 
     /// Construct from quaternion with validation.
-    [[nodiscard]] static cartan::expected<rotation, lie_failure>
+    static cartan::expected<rotation, lie_failure>
     from_quaternion(const quaternion<Scalar>& q)
     {
         auto result = so3<Scalar, Policy>::from_quaternion(q);

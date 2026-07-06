@@ -22,7 +22,7 @@ namespace cartan::detail
 /// The tool offset is the vector from wrist center to end-effector
 /// expressed in the tool (body) frame.
 template <typename Scalar>
-[[nodiscard]] vector3<Scalar> compute_wrist_center(
+vector3<Scalar> compute_wrist_center(
     const se3<Scalar>& target,
     const vector3<Scalar>& tool_offset)
 {
@@ -34,7 +34,7 @@ template <typename Scalar>
 /// Line i: q_i + t * d_i. Returns the midpoint of the closest approach
 /// segment. If lines are parallel, returns q1.
 template <typename Scalar>
-[[nodiscard]] vector3<Scalar> closest_approach_midpoint(
+vector3<Scalar> closest_approach_midpoint(
     const vector3<Scalar>& q1, const vector3<Scalar>& d1,
     const vector3<Scalar>& q2, const vector3<Scalar>& d2)
 {
@@ -59,7 +59,7 @@ template <typename Scalar>
 
 /// Closest approach distance between two lines in 3D.
 template <typename Scalar>
-[[nodiscard]] Scalar closest_approach_distance(
+Scalar closest_approach_distance(
     const vector3<Scalar>& q1, const vector3<Scalar>& d1,
     const vector3<Scalar>& q2, const vector3<Scalar>& d2)
 {
@@ -83,7 +83,7 @@ template <typename Scalar>
 /// three pairwise distances are below tolerance, the intersection point
 /// is the average of the three pairwise closest points.
 template <typename Scalar>
-[[nodiscard]] cartan::expected<vector3<Scalar>, analytical_failure>
+cartan::expected<vector3<Scalar>, analytical_failure>
 find_wrist_intersection(
     const screw_axis<Scalar>& axis4,
     const screw_axis<Scalar>& axis5,

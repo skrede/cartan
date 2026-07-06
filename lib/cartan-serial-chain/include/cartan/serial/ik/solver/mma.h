@@ -199,11 +199,11 @@ public:
         return {m_status, {units, m_error_norm}};
     }
 
-    [[nodiscard]] bool converged() const { return m_status == ik_status::converged; }
-    [[nodiscard]] const position_type& solution() const { return m_q; }
-    [[nodiscard]] scalar_type error_norm() const { return m_error_norm; }
-    [[nodiscard]] int iterations() const { return m_iterations; }
-    [[nodiscard]] ik_status status() const { return m_status; }
+    bool converged() const { return m_status == ik_status::converged; }
+    const position_type& solution() const { return m_q; }
+    scalar_type error_norm() const { return m_error_norm; }
+    int iterations() const { return m_iterations; }
+    ik_status status() const { return m_status; }
     void abort() { m_status = ik_status::stalled; }
 
 private:

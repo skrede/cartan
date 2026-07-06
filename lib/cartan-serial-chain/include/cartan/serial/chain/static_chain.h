@@ -34,7 +34,7 @@ namespace detail
 /// Map a compile-time joint tag to the runtime joint_kind it describes. Used to
 /// check that a static_chain's stored screw axes agree with their tags.
 template <joint_tag Tag>
-[[nodiscard]] constexpr joint_kind tag_joint_kind()
+constexpr joint_kind tag_joint_kind()
 {
     if constexpr (std::same_as<Tag, revolute_x>) return joint_kind::revolute_x;
     else if constexpr (std::same_as<Tag, revolute_y>) return joint_kind::revolute_y;
@@ -84,7 +84,7 @@ public:
     /// screw under a revolute_z tag) would otherwise be silently mis-evaluated
     /// by the tag-dispatched FK/Jacobian fast paths, so the constructor asserts
     /// on this predicate in debug builds.
-    [[nodiscard]] static bool axes_match_tags(const axes_storage& axes)
+    static bool axes_match_tags(const axes_storage& axes)
     {
         return [&]<std::size_t... Is>(std::index_sequence<Is...>)
         {
@@ -96,22 +96,22 @@ public:
     }
 
     /// Home configuration (M matrix): end-effector pose at zero joint angles.
-    [[nodiscard]] const se3<Scalar>& home() const { return m_home; }
+    const se3<Scalar>& home() const { return m_home; }
 
     /// Number of joints in the chain.
-    [[nodiscard]] int num_joints() const { return joints; }
+    int num_joints() const { return joints; }
 
     /// Access a single screw axis by index.
-    [[nodiscard]] const screw_axis<Scalar>& axis(int i) const
+    const screw_axis<Scalar>& axis(int i) const
     {
         return m_axes[static_cast<std::size_t>(i)];
     }
 
     /// Space-frame screw axes.
-    [[nodiscard]] const axes_storage& axes() const { return m_axes; }
+    const axes_storage& axes() const { return m_axes; }
 
     /// Joint limits.
-    [[nodiscard]] const limits_storage& limits() const { return m_limits; }
+    const limits_storage& limits() const { return m_limits; }
 
 private:
     se3<Scalar> m_home;

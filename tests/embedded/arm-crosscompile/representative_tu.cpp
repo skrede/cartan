@@ -32,7 +32,7 @@ namespace
 /// Build a planar 3R chain identical in spirit to the ESP-IDF smoke: three
 /// revolute joints about +z with unit link spacing and a home pose one unit
 /// past the last joint.
-[[nodiscard]] cartan::kinematic_chain<float, 3> build_planar_3r()
+cartan::kinematic_chain<float, 3> build_planar_3r()
 {
     using vec3f = cartan::vector3<float>;
     using screw = cartan::screw_axis<float>;
@@ -55,7 +55,7 @@ namespace
 /// Exercise forward kinematics, the body Jacobian, one projected-LM IK step,
 /// and Paden-Kahan subproblem 1, folding every result into a single float so
 /// none of the instantiations are dead-code-eliminated.
-[[nodiscard]] float app_stub()
+float app_stub()
 {
     auto chain = build_planar_3r();
 

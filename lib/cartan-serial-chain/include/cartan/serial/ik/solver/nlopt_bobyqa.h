@@ -168,19 +168,19 @@ public:
     }
 
     /// Whether the solve policy has converged.
-    [[nodiscard]] bool converged() const { return m_status == ik_status::converged; }
+    bool converged() const { return m_status == ik_status::converged; }
 
     /// Current joint configuration.
-    [[nodiscard]] position_type solution() const
+    position_type solution() const
     {
         return cartan::detail::stdvec_to_eigen<scalar_type, joints>(m_q_vec);
     }
 
     /// Current error norm.
-    [[nodiscard]] scalar_type error_norm() const { return m_error_norm; }
+    scalar_type error_norm() const { return m_error_norm; }
 
     /// Number of step() calls executed.
-    [[nodiscard]] int iterations() const { return m_iterations; }
+    int iterations() const { return m_iterations; }
 
     /// Abort the solver.
     void abort()
@@ -190,7 +190,7 @@ public:
     }
 
     /// Current solve policy status.
-    [[nodiscard]] ik_status status() const { return m_status; }
+    ik_status status() const { return m_status; }
 
 private:
     /// NLopt objective: 0.5 * ||V_b||^2 (no gradient -- BOBYQA is derivative-free).

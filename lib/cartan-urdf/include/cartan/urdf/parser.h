@@ -41,7 +41,7 @@ namespace detail
 /// Convert a zero-based byte offset within the file text to a one-based line
 /// number. Used to translate pugixml's xml_parse_result::offset into the
 /// urdf_source_location reported on parse failures.
-[[nodiscard]] inline int offset_to_line(const std::string& text, std::ptrdiff_t offset)
+inline int offset_to_line(const std::string& text, std::ptrdiff_t offset)
 {
     int line = 1;
     const auto cap = static_cast<std::ptrdiff_t>(text.size());
@@ -59,7 +59,7 @@ namespace detail
 /// Read the entire file into a string. Returns an empty string on failure;
 /// callers should not rely on this value being meaningful beyond line-number
 /// tracking on a separate pugixml load_file call.
-[[nodiscard]] inline std::string slurp_file(const std::filesystem::path& path)
+inline std::string slurp_file(const std::filesystem::path& path)
 {
     std::error_code ec;
     auto size = std::filesystem::file_size(path, ec);
@@ -85,7 +85,7 @@ namespace detail
 /// this is the single choke point every numeric attribute passes through; an
 /// empty optional signals the caller to raise urdf_failure::non_finite_value
 /// naming the offending element.
-[[nodiscard]] inline std::optional<double> as_finite_double(const pugi::xml_attribute& attr)
+inline std::optional<double> as_finite_double(const pugi::xml_attribute& attr)
 {
     const double raw = attr.as_double();
     if (!std::isfinite(raw))
@@ -99,7 +99,7 @@ namespace detail
 /// false on parse failure; the caller is responsible for raising the
 /// appropriate urdf_failure.
 template <typename Scalar>
-[[nodiscard]] bool parse_triple(std::string_view s, vector3<Scalar>& out)
+bool parse_triple(std::string_view s, vector3<Scalar>& out)
 {
     std::stringstream ss{std::string(s)};
     Scalar x{}, y{}, z{};
@@ -115,7 +115,7 @@ template <typename Scalar>
 /// R = Rz(yaw) * Ry(pitch) * Rx(roll). Each axis rotation is built via
 /// so3::exp so the implementation reuses the validated cartan exponential map.
 template <typename Scalar>
-[[nodiscard]] so3<Scalar> rotation_from_rpy(Scalar roll, Scalar pitch, Scalar yaw)
+so3<Scalar> rotation_from_rpy(Scalar roll, Scalar pitch, Scalar yaw)
 {
     auto rx = so3<Scalar>::exp(vector3<Scalar>(roll, Scalar(0), Scalar(0)));
     auto ry = so3<Scalar>::exp(vector3<Scalar>(Scalar(0), pitch, Scalar(0)));
@@ -128,7 +128,7 @@ template <typename Scalar>
 /// on malformed numeric content; absence of the <origin> element entirely is
 /// the caller's concern.
 template <typename Scalar>
-[[nodiscard]] std::optional<se3<Scalar>> parse_origin(const pugi::xml_node& origin)
+std::optional<se3<Scalar>> parse_origin(const pugi::xml_node& origin)
 {
     vector3<Scalar> xyz = vector3<Scalar>::Zero();
     vector3<Scalar> rpy = vector3<Scalar>::Zero();
@@ -152,7 +152,7 @@ template <typename Scalar>
 /// Map a URDF joint type token to the parser's enumeration. Returns
 /// std::nullopt when the token is not one of the supported kinds; callers
 /// translate that into urdf_failure::unsupported_joint_type.
-[[nodiscard]] inline std::optional<parsed_joint_kind> joint_kind_from_token(std::string_view token)
+inline std::optional<parsed_joint_kind> joint_kind_from_token(std::string_view token)
 {
     if (token == "fixed") { return parsed_joint_kind::fixed; }
     if (token == "revolute") { return parsed_joint_kind::revolute; }
@@ -165,7 +165,7 @@ template <typename Scalar>
 /// non-positive mass and negative diagonal entries in the inertia matrix
 /// (cheap necessary condition for positive semidefiniteness).
 template <typename Scalar>
-[[nodiscard]] cartan::expected<parsed_inertial<Scalar>, urdf_error>
+cartan::expected<parsed_inertial<Scalar>, urdf_error>
 parse_inertial(const pugi::xml_node& inertial_node,
                const std::string& link_name,
                const std::string& file_path)
@@ -276,7 +276,7 @@ parse_inertial(const pugi::xml_node& inertial_node,
 ///   - urdf_failure::inertial_singular when an <inertial> element declares a
 ///     non-positive mass or a negative diagonal inertia entry.
 template <typename Scalar = double>
-[[nodiscard]] cartan::expected<parsed_model<Scalar>, urdf_error>
+cartan::expected<parsed_model<Scalar>, urdf_error>
 parse_urdf_file(const std::filesystem::path& path)
 {
     const std::string path_str = path.string();

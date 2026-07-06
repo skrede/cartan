@@ -43,8 +43,8 @@ struct analytical_result
     std::array<position_type, static_cast<std::size_t>(MaxSolutions)> solutions;
     int count{0};
 
-    [[nodiscard]] auto begin() const { return solutions.begin(); }
-    [[nodiscard]] auto end() const { return solutions.begin() + count; }
+    auto begin() const { return solutions.begin(); }
+    auto end() const { return solutions.begin() + count; }
 };
 
 }

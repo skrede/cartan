@@ -11,22 +11,22 @@
 namespace cartan
 {
 
-[[nodiscard]] constexpr std::string_view version() noexcept
+constexpr std::string_view version() noexcept
 {
     return CARTAN_VERSION_STRING;
 }
 
-[[nodiscard]] constexpr int version_major() noexcept
+constexpr int version_major() noexcept
 {
     return CARTAN_VERSION_MAJOR;
 }
 
-[[nodiscard]] constexpr int version_minor() noexcept
+constexpr int version_minor() noexcept
 {
     return CARTAN_VERSION_MINOR;
 }
 
-[[nodiscard]] constexpr int version_patch() noexcept
+constexpr int version_patch() noexcept
 {
     return CARTAN_VERSION_PATCH;
 }

@@ -169,16 +169,16 @@ public:
         return {m_status, {units, m_error_norm}};
     }
 
-    [[nodiscard]] bool converged() const { return m_status == ik_status::converged; }
+    bool converged() const { return m_status == ik_status::converged; }
 
-    [[nodiscard]] position_type solution() const
+    position_type solution() const
     {
         return cartan::detail::stdvec_to_eigen<scalar_type, joints>(m_q_vec);
     }
 
-    [[nodiscard]] scalar_type error_norm() const { return m_error_norm; }
+    scalar_type error_norm() const { return m_error_norm; }
 
-    [[nodiscard]] int iterations() const { return m_iterations; }
+    int iterations() const { return m_iterations; }
 
     /// Cumulative number of times `objective_func` was invoked by nlopt
     /// since the last `setup()` call. Counts both value-only and
@@ -189,7 +189,7 @@ public:
     /// of how many cartan-outer `step()` rounds or internal restarts
     /// happened during the pose's solve. Zero if `setup()` has not been
     /// called.
-    [[nodiscard]] std::uint64_t nlopt_objective_calls() const
+    std::uint64_t nlopt_objective_calls() const
     {
         return m_objective_calls;
     }
@@ -203,7 +203,7 @@ public:
     /// subsequent step() that re-runs optimize on the perturbed seed.
     /// Capped by `options::max_restarts` (default 10). Reset in
     /// `setup()`.
-    [[nodiscard]] int nlopt_restart_count() const
+    int nlopt_restart_count() const
     {
         return m_restart_count;
     }
@@ -214,7 +214,7 @@ public:
         m_status = ik_status::stalled;
     }
 
-    [[nodiscard]] ik_status status() const { return m_status; }
+    ik_status status() const { return m_status; }
 
 private:
     /// NLopt objective with analytical gradient via SE(3) log Jacobian.

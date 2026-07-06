@@ -124,7 +124,7 @@ public:
     /// gate free of false accepts; the swept transition sits between
     /// d = position_tolerance (solvable) and d = 5*position_tolerance
     /// (unsolvable).
-    [[nodiscard]] static cartan::expected<pieper_6r_solver, analytical_error<scalar_type>>
+    static cartan::expected<pieper_6r_solver, analytical_error<scalar_type>>
     make(const Chain& chain,
          scalar_type position_tolerance = default_position_tolerance)
     {
@@ -166,7 +166,7 @@ public:
         return pieper_6r_solver(chain, position_tolerance);
     }
 
-    [[nodiscard]] cartan::expected<
+    cartan::expected<
         analytical_result<scalar_type, 6, 8>,
         analytical_error<scalar_type>>
     solve(const se3<scalar_type>& target) const
@@ -297,7 +297,7 @@ private:
     /// Wrap a joint angle to the half-open interval (-pi, pi]. std::remainder
     /// maps into [-pi, pi]; the boundary is nudged so the interval is
     /// half-open, giving a single canonical representative per angle.
-    [[nodiscard]] static Scalar wrap_angle(Scalar theta)
+    static Scalar wrap_angle(Scalar theta)
     {
         Scalar w = std::remainder(theta, Scalar(2) * std::numbers::pi_v<Scalar>);
         if (w <= -std::numbers::pi_v<Scalar>)
@@ -306,7 +306,7 @@ private:
     }
 
     /// Wrap every component of a joint configuration to (-pi, pi].
-    [[nodiscard]] static Eigen::Vector<Scalar, 6> wrap_config(
+    static Eigen::Vector<Scalar, 6> wrap_config(
         const Eigen::Vector<Scalar, 6>& q)
     {
         Eigen::Vector<Scalar, 6> w;
@@ -318,7 +318,7 @@ private:
     /// Return true when q coincides, joint-by-joint modulo 2*pi, with a
     /// configuration already stored in result. Comparing the wrapped difference
     /// also collapses boundary duplicates (a joint at +pi versus -pi).
-    [[nodiscard]] static bool is_duplicate_config(
+    static bool is_duplicate_config(
         const analytical_result<Scalar, 6, 8>& result,
         const Eigen::Vector<Scalar, 6>& q)
     {
@@ -342,7 +342,7 @@ private:
     }
 
     /// Rotate a point about a screw axis by theta (Rodrigues).
-    [[nodiscard]] static vector3<Scalar> rotate_point_about_axis(
+    static vector3<Scalar> rotate_point_about_axis(
         const vector3<Scalar>& omega,
         const vector3<Scalar>& q,
         const vector3<Scalar>& p,
@@ -357,7 +357,7 @@ private:
     }
 
     /// Find the reference point for axes 1-2 (closest approach midpoint).
-    [[nodiscard]] static vector3<Scalar> find_axes_reference(
+    static vector3<Scalar> find_axes_reference(
         const vector3<Scalar>& omega1,
         const vector3<Scalar>& q1,
         const vector3<Scalar>& omega2,
@@ -387,7 +387,7 @@ private:
     ///
     /// For the rotation contribution of joints 1-3, we compute
     /// the cumulative rotation from the home configuration.
-    [[nodiscard]] so3<Scalar> compute_rotation_123(
+    so3<Scalar> compute_rotation_123(
         Scalar theta1, Scalar theta2, Scalar theta3) const
     {
         // Rotation contribution of each joint
@@ -426,7 +426,7 @@ private:
     ///
     /// R_wrist = R_03^(-1) * R_target * R_home^(-1)
     /// = exp(omega4*t4) * exp(omega5*t5) * exp(omega6*t6)
-    [[nodiscard]] euler_result extract_wrist_angles(
+    euler_result extract_wrist_angles(
         const so3<Scalar>& R_wrist_input) const
     {
         // The actual wrist rotation to decompose:
@@ -444,7 +444,7 @@ private:
     /// detection lives in extract_euler_general; the wrist-axis dispatch used
     /// to be parameterized on the joint tags but those parameters were dropped
     /// when the solver was re-templated against the chain concept.
-    [[nodiscard]] euler_result extract_euler_dispatch(
+    euler_result extract_euler_dispatch(
         const matrix3<Scalar>& R) const
     {
         return extract_euler_general(R);
@@ -458,7 +458,7 @@ private:
     /// For the middle axis (joint 5), we can extract theta5 from the
     /// known rotation structure. Then theta4 and theta6 follow from
     /// single-axis subproblems.
-    [[nodiscard]] euler_result extract_euler_general(
+    euler_result extract_euler_general(
         const matrix3<Scalar>& R) const
     {
         euler_result result;
@@ -501,7 +501,7 @@ private:
 
     /// Symmetric Euler angle extraction (e.g., ZYZ, XYX).
     /// R = Rot(w4, t4) * Rot(w5, t5) * Rot(w6, t6) where w4 || w6.
-    [[nodiscard]] euler_result extract_symmetric_euler(
+    euler_result extract_symmetric_euler(
         const matrix3<Scalar>& R,
         const vector3<Scalar>& w_outer,
         const vector3<Scalar>& w_middle,
@@ -590,7 +590,7 @@ private:
 
     /// Asymmetric Euler angle extraction (e.g., ZYX, XYZ).
     /// R = Rot(w4, t4) * Rot(w5, t5) * Rot(w6, t6) where w4, w5, w6 are distinct.
-    [[nodiscard]] euler_result extract_asymmetric_euler(
+    euler_result extract_asymmetric_euler(
         const matrix3<Scalar>& R,
         const vector3<Scalar>& w4,
         const vector3<Scalar>& w5,
@@ -761,7 +761,7 @@ static_assert(analytical_solver<pieper_6r_solver<kinematic_chain<double, dynamic
     "pieper_6r_solver must also satisfy analytical_solver concept against dynamic chain");
 
 template <typename Scalar, joint_tag... Joints>
-[[nodiscard]] auto solve_6r(
+auto solve_6r(
     const static_chain<Scalar, Joints...>& chain,
     const se3<Scalar>& target)
 {

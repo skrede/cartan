@@ -16,19 +16,19 @@ struct framed_wrench
     vector6<Scalar> m_value;
 
     /// Access moment component (first 3 elements).
-    [[nodiscard]] auto moment() const
+    auto moment() const
     {
         return m_value.template head<3>();
     }
 
     /// Access force component (last 3 elements).
-    [[nodiscard]] auto force() const
+    auto force() const
     {
         return m_value.template tail<3>();
     }
 
     /// Construct from separate moment and force vectors.
-    [[nodiscard]] static framed_wrench from_moment_force(
+    static framed_wrench from_moment_force(
         const vector3<Scalar>& m, const vector3<Scalar>& f)
     {
         vector6<Scalar> v;
@@ -42,7 +42,7 @@ struct framed_wrench
 /// CoAd_T * W = (Ad_{T^{-1}})^T * W.
 /// Frame enforcement is structural: wrench Frame must match transform's To.
 template <typename From, typename To, typename Scalar, lie_group_policy Policy>
-[[nodiscard]] framed_wrench<From, Scalar>
+framed_wrench<From, Scalar>
 coadjoint_map(const transform<From, To, Scalar, Policy>& T,
               const framed_wrench<To, Scalar>& w)
 {

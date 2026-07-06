@@ -70,7 +70,7 @@ struct fk_matrix_result
     pose_matrix<Scalar> end_effector{};
     intermediate_storage intermediates{detail::make_matrix_intermediate_storage<Scalar, N>()};
 
-    [[nodiscard]] int num_joints() const
+    int num_joints() const
     {
         return static_cast<int>(intermediates.size());
     }
@@ -78,7 +78,7 @@ struct fk_matrix_result
 
 /// Matrix-form forward kinematics for a kinematic chain.
 template <typename Scalar, int N>
-[[nodiscard]] fk_matrix_result<Scalar, N> forward_kinematics_matrix(
+fk_matrix_result<Scalar, N> forward_kinematics_matrix(
     const kinematic_chain<Scalar, N>& chain,
     const typename joint_state<Scalar, N>::position_type& q)
 {
@@ -118,7 +118,7 @@ template <typename Scalar, int N>
 /// Matrix-form forward kinematics for a static_chain. Joint tags are
 /// known at compile time; dispatches into per-tag `exp_joint_matrix`.
 template <typename Scalar, joint_tag... Joints>
-[[nodiscard]] fk_matrix_result<Scalar, static_cast<int>(sizeof...(Joints))>
+fk_matrix_result<Scalar, static_cast<int>(sizeof...(Joints))>
 forward_kinematics_matrix(
     const static_chain<Scalar, Joints...>& chain,
     const typename joint_state<Scalar, static_cast<int>(sizeof...(Joints))>::position_type& q)

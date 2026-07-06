@@ -24,7 +24,7 @@ namespace cartan
 
 /// Compute a single element of the Halton (van der Corput) sequence.
 template <typename Scalar>
-[[nodiscard]] constexpr Scalar halton_element(int index, int base)
+constexpr Scalar halton_element(int index, int base)
 {
     Scalar result{0};
     Scalar f = Scalar(1) / static_cast<Scalar>(base);
@@ -44,7 +44,7 @@ template <typename Scalar>
 /// limit. Falls back to clamping when the wrapped value lands outside the
 /// opposite limit (occurs when the joint range is less than 2pi).
 template <typename Scalar>
-[[nodiscard]] Scalar wrap_joint_angle(Scalar q, Scalar q_min, Scalar q_max)
+Scalar wrap_joint_angle(Scalar q, Scalar q_min, Scalar q_max)
 {
     constexpr Scalar two_pi = Scalar(2) * std::numbers::pi_v<Scalar>;
 
@@ -108,7 +108,7 @@ public:
     /// Generate seed configuration for the given restart index (0-based).
     ///
     /// Maps Halton [0,1]^N to joint limits via linear scaling.
-    [[nodiscard]] position_type operator()(int index) const
+    position_type operator()(int index) const
     {
         int n = m_chain->num_joints();
         position_type q;

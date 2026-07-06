@@ -20,7 +20,7 @@ struct revolute_x
     static constexpr bool is_revolute = true;
 
     template <typename Scalar>
-    [[nodiscard]] static constexpr vector3<Scalar> omega()
+    static constexpr vector3<Scalar> omega()
     {
         return {Scalar(1), Scalar(0), Scalar(0)};
     }
@@ -32,7 +32,7 @@ struct revolute_y
     static constexpr bool is_revolute = true;
 
     template <typename Scalar>
-    [[nodiscard]] static constexpr vector3<Scalar> omega()
+    static constexpr vector3<Scalar> omega()
     {
         return {Scalar(0), Scalar(1), Scalar(0)};
     }
@@ -44,7 +44,7 @@ struct revolute_z
     static constexpr bool is_revolute = true;
 
     template <typename Scalar>
-    [[nodiscard]] static constexpr vector3<Scalar> omega()
+    static constexpr vector3<Scalar> omega()
     {
         return {Scalar(0), Scalar(0), Scalar(1)};
     }
@@ -56,7 +56,7 @@ struct prismatic_x
     static constexpr bool is_revolute = false;
 
     template <typename Scalar>
-    [[nodiscard]] static constexpr vector3<Scalar> direction()
+    static constexpr vector3<Scalar> direction()
     {
         return {Scalar(1), Scalar(0), Scalar(0)};
     }
@@ -68,7 +68,7 @@ struct prismatic_y
     static constexpr bool is_revolute = false;
 
     template <typename Scalar>
-    [[nodiscard]] static constexpr vector3<Scalar> direction()
+    static constexpr vector3<Scalar> direction()
     {
         return {Scalar(0), Scalar(1), Scalar(0)};
     }
@@ -80,7 +80,7 @@ struct prismatic_z
     static constexpr bool is_revolute = false;
 
     template <typename Scalar>
-    [[nodiscard]] static constexpr vector3<Scalar> direction()
+    static constexpr vector3<Scalar> direction()
     {
         return {Scalar(0), Scalar(0), Scalar(1)};
     }

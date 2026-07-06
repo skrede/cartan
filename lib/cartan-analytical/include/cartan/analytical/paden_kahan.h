@@ -21,7 +21,7 @@ namespace cartan
 ///
 /// Reference: Murray, Li and Sastry (1994), Section 3.3.1.
 template <typename Scalar>
-[[nodiscard]] cartan::expected<Scalar, analytical_failure>
+cartan::expected<Scalar, analytical_failure>
 paden_kahan_1(
     const vector3<Scalar>& omega,
     const vector3<Scalar>& q,
@@ -75,7 +75,7 @@ struct paden_kahan_2_result
 ///
 /// Reference: Murray, Li and Sastry (1994), Section 3.3.2.
 template <typename Scalar>
-[[nodiscard]] cartan::expected<paden_kahan_2_result<Scalar>, analytical_failure>
+cartan::expected<paden_kahan_2_result<Scalar>, analytical_failure>
 paden_kahan_2(
     const vector3<Scalar>& omega1,
     const vector3<Scalar>& omega2,
@@ -148,7 +148,7 @@ struct paden_kahan_3_result
 ///
 /// Reference: Murray, Li and Sastry (1994), Section 3.3.3.
 template <typename Scalar>
-[[nodiscard]] cartan::expected<paden_kahan_3_result<Scalar>, analytical_failure>
+cartan::expected<paden_kahan_3_result<Scalar>, analytical_failure>
 paden_kahan_3(
     const vector3<Scalar>& omega,
     const vector3<Scalar>& q,

@@ -33,7 +33,7 @@ struct se3_q_coeffs
 /// c2 = 1/24  - phi^2/720  + phi^4/40320
 /// c3 = 1/120 - phi^2/2520 + phi^4/120960
 template <typename Scalar>
-[[nodiscard]] constexpr se3_q_coeffs<Scalar> se3_q_taylor_coeffs(Scalar phi_sq)
+constexpr se3_q_coeffs<Scalar> se3_q_taylor_coeffs(Scalar phi_sq)
 {
     const Scalar phi_4 = phi_sq * phi_sq;
     return {
@@ -46,7 +46,7 @@ template <typename Scalar>
 /// Exact closed forms for the Q-matrix coefficients (Barfoot, Eq. 8.91a). These
 /// are accurate for larger phi but suffer cancellation as phi -> 0.
 template <typename Scalar>
-[[nodiscard]] se3_q_coeffs<Scalar> se3_q_closed_coeffs(Scalar phi)
+se3_q_coeffs<Scalar> se3_q_closed_coeffs(Scalar phi)
 {
     const Scalar phi_sq = phi * phi;
     const Scalar phi_cu = phi_sq * phi;
@@ -97,7 +97,7 @@ inline constexpr Scalar q_taylor_switch_v = q_taylor_switch_traits<Scalar>::valu
 /// Adapted from Barfoot, State Estimation for Robotics, Eq. 8.91a
 /// to cartan's omega-first convention.
 template <typename Scalar>
-[[nodiscard]] matrix3<Scalar> se3_Q_matrix(const vector3<Scalar>& omega, const vector3<Scalar>& rho)
+matrix3<Scalar> se3_Q_matrix(const vector3<Scalar>& omega, const vector3<Scalar>& rho)
 {
     Scalar phi_sq = omega.squaredNorm();
 
@@ -124,7 +124,7 @@ template <typename Scalar>
 /// Uses cartan's omega-first convention: top-left = J_so3, bottom-left = Q.
 /// Ref: Barfoot, State Estimation for Robotics, Eq. 8.91, adapted to omega-first.
 template <typename Scalar>
-[[nodiscard]] matrix6<Scalar> se3_left_jacobian(const vector6<Scalar>& xi)
+matrix6<Scalar> se3_left_jacobian(const vector6<Scalar>& xi)
 {
     vector3<Scalar> omega = xi.template head<3>();
     vector3<Scalar> rho = xi.template tail<3>();
@@ -144,7 +144,7 @@ template <typename Scalar>
 /// Uses cartan's omega-first convention.
 /// Ref: Barfoot, State Estimation for Robotics, Eq. 8.100b, adapted to omega-first.
 template <typename Scalar>
-[[nodiscard]] matrix6<Scalar> se3_left_jacobian_inv(const vector6<Scalar>& xi)
+matrix6<Scalar> se3_left_jacobian_inv(const vector6<Scalar>& xi)
 {
     vector3<Scalar> omega = xi.template head<3>();
     vector3<Scalar> rho = xi.template tail<3>();

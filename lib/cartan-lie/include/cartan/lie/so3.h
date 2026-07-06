@@ -23,7 +23,7 @@ namespace detail
 /// Avoids theta~pi eigenvector branch entirely; only theta~0 needs Taylor.
 /// Ref: Barfoot, State Estimation for Robotics, Eq. 8.22/8.28, p. 284-286.
 template <typename Scalar>
-[[nodiscard]] vector3<Scalar> so3_log_impl(quaternion<Scalar> q)
+vector3<Scalar> so3_log_impl(quaternion<Scalar> q)
 {
     // Canonicalize to w >= 0 hemisphere (double-cover)
     if (q.w() < Scalar(0))
@@ -51,7 +51,7 @@ template <typename Scalar>
 /// SO(3) left Jacobian implementation.
 /// Ref: Barfoot, State Estimation for Robotics, Eq. 8.82b, p. 298.
 template <typename Scalar>
-[[nodiscard]] matrix3<Scalar> so3_left_jacobian_impl(const vector3<Scalar>& phi)
+matrix3<Scalar> so3_left_jacobian_impl(const vector3<Scalar>& phi)
 {
     Scalar phi_sq = phi.squaredNorm();
     matrix3<Scalar> I = matrix3<Scalar>::Identity();
@@ -77,7 +77,7 @@ template <typename Scalar>
 /// SO(3) inverse left Jacobian implementation.
 /// Ref: Barfoot, State Estimation for Robotics, Eq. 8.84, p. 299.
 template <typename Scalar>
-[[nodiscard]] matrix3<Scalar> so3_left_jacobian_inv_impl(const vector3<Scalar>& phi)
+matrix3<Scalar> so3_left_jacobian_inv_impl(const vector3<Scalar>& phi)
 {
     Scalar phi_sq = phi.squaredNorm();
     matrix3<Scalar> I = matrix3<Scalar>::Identity();
@@ -150,7 +150,7 @@ public:
     /// phi is the axis-angle vector (axis * angle).
     /// Ref: Barfoot, State Estimation for Robotics, Eq. 8.23, p. 285.
     ///      Lynch & Park, Modern Robotics, Prop. 3.11/Eq. 3.51, p. 82.
-    [[nodiscard]] static so3 exp(const vector3<Scalar>& phi)
+    static so3 exp(const vector3<Scalar>& phi)
     {
         Scalar theta_sq = phi.squaredNorm();
         quaternion<Scalar> q;
@@ -178,7 +178,7 @@ public:
     /// Logarithmic map: SO(3) -> so(3) via quaternion atan2 approach.
     /// Avoids theta~pi eigenvector branch; only theta~0 needs Taylor.
     /// Ref: Barfoot, State Estimation for Robotics, Eq. 8.22/8.28, p. 284-286.
-    [[nodiscard]] vector3<Scalar> log() const
+    vector3<Scalar> log() const
     {
         return detail::so3_log_impl(m_quaternion);
     }
@@ -187,7 +187,7 @@ public:
     /// Result uses stricter of two policies.
     /// Ref: Lynch & Park, Modern Robotics, rotation composition, p. 70.
     template <typename P2>
-    [[nodiscard]] auto operator*(const so3<Scalar, P2>& rhs) const
+    auto operator*(const so3<Scalar, P2>& rhs) const
         -> so3<Scalar, stricter_policy<Policy, P2>>
     {
         return so3<Scalar, stricter_policy<Policy, P2>>(
@@ -196,63 +196,63 @@ public:
 
     /// Group inverse via quaternion conjugate: q^{-1} = q*.
     /// Ref: Lynch & Park, Modern Robotics, p. 70.
-    [[nodiscard]] so3 inverse() const
+    so3 inverse() const
     {
         return so3(m_quaternion.conjugate());
     }
 
     /// Adjoint representation: Ad_R = R (the rotation matrix itself for SO(3)).
     /// Ref: Lynch & Park, Modern Robotics, p. 75.
-    [[nodiscard]] matrix3<Scalar> adjoint() const
+    matrix3<Scalar> adjoint() const
     {
         return m_quaternion.toRotationMatrix();
     }
 
     /// Coadjoint representation: Ad_R^{-T} = R for SO(3) (since R is orthogonal).
     /// Ref: Derived from general coadjoint definition; SO(3) is compact.
-    [[nodiscard]] matrix3<Scalar> coadjoint() const
+    matrix3<Scalar> coadjoint() const
     {
         return m_quaternion.toRotationMatrix();
     }
 
     /// Left Jacobian of SO(3).
     /// Ref: Barfoot, State Estimation for Robotics, Eq. 8.82b, p. 298.
-    [[nodiscard]] static matrix3<Scalar> left_jacobian(const vector3<Scalar>& phi)
+    static matrix3<Scalar> left_jacobian(const vector3<Scalar>& phi)
     {
         return detail::so3_left_jacobian_impl(phi);
     }
 
     /// Right Jacobian: J_r(phi) = J_l(-phi).
     /// Ref: Barfoot, State Estimation for Robotics, Eq. 8.82a, p. 298.
-    [[nodiscard]] static matrix3<Scalar> right_jacobian(const vector3<Scalar>& phi)
+    static matrix3<Scalar> right_jacobian(const vector3<Scalar>& phi)
     {
         return detail::so3_left_jacobian_impl(vector3<Scalar>(-phi));
     }
 
     /// Inverse left Jacobian.
     /// Ref: Barfoot, State Estimation for Robotics, Eq. 8.84, p. 299.
-    [[nodiscard]] static matrix3<Scalar> left_jacobian_inv(const vector3<Scalar>& phi)
+    static matrix3<Scalar> left_jacobian_inv(const vector3<Scalar>& phi)
     {
         return detail::so3_left_jacobian_inv_impl(phi);
     }
 
     /// Inverse right Jacobian: J_r^{-1}(phi) = J_l^{-1}(-phi).
     /// Ref: Barfoot, State Estimation for Robotics, Eq. 8.84.
-    [[nodiscard]] static matrix3<Scalar> right_jacobian_inv(const vector3<Scalar>& phi)
+    static matrix3<Scalar> right_jacobian_inv(const vector3<Scalar>& phi)
     {
         return detail::so3_left_jacobian_inv_impl(vector3<Scalar>(-phi));
     }
 
     /// Convert to 3x3 rotation matrix.
     /// Ref: Lynch & Park, Modern Robotics, Eq. 3.10 (rotation matrix from quaternion).
-    [[nodiscard]] matrix3<Scalar> matrix() const
+    matrix3<Scalar> matrix() const
     {
         return m_quaternion.toRotationMatrix();
     }
 
     /// Access the internal quaternion (read-only).
     /// Named quaternion_ref() to avoid collision with Eigen type alias.
-    [[nodiscard]] const quaternion<Scalar>& quaternion_ref() const
+    const quaternion<Scalar>& quaternion_ref() const
     {
         return m_quaternion;
     }
@@ -263,13 +263,13 @@ public:
     /// quaternion double cover -- q and -q denote the same rotation and compare
     /// equal. No exact equality operator is provided: bit-exact floating compare
     /// on the raw storage is a footgun (double cover, drift).
-    [[nodiscard]] bool isApprox(const so3& other, Scalar tol) const
+    bool isApprox(const so3& other, Scalar tol) const
     {
         return (inverse() * other).log().norm() <= tol;
     }
 
     /// Identity element: zero rotation (unit quaternion w=1).
-    [[nodiscard]] static so3 identity()
+    static so3 identity()
     {
         return so3(quaternion<Scalar>(Scalar(1), Scalar(0), Scalar(0), Scalar(0)),
                    trusted_unit);
@@ -278,7 +278,7 @@ public:
     /// Construct from 3x3 rotation matrix with validation.
     /// Checks R^T*R ~= I and det(R) ~= 1.
     /// Ref: Rotation matrix properties, Lynch & Park, Modern Robotics, p. 23-24.
-    [[nodiscard]] static cartan::expected<so3, lie_failure>
+    static cartan::expected<so3, lie_failure>
     from_matrix(const matrix3<Scalar>& R)
     {
         Scalar tol = detail::sqrt_epsilon_v<Scalar>;
@@ -300,7 +300,7 @@ public:
 
     /// Construct from quaternion with validation.
     /// Checks ||q|| ~= 1.
-    [[nodiscard]] static cartan::expected<so3, lie_failure>
+    static cartan::expected<so3, lie_failure>
     from_quaternion(const quaternion<Scalar>& q)
     {
         if (std::abs(q.squaredNorm() - Scalar(1)) > detail::sqrt_epsilon_v<Scalar>)
@@ -313,7 +313,7 @@ public:
 
     /// Rotate a 3D vector: R * v.
     /// Ref: SO(3) action on R^3 via quaternion rotation.
-    [[nodiscard]] vector3<Scalar> act(const vector3<Scalar>& v) const
+    vector3<Scalar> act(const vector3<Scalar>& v) const
     {
         return m_quaternion * v;
     }
@@ -332,7 +332,7 @@ namespace detail
 ///                                cos(t) = 2*cos^2(t/2) - 1.
 /// Ref: Barfoot, State Estimation for Robotics, Eq. 8.23 + 8.82b.
 template <typename Scalar>
-[[nodiscard]] std::pair<so3<Scalar>, matrix3<Scalar>>
+std::pair<so3<Scalar>, matrix3<Scalar>>
 exp_with_left_jacobian(const vector3<Scalar>& phi)
 {
     Scalar theta_sq = phi.squaredNorm();

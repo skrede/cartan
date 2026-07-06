@@ -149,7 +149,7 @@ fk_result<Scalar, N> forward_kinematics(
 /// Wins over the generic chain overload via partial ordering on
 /// static_chain<Scalar, Joints...>.
 template <typename Scalar, joint_tag... Joints>
-[[nodiscard]] fk_result<Scalar, static_cast<int>(sizeof...(Joints))>
+fk_result<Scalar, static_cast<int>(sizeof...(Joints))>
 forward_kinematics(
     const static_chain<Scalar, Joints...>& chain,
     const typename joint_state<Scalar, static_cast<int>(sizeof...(Joints))>::position_type& q)
@@ -186,7 +186,7 @@ forward_kinematics(
 ///
 /// Lynch & Park, Modern Robotics, Eq. 4.10, p. 138.
 template <chain Chain>
-[[nodiscard]] fk_result<typename Chain::scalar_type, Chain::joints>
+fk_result<typename Chain::scalar_type, Chain::joints>
 forward_kinematics(
     const Chain& chain,
     const typename joint_state<typename Chain::scalar_type, Chain::joints>::position_type& q)

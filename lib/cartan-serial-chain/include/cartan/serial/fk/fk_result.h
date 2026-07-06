@@ -38,7 +38,7 @@ struct fk_result
     intermediate_storage intermediates{};  ///< Partial products T_i for Jacobian reuse
 
     /// Number of joints reflected in this result.
-    [[nodiscard]] int num_joints() const
+    int num_joints() const
     {
         return static_cast<int>(intermediates.size());
     }

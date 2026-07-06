@@ -59,7 +59,7 @@ public:
     static_assert(std::is_floating_point_v<scalar_type>,
         "exhaustive_ik_runner requires a floating-point Scalar type");
 
-    [[nodiscard]] exhaustive_result<scalar_type, joints> solve(
+    exhaustive_result<scalar_type, joints> solve(
         const Chain& chain,
         const se3<scalar_type>& target,
         const position_type& seed,

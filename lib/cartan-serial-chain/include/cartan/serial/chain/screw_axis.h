@@ -29,7 +29,7 @@ class screw_axis
 {
 public:
     /// Construct a revolute joint screw axis.
-    [[nodiscard]] static screw_axis revolute(
+    static screw_axis revolute(
         const vector3<Scalar>& axis,
         const vector3<Scalar>& point)
     {
@@ -39,7 +39,7 @@ public:
     }
 
     /// Construct a prismatic joint screw axis.
-    [[nodiscard]] static screw_axis prismatic(const vector3<Scalar>& direction)
+    static screw_axis prismatic(const vector3<Scalar>& direction)
     {
         return screw_axis(vector3<Scalar>::Zero(), direction.normalized());
     }
@@ -47,7 +47,7 @@ public:
     /// Construct from a 6-vector (omega, v) with unit constraint validation.
     /// Revolute (||omega|| > 0): requires ||omega|| = 1.
     /// Prismatic (omega = 0): requires ||v|| = 1.
-    [[nodiscard]] static cartan::expected<screw_axis, lie_failure> from_vector(
+    static cartan::expected<screw_axis, lie_failure> from_vector(
         const vector6<Scalar>& vec)
     {
         vector3<Scalar> omega = vec.template head<3>();
@@ -75,13 +75,13 @@ public:
     }
 
     /// Angular velocity component (rotation axis for revolute, zero for prismatic).
-    [[nodiscard]] const vector3<Scalar>& omega() const { return m_omega; }
+    const vector3<Scalar>& omega() const { return m_omega; }
 
     /// Linear velocity component.
-    [[nodiscard]] const vector3<Scalar>& v() const { return m_v; }
+    const vector3<Scalar>& v() const { return m_v; }
 
     /// Export as 6-vector (omega, v) in omega-first convention.
-    [[nodiscard]] vector6<Scalar> to_vector() const
+    vector6<Scalar> to_vector() const
     {
         vector6<Scalar> vec;
         vec.template head<3>() = m_omega;
@@ -90,13 +90,13 @@ public:
     }
 
     /// True if this is a revolute (rotational) joint axis.
-    [[nodiscard]] bool is_revolute() const
+    bool is_revolute() const
     {
         return m_omega.squaredNorm() > detail::epsilon_v<Scalar>;
     }
 
     /// True if this is a prismatic (translational) joint axis.
-    [[nodiscard]] bool is_prismatic() const { return !is_revolute(); }
+    bool is_prismatic() const { return !is_revolute(); }
 
 private:
     screw_axis(const vector3<Scalar>& omega, const vector3<Scalar>& v)

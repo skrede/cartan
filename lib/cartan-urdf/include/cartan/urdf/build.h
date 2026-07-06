@@ -42,7 +42,7 @@ namespace detail
 /// A link with multiple non-fixed outgoing joints is a branch point; the chain
 /// extractor surfaces that via urdf_failure::branched_kinematic_tree.
 template <typename Scalar>
-[[nodiscard]] inline std::unordered_map<std::string, std::vector<std::size_t>>
+inline std::unordered_map<std::string, std::vector<std::size_t>>
 build_outgoing(const parsed_model<Scalar>& model)
 {
     std::unordered_map<std::string, std::vector<std::size_t>> out;
@@ -56,7 +56,7 @@ build_outgoing(const parsed_model<Scalar>& model)
 /// Build the child-link -> parent-joint-index reverse map. Used to identify
 /// root links (those with no incoming joint).
 template <typename Scalar>
-[[nodiscard]] inline std::unordered_map<std::string, std::size_t>
+inline std::unordered_map<std::string, std::size_t>
 build_incoming(const parsed_model<Scalar>& model)
 {
     std::unordered_map<std::string, std::size_t> in;
@@ -69,7 +69,7 @@ build_incoming(const parsed_model<Scalar>& model)
 
 /// Identify the root links (no incoming joint) in source order.
 template <typename Scalar>
-[[nodiscard]] inline std::vector<std::string>
+inline std::vector<std::string>
 collect_roots(const parsed_model<Scalar>& model,
               const std::unordered_map<std::string, std::size_t>& incoming)
 {
@@ -101,7 +101,7 @@ collect_roots(const parsed_model<Scalar>& model,
 /// that link instead of the auto-detected root; when tool_link is set, the
 /// walk stops once it reaches that link.
 template <typename Scalar = double>
-[[nodiscard]] cartan::expected<urdf_load_result<Scalar>, urdf_error>
+cartan::expected<urdf_load_result<Scalar>, urdf_error>
 build_chain(const parsed_model<Scalar>& model, const load_options& opts = {})
 {
     // Validate overrides against the link set up front so the caller gets the

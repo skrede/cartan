@@ -21,7 +21,7 @@ struct transform
 
     /// Compose with another transform whose From frame matches our To frame.
     template <typename C, lie_group_policy P2>
-    [[nodiscard]] auto operator*(const transform<To, C, Scalar, P2>& rhs) const
+    auto operator*(const transform<To, C, Scalar, P2>& rhs) const
         -> transform<From, C, Scalar, stricter_policy<Policy, P2>>
     {
         return transform<From, C, Scalar, stricter_policy<Policy, P2>>{
@@ -30,49 +30,49 @@ struct transform
     }
 
     /// Inverse flips frame tags: transform<A,B>.inverse() -> transform<B,A>.
-    [[nodiscard]] transform<To, From, Scalar, Policy> inverse() const
+    transform<To, From, Scalar, Policy> inverse() const
     {
         return transform<To, From, Scalar, Policy>{m_value.inverse()};
     }
 
     /// Convert to 4x4 homogeneous transformation matrix.
-    [[nodiscard]] matrix4<Scalar> matrix() const
+    matrix4<Scalar> matrix() const
     {
         return m_value.matrix();
     }
 
     /// Access the rotation component.
-    [[nodiscard]] const so3<Scalar, Policy>& rotation() const
+    const so3<Scalar, Policy>& rotation() const
     {
         return m_value.rotation();
     }
 
     /// Access the translation component.
-    [[nodiscard]] const vector3<Scalar>& translation() const
+    const vector3<Scalar>& translation() const
     {
         return m_value.translation();
     }
 
     /// Logarithmic map: SE(3) -> se(3).
-    [[nodiscard]] vector6<Scalar> log() const
+    vector6<Scalar> log() const
     {
         return m_value.log();
     }
 
     /// Transform a 3D point: R * p + t.
-    [[nodiscard]] vector3<Scalar> act(const vector3<Scalar>& p) const
+    vector3<Scalar> act(const vector3<Scalar>& p) const
     {
         return m_value.act(p);
     }
 
     /// Identity transform (no rotation, no translation).
-    [[nodiscard]] static transform identity()
+    static transform identity()
     {
         return transform{se3<Scalar, Policy>::identity()};
     }
 
     /// Construct from 4x4 homogeneous matrix with validation.
-    [[nodiscard]] static cartan::expected<transform, lie_failure>
+    static cartan::expected<transform, lie_failure>
     from_matrix(const matrix4<Scalar>& T)
     {
         auto result = se3<Scalar, Policy>::from_matrix(T);

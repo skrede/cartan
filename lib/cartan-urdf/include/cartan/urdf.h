@@ -27,7 +27,7 @@ namespace cartan
 /// extractor failures (branched tree, missing override link) flow through the
 /// same cartan::expected channel using the same urdf_error type.
 template <typename Scalar = double>
-[[nodiscard]] inline cartan::expected<urdf_load_result<Scalar>, urdf_error>
+inline cartan::expected<urdf_load_result<Scalar>, urdf_error>
 load_urdf(const std::filesystem::path& path, const load_options& opts = {})
 {
     auto parsed = parse_urdf_file<Scalar>(path);
@@ -42,7 +42,7 @@ load_urdf(const std::filesystem::path& path, const load_options& opts = {})
 /// formats live behind a uniform pair of names. Returns
 /// urdf_failure::sdf_not_supported unconditionally.
 template <typename Scalar = double>
-[[nodiscard]] inline cartan::expected<urdf_load_result<Scalar>, urdf_error>
+inline cartan::expected<urdf_load_result<Scalar>, urdf_error>
 load_sdf(const std::filesystem::path&)
 {
     return cartan::unexpected(urdf_error{

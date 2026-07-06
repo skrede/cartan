@@ -19,7 +19,7 @@ enum class lie_failure
 
 /// Human-readable diagnostic for a lie_failure, for logging and binding
 /// exception messages. Returns a static string literal; no allocation.
-[[nodiscard]] constexpr const char* message(lie_failure failure)
+constexpr const char* message(lie_failure failure)
 {
     switch (failure)
     {

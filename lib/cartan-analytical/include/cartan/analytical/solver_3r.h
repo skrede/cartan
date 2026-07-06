@@ -70,7 +70,7 @@ public:
         m_valid = true;
     }
 
-    [[nodiscard]] cartan::expected<
+    cartan::expected<
         analytical_result<scalar_type, 3, 4>,
         analytical_error<scalar_type>>
     solve(const se3<scalar_type>& target) const
@@ -150,7 +150,7 @@ private:
     /// <typename Scalar, joint_tag... Joints> to <chain Chain>.
     using Scalar = scalar_type;
 
-    [[nodiscard]] static vector3<Scalar> rotate_point_about_axis(
+    static vector3<Scalar> rotate_point_about_axis(
         const vector3<Scalar>& omega,
         const vector3<Scalar>& q,
         const vector3<Scalar>& p,
@@ -166,7 +166,7 @@ private:
 
     /// Find the intersection point of two lines (or closest approach midpoint).
     /// Line i: point q_i + t * omega_i.
-    [[nodiscard]] static vector3<Scalar> find_axes_intersection(
+    static vector3<Scalar> find_axes_intersection(
         const vector3<Scalar>& omega1,
         const vector3<Scalar>& q1,
         const vector3<Scalar>& omega2,
@@ -207,7 +207,7 @@ static_assert(analytical_solver<spatial_3r_solver<kinematic_chain<double, dynami
     "spatial_3r_solver must also satisfy analytical_solver concept against dynamic chain");
 
 template <typename Scalar, joint_tag... Joints>
-[[nodiscard]] auto solve_3r(
+auto solve_3r(
     const static_chain<Scalar, Joints...>& chain,
     const se3<Scalar>& target)
 {

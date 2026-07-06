@@ -206,17 +206,17 @@ public:
         return {m_status, {units, m_error_norm}};
     }
 
-    [[nodiscard]] bool converged() const { return m_status == ik_status::converged; }
+    bool converged() const { return m_status == ik_status::converged; }
     // Report the feasibility-first best-so-far iterate across restarts, not the
     // last perturbed attempt, so a terminal solve still surfaces its best result.
-    [[nodiscard]] const position_type& solution() const { return m_best_valid ? m_best_q : m_q; }
-    [[nodiscard]] scalar_type error_norm() const { return m_best_valid ? m_best_q_error : m_error_norm; }
-    [[nodiscard]] int iterations() const { return m_iterations; }
-    [[nodiscard]] ik_status status() const { return m_status; }
-    [[nodiscard]] ik_termination_reason termination_reason() const { return m_termination_reason; }
-    [[nodiscard]] int restart_count() const { return m_restart_count; }
+    const position_type& solution() const { return m_best_valid ? m_best_q : m_q; }
+    scalar_type error_norm() const { return m_best_valid ? m_best_q_error : m_error_norm; }
+    int iterations() const { return m_iterations; }
+    ik_status status() const { return m_status; }
+    ik_termination_reason termination_reason() const { return m_termination_reason; }
+    int restart_count() const { return m_restart_count; }
 
-    [[nodiscard]] std::uint64_t line_search_calls() const
+    std::uint64_t line_search_calls() const
     {
         if (!m_solver) return 0;
         using state_t = std::remove_cvref_t<decltype(m_solver->state())>;
@@ -226,7 +226,7 @@ public:
             return 0;
     }
 
-    [[nodiscard]] std::uint32_t argmin_iterations() const
+    std::uint32_t argmin_iterations() const
     {
         if (!m_solver) return 0;
         using state_t = std::remove_cvref_t<decltype(m_solver->state())>;
@@ -236,7 +236,7 @@ public:
             return 0;
     }
 
-    [[nodiscard]] auto last_check_results() const
+    auto last_check_results() const
     {
         if constexpr (requires { m_nab_opts.convergence.last_check_results(); })
             return m_nab_opts.convergence.last_check_results();

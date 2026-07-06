@@ -42,7 +42,7 @@ inline void fk_sincos(long double x, long double& s, long double& c) { s = std::
 /// entries. For prismatic joints, returns identity rotation with
 /// axis-aligned translation. Avoids generic Rodrigues exponential.
 template <joint_tag JointTag, typename Scalar>
-[[nodiscard]] se3<Scalar> exp_joint(Scalar q, const screw_axis<Scalar>& axis)
+se3<Scalar> exp_joint(Scalar q, const screw_axis<Scalar>& axis)
 {
     if constexpr (std::same_as<JointTag, revolute_z>)
     {
@@ -232,7 +232,7 @@ void jacobian_column(
 /// specializations as static_chain, based on the cached joint_kind. The
 /// general fallback uses the standard se3::exp path.
 template <typename Scalar>
-[[nodiscard]] se3<Scalar> exp_joint_runtime(
+se3<Scalar> exp_joint_runtime(
     joint_kind kind,
     Scalar q,
     const screw_axis<Scalar>& axis)
@@ -448,11 +448,11 @@ struct generic_chain_wrapper
     using scalar_type = typename ChainType::scalar_type;
     static constexpr int joints = ChainType::joints;
 
-    [[nodiscard]] const auto& home() const { return wrapped.home(); }
-    [[nodiscard]] int num_joints() const { return wrapped.num_joints(); }
-    [[nodiscard]] const auto& axis(int i) const { return wrapped.axis(i); }
-    [[nodiscard]] const auto& axes() const { return wrapped.axes(); }
-    [[nodiscard]] const auto& limits() const { return wrapped.limits(); }
+    const auto& home() const { return wrapped.home(); }
+    int num_joints() const { return wrapped.num_joints(); }
+    const auto& axis(int i) const { return wrapped.axis(i); }
+    const auto& axes() const { return wrapped.axes(); }
+    const auto& limits() const { return wrapped.limits(); }
 };
 
 }

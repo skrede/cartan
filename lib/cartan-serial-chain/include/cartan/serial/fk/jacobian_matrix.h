@@ -143,7 +143,7 @@ inline void jacobian_column_matrix(
 
 /// Space Jacobian from matrix-form FK result.
 template <typename Scalar, int N>
-[[nodiscard]] jacobian_matrix<Scalar, N> space_jacobian(
+jacobian_matrix<Scalar, N> space_jacobian(
     const kinematic_chain<Scalar, N>& chain,
     const fk_matrix_result<Scalar, N>& fk)
 {
@@ -179,7 +179,7 @@ template <typename Scalar, int N>
 /// Compile-time joint tags allow per-tag specialization to drop the
 /// runtime switch in the hot loop.
 template <typename Scalar, joint_tag... Joints>
-[[nodiscard]] jacobian_matrix<Scalar, static_cast<int>(sizeof...(Joints))>
+jacobian_matrix<Scalar, static_cast<int>(sizeof...(Joints))>
 space_jacobian(
     const static_chain<Scalar, Joints...>& chain,
     const fk_matrix_result<Scalar, static_cast<int>(sizeof...(Joints))>& fk)

@@ -514,7 +514,7 @@ struct planar_2r_geometry
     static constexpr Scalar l1 = Scalar(0.5);
     static constexpr Scalar l2 = Scalar(0.4);
 
-    [[nodiscard]] static std::array<cartan::screw_axis<Scalar>, 2> axes()
+    static std::array<cartan::screw_axis<Scalar>, 2> axes()
     {
         using vec3 = cartan::vector3<Scalar>;
         return {
@@ -526,14 +526,14 @@ struct planar_2r_geometry
                 vec3(l1, Scalar(0), Scalar(0)))};
     }
 
-    [[nodiscard]] static cartan::se3<Scalar> home()
+    static cartan::se3<Scalar> home()
     {
         return cartan::se3<Scalar>(
             cartan::so3<Scalar>::identity(),
             cartan::vector3<Scalar>(l1 + l2, Scalar(0), Scalar(0)));
     }
 
-    [[nodiscard]] static std::array<cartan::joint_limits<Scalar>, 2> limits()
+    static std::array<cartan::joint_limits<Scalar>, 2> limits()
     {
         cartan::joint_limits<Scalar> lim{
             -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
@@ -548,7 +548,7 @@ struct spatial_3r_geometry
     static constexpr Scalar link_offset = Scalar(0.5);
     static constexpr Scalar ee_offset = Scalar(0.3);
 
-    [[nodiscard]] static std::array<cartan::screw_axis<Scalar>, 3> axes()
+    static std::array<cartan::screw_axis<Scalar>, 3> axes()
     {
         using vec3 = cartan::vector3<Scalar>;
         return {
@@ -563,14 +563,14 @@ struct spatial_3r_geometry
                 vec3(link_offset, Scalar(0), Scalar(0)))};
     }
 
-    [[nodiscard]] static cartan::se3<Scalar> home()
+    static cartan::se3<Scalar> home()
     {
         return cartan::se3<Scalar>(
             cartan::so3<Scalar>::identity(),
             cartan::vector3<Scalar>(link_offset + ee_offset, Scalar(0), Scalar(0)));
     }
 
-    [[nodiscard]] static std::array<cartan::joint_limits<Scalar>, 3> limits()
+    static std::array<cartan::joint_limits<Scalar>, 3> limits()
     {
         cartan::joint_limits<Scalar> lim{
             -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
@@ -595,7 +595,7 @@ struct spatial_3r_geometry
 template <typename Scalar>
 struct abb_irb120_geometry
 {
-    [[nodiscard]] static std::array<cartan::screw_axis<Scalar>, 6> axes()
+    static std::array<cartan::screw_axis<Scalar>, 6> axes()
     {
         using vec3 = cartan::vector3<Scalar>;
         return {
@@ -619,14 +619,14 @@ struct abb_irb120_geometry
                 vec3(Scalar(0), Scalar(0), Scalar(0.862)))};
     }
 
-    [[nodiscard]] static cartan::se3<Scalar> home()
+    static cartan::se3<Scalar> home()
     {
         return cartan::se3<Scalar>(
             cartan::so3<Scalar>::identity(),
             cartan::vector3<Scalar>(Scalar(0), Scalar(0), Scalar(0.934)));
     }
 
-    [[nodiscard]] static std::array<cartan::joint_limits<Scalar>, 6> limits()
+    static std::array<cartan::joint_limits<Scalar>, 6> limits()
     {
         cartan::joint_limits<Scalar> lim{
             -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
@@ -638,7 +638,7 @@ struct abb_irb120_geometry
 template <typename Scalar>
 struct kr6_sixx_geometry
 {
-    [[nodiscard]] static std::array<cartan::screw_axis<Scalar>, 6> axes()
+    static std::array<cartan::screw_axis<Scalar>, 6> axes()
     {
         using vec3 = cartan::vector3<Scalar>;
         return {
@@ -662,14 +662,14 @@ struct kr6_sixx_geometry
                 vec3(Scalar(0.935), Scalar(0), Scalar(0.400)))};
     }
 
-    [[nodiscard]] static cartan::se3<Scalar> home()
+    static cartan::se3<Scalar> home()
     {
         return cartan::se3<Scalar>(
             cartan::so3<Scalar>::identity(),
             cartan::vector3<Scalar>(Scalar(0.935), Scalar(0), Scalar(0.400)));
     }
 
-    [[nodiscard]] static std::array<cartan::joint_limits<Scalar>, 6> limits()
+    static std::array<cartan::joint_limits<Scalar>, 6> limits()
     {
         cartan::joint_limits<Scalar> lim{
             -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};

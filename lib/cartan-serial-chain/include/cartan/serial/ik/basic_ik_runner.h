@@ -243,9 +243,9 @@ public:
         return build_result();
     }
 
-    [[nodiscard]] bool converged() const { return m_status == ik_status::converged; }
+    bool converged() const { return m_status == ik_status::converged; }
 
-    [[nodiscard]] scalar_type error_norm() const
+    scalar_type error_norm() const
     {
         if constexpr (sizeof...(Policies) == 1)
         {
@@ -263,9 +263,9 @@ public:
         }
     }
 
-    [[nodiscard]] int iterations() const { return m_total_iterations; }
-    [[nodiscard]] const position_type& current_q() const { return m_best_q; }
-    [[nodiscard]] ik_status status() const { return m_status; }
+    int iterations() const { return m_total_iterations; }
+    const position_type& current_q() const { return m_best_q; }
+    ik_status status() const { return m_status; }
 
     void abort()
     {

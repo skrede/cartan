@@ -114,7 +114,7 @@ private:
         free_index_storage indices{};
         int count{0};
 
-        [[nodiscard]] int operator[](int i) const
+        int operator[](int i) const
         {
             return indices[static_cast<std::size_t>(i)];
         }
@@ -211,16 +211,16 @@ public:
         return {m_status, {units, m_error_norm}};
     }
 
-    [[nodiscard]] bool converged() const { return m_status == ik_status::converged; }
+    bool converged() const { return m_status == ik_status::converged; }
     // Report the feasibility-first best-so-far iterate, not the last attempt's
     // final configuration, so a terminal solve still surfaces its best result.
-    [[nodiscard]] const position_type& solution() const { return m_best_valid ? m_best_q : m_q; }
-    [[nodiscard]] scalar_type error_norm() const { return m_best_valid ? m_best_error : m_error_norm; }
-    [[nodiscard]] int iterations() const { return m_total_iterations; }
+    const position_type& solution() const { return m_best_valid ? m_best_q : m_q; }
+    scalar_type error_norm() const { return m_best_valid ? m_best_error : m_error_norm; }
+    int iterations() const { return m_total_iterations; }
     void abort() { m_aborted = true; }
-    [[nodiscard]] scalar_type lambda() const { return m_lambda; }
+    scalar_type lambda() const { return m_lambda; }
     void set_lambda(scalar_type l) { m_lambda = l; }
-    [[nodiscard]] ik_status status() const { return m_status; }
+    ik_status status() const { return m_status; }
 
 private:
     // Retain the best-so-far iterate lexicographically: a feasible iterate always

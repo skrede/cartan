@@ -48,21 +48,21 @@ public:
 
     /// Exponential map: angle -> SO(2) rotation.
     /// Reference: Lynch & Park, Modern Robotics, Def. 3.2, p. 68.
-    [[nodiscard]] static so2 exp(Scalar theta)
+    static so2 exp(Scalar theta)
     {
         return so2(std::cos(theta), std::sin(theta));
     }
 
     /// Logarithmic map: SO(2) rotation -> angle in (-pi, pi].
     /// Reference: Lynch & Park, Modern Robotics, p. 69.
-    [[nodiscard]] Scalar log() const
+    Scalar log() const
     {
         return std::atan2(m_sin, m_cos);
     }
 
     /// Group inverse: R^{-1} = R^T, which negates the sine component.
     /// Reference: Rotation inverse is transpose for orthogonal matrices.
-    [[nodiscard]] so2 inverse() const
+    so2 inverse() const
     {
         return so2(m_cos, -m_sin);
     }
@@ -71,7 +71,7 @@ public:
     /// Result uses the stricter of the two policies.
     /// Reference: Lynch & Park, Modern Robotics, rotation composition, p. 68.
     template <typename P2>
-    [[nodiscard]] auto operator*(const so2<Scalar, P2>& rhs) const
+    auto operator*(const so2<Scalar, P2>& rhs) const
         -> so2<Scalar, stricter_policy<Policy, P2>>
     {
         return so2<Scalar, stricter_policy<Policy, P2>>(
@@ -81,7 +81,7 @@ public:
 
     /// Convert to 2x2 rotation matrix: [[c, -s], [s, c]].
     /// Reference: Lynch & Park, Modern Robotics, Eq. 3.10, p. 68.
-    [[nodiscard]] matrix2<Scalar> matrix() const
+    matrix2<Scalar> matrix() const
     {
         matrix2<Scalar> R;
         R << m_cos, -m_sin,
@@ -90,7 +90,7 @@ public:
     }
 
     /// Angle accessor (same as log).
-    [[nodiscard]] Scalar angle() const
+    Scalar angle() const
     {
         return log();
     }
@@ -101,13 +101,13 @@ public:
     /// that denote the same rotation compare equal. No exact equality operator
     /// is provided: bit-exact floating compare on cos/sin is a footgun (angle
     /// wrap, drift).
-    [[nodiscard]] bool isApprox(const so2& other, Scalar tol) const
+    bool isApprox(const so2& other, Scalar tol) const
     {
         return std::abs((inverse() * other).log()) <= tol;
     }
 
     /// Identity element: zero rotation.
-    [[nodiscard]] static so2 identity()
+    static so2 identity()
     {
         return so2(Scalar(1), Scalar(0));
     }
@@ -116,7 +116,7 @@ public:
     /// Checks orthogonality (R^T * R ~= I) and det(R) ~= 1.
     /// Returns cartan::unexpected with a lie_failure code on failure.
     /// Reference: Rotation matrix properties, Lynch & Park, p. 23-24.
-    [[nodiscard]] static cartan::expected<so2, lie_failure>
+    static cartan::expected<so2, lie_failure>
     from_matrix(const matrix2<Scalar>& R)
     {
         Scalar tol = detail::sqrt_epsilon_v<Scalar>;
@@ -139,14 +139,14 @@ public:
     }
 
     /// Direct access to cosine component.
-    [[nodiscard]] Scalar cos_angle() const { return m_cos; }
+    Scalar cos_angle() const { return m_cos; }
 
     /// Direct access to sine component.
-    [[nodiscard]] Scalar sin_angle() const { return m_sin; }
+    Scalar sin_angle() const { return m_sin; }
 
     /// Rotate a 2D vector: R * v.
     /// Reference: 2D rotation action on R^2.
-    [[nodiscard]] vector2<Scalar> act(const vector2<Scalar>& v) const
+    vector2<Scalar> act(const vector2<Scalar>& v) const
     {
         return matrix() * v;
     }

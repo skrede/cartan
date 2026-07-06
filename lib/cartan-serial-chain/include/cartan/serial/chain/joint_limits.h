@@ -26,7 +26,7 @@ struct joint_limits
     std::optional<Scalar> acceleration_max{};         ///< Maximum joint acceleration (optional)
 
     /// Check whether a position value lies within [position_min, position_max].
-    [[nodiscard]] bool contains(Scalar position) const
+    bool contains(Scalar position) const
     {
         return position >= position_min && position <= position_max;
     }
@@ -55,7 +55,7 @@ inline constexpr Scalar k_unbounded_angular_range_v
 /// joints with +/-infinity bounds (unbounded angular joints) produce a finite,
 /// usable step scale instead of NaN propagation through the inner loops.
 template <typename Scalar>
-[[nodiscard]] constexpr Scalar finite_range_or(Scalar range, Scalar fallback) noexcept
+constexpr Scalar finite_range_or(Scalar range, Scalar fallback) noexcept
 {
     return std::isfinite(range) ? range : fallback;
 }
@@ -67,13 +67,13 @@ template <typename Scalar>
 /// SQP-family inner solvers stall when constraint values are themselves
 /// infinite even though the constraint is trivially satisfied mathematically.
 template <typename Scalar>
-[[nodiscard]] constexpr Scalar finite_lower_or(Scalar lo, Scalar half_fallback) noexcept
+constexpr Scalar finite_lower_or(Scalar lo, Scalar half_fallback) noexcept
 {
     return std::isfinite(lo) ? lo : -half_fallback;
 }
 
 template <typename Scalar>
-[[nodiscard]] constexpr Scalar finite_upper_or(Scalar hi, Scalar half_fallback) noexcept
+constexpr Scalar finite_upper_or(Scalar hi, Scalar half_fallback) noexcept
 {
     return std::isfinite(hi) ? hi : +half_fallback;
 }

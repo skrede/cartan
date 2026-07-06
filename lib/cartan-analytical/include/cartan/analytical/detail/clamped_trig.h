@@ -10,13 +10,13 @@ namespace cartan::detail
 {
 
 template <typename Scalar>
-[[nodiscard]] CARTAN_CONSTEXPR_CMATH Scalar safe_acos(Scalar x)
+CARTAN_CONSTEXPR_CMATH Scalar safe_acos(Scalar x)
 {
     return std::acos(std::clamp(x, Scalar(-1), Scalar(1)));
 }
 
 template <typename Scalar>
-[[nodiscard]] CARTAN_CONSTEXPR_CMATH Scalar safe_asin(Scalar x)
+CARTAN_CONSTEXPR_CMATH Scalar safe_asin(Scalar x)
 {
     return std::asin(std::clamp(x, Scalar(-1), Scalar(1)));
 }

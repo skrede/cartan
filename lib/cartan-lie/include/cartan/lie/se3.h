@@ -55,7 +55,7 @@ public:
     /// drift. Designed for FK chain accumulators where N successive unit
     /// quaternion products keep ||q||^2 - 1 bounded by O(N * eps).
     template <typename P2>
-    [[nodiscard]] se3<Scalar, fast_policy>
+    se3<Scalar, fast_policy>
     compose_trusted(const se3<Scalar, P2>& rhs) const
     {
         quaternion<Scalar> q = m_rotation.quaternion_ref()
@@ -69,7 +69,7 @@ public:
     /// Twist V = (omega, rho) uses omega-first convention.
     /// Ref: Lynch & Park, Modern Robotics, Prop. 3.25/Eq. 3.88, p. 103.
     ///      Barfoot, State Estimation for Robotics, Eq. 8.33, p. 289.
-    [[nodiscard]] static se3 exp(const vector6<Scalar>& v)
+    static se3 exp(const vector6<Scalar>& v)
     {
         vector3<Scalar> omega = v.template head<3>();
         vector3<Scalar> rho = v.template tail<3>();
@@ -84,7 +84,7 @@ public:
     /// Returns V = (omega, rho) in omega-first convention.
     /// Ref: Lynch & Park, Modern Robotics, Eq. 3.91-3.92, p. 104.
     ///      Barfoot, State Estimation for Robotics, Eq. 8.35, p. 290.
-    [[nodiscard]] vector6<Scalar> log() const
+    vector6<Scalar> log() const
     {
         vector3<Scalar> omega = m_rotation.log();
         matrix3<Scalar> J_inv = so3<Scalar, Policy>::left_jacobian_inv(omega);
@@ -100,7 +100,7 @@ public:
     /// Result uses the stricter of the two policies.
     /// Ref: Lynch & Park, Modern Robotics, homogeneous transform composition.
     template <typename P2>
-    [[nodiscard]] auto operator*(const se3<Scalar, P2>& rhs) const
+    auto operator*(const se3<Scalar, P2>& rhs) const
         -> se3<Scalar, stricter_policy<Policy, P2>>
     {
         using RP = stricter_policy<Policy, P2>;
@@ -113,7 +113,7 @@ public:
 
     /// Group inverse: T^{-1} = (R^{-1}, -R^{-1} * t).
     /// Ref: Lynch & Park, Modern Robotics, Eq. 3.64, p. 94.
-    [[nodiscard]] se3 inverse() const
+    se3 inverse() const
     {
         auto rot_inv = m_rotation.inverse();
         return se3(rot_inv, -(rot_inv.act(m_translation)));
@@ -124,7 +124,7 @@ public:
     ///   [Ad_T] = [R        0   ]
     ///            [[p]R     R   ]
     /// Ref: Lynch & Park, Modern Robotics, Def. 3.20, p. 98.
-    [[nodiscard]] matrix6<Scalar> adjoint() const
+    matrix6<Scalar> adjoint() const
     {
         matrix6<Scalar> Ad;
         Ad.setZero();
@@ -138,14 +138,14 @@ public:
     /// Coadjoint representation: Ad_T^{-T} = (Ad_{T^{-1}})^T.
     /// Computed as inverse().adjoint().transpose() for correctness.
     /// Ref: Derived from general coadjoint definition Ad_T^{-T}.
-    [[nodiscard]] matrix6<Scalar> coadjoint() const
+    matrix6<Scalar> coadjoint() const
     {
         return inverse().adjoint().transpose();
     }
 
     /// Convert to 4x4 homogeneous transformation matrix.
     /// Ref: Lynch & Park, Modern Robotics, Eq. 3.60-3.61.
-    [[nodiscard]] matrix4<Scalar> matrix() const
+    matrix4<Scalar> matrix() const
     {
         matrix4<Scalar> T;
         T.setZero();
@@ -156,10 +156,10 @@ public:
     }
 
     /// Access the rotation component.
-    [[nodiscard]] const so3<Scalar, Policy>& rotation() const { return m_rotation; }
+    const so3<Scalar, Policy>& rotation() const { return m_rotation; }
 
     /// Access the translation component.
-    [[nodiscard]] const vector3<Scalar>& translation() const { return m_translation; }
+    const vector3<Scalar>& translation() const { return m_translation; }
 
     /// Manifold-aware approximate equality: true iff the se(3) twist distance
     /// between the two transforms is at most tol. Uses
@@ -168,13 +168,13 @@ public:
     /// following the Sophus convention. Double-cover safe via the so3 log. No
     /// exact equality operator is provided: bit-exact floating compare is a
     /// footgun.
-    [[nodiscard]] bool isApprox(const se3& other, Scalar tol) const
+    bool isApprox(const se3& other, Scalar tol) const
     {
         return (inverse() * other).log().norm() <= tol;
     }
 
     /// Identity element: no rotation, no translation.
-    [[nodiscard]] static se3 identity()
+    static se3 identity()
     {
         return se3(so3<Scalar, Policy>::identity(), vector3<Scalar>::Zero());
     }
@@ -182,7 +182,7 @@ public:
     /// Construct from 4x4 homogeneous matrix with validation.
     /// Validates rotation block is SO(3) and bottom row is (0,0,0,1).
     /// Ref: SE(3) matrix structure, Lynch & Park, Modern Robotics, p. 86.
-    [[nodiscard]] static cartan::expected<se3, lie_failure>
+    static cartan::expected<se3, lie_failure>
     from_matrix(const matrix4<Scalar>& T)
     {
         Scalar tol = detail::sqrt_epsilon_v<Scalar>;
@@ -208,7 +208,7 @@ public:
 
     /// Transform a 3D point: R * p + t.
     /// Ref: SE(3) action on R^3.
-    [[nodiscard]] vector3<Scalar> act(const vector3<Scalar>& p) const
+    vector3<Scalar> act(const vector3<Scalar>& p) const
     {
         return m_rotation.act(p) + m_translation;
     }

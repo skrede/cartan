@@ -301,15 +301,15 @@ public:
         return {m_status, {units, m_error_norm}};
     }
 
-    [[nodiscard]] bool converged() const { return m_status == ik_status::converged; }
+    bool converged() const { return m_status == ik_status::converged; }
     // Report the feasibility-first best-so-far iterate across restarts, not the
     // last perturbed attempt, so a terminal solve still surfaces its best result.
-    [[nodiscard]] const position_type& solution() const { return m_best_valid ? m_best_q : m_q; }
-    [[nodiscard]] scalar_type error_norm() const { return m_best_valid ? m_best_q_error : m_error_norm; }
-    [[nodiscard]] int iterations() const { return m_iterations; }
-    [[nodiscard]] ik_status status() const { return m_status; }
-    [[nodiscard]] ik_termination_reason termination_reason() const { return m_termination_reason; }
-    [[nodiscard]] int restart_count() const { return m_restart_count; }
+    const position_type& solution() const { return m_best_valid ? m_best_q : m_q; }
+    scalar_type error_norm() const { return m_best_valid ? m_best_q_error : m_error_norm; }
+    int iterations() const { return m_iterations; }
+    ik_status status() const { return m_status; }
+    ik_termination_reason termination_reason() const { return m_termination_reason; }
+    int restart_count() const { return m_restart_count; }
 
     /// Cumulative number of phi(alpha) line-search calls the underlying
     /// kraft_slsqp_policy has made since setup(). Zero if the solver has
@@ -317,7 +317,7 @@ public:
     /// per solver step without reaching into argmin internals. Gracefully
     /// returns 0 on argmin versions predating the counter member (shipped
     /// in argmin commit 95ffe8d).
-    [[nodiscard]] std::uint64_t line_search_calls() const
+    std::uint64_t line_search_calls() const
     {
         if (!m_solver) return 0;
         using state_t = std::remove_cvref_t<decltype(m_solver->state())>;
@@ -332,7 +332,7 @@ public:
     /// inner step count that pairs with line_search_calls to compute
     /// average backtracks per argmin step. Zero if the solver has not
     /// been set up.
-    [[nodiscard]] std::uint32_t argmin_iterations() const
+    std::uint32_t argmin_iterations() const
     {
         if (!m_solver) return 0;
         using state_t = std::remove_cvref_t<decltype(m_solver->state())>;
@@ -360,7 +360,7 @@ public:
     /// per-iteration telemetry into the caller's opts, not into the solver's
     /// stored_convergence_. The stored_convergence_ back-copy is only done
     /// by the no-opts `step_n(budget)` overload.
-    [[nodiscard]] auto last_check_results() const
+    auto last_check_results() const
     {
         if constexpr (requires { m_nab_opts.convergence.last_check_results(); })
             return m_nab_opts.convergence.last_check_results();

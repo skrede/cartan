@@ -38,7 +38,7 @@ namespace detail
 /// range does not. This is the boundary tolerance for within_limits and is a
 /// candidate for an empirical sweep should a bound-hugging solver need slack.
 template <typename Scalar>
-[[nodiscard]] inline Scalar default_feasibility_tol() noexcept
+inline Scalar default_feasibility_tol() noexcept
 {
     return std::sqrt(std::numeric_limits<Scalar>::epsilon());
 }
@@ -52,7 +52,7 @@ template <typename Scalar>
 /// pose-converged but out-of-range configuration is reported as a joint-limit
 /// failure rather than a trustworthy solution.
 template <chain Chain>
-[[nodiscard]] bool within_limits(
+bool within_limits(
     const typename joint_state<typename Chain::scalar_type, Chain::joints>::position_type& q,
     const Chain& chain,
     typename Chain::scalar_type tol)
@@ -92,7 +92,7 @@ template <chain Chain>
 /// the cross product on a large-reach chain is absorbed without admitting a
 /// physically meaningful (millimeter-scale) pitch as "zero".
 template <typename Scalar>
-[[nodiscard]] inline bool is_zero_pitch_revolute(const screw_axis<Scalar>& s) noexcept
+inline bool is_zero_pitch_revolute(const screw_axis<Scalar>& s) noexcept
 {
     if (!s.is_revolute())
     {
@@ -130,7 +130,7 @@ template <typename Scalar>
 /// Without this guard an angle sitting exactly on the upper bound of a span-2*pi
 /// range would be needlessly re-anchored to the lower bound (e.g. +pi -> -pi).
 template <typename Scalar>
-[[nodiscard]] inline Scalar canonical_angle_in_limits(
+inline Scalar canonical_angle_in_limits(
     Scalar theta, Scalar lo, Scalar hi, Scalar tol) noexcept
 {
     const bool above_lo = !std::isfinite(lo) || theta >= lo - tol;
@@ -197,7 +197,7 @@ void canonicalize_into_limits(
 /// fails. On return q holds the canonical representative regardless of the verdict;
 /// callers store it as the solution only on the feasible (converged) path.
 template <chain Chain>
-[[nodiscard]] bool feasible_after_canonicalization(
+bool feasible_after_canonicalization(
     typename joint_state<typename Chain::scalar_type, Chain::joints>::position_type& q,
     const Chain& chain,
     typename Chain::scalar_type tol)

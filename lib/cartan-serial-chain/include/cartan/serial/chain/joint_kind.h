@@ -43,7 +43,7 @@ enum class joint_kind : std::uint8_t
 /// screw_axis::v() direction for prismatic joints.
 /// All other axes return joint_kind::general.
 template <typename Scalar>
-[[nodiscard]] inline joint_kind detect_joint_kind(const screw_axis<Scalar>& axis)
+inline joint_kind detect_joint_kind(const screw_axis<Scalar>& axis)
 {
     const Scalar tol = detail::sqrt_epsilon_v<Scalar>;
     auto is_unit = [tol](Scalar x) { return std::abs(std::abs(x) - Scalar(1)) < tol; };

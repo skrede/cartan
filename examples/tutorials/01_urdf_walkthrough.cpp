@@ -24,7 +24,7 @@ namespace
 /// uniform distribution is well-defined. The math under test does not depend
 /// on sampling the whole real line.
 template <typename Scalar>
-[[nodiscard]] auto random_within_limits(
+auto random_within_limits(
     const cartan::kinematic_chain<Scalar, cartan::dynamic>& chain,
     std::mt19937& rng) -> Eigen::Matrix<Scalar, Eigen::Dynamic, 1>
 {

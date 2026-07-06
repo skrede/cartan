@@ -18,7 +18,7 @@ namespace cartan
 {
 
 template <chain Chain>
-[[nodiscard]] bool verify_solution(
+bool verify_solution(
     const Chain& chain,
     const se3<typename Chain::scalar_type>& target,
     const typename joint_state<typename Chain::scalar_type, Chain::joints>::position_type& q,
@@ -31,7 +31,7 @@ template <chain Chain>
 }
 
 template <chain Chain, typename Scalar, int N>
-[[nodiscard]] std::vector<ik_result<Scalar, N>> filter_valid_solutions(
+std::vector<ik_result<Scalar, N>> filter_valid_solutions(
     const Chain& chain,
     const se3<Scalar>& target,
     std::vector<ik_result<Scalar, N>> solutions,

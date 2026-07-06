@@ -75,7 +75,7 @@ public:
     /// b = 2 sin^2(omega/2) / omega instead of (1 - cos(omega)) / omega; the
     /// only branch is the literal-0/0 guard at omega == 0.
     /// Reference: Lynch & Park, Modern Robotics, Def. 3.14, p. 88.
-    [[nodiscard]] static se2 exp(const vector3<Scalar>& v)
+    static se2 exp(const vector3<Scalar>& v)
     {
         Scalar omega = v(0);
         Scalar vx = v(1);
@@ -117,7 +117,7 @@ public:
     /// term (omega/2) cot(omega/2) is well-conditioned, so the only branch is
     /// the literal-0/0 guard at omega == 0.
     /// Reference: Lynch & Park, Modern Robotics, p. 89-90.
-    [[nodiscard]] vector3<Scalar> log() const
+    vector3<Scalar> log() const
     {
         Scalar omega = m_rotation.log();
         vector3<Scalar> result;
@@ -149,7 +149,7 @@ public:
 
     /// Group inverse: T^{-1} = (R^{-1}, -R^{-1} * t).
     /// Reference: Lynch & Park, Modern Robotics, Eq. 3.64, adapted for 2D.
-    [[nodiscard]] se2 inverse() const
+    se2 inverse() const
     {
         auto rot_inv = m_rotation.inverse();
         return se2(rot_inv, -(rot_inv.matrix() * m_translation));
@@ -159,7 +159,7 @@ public:
     /// Result uses the stricter of the two policies.
     /// Reference: Lynch & Park, Modern Robotics, homogeneous transform composition.
     template <typename P2>
-    [[nodiscard]] auto operator*(const se2<Scalar, P2>& rhs) const
+    auto operator*(const se2<Scalar, P2>& rhs) const
         -> se2<Scalar, stricter_policy<Policy, P2>>
     {
         using ResultPolicy = stricter_policy<Policy, P2>;
@@ -173,7 +173,7 @@ public:
 
     /// Convert to 3x3 homogeneous transformation matrix.
     /// Reference: Lynch & Park, Modern Robotics, Eq. 3.60-3.61.
-    [[nodiscard]] Eigen::Matrix<Scalar, 3, 3> matrix() const
+    Eigen::Matrix<Scalar, 3, 3> matrix() const
     {
         Eigen::Matrix<Scalar, 3, 3> T;
         T.setZero();
@@ -187,7 +187,7 @@ public:
     /// For SE(2): Ad_T = [[1, 0, 0], [ty, cos, -sin], [-tx, sin, cos]]
     /// where the twist is (omega, vx, vy) omega-first.
     /// Reference: Derived from Lynch & Park, Modern Robotics, Def. 3.20, adapted for 2D.
-    [[nodiscard]] Eigen::Matrix<Scalar, 3, 3> adjoint() const
+    Eigen::Matrix<Scalar, 3, 3> adjoint() const
     {
         Eigen::Matrix<Scalar, 3, 3> Ad;
         Scalar c = m_rotation.cos_angle();
@@ -212,13 +212,13 @@ public:
     /// following the Sophus convention. Angle-wrap safe via the so2 log. No
     /// exact equality operator is provided: bit-exact floating compare is a
     /// footgun.
-    [[nodiscard]] bool isApprox(const se2& other, Scalar tol) const
+    bool isApprox(const se2& other, Scalar tol) const
     {
         return (inverse() * other).log().norm() <= tol;
     }
 
     /// Identity element: no rotation, no translation.
-    [[nodiscard]] static se2 identity()
+    static se2 identity()
     {
         return se2(so2<Scalar, Policy>::identity(), vector2<Scalar>::Zero());
     }
@@ -226,7 +226,7 @@ public:
     /// Construct from 3x3 homogeneous matrix with validation.
     /// Validates rotation block is SO(2) and bottom row is [0, 0, 1].
     /// Reference: SE(2) matrix structure, Lynch & Park, p. 86.
-    [[nodiscard]] static cartan::expected<se2, lie_failure>
+    static cartan::expected<se2, lie_failure>
     from_matrix(const Eigen::Matrix<Scalar, 3, 3>& T)
     {
         Scalar tol = detail::sqrt_epsilon_v<Scalar>;
@@ -251,14 +251,14 @@ public:
     }
 
     /// Access the rotation component.
-    [[nodiscard]] const so2<Scalar, Policy>& rotation() const { return m_rotation; }
+    const so2<Scalar, Policy>& rotation() const { return m_rotation; }
 
     /// Access the translation component.
-    [[nodiscard]] const vector2<Scalar>& translation() const { return m_translation; }
+    const vector2<Scalar>& translation() const { return m_translation; }
 
     /// Transform a 2D point: R * p + t.
     /// Reference: SE(2) action on R^2.
-    [[nodiscard]] vector2<Scalar> act(const vector2<Scalar>& p) const
+    vector2<Scalar> act(const vector2<Scalar>& p) const
     {
         return m_rotation.act(p) + m_translation;
     }

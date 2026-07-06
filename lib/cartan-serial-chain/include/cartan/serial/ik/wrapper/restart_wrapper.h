@@ -221,11 +221,11 @@ public:
         return {ik_status::running, {inner_result.metrics.units_consumed, m_inner.error_norm()}};
     }
 
-    [[nodiscard]] bool converged() const { return m_inner.converged(); }
+    bool converged() const { return m_inner.converged(); }
     // On a converged solve the live inner iterate is the answer; on a terminal
     // solve report the feasibility-first best-so-far captured across restarts
     // rather than the last (discarded) attempt.
-    [[nodiscard]] position_type solution() const
+    position_type solution() const
     {
         if (m_inner.converged() || !m_best_valid)
         {
@@ -233,7 +233,7 @@ public:
         }
         return m_best_q;
     }
-    [[nodiscard]] scalar_type error_norm() const
+    scalar_type error_norm() const
     {
         if (m_inner.converged() || !m_best_valid)
         {
@@ -241,7 +241,7 @@ public:
         }
         return m_best_q_error;
     }
-    [[nodiscard]] int iterations() const { return m_total_iterations; }
+    int iterations() const { return m_total_iterations; }
 
     void abort()
     {

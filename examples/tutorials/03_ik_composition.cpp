@@ -44,7 +44,7 @@ struct aggregate
     double mean_multi_solutions{0.0};
 };
 
-[[nodiscard]] aggregate summarize(const std::vector<call_record>& records)
+aggregate summarize(const std::vector<call_record>& records)
 {
     aggregate out;
     if (records.empty())

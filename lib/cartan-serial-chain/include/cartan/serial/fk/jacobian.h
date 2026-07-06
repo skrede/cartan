@@ -162,7 +162,7 @@ jacobian_matrix<Scalar, N> body_jacobian(
 /// helpers that use column extraction and sparse multiply instead of the
 /// full 6x6 adjoint matrix.
 template <typename Scalar, joint_tag... Joints>
-[[nodiscard]] jacobian_matrix<Scalar, static_cast<int>(sizeof...(Joints))>
+jacobian_matrix<Scalar, static_cast<int>(sizeof...(Joints))>
 space_jacobian(
     const static_chain<Scalar, Joints...>& chain,
     const fk_result<Scalar, static_cast<int>(sizeof...(Joints))>& fk)
@@ -199,7 +199,7 @@ space_jacobian(
 /// Specialized body Jacobian for static_chain.
 /// Delegates to the specialized space_jacobian and applies Ad_{T^{-1}}.
 template <typename Scalar, joint_tag... Joints>
-[[nodiscard]] jacobian_matrix<Scalar, static_cast<int>(sizeof...(Joints))>
+jacobian_matrix<Scalar, static_cast<int>(sizeof...(Joints))>
 body_jacobian(
     const static_chain<Scalar, Joints...>& chain,
     const fk_result<Scalar, static_cast<int>(sizeof...(Joints))>& fk)
@@ -216,7 +216,7 @@ body_jacobian(
 ///
 /// Reference: Lynch & Park, Modern Robotics, Eq. 5.11, p. 178.
 template <chain Chain>
-[[nodiscard]] jacobian_matrix<typename Chain::scalar_type, Chain::joints>
+jacobian_matrix<typename Chain::scalar_type, Chain::joints>
 space_jacobian(
     const Chain& chain,
     const fk_result<typename Chain::scalar_type, Chain::joints>& fk)
@@ -253,7 +253,7 @@ space_jacobian(
 ///
 /// Reference: Lynch & Park, Modern Robotics, Eq. 5.22, p. 185.
 template <chain Chain>
-[[nodiscard]] jacobian_matrix<typename Chain::scalar_type, Chain::joints>
+jacobian_matrix<typename Chain::scalar_type, Chain::joints>
 body_jacobian(
     const Chain& chain,
     const fk_result<typename Chain::scalar_type, Chain::joints>& fk)

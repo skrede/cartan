@@ -11,7 +11,7 @@ namespace cartan
 /// Property: hat(v) * w = v x w (cross product).
 /// Reference: Lynch & Park, Modern Robotics, Def. 3.7 / Eq. 3.30, p. 75.
 template <typename Scalar>
-[[nodiscard]] matrix3<Scalar> hat(const vector3<Scalar>& v)
+matrix3<Scalar> hat(const vector3<Scalar>& v)
 {
     matrix3<Scalar> S;
     S <<      Scalar(0), -v(2),        v(1),
@@ -24,7 +24,7 @@ template <typename Scalar>
 /// Inverse of hat for so(3): vee(hat(v)) == v.
 /// Reference: Lynch & Park, Modern Robotics, inverse of Def. 3.7, p. 75.
 template <typename Scalar>
-[[nodiscard]] vector3<Scalar> vee(const matrix3<Scalar>& S)
+vector3<Scalar> vee(const matrix3<Scalar>& S)
 {
     vector3<Scalar> v;
     v << S(2, 1), S(0, 2), S(1, 0);
@@ -36,7 +36,7 @@ template <typename Scalar>
 /// Layout: top-left 3x3 = hat(omega), top-right 3x1 = v, bottom row = zeros.
 /// Reference: Lynch & Park, Modern Robotics, Eq. 3.85, p. 103.
 template <typename Scalar>
-[[nodiscard]] matrix4<Scalar> hat(const vector6<Scalar>& V)
+matrix4<Scalar> hat(const vector6<Scalar>& V)
 {
     matrix4<Scalar> M;
     M.setZero();
@@ -51,7 +51,7 @@ template <typename Scalar>
 /// Inverse of hat for se(3): vee(hat(V)) == V.
 /// Reference: Lynch & Park, Modern Robotics, inverse of Eq. 3.85, p. 103.
 template <typename Scalar>
-[[nodiscard]] vector6<Scalar> vee(const matrix4<Scalar>& M)
+vector6<Scalar> vee(const matrix4<Scalar>& M)
 {
     vector6<Scalar> V;
     matrix3<Scalar> omega_hat = M.template block<3, 3>(0, 0);
