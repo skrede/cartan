@@ -40,6 +40,8 @@ if (CARTAN_BUILD_ARGMIN)
     )
 endif ()
 
+target_compile_features(cartan_serial_chain INTERFACE cxx_std_20)
+
 set_target_properties(cartan_serial_chain PROPERTIES EXPORT_NAME serial_chain)
 
 if (CARTAN_ENABLE_INSTALL)

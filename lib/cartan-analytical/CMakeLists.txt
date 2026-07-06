@@ -12,6 +12,8 @@ target_link_libraries(cartan_analytical
     cartan::serial_chain
 )
 
+target_compile_features(cartan_analytical INTERFACE cxx_std_20)
+
 set_target_properties(cartan_analytical PROPERTIES EXPORT_NAME analytical)
 
 if (CARTAN_ENABLE_INSTALL)

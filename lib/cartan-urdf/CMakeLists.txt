@@ -32,6 +32,8 @@ target_link_libraries(cartan_urdf
     pugixml::pugixml
 )
 
+target_compile_features(cartan_urdf INTERFACE cxx_std_20)
+
 set_target_properties(cartan_urdf PROPERTIES EXPORT_NAME urdf)
 
 if (CARTAN_ENABLE_INSTALL)

@@ -5,7 +5,7 @@ All notable user-facing changes to this project are documented in this file.
 The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] — 0.4.1
+## [0.4.1] - 2026-07-06
 
 ### Added
 - Apache License 2.0 stamped at repo root; `CONTRIBUTING.md` covering issue
@@ -38,6 +38,12 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 - This `CHANGELOG.md` covering the 0.1.0 through 0.4.1 history.
 
 ### Changed
+- Language baseline relaxed from C++23 to C++20, making C++20 the stated
+  requirement across the README badge, `docs/getting-started.md`,
+  `CONTRIBUTING.md`, and the package metadata. The one C++23 dependency,
+  `std::expected`, is covered by an in-tree `<cartan/expected.h>` polyfill
+  (`cartan::expected`), so the public headers compile on the exceptions-off
+  embedded GCC backends that do not yet ship the C++23 standard library.
 - README license badge and footer corrected from MIT to Apache 2.0 (the
   `LICENSE` file at repo root has always carried Apache 2.0 text; the badge
   and footer were the inconsistency).
@@ -280,7 +286,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   NLopt SQP stepper, and `ik_objective`-driven secondary optimization.
 - Racing and fallback schedulers with tick policies for cooperative
   multi-solver IK.
-- CMake project skeleton with C++23, Eigen INTERFACE target, NLopt optional
-  backend, seven presets.
+- CMake project skeleton (originally C++23, later relaxed to a C++20 baseline
+  in 0.4.1), Eigen INTERFACE target, NLopt optional backend, seven presets.
 - CI pipeline with GCC-14 / Clang-18 matrix, ASan + UBSan + MSan sanitizer
   jobs, clang-tidy adapted for spatialpp headers.

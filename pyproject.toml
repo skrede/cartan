@@ -7,8 +7,8 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "cartan"
-version = "0.4.1.dev0"
-description = "Python bindings for cartan — C++23 Lie group, kinematics, and IK library"
+version = "0.4.1"
+description = "Python bindings for cartan — C++20 Lie group, kinematics, and IK library"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }

@@ -2,7 +2,8 @@
 
 ## Prerequisites
 
-- C++23 compiler: GCC 14+, Clang 18+, MSVC 17.10+
+- C++20 compiler: GCC 10+, Clang 13+, MSVC 17.x+ (tested on GCC 14, Clang 18,
+  MSVC 17.10). Embedded targets build with an exceptions-off C++20 GCC backend.
 - CMake 3.28+
 - Eigen 3.4+ (fetched automatically via FetchContent)
 
@@ -59,7 +60,7 @@ same directory:
 cmake_minimum_required(VERSION 3.28)
 project(hello_cartan)
 
-set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(FetchContent)

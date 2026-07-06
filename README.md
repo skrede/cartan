@@ -5,7 +5,7 @@
 ![Windows](https://github.com/skrede/cartan/actions/workflows/windows.yml/badge.svg)
 [![codecov](https://codecov.io/gh/skrede/cartan/branch/master/graph/badge.svg)](https://codecov.io/gh/skrede/cartan)
 ![License](https://img.shields.io/badge/license-Apache_2.0-blue.svg)
-![C++23](https://img.shields.io/badge/C%2B%2B-23-blue.svg)
+![C++20](https://img.shields.io/badge/C%2B%2B-20-blue.svg)
 
 C++ Lie group and kinematics library for robotics.
 

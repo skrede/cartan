@@ -73,15 +73,18 @@ need their respective external dependencies installed.
 
 ## Coding Conventions
 
-Cartan targets idiomatic C++23. The conventions below carry over from
-internal codebase rules and apply to all public contributions.
+Cartan targets idiomatic C++20 with first-class embedded targets. The
+conventions below carry over from internal codebase rules and apply to all
+public contributions.
 
 ### Language and style
 
-- **C++23** -- use modern features where they improve clarity:
-  `concepts`, `std::expected`, `std::ranges`, `if constexpr`,
-  designated initializers, etc. Don't reach for C++23 features purely
-  for novelty; reach for them where they make the code clearer.
+- **C++20** -- use modern features where they improve clarity:
+  `concepts`, `std::ranges`, `if constexpr`, designated initializers, etc.
+  `std::expected` is C++23, so cartan ships its own `<cartan/expected.h>`
+  polyfill (`cartan::expected`) to keep the baseline at C++20 and the public
+  headers usable on the exceptions-off embedded backends. Don't reach for a
+  feature purely for novelty; reach for it where it makes the code clearer.
 - **Eigen is the only required dependency.** NLopt, argmin/nablapp,
   pinocchio, and TRAC-IK are optional and gated behind CMake feature
   flags.
