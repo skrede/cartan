@@ -232,11 +232,11 @@ TEST_CASE("Singular configuration: elbow singularity does not diverge", "[ik][in
     solver.setup(chain, target, q0, criteria);
     auto result = solver.solve();
 
-    // Adaptive damping should prevent divergence
-    if (!result.has_value())
-    {
-        REQUIRE(result.error().reason != spp::ik_failure::diverged);
-    }
+    // The target is a reachable FK pose at a near-singular configuration.
+    // Adaptive damping must drive the solve to a joint vector that actually
+    // reaches the target under FK re-verification -- not merely avoid divergence.
+    REQUIRE(result.has_value());
+    REQUIRE(spp::verify_solution(chain, target, result.value().solution.position, criteria));
 }
 
 // ============================================================================
@@ -290,9 +290,18 @@ TEST_CASE("Unreachable target: inside workspace but impossible orientation", "[i
     solver.setup(chain, target, q0, criteria);
     auto result = solver.solve();
 
-    // May converge to a different config or report failure; either is acceptable
-    // Key: does not hang or crash
-    REQUIRE(true);
+    // A full 6-DOF arm can in fact reach this orientation at the in-workspace
+    // position. If the solver reports success, FK re-verification must confirm
+    // the returned joints actually reach the target to tolerance; if it instead
+    // reports failure, that failure must be a bounded, non-divergent termination.
+    if (result.has_value())
+    {
+        REQUIRE(spp::verify_solution(chain, target, result.value().solution.position, criteria));
+    }
+    else
+    {
+        REQUIRE(result.error().reason != spp::ik_failure::diverged);
+    }
 }
 
 // ============================================================================

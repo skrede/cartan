@@ -189,11 +189,25 @@ TEST_CASE("DLS near-singular convergence", "[ik][dls]")
     criteria.max_iterations_per_attempt = 300;
     criteria.max_total_work_units = 600;
 
+    // Seed pose error, used below to show the damped iterate makes real progress.
+    auto seed_err = (spp::forward_kinematics(chain, q0).end_effector.inverse() * target).log();
+
     stepper.setup(chain, target, q0, criteria);
     auto status = run_stepper(stepper, chain, 300);
 
-    // Should converge or at least not diverge
+    // Near this singularity the damped solve stalls short of the tight 1e-6
+    // gate, but the DLS damping invariant must hold: the step stays finite and
+    // bounded. It never diverges, the Jacobian condition number stays finite,
+    // and the iterate is driven far below the seed error to a small bounded
+    // residual rather than blowing up.
     REQUIRE(status != spp::ik_status::diverged);
+    REQUIRE(std::isfinite(stepper.condition_number()));
+
+    auto fk_sol = spp::forward_kinematics(chain, stepper.solution());
+    auto err = (fk_sol.end_effector.inverse() * target).log();
+    REQUIRE(std::isfinite(err.norm()));
+    REQUIRE(err.norm() < 1e-2);                     // reaches within 1e-2 of the target
+    REQUIRE(err.norm() < 0.1 * seed_err.norm());    // and improves the seed error by >10x
 }
 
 // ============================================================================
@@ -229,23 +243,40 @@ TEST_CASE("DLS separate angular/linear convergence", "[ik][dls]")
 // DLS condition_number returns positive value
 // ============================================================================
 
-TEST_CASE("DLS condition_number returns positive value", "[ik][dls]")
+TEST_CASE("DLS condition_number tracks proximity to singularity", "[ik][dls]")
 {
     auto chain = make_ur5_like_chain();
 
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
+    auto target = spp::forward_kinematics(chain, q_known).end_effector;
 
-    auto fk_target = spp::forward_kinematics(chain, q_known);
-
-    spp::dls<spp::kinematic_chain<double, 6>> stepper;
-    Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
 
-    stepper.setup(chain, fk_target.end_effector, q0, criteria);
-    (void)stepper.step(chain, 1);
+    // Well-conditioned interior configuration: the Jacobian is far from
+    // rank-deficient, so its condition number is a small O(10) value.
+    spp::dls<spp::kinematic_chain<double, 6>> stepper_good;
+    Eigen::Vector<double, 6> q_good;
+    q_good << 0.35, -0.45, 0.75, 0.15, -0.35, 0.65;
+    stepper_good.setup(chain, target, q_good, criteria);
+    (void)stepper_good.step(chain, 1);
+    auto cond_good = stepper_good.condition_number();
+    REQUIRE(std::isfinite(cond_good));
+    REQUIRE(cond_good > 0);
+    REQUIRE(cond_good < 1e4);
 
-    REQUIRE(stepper.condition_number() > 0);
+    // The zero configuration is a kinematic singularity for this chain: the
+    // Jacobian is (near) rank-deficient, so the reported condition number must
+    // blow up by many orders of magnitude relative to the well-conditioned
+    // config -- condition_number() tracks the actual geometry, not just sign.
+    spp::dls<spp::kinematic_chain<double, 6>> stepper_sing;
+    Eigen::Vector<double, 6> q_sing = Eigen::Vector<double, 6>::Zero();
+    stepper_sing.setup(chain, target, q_sing, criteria);
+    (void)stepper_sing.step(chain, 1);
+    auto cond_sing = stepper_sing.condition_number();
+    REQUIRE(std::isfinite(cond_sing));
+    REQUIRE(cond_sing > 1e6);
+    REQUIRE(cond_sing > 1e3 * cond_good);
 }
 
 // ============================================================================

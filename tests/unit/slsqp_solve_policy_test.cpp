@@ -6,6 +6,7 @@
 #include <cartan/types.h>
 
 #include <cartan/serial/ik/ik_status.h>
+#include <cartan/serial/ik/ik_validation.h>
 
 #include <cartan/lie/se3.h>
 #include <cartan/lie/so3.h>
@@ -82,6 +83,11 @@ TEST_CASE("nlopt_slsqp_solve_policy converges on UR5-like chain", "[ik][slsqp]")
 
     run_stepper(stepper, chain, 50);
 
+    // FK re-verify the recovered joints against the same tolerance gate the
+    // solve used: the solver's self-reported convergence is not evidence, only
+    // the independently recomputed forward-kinematics twist error is. This is
+    // the authoritative acceptance gate; converged()/error_norm() are secondary.
+    REQUIRE(spp::verify_solution(chain, target, stepper.solution(), criteria));
     REQUIRE(stepper.converged());
     REQUIRE(stepper.error_norm() < 1e-3);
 }
