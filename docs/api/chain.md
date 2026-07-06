@@ -56,12 +56,13 @@ Construct a prismatic joint screw axis. `direction` is the translation
 direction (will be normalized). Sets `omega = 0`.
 
 ```cpp
-static std::expected<screw_axis, std::string> from_vector(const vector6<Scalar>& vec);
+static cartan::expected<screw_axis, lie_failure> from_vector(const vector6<Scalar>& vec);
 ```
 
 Construct from a 6-vector `(omega, v)` with unit constraint validation. For
 revolute axes, requires `||omega|| = 1`. For prismatic axes (`omega ~ 0`),
-requires `||v|| = 1`. Returns an error string on validation failure.
+requires `||v|| = 1`. Returns `cartan::unexpected(lie_failure::non_unit_screw_axis)`
+on validation failure (see [Error Handling](lie.md#error-handling)).
 
 ### Member Methods
 

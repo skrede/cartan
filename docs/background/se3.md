@@ -202,8 +202,10 @@ T = \exp([\mathcal{V}]^\wedge) = \begin{bmatrix} \exp([\omega]_\times) & J_l(\om
 $$
 
 where $J_l(\omega)$ is the SO(3) left Jacobian evaluated at $\omega$. Note
-that $G(\theta) = J_l(\theta\hat{\omega})$ when $\omega = \theta\hat{\omega}$
-is the unit-axis form.
+that $G(\theta) = \theta \, J_l(\theta\hat{\omega})$ when $\omega = \theta\hat{\omega}$
+is the unit-axis form: the coupling matrix $G(\theta)$ carries an extra factor
+of $\theta$ because it multiplies the unit-axis linear velocity $v$, whereas
+$J_l(\omega)$ multiplies the already-scaled twist component $\theta v$.
 
 ### Pure Translation ($\omega = 0$)
 

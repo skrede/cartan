@@ -78,9 +78,9 @@ textbooks and to their Cartan C++ implementations.
 
 | Concept | Lynch & Park [1] | Siciliano et al. [3] | Barfoot [2] | Cartan C++ |
 |---------|-----------------|---------------------|-------------|-----------|
-| IK error twist | $\mathcal{V}_b = \log(T_{sd}^{-1} T_{sb})$ | $e = x_d - x$ | -- | Body-frame log error |
-| Damped least squares | -- | DLS / Levenberg | -- | `dls_stepper<DOF, Scalar>` |
-| Levenberg-Marquardt | -- | LM | -- | `lm_stepper<DOF, Scalar>` |
+| IK error twist | $\mathcal{V}_b = \log(T_{sb}^{-1} T_{sd})$ | $e = x_d - x$ | -- | Body-frame log error |
+| Damped least squares | -- | DLS / Levenberg | -- | `dls<Chain>` |
+| Levenberg-Marquardt | -- | LM | -- | `lm<Chain>` |
 | Null-space projection | $(I - J^\dagger J) z$ | $(I - J^\dagger J) q_0$ | -- | Null-space API |
 
 ## Twist Ordering Convention

@@ -23,6 +23,8 @@ See [SO(2) Theory](../background/so2.md) | [SE(2) Theory](../background/se2.md) 
 | Forward declarations | `#include <cartan/lie/fwd.h>` |
 | Foundation types | `#include <cartan/types.h>` |
 | Epsilon constants | `#include <cartan/detail/epsilon.h>` |
+| `cartan::expected`, `cartan::unexpected` | `#include <cartan/expected.h>` |
+| `cartan::lie_failure`, `cartan::message` | `#include <cartan/lie/lie_failure.h>` |
 
 ## Foundation Types
 
@@ -74,6 +76,39 @@ inline constexpr Scalar sqrt_epsilon_v;  // sqrt(epsilon), computed at compile t
 ```
 
 `epsilon_v<double>` is approximately `2.22e-16`. `sqrt_epsilon_v<double>` is approximately `1.49e-8`. Used throughout Lie group operations to select Taylor expansion branches near singularities.
+
+## Error Handling
+
+Defined in `expected.h`. The validating factories (`from_matrix`, `from_quaternion`, `screw_axis::from_vector`) return their result in a `cartan::expected<T, E>`, a sum type holding either a value of `T` or an error of `E`.
+
+```cpp
+template <typename T, typename E>
+class expected;   // holds either a T (success) or an E (failure)
+
+template <typename E>
+class unexpected;  // wraps an error value for expected's error state
+```
+
+`cartan::expected<T, E>` is a 1:1 API mirror of the C++23 standard `expected` type — the same observers (`has_value()`, `operator bool`, `operator*`, `value()`, `error()`, `value_or()`), the same monadic operations (`and_then`, `or_else`, `transform`, `transform_error`), and the same construction rules. Cartan ships its own polyfill so the library compiles under a **C++20** baseline: the standard `expected` requires a C++23 standard library, which is not yet universal across Cartan's deployment targets (embedded toolchains, older `libstdc++`). When the toolchain does provide a C++23 standard library, `cartan::expected` gains explicit conversions to and from the standard `expected`.
+
+The Lie factories report failure through the `cartan::lie_failure` enum (see `lie_failure.h`), an allocation-free, matchable error code shared by `so2`/`so3`/`se2`/`se3` `from_matrix`, `so3::from_quaternion`, the frame-tagged `rotation`/`transform` wrappers, and `screw_axis::from_vector`. `cartan::message(lie_failure)` maps a code to a static human-readable diagnostic.
+
+```cpp
+enum class lie_failure
+{
+    non_orthogonal,       // R^T * R deviates from identity
+    improper_rotation,    // det(R) != 1: a reflection, not a rotation
+    non_unit_quaternion,  // ||q||^2 deviates from 1
+    invalid_affine_row,   // homogeneous bottom row is not [0..0 1]
+    non_unit_screw_axis   // revolute ||omega|| != 1 or prismatic ||v|| != 1
+};
+
+auto r = cartan::so3<double>::from_matrix(M);
+if (!r)
+    std::cerr << cartan::message(r.error()) << '\n';
+else
+    use(*r);
+```
 
 ## Policy
 
@@ -205,7 +240,7 @@ static so2 identity();
 Identity element (zero rotation).
 
 ```cpp
-static std::expected<so2, std::string> from_matrix(const matrix2<Scalar>& R);
+static cartan::expected<so2, lie_failure> from_matrix(const matrix2<Scalar>& R);
 ```
 
 Construct from 2x2 rotation matrix with validation. Returns error if `R^T * R` deviates from identity or `det(R) != 1`.
@@ -280,7 +315,7 @@ static se2 identity();
 Identity element (no rotation, no translation).
 
 ```cpp
-static std::expected<se2, std::string> from_matrix(const Eigen::Matrix<Scalar, 3, 3>& T);
+static cartan::expected<se2, lie_failure> from_matrix(const Eigen::Matrix<Scalar, 3, 3>& T);
 ```
 
 Construct from 3x3 homogeneous matrix with validation. Checks rotation block and bottom row `[0, 0, 1]`.
@@ -375,13 +410,13 @@ static so3 identity();
 Identity element (unit quaternion `w=1`).
 
 ```cpp
-static std::expected<so3, std::string> from_matrix(const matrix3<Scalar>& R);
+static cartan::expected<so3, lie_failure> from_matrix(const matrix3<Scalar>& R);
 ```
 
 Construct from 3x3 rotation matrix with validation.
 
 ```cpp
-static std::expected<so3, std::string> from_quaternion(const quaternion<Scalar>& q);
+static cartan::expected<so3, lie_failure> from_quaternion(const quaternion<Scalar>& q);
 ```
 
 Construct from quaternion with unit-norm validation.
@@ -510,7 +545,7 @@ static se3 identity();
 Identity element.
 
 ```cpp
-static std::expected<se3, std::string> from_matrix(const matrix4<Scalar>& T);
+static cartan::expected<se3, lie_failure> from_matrix(const matrix4<Scalar>& T);
 ```
 
 Construct from 4x4 homogeneous matrix with validation. Checks rotation block and bottom row `[0, 0, 0, 1]`.

@@ -136,7 +136,7 @@ Execute `n` round-robin rounds, stopping early on terminal status.
 ### solve
 
 ```cpp
-std::expected<ik_result<scalar_type, joints>, ik_error<scalar_type, joints>>
+cartan::expected<ik_result<scalar_type, joints>, ik_error<scalar_type, joints>>
 solve();
 ```
 

@@ -199,7 +199,7 @@ e^{[\mathcal{S}_2]\pi/4} = \begin{bmatrix} 0.707 & -0.707 & 0 & 0.293 \\ 0.707 &
 $$
 
 Multiplying out $T = e^{[\mathcal{S}_1]\pi/4} \, e^{[\mathcal{S}_2]\pi/4} \, M$
-yields the end-effector at position $(x, y) \approx (0.293, 1.707)$ rotated
+yields the end-effector at position $(x, y) \approx (0.707, 1.707)$ rotated
 by $\pi/2$ from the base frame, which matches the geometric intuition of
 both joints bent 45 degrees.
 

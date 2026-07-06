@@ -145,17 +145,22 @@ problem: minimize $f(\theta) = \frac{1}{2} \lVert \xi_b(\theta) \rVert^2$.
 The LM update solves:
 
 $$
-\Delta\theta = (J_b^\top J_b + \lambda \, \text{diag}(J_b^\top J_b))^{-1} J_b^\top \xi_b
+\Delta\theta = (J_b^\top J_b + \lambda I)^{-1} J_b^\top \xi_b
 $$
+
+Writing $H = J_b^\top J_b$ for the Gauss-Newton Hessian approximation and
+$g = J_b^\top \xi_b$ for the gradient, each step solves the damped linear
+system $(H + \lambda I)\,\Delta\theta = g$.
 
 This interpolates between two regimes:
 
 - **$\lambda \to 0$ (Gauss-Newton):** $\Delta\theta \approx (J_b^\top J_b)^{-1} J_b^\top \xi_b$ -- fast quadratic convergence near the solution
-- **$\lambda \to \infty$ (gradient descent):** $\Delta\theta \approx \frac{1}{\lambda} \, \text{diag}(J_b^\top J_b)^{-1} J_b^\top \xi_b$ -- small, safe steps in the steepest descent direction
+- **$\lambda \to \infty$ (gradient descent):** $\Delta\theta \approx \frac{1}{\lambda} \, J_b^\top \xi_b$ -- small, safe steps in the steepest descent direction
 
-The diagonal scaling $\text{diag}(J_b^\top J_b)$ (rather than identity as in
-DLS) provides implicit column scaling, making the algorithm invariant to
-parameter scaling.
+The damping term is the identity matrix $\lambda I$ (Levenberg's original
+form), so the same $\lambda$ regularizes every direction uniformly, exactly
+as in DLS. This keeps the damped normal-equation matrix symmetric positive
+definite and solvable by a Cholesky ($LDL^\top$) factorization.
 
 ### Gain Ratio and Lambda Update
 

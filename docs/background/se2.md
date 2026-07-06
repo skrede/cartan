@@ -197,7 +197,7 @@ $[\xi]^\wedge = \begin{bmatrix} [\omega]_\times & v \\ 0 & 0 \end{bmatrix}$.
 Conjugation gives:
 
 $$
-T [\xi]^\wedge T^{-1} = \begin{bmatrix} R [\omega]_\times R^\top & R v + \omega \begin{bmatrix} -p_y \\ p_x \end{bmatrix} \\ 0 & 0 \end{bmatrix}
+T [\xi]^\wedge T^{-1} = \begin{bmatrix} R [\omega]_\times R^\top & R v + \omega \begin{bmatrix} p_y \\ -p_x \end{bmatrix} \\ 0 & 0 \end{bmatrix}
 $$
 
 Since SO(2) is abelian, $R[\omega]_\times R^\top = [\omega]_\times$, and the

@@ -77,11 +77,11 @@ static rotation identity();
 Identity rotation.
 
 ```cpp
-static std::expected<rotation, std::string> from_matrix(const matrix3<Scalar>& R);
-static std::expected<rotation, std::string> from_quaternion(const quaternion<Scalar>& q);
+static cartan::expected<rotation, lie_failure> from_matrix(const matrix3<Scalar>& R);
+static cartan::expected<rotation, lie_failure> from_quaternion(const quaternion<Scalar>& q);
 ```
 
-Validated constructors from matrix or quaternion.
+Validated constructors from matrix or quaternion. On failure they return a `cartan::unexpected` carrying a `lie_failure` code (see [Error Handling](lie.md#error-handling)).
 
 ## transform
 
@@ -148,10 +148,10 @@ static transform identity();
 Identity transform.
 
 ```cpp
-static std::expected<transform, std::string> from_matrix(const matrix4<Scalar>& T);
+static cartan::expected<transform, lie_failure> from_matrix(const matrix4<Scalar>& T);
 ```
 
-Validated constructor from 4x4 homogeneous matrix.
+Validated constructor from 4x4 homogeneous matrix. On failure it returns a `cartan::unexpected` carrying a `lie_failure` code (see [Error Handling](lie.md#error-handling)).
 
 ## framed_twist
 
