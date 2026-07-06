@@ -3,8 +3,8 @@
 
 #include "cartan/lie/se3.h"
 #include "cartan/lie/policy.h"
+#include "cartan/lie/lie_failure.h"
 
-#include <string>
 #include "cartan/expected.h"
 
 namespace cartan
@@ -72,7 +72,7 @@ struct transform
     }
 
     /// Construct from 4x4 homogeneous matrix with validation.
-    [[nodiscard]] static cartan::expected<transform, std::string>
+    [[nodiscard]] static cartan::expected<transform, lie_failure>
     from_matrix(const matrix4<Scalar>& T)
     {
         auto result = se3<Scalar, Policy>::from_matrix(T);

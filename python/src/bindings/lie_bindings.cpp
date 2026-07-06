@@ -1,5 +1,6 @@
 #include "cartan/lie/so3.h"
 #include "cartan/lie/se3.h"
+#include "cartan/lie/lie_failure.h"
 
 #include "registrations.h"
 #include "detail/expected_caster.h"
@@ -46,7 +47,7 @@ void register_lie(nb::module_& m)
         .def_static("from_matrix",
             [](const nb::DRef<const cartan::matrix3<double>>& R) -> SO3d {
                 auto r = SO3d::from_matrix(R);
-                if (!r) throw nb::value_error(r.error().c_str());
+                if (!r) throw nb::value_error(cartan::message(r.error()));
                 return *std::move(r);
             },
             "Construct an SO(3) from a 3x3 rotation matrix. "
@@ -84,7 +85,7 @@ void register_lie(nb::module_& m)
         .def_static("from_matrix",
             [](const nb::DRef<const cartan::matrix4<double>>& T) -> SE3d {
                 auto r = SE3d::from_matrix(T);
-                if (!r) throw nb::value_error(r.error().c_str());
+                if (!r) throw nb::value_error(cartan::message(r.error()));
                 return *std::move(r);
             },
             "Construct an SE(3) from a 4x4 homogeneous transformation matrix. "

@@ -3,8 +3,8 @@
 
 #include "cartan/lie/so3.h"
 #include "cartan/lie/policy.h"
+#include "cartan/lie/lie_failure.h"
 
-#include <string>
 #include "cartan/expected.h"
 
 namespace cartan
@@ -67,7 +67,7 @@ struct rotation
     }
 
     /// Construct from 3x3 rotation matrix with validation.
-    [[nodiscard]] static cartan::expected<rotation, std::string>
+    [[nodiscard]] static cartan::expected<rotation, lie_failure>
     from_matrix(const matrix3<Scalar>& R)
     {
         auto result = so3<Scalar, Policy>::from_matrix(R);
@@ -79,7 +79,7 @@ struct rotation
     }
 
     /// Construct from quaternion with validation.
-    [[nodiscard]] static cartan::expected<rotation, std::string>
+    [[nodiscard]] static cartan::expected<rotation, lie_failure>
     from_quaternion(const quaternion<Scalar>& q)
     {
         auto result = so3<Scalar, Policy>::from_quaternion(q);

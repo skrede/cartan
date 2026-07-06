@@ -12,8 +12,9 @@
 #include "cartan/types.h"
 #include "cartan/detail/epsilon.h"
 
+#include "cartan/lie/lie_failure.h"
+
 #include <cmath>
-#include <string>
 #include "cartan/expected.h"
 
 namespace cartan
@@ -46,7 +47,7 @@ public:
     /// Construct from a 6-vector (omega, v) with unit constraint validation.
     /// Revolute (||omega|| > 0): requires ||omega|| = 1.
     /// Prismatic (omega = 0): requires ||v|| = 1.
-    [[nodiscard]] static cartan::expected<screw_axis, std::string> from_vector(
+    [[nodiscard]] static cartan::expected<screw_axis, lie_failure> from_vector(
         const vector6<Scalar>& vec)
     {
         vector3<Scalar> omega = vec.template head<3>();
@@ -59,9 +60,7 @@ public:
             // Revolute: ||omega|| must be 1
             if (std::abs(omega_norm - Scalar(1)) > detail::sqrt_epsilon_v<Scalar>)
             {
-                return cartan::unexpected(
-                    "Revolute screw axis requires ||omega|| = 1, got "
-                    + std::to_string(static_cast<double>(omega_norm)));
+                return cartan::unexpected(lie_failure::non_unit_screw_axis);
             }
             return screw_axis(omega, v);
         }
@@ -70,9 +69,7 @@ public:
         Scalar v_norm = v.norm();
         if (std::abs(v_norm - Scalar(1)) > detail::sqrt_epsilon_v<Scalar>)
         {
-            return cartan::unexpected(
-                "Prismatic screw axis requires ||v|| = 1, got "
-                + std::to_string(static_cast<double>(v_norm)));
+            return cartan::unexpected(lie_failure::non_unit_screw_axis);
         }
         return screw_axis(omega, v);
     }

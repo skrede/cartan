@@ -6,9 +6,9 @@
 
 #include "cartan/lie/policy.h"
 #include "cartan/lie/hat_vee.h"
+#include "cartan/lie/lie_failure.h"
 
 #include <cmath>
-#include <string>
 #include <cassert>
 #include <utility>
 #include "cartan/expected.h"
@@ -258,7 +258,7 @@ public:
     /// Construct from 3x3 rotation matrix with validation (D-09).
     /// Checks R^T*R ~= I and det(R) ~= 1.
     /// Ref: Rotation matrix properties, Lynch & Park, Modern Robotics, p. 23-24.
-    [[nodiscard]] static cartan::expected<so3, std::string>
+    [[nodiscard]] static cartan::expected<so3, lie_failure>
     from_matrix(const matrix3<Scalar>& R)
     {
         Scalar tol = detail::sqrt_epsilon_v<Scalar>;
@@ -266,12 +266,12 @@ public:
         matrix3<Scalar> RtR = R.transpose() * R;
         if ((RtR - matrix3<Scalar>::Identity()).norm() > tol)
         {
-            return cartan::unexpected("Matrix is not orthogonal: R^T * R deviates from identity");
+            return cartan::unexpected(lie_failure::non_orthogonal);
         }
 
         if (std::abs(R.determinant() - Scalar(1)) > tol)
         {
-            return cartan::unexpected("Matrix has determinant != 1: not a proper rotation");
+            return cartan::unexpected(lie_failure::improper_rotation);
         }
 
         quaternion<Scalar> q(R);
@@ -280,12 +280,12 @@ public:
 
     /// Construct from quaternion with validation (D-09).
     /// Checks ||q|| ~= 1.
-    [[nodiscard]] static cartan::expected<so3, std::string>
+    [[nodiscard]] static cartan::expected<so3, lie_failure>
     from_quaternion(const quaternion<Scalar>& q)
     {
         if (std::abs(q.squaredNorm() - Scalar(1)) > detail::sqrt_epsilon_v<Scalar>)
         {
-            return cartan::unexpected("Quaternion is not unit: ||q||^2 deviates from 1");
+            return cartan::unexpected(lie_failure::non_unit_quaternion);
         }
 
         return so3(q);

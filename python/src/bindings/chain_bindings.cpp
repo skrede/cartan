@@ -51,7 +51,7 @@ void register_chain(nb::module_& m)
         .def_static("from_vector",
             [](const nb::DRef<const cartan::vector6<double>>& v) -> ScrewAxisd {
                 auto r = ScrewAxisd::from_vector(v);
-                if (!r) throw nb::value_error(r.error().c_str());
+                if (!r) throw nb::value_error(cartan::message(r.error()));
                 return *std::move(r);
             },
             "Construct a ScrewAxis from a 6-vector (omega, v). "

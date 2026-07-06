@@ -6,29 +6,6 @@
 #include <nanobind/nanobind.h>
 
 #include <string>
-#include <exception>
-
-namespace cartan::detail
-{
-
-/// Binding-internal exception thrown by the caster when an expected arrives
-/// with !has_value() and the call site did not pre-unwrap. Per-site lambdas
-/// typically pre-unwrap and throw ValueError or a typed exception, so this
-/// fallback path is the "no policy chosen" branch and intentionally a generic
-/// RuntimeError shape on the Python side.
-struct expected_unwrap_error : std::exception
-{
-    std::string detail;
-
-    explicit expected_unwrap_error(std::string msg) : detail(std::move(msg)) {}
-
-    [[nodiscard]] const char* what() const noexcept override
-    {
-        return detail.c_str();
-    }
-};
-
-}
 
 namespace nanobind::detail
 {
@@ -60,9 +37,7 @@ struct type_caster<cartan::expected<T, E>>
             // Per-site lambdas pre-unwrap to avoid this path and raise their
             // preferred exception type (ValueError, UrdfError, ...).
             std::string msg;
-            if constexpr (std::is_convertible_v<E, std::string>)
-                msg = value.error();
-            else if constexpr (requires { value.error().detail; })
+            if constexpr (requires { value.error().detail; })
                 msg = value.error().detail;
             else
                 msg = "cartan::expected unwrap on the C++ -> Python boundary";

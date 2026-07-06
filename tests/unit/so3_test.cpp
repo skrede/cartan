@@ -291,6 +291,7 @@ TEST_CASE("so3: from_matrix rejects non-orthogonal matrix", "[so3]")
     cartan::matrix3<double> bad = cartan::matrix3<double>::Random();
     auto result = cartan::so3<double>::from_matrix(bad);
     REQUIRE_FALSE(result.has_value());
+    REQUIRE(result.error() == cartan::lie_failure::non_orthogonal);
 }
 
 // ============================================================================
@@ -311,6 +312,7 @@ TEST_CASE("so3: from_quaternion rejects non-unit quaternion", "[so3]")
     cartan::quaternion<double> q(2.0, 3.0, 4.0, 5.0);
     auto result = cartan::so3<double>::from_quaternion(q);
     REQUIRE_FALSE(result.has_value());
+    REQUIRE(result.error() == cartan::lie_failure::non_unit_quaternion);
 }
 
 // ============================================================================

@@ -6,9 +6,9 @@
 
 #include "cartan/lie/so2.h"
 #include "cartan/lie/policy.h"
+#include "cartan/lie/lie_failure.h"
 
 #include <cmath>
-#include <string>
 #include <type_traits>
 #include "cartan/expected.h"
 
@@ -205,7 +205,7 @@ public:
     /// Construct from 3x3 homogeneous matrix with validation (D-09).
     /// Validates rotation block is SO(2) and bottom row is [0, 0, 1].
     /// Reference: SE(2) matrix structure, Lynch & Park, p. 86.
-    [[nodiscard]] static cartan::expected<se2, std::string>
+    [[nodiscard]] static cartan::expected<se2, lie_failure>
     from_matrix(const Eigen::Matrix<Scalar, 3, 3>& T)
     {
         Scalar tol = detail::sqrt_epsilon_v<Scalar>;
@@ -214,7 +214,7 @@ public:
         if (std::abs(T(2, 0)) > tol || std::abs(T(2, 1)) > tol ||
             std::abs(T(2, 2) - Scalar(1)) > tol)
         {
-            return cartan::unexpected("Bottom row is not [0, 0, 1]");
+            return cartan::unexpected(lie_failure::invalid_affine_row);
         }
 
         // Validate rotation block
@@ -222,7 +222,7 @@ public:
         auto rot_result = so2<Scalar, Policy>::from_matrix(R);
         if (!rot_result.has_value())
         {
-            return cartan::unexpected("Rotation block invalid: " + rot_result.error());
+            return cartan::unexpected(rot_result.error());
         }
 
         vector2<Scalar> trans = T.template block<2, 1>(0, 2);

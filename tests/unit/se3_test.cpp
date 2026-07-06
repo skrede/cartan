@@ -224,6 +224,7 @@ TEST_CASE("se3: from_matrix rejects invalid bottom row", "[se3]")
     bad(3, 0) = 0.5;
     auto result = cartan::se3<double>::from_matrix(bad);
     REQUIRE_FALSE(result.has_value());
+    REQUIRE(result.error() == cartan::lie_failure::invalid_affine_row);
 }
 
 // ============================================================================

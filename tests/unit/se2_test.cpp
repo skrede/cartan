@@ -166,6 +166,7 @@ TEST_CASE("se2: from_matrix rejects invalid matrix", "[se2]")
 
     auto result = cartan::se2<double>::from_matrix(bad);
     REQUIRE_FALSE(result.has_value());
+    REQUIRE(result.error() == cartan::lie_failure::non_orthogonal);
 }
 
 TEST_CASE("se2: from_matrix rejects wrong bottom row", "[se2]")
@@ -177,6 +178,7 @@ TEST_CASE("se2: from_matrix rejects wrong bottom row", "[se2]")
 
     auto result = cartan::se2<double>::from_matrix(bad);
     REQUIRE_FALSE(result.has_value());
+    REQUIRE(result.error() == cartan::lie_failure::invalid_affine_row);
 }
 
 // ============================================================================

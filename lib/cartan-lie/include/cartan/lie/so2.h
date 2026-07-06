@@ -5,9 +5,9 @@
 #include "cartan/detail/epsilon.h"
 
 #include "cartan/lie/policy.h"
+#include "cartan/lie/lie_failure.h"
 
 #include <cmath>
-#include <string>
 #include <cassert>
 #include "cartan/expected.h"
 
@@ -95,9 +95,9 @@ public:
 
     /// Construct from 2x2 rotation matrix with validation (D-09).
     /// Checks orthogonality (R^T * R ~= I) and det(R) ~= 1.
-    /// Returns cartan::unexpected with message on failure.
+    /// Returns cartan::unexpected with a lie_failure code on failure.
     /// Reference: Rotation matrix properties, Lynch & Park, p. 23-24.
-    [[nodiscard]] static cartan::expected<so2, std::string>
+    [[nodiscard]] static cartan::expected<so2, lie_failure>
     from_matrix(const matrix2<Scalar>& R)
     {
         Scalar tol = detail::sqrt_epsilon_v<Scalar>;
@@ -106,14 +106,14 @@ public:
         matrix2<Scalar> RtR = R.transpose() * R;
         if ((RtR - matrix2<Scalar>::Identity()).norm() > tol)
         {
-            return cartan::unexpected("Matrix is not orthogonal: R^T * R deviates from identity");
+            return cartan::unexpected(lie_failure::non_orthogonal);
         }
 
         // Check determinant ~= +1 (not a reflection)
         Scalar det = R.determinant();
         if (std::abs(det - Scalar(1)) > tol)
         {
-            return cartan::unexpected("Matrix has determinant != 1: not a proper rotation");
+            return cartan::unexpected(lie_failure::improper_rotation);
         }
 
         return so2(R(0, 0), R(1, 0));

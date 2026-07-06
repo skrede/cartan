@@ -158,6 +158,7 @@ TEST_CASE("so2: from_matrix rejects non-orthogonal matrix", "[so2]")
 
     auto result = cartan::so2<double>::from_matrix(bad);
     REQUIRE_FALSE(result.has_value());
+    REQUIRE(result.error() == cartan::lie_failure::non_orthogonal);
 }
 
 TEST_CASE("so2: from_matrix rejects negative determinant", "[so2]")
@@ -168,6 +169,7 @@ TEST_CASE("so2: from_matrix rejects negative determinant", "[so2]")
 
     auto result = cartan::so2<double>::from_matrix(reflection);
     REQUIRE_FALSE(result.has_value());
+    REQUIRE(result.error() == cartan::lie_failure::improper_rotation);
 }
 
 // ============================================================================
