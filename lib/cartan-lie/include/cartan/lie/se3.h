@@ -24,6 +24,15 @@ template <typename Scalar, typename Policy = strict_policy>
 class se3
 {
 public:
+    /// Default constructor: the identity transform (identity rotation, zero
+    /// translation). The rotation defaults to the so3 identity via its own
+    /// default constructor; no normalization runs.
+    se3()
+        : m_rotation()
+        , m_translation(vector3<Scalar>::Zero())
+    {
+    }
+
     /// Construct from rotation and translation components.
     se3(const so3<Scalar, Policy>& rot, const vector3<Scalar>& trans)
         : m_rotation(rot)
@@ -151,6 +160,18 @@ public:
 
     /// Access the translation component.
     [[nodiscard]] const vector3<Scalar>& translation() const { return m_translation; }
+
+    /// Manifold-aware approximate equality: true iff the se(3) twist distance
+    /// between the two transforms is at most tol. Uses
+    /// (this->inverse() * other).log().norm(); the single tol folds the
+    /// rotational (rad) and translational (m) tangent components under one norm,
+    /// following the Sophus convention. Double-cover safe via the so3 log. No
+    /// exact equality operator is provided: bit-exact floating compare is a
+    /// footgun.
+    [[nodiscard]] bool isApprox(const se3& other, Scalar tol) const
+    {
+        return (inverse() * other).log().norm() <= tol;
+    }
 
     /// Identity element: no rotation, no translation.
     [[nodiscard]] static se3 identity()

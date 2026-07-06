@@ -349,3 +349,47 @@ TEST_CASE("se3: log with pure rotation (zero translation)", "[se3]")
     // Rho part should be zero (since translation is zero)
     REQUIRE(v.tail<3>().norm() < 1e-12);
 }
+
+// ============================================================================
+// Default constructor is identity
+// ============================================================================
+
+TEMPLATE_TEST_CASE("se3: default constructor is identity", "[se3]", double, float)
+{
+    using S = TestType;
+    S tol = std::is_same_v<S, float> ? S(1e-6) : S(1e-12);
+    cartan::se3<S> d{};
+    REQUIRE(d.isApprox(cartan::se3<S>::identity(), tol));
+    REQUIRE((d.matrix() - cartan::matrix4<S>::Identity()).norm() < tol);
+}
+
+// ============================================================================
+// Manifold-aware isApprox
+// ============================================================================
+
+TEMPLATE_TEST_CASE("se3: isApprox reflexive and tolerance-sensitive", "[se3]", double, float)
+{
+    using S = TestType;
+    S tol = std::is_same_v<S, float> ? S(1e-5) : S(1e-10);
+    cartan::vector6<S> v;
+    v << S(0.2), S(-0.4), S(0.5), S(0.3), S(-0.1), S(0.6);
+    auto t = cartan::se3<S>::exp(v);
+    REQUIRE(t.isApprox(t, tol));
+
+    cartan::vector6<S> v_far = v + cartan::vector6<S>::Constant(S(0.1));
+    REQUIRE_FALSE(t.isApprox(cartan::se3<S>::exp(v_far), tol));
+}
+
+TEST_CASE("se3: isApprox is quaternion double-cover safe", "[se3]")
+{
+    cartan::vector3<double> phi;
+    phi << 0.4, -0.2, 0.9;
+    cartan::vector3<double> trans(0.5, -0.3, 0.7);
+    auto r = cartan::so3<double>::exp(phi);
+    cartan::quaternion<double> q = r.quaternion_ref();
+    cartan::quaternion<double> neg(-q.w(), -q.x(), -q.y(), -q.z());
+    cartan::se3<double> a(r, trans);
+    cartan::se3<double> b(cartan::so3<double>(neg), trans);
+    // Same rotation built from q and -q, same translation -> identical transform
+    REQUIRE(a.isApprox(b, 1e-12));
+}

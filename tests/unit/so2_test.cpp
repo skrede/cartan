@@ -242,3 +242,41 @@ TEST_CASE("so2: float scalar operations", "[so2][float]")
     auto product = r * inv;
     REQUIRE(product.log() == Approx(0.0f).margin(1e-5f));
 }
+
+// ============================================================================
+// Default constructor is identity
+// ============================================================================
+
+TEMPLATE_TEST_CASE("so2: default constructor is identity", "[so2]", double, float)
+{
+    using S = TestType;
+    S tol = std::is_same_v<S, float> ? S(1e-6) : S(1e-12);
+    cartan::so2<S> d{};
+    REQUIRE(d.isApprox(cartan::so2<S>::identity(), tol));
+    REQUIRE(d.cos_angle() == Approx(S(1)).margin(tol));
+    REQUIRE(d.sin_angle() == Approx(S(0)).margin(tol));
+}
+
+// ============================================================================
+// Manifold-aware isApprox
+// ============================================================================
+
+TEMPLATE_TEST_CASE("so2: isApprox reflexive and tolerance-sensitive", "[so2]", double, float)
+{
+    using S = TestType;
+    S tol = std::is_same_v<S, float> ? S(1e-5) : S(1e-10);
+    auto r = cartan::so2<S>::exp(S(0.6));
+    REQUIRE(r.isApprox(r, tol));
+    REQUIRE(r.isApprox(cartan::so2<S>::exp(S(0.6) + tol / S(10)), tol));
+    REQUIRE_FALSE(r.isApprox(cartan::so2<S>::exp(S(0.6) + S(0.1)), tol));
+}
+
+TEST_CASE("so2: isApprox is angle-wrap safe", "[so2]")
+{
+    constexpr double pi = std::numbers::pi;
+    auto a = cartan::so2<double>::exp(pi - 1e-10);
+    auto b = cartan::so2<double>::exp(pi + 1e-10);  // wraps to near -pi
+    // Naive angle() difference is ~2*pi; manifold-aware isApprox sees ~2e-10
+    REQUIRE(std::abs(a.angle() - b.angle()) > 1.0);
+    REQUIRE(a.isApprox(b, 1e-8));
+}

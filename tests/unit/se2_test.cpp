@@ -405,3 +405,43 @@ TEMPLATE_TEST_CASE("se2: small-omega coefficient stability and recorded guard",
                 <= 4.0L * static_cast<long double>(s_eps));
     }
 }
+
+// ============================================================================
+// Default constructor is identity
+// ============================================================================
+
+TEMPLATE_TEST_CASE("se2: default constructor is identity", "[se2]", double, float)
+{
+    using S = TestType;
+    S tol = std::is_same_v<S, float> ? S(1e-6) : S(1e-12);
+    cartan::se2<S> d{};
+    REQUIRE(d.isApprox(cartan::se2<S>::identity(), tol));
+    REQUIRE((d.matrix() - Eigen::Matrix<S, 3, 3>::Identity()).norm() < tol);
+}
+
+// ============================================================================
+// Manifold-aware isApprox
+// ============================================================================
+
+TEMPLATE_TEST_CASE("se2: isApprox reflexive and tolerance-sensitive", "[se2]", double, float)
+{
+    using S = TestType;
+    S tol = std::is_same_v<S, float> ? S(1e-5) : S(1e-10);
+    cartan::vector3<S> v;
+    v << S(0.4), S(0.3), S(-0.2);
+    auto t = cartan::se2<S>::exp(v);
+    REQUIRE(t.isApprox(t, tol));
+
+    cartan::vector3<S> v_far = v + cartan::vector3<S>::Constant(S(0.1));
+    REQUIRE_FALSE(t.isApprox(cartan::se2<S>::exp(v_far), tol));
+}
+
+TEST_CASE("se2: isApprox is rotation-wrap safe", "[se2]")
+{
+    constexpr double pi = std::numbers::pi;
+    cartan::vector2<double> trans(0.5, -0.3);
+    // Rotation parts straddle +/-pi but denote the same element (differ by ~2e-10)
+    cartan::se2<double> a(cartan::so2<double>::exp(pi - 1e-10), trans);
+    cartan::se2<double> b(cartan::so2<double>::exp(pi + 1e-10), trans);
+    REQUIRE(a.isApprox(b, 1e-6));
+}

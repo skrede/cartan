@@ -15,36 +15,10 @@
 #include "cartan/lie/se3.h"
 #include "cartan/serial/chain/storage_trait.h"
 
-#include <utility>
 #include <type_traits>
 
 namespace cartan
 {
-
-namespace detail
-{
-
-/// Create a std::array of N identity se3 elements.
-template <typename Scalar, std::size_t... Is>
-std::array<se3<Scalar>, sizeof...(Is)> make_identity_array(std::index_sequence<Is...>)
-{
-    return {{ ((void)Is, se3<Scalar>::identity())... }};
-}
-
-template <typename Scalar, int N>
-auto make_intermediate_storage()
-{
-    if constexpr (N == dynamic)
-    {
-        return std::vector<se3<Scalar>>{};
-    }
-    else
-    {
-        return make_identity_array<Scalar>(std::make_index_sequence<static_cast<std::size_t>(N)>{});
-    }
-}
-
-} // namespace detail
 
 /// Result of forward kinematics via Product of Exponentials.
 ///
@@ -58,8 +32,10 @@ struct fk_result
     static_assert(std::is_floating_point_v<Scalar>, "fk_result requires a floating-point Scalar type");
     using intermediate_storage = detail::storage_t<N, se3<Scalar>>;
 
-    se3<Scalar> end_effector{se3<Scalar>::identity()};  ///< End-effector pose T(q) = T_1...T_n * M
-    intermediate_storage intermediates{detail::make_intermediate_storage<Scalar, N>()};  ///< Partial products T_i for Jacobian reuse
+    // Default construction yields the identity element for se3 and, for a
+    // fixed-N array, N identities; for a dynamic chain the vector starts empty.
+    se3<Scalar> end_effector{};  ///< End-effector pose T(q) = T_1...T_n * M
+    intermediate_storage intermediates{};  ///< Partial products T_i for Jacobian reuse
 
     /// Number of joints reflected in this result.
     [[nodiscard]] int num_joints() const

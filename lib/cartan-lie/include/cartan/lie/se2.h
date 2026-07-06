@@ -51,6 +51,15 @@ template <typename Scalar, typename Policy = strict_policy>
 class se2
 {
 public:
+    /// Default constructor: the identity transform (identity rotation, zero
+    /// translation). The rotation defaults to the so2 identity via its own
+    /// default constructor; no normalization runs.
+    se2()
+        : m_rotation()
+        , m_translation(vector2<Scalar>::Zero())
+    {
+    }
+
     /// Construct from rotation and translation components.
     se2(const so2<Scalar, Policy>& rot, const vector2<Scalar>& trans)
         : m_rotation(rot)
@@ -194,6 +203,18 @@ public:
               -tx,       s,          c;
 
         return Ad;
+    }
+
+    /// Manifold-aware approximate equality: true iff the se(2) twist distance
+    /// between the two transforms is at most tol. Uses
+    /// (this->inverse() * other).log().norm(); the single tol folds the
+    /// rotational (rad) and translational (m) tangent components under one norm,
+    /// following the Sophus convention. Angle-wrap safe via the so2 log. No
+    /// exact equality operator is provided: bit-exact floating compare is a
+    /// footgun.
+    [[nodiscard]] bool isApprox(const se2& other, Scalar tol) const
+    {
+        return (inverse() * other).log().norm() <= tol;
     }
 
     /// Identity element: no rotation, no translation.

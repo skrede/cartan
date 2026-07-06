@@ -393,3 +393,48 @@ TEST_CASE("so3: matrix roundtrip with from_matrix", "[so3]")
     REQUIRE(result.has_value());
     REQUIRE((result.value().matrix() - R).norm() < 1e-12);
 }
+
+// ============================================================================
+// Default constructor is identity
+// ============================================================================
+
+TEMPLATE_TEST_CASE("so3: default constructor is identity", "[so3]", double, float)
+{
+    using S = TestType;
+    S tol = std::is_same_v<S, float> ? S(1e-6) : S(1e-12);
+    cartan::so3<S> d{};
+    REQUIRE(d.isApprox(cartan::so3<S>::identity(), tol));
+    REQUIRE((d.matrix() - cartan::matrix3<S>::Identity()).norm() < tol);
+}
+
+// ============================================================================
+// Manifold-aware isApprox
+// ============================================================================
+
+TEMPLATE_TEST_CASE("so3: isApprox reflexive and tolerance-sensitive", "[so3]", double, float)
+{
+    using S = TestType;
+    S tol = std::is_same_v<S, float> ? S(1e-5) : S(1e-10);
+    cartan::vector3<S> phi;
+    phi << S(0.3), S(-0.5), S(0.7);
+    auto r = cartan::so3<S>::exp(phi);
+    REQUIRE(r.isApprox(r, tol));
+
+    cartan::vector3<S> phi_near = phi + cartan::vector3<S>::Constant(tol / S(10));
+    REQUIRE(r.isApprox(cartan::so3<S>::exp(phi_near), tol));
+
+    cartan::vector3<S> phi_far = phi + cartan::vector3<S>::Constant(S(0.1));
+    REQUIRE_FALSE(r.isApprox(cartan::so3<S>::exp(phi_far), tol));
+}
+
+TEST_CASE("so3: isApprox is quaternion double-cover safe", "[so3]")
+{
+    cartan::vector3<double> phi;
+    phi << 0.4, -0.2, 0.9;
+    auto r = cartan::so3<double>::exp(phi);
+    cartan::quaternion<double> q = r.quaternion_ref();
+    cartan::quaternion<double> neg(-q.w(), -q.x(), -q.y(), -q.z());
+    cartan::so3<double> r_neg(neg);
+    // q and -q are the same rotation: manifold-aware isApprox must treat them as equal
+    REQUIRE(r.isApprox(r_neg, 1e-12));
+}

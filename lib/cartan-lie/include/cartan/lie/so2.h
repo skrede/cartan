@@ -21,6 +21,14 @@ template <typename Scalar, typename Policy = strict_policy>
 class so2
 {
 public:
+    /// Default constructor: the identity rotation (cos = 1, sin = 0). Already
+    /// unit, so no normalization runs regardless of policy.
+    so2()
+        : m_cos(Scalar(1))
+        , m_sin(Scalar(0))
+    {
+    }
+
     /// Construct from cos/sin pair. Strict policy normalizes to unit circle.
     so2(Scalar cos_val, Scalar sin_val)
         : m_cos(cos_val)
@@ -85,6 +93,17 @@ public:
     [[nodiscard]] Scalar angle() const
     {
         return log();
+    }
+
+    /// Manifold-aware approximate equality: true iff the wrapped angular
+    /// distance between the two rotations is at most tol (radians). Uses
+    /// std::abs((this->inverse() * other).log()), so angles straddling +/-pi
+    /// that denote the same rotation compare equal. No exact equality operator
+    /// is provided: bit-exact floating compare on cos/sin is a footgun (angle
+    /// wrap, drift).
+    [[nodiscard]] bool isApprox(const so2& other, Scalar tol) const
+    {
+        return std::abs((inverse() * other).log()) <= tol;
     }
 
     /// Identity element: zero rotation.

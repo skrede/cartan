@@ -113,6 +113,15 @@ template <typename Scalar, typename Policy = strict_policy>
 class so3
 {
 public:
+    /// Default constructor: the identity rotation (unit quaternion w = 1).
+    /// Routed through the trusted-unit path -- identity is trivially unit, so no
+    /// normalization runs regardless of policy.
+    so3()
+        : so3(quaternion<Scalar>(Scalar(1), Scalar(0), Scalar(0), Scalar(0)),
+              trusted_unit)
+    {
+    }
+
     /// Construct from quaternion. Strict policy normalizes to unit length.
     /// Reference: Unit quaternion represents rotation; ||q|| = 1.
     explicit so3(const quaternion<Scalar>& q)
@@ -246,6 +255,17 @@ public:
     [[nodiscard]] const quaternion<Scalar>& quaternion_ref() const
     {
         return m_quaternion;
+    }
+
+    /// Manifold-aware approximate equality: true iff the geodesic (tangent-space)
+    /// distance between the two rotations is at most tol (radians). Uses
+    /// (this->inverse() * other).log().norm(), which is invariant to the
+    /// quaternion double cover -- q and -q denote the same rotation and compare
+    /// equal. No exact equality operator is provided: bit-exact floating compare
+    /// on the raw storage is a footgun (double cover, drift).
+    [[nodiscard]] bool isApprox(const so3& other, Scalar tol) const
+    {
+        return (inverse() * other).log().norm() <= tol;
     }
 
     /// Identity element: zero rotation (unit quaternion w=1).
