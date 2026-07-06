@@ -1,363 +1,184 @@
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/catch_template_test_macros.hpp>
-#include "../test_utils.h"
+/// @file fk_sweep_test.cpp
+/// @brief Seeded-random forward-kinematics regression sweep.
+///
+/// For each of the nine benchmark robots the fixed-size PoE forward
+/// kinematics is checked over fifty seeded random configurations, drawn
+/// uniformly within the joint limits, against two independent oracles:
+///   1. an explicit se3::exp Product-of-Exponentials evaluation, built with a
+///      hand loop so it does not share the forward_kinematics dispatch under
+///      test, and
+///   2. the dynamic-size chain evaluated on the same configuration, guarding
+///      the fixed-size fast path against the runtime path.
+/// Both must agree with the fixed-size result to 1e-10, so a regression in the
+/// PoE formula or in either specialization fails the sweep on the offending
+/// robot and configuration. Coverage extends past the revolute-only robots to
+/// a pure-prismatic chain, a mixed revolute/prismatic chain, and a zero-DOF
+/// chain.
+///
+/// The pattern (mt19937 seed 42, per-joint uniform-in-limits draw, 1e-10 gate)
+/// mirrors the KDL comparison sweep; the deterministic seed makes any failure
+/// reproducible.
+
+#include "../fixtures/chain_factories.h"
+#include "../fixtures/prismatic_chains.h"
 
 #include <cartan/types.h>
 #include <cartan/lie/se3.h>
 #include <cartan/lie/so3.h>
+#include <cartan/serial/chain/screw_axis.h>
+#include <cartan/serial/chain/joint_limits.h>
 #include <cartan/serial/chain/kinematic_chain.h>
 #include <cartan/serial/fk/forward_kinematics.h>
 
-#include <numbers>
+#include <catch2/catch_test_macros.hpp>
 
-// ============================================================================
-// FK sweep: DOF 1-7 x {double, float} x {fixed, dynamic}
-//
-// For each DOF level:
-//   A. Zero config returns home pose
-//   B. Non-zero config produces non-home pose
-//   C. Fixed-vs-dynamic comparison
-// ============================================================================
+#include <random>
+#include <vector>
+#include <cstddef>
 
-TEMPLATE_TEST_CASE("FK sweep: DOF 1-7", "[fk][sweep]", double, float)
+namespace
 {
-    using Scalar = TestType;
-    const Scalar tol = Scalar(100) * cartan::test::test_eps<Scalar>;
 
-    // ------------------------------------------------------------------
-    // DOF 1
-    // ------------------------------------------------------------------
-    SECTION("DOF 1")
+constexpr double sweep_tol = 1e-10;
+constexpr int sweep_trials = 50;
+
+/// Independent space-form Product-of-Exponentials oracle:
+///   T(q) = exp([S1] q1) ... exp([Sn] qn) * M
+/// The explicit se3::exp loop shares no code with the forward_kinematics
+/// dispatch under test, so agreement is a genuine correctness signal.
+template <typename Chain, typename Vec>
+auto poe_oracle(const Chain& chain, const Vec& q)
+    -> cartan::se3<typename Chain::scalar_type>
+{
+    using Scalar = typename Chain::scalar_type;
+    auto T = cartan::se3<Scalar>::identity();
+    const int n = chain.num_joints();
+    for (int i = 0; i < n; ++i)
     {
-        auto chain = cartan::test::make_1r_chain<Scalar>();
-        auto M = chain.home();
+        const cartan::vector6<Scalar> screw = chain.axis(i).to_vector();
+        T = T * cartan::se3<Scalar>::exp((screw * q(i)).eval());
+    }
+    return T * chain.home();
+}
 
-        SECTION("zero config returns home")
+template <typename Scalar>
+Scalar pose_error(const cartan::se3<Scalar>& a, const cartan::se3<Scalar>& b)
+{
+    return (a.inverse() * b).log().norm();
+}
+
+/// One robot: fifty seeded random configs, fixed FK vs PoE oracle and vs the
+/// dynamic-size path.
+template <typename MakeChain>
+void fk_sweep_robot(MakeChain make_chain, const char* name)
+{
+    INFO("Robot: " << name);
+
+    auto chain = make_chain();
+    using Chain = decltype(chain);
+    using Scalar = typename Chain::scalar_type;
+    constexpr int N = Chain::joints;
+
+    auto dyn = chain.to_dynamic();
+    const int n = chain.num_joints();
+
+    std::mt19937 rng(42);
+    std::uniform_real_distribution<Scalar> unit(Scalar(0), Scalar(1));
+
+    for (int trial = 0; trial < sweep_trials; ++trial)
+    {
+        INFO("Trial: " << trial);
+
+        Eigen::Vector<Scalar, N> q;
+        Eigen::VectorX<Scalar> q_dyn(n);
+        for (int j = 0; j < n; ++j)
         {
-            Eigen::Vector<Scalar, 1> q = Eigen::Vector<Scalar, 1>::Zero();
-            auto fk = cartan::forward_kinematics(chain, q);
-            Scalar err = (fk.end_effector.inverse() * M).log().norm();
-            REQUIRE(err < tol);
+            const auto& lim = chain.limits()[static_cast<std::size_t>(j)];
+            q(j) = lim.position_min
+                 + (lim.position_max - lim.position_min) * unit(rng);
+            q_dyn(j) = q(j);
         }
 
-        SECTION("non-zero config differs from home")
-        {
-            Eigen::Vector<Scalar, 1> q;
-            q << Scalar(0.1);
-            auto fk = cartan::forward_kinematics(chain, q);
-            Scalar diff = (fk.end_effector.inverse() * M).log().norm();
-            REQUIRE(diff > Scalar(0.01));
-        }
+        auto fk = cartan::forward_kinematics(chain, q).end_effector;
+        auto oracle = poe_oracle(chain, q);
+        auto fk_dyn = cartan::forward_kinematics(dyn, q_dyn).end_effector;
 
-        SECTION("fixed vs dynamic")
-        {
-            Eigen::Vector<Scalar, 1> q_fixed;
-            q_fixed << Scalar(0.3);
-            auto fk_fixed = cartan::forward_kinematics(chain, q_fixed);
+        REQUIRE(pose_error(fk, oracle) < Scalar(sweep_tol));
+        REQUIRE(pose_error(fk, fk_dyn) < Scalar(sweep_tol));
+    }
+}
 
-            auto dyn_chain = chain.to_dynamic();
-            Eigen::VectorX<Scalar> q_dyn(1);
-            q_dyn << Scalar(0.3);
-            auto fk_dyn = cartan::forward_kinematics(dyn_chain, q_dyn);
+/// Pure-prismatic P-P-P gantry (signed directions +z, +x, -y). The negative
+/// third direction exercises the prismatic sign path against the PoE oracle.
+template <typename Scalar>
+auto make_ppp_chain() -> cartan::kinematic_chain<Scalar, 3>
+{
+    using vec3 = cartan::vector3<Scalar>;
 
-            Scalar err = (fk_fixed.end_effector.inverse() * fk_dyn.end_effector).log().norm();
-            REQUIRE(err < tol);
-        }
+    auto s1 = cartan::screw_axis<Scalar>::prismatic(
+        vec3(Scalar(0), Scalar(0), Scalar(1)));
+    auto s2 = cartan::screw_axis<Scalar>::prismatic(
+        vec3(Scalar(1), Scalar(0), Scalar(0)));
+    auto s3 = cartan::screw_axis<Scalar>::prismatic(
+        vec3(Scalar(0), Scalar(-1), Scalar(0)));
+
+    auto home = cartan::se3<Scalar>(
+        cartan::so3<Scalar>::identity(), vec3(Scalar(0), Scalar(0), Scalar(0)));
+    cartan::joint_limits<Scalar> lim{Scalar(-1), Scalar(1)};
+
+    return cartan::kinematic_chain<Scalar, 3>(
+        home, {s1, s2, s3}, {lim, lim, lim});
+}
+
+/// Zero-DOF dynamic chain: empty axis/limit storage, non-trivial home pose.
+template <typename Scalar>
+auto make_zero_dof_chain() -> cartan::kinematic_chain<Scalar, cartan::dynamic>
+{
+    auto home = cartan::se3<Scalar>(
+        cartan::so3<Scalar>::identity(),
+        cartan::vector3<Scalar>(Scalar(0.1), Scalar(0.2), Scalar(0.3)));
+    return cartan::kinematic_chain<Scalar, cartan::dynamic>(
+        home,
+        std::vector<cartan::screw_axis<Scalar>>{},
+        std::vector<cartan::joint_limits<Scalar>>{});
+}
+
+}
+
+TEST_CASE("FK sweep: nine robots x fifty seeded configs", "[fk][sweep]")
+{
+    fk_sweep_robot(cartan::fixtures::make_ur3e_chain<double>, "UR3e");
+    fk_sweep_robot(cartan::fixtures::make_lbr_med14_chain<double>, "LBR Med 14");
+    fk_sweep_robot(cartan::fixtures::make_kr6_sixx_chain<double>, "KR6 SIXX");
+    fk_sweep_robot(cartan::fixtures::make_panda_chain<double>, "Panda");
+    fk_sweep_robot(cartan::fixtures::make_abb_irb120_chain<double>, "ABB IRB 120");
+    fk_sweep_robot(cartan::fixtures::make_jaco2_chain<double>, "Jaco2");
+    fk_sweep_robot(cartan::fixtures::make_fetch_chain<double>, "Fetch");
+    fk_sweep_robot(cartan::fixtures::make_baxter_chain<double>, "Baxter");
+    fk_sweep_robot(cartan::fixtures::make_kuka_lwr4_chain<double>, "Kuka LWR4");
+}
+
+TEST_CASE("FK sweep: prismatic, mixed, and zero-DOF coverage",
+    "[fk][sweep][prismatic]")
+{
+    SECTION("pure prismatic chain")
+    {
+        fk_sweep_robot(make_ppp_chain<double>, "PPP prismatic");
     }
 
-    // ------------------------------------------------------------------
-    // DOF 2
-    // ------------------------------------------------------------------
-    SECTION("DOF 2")
+    SECTION("mixed revolute/prismatic chain")
     {
-        auto chain = cartan::test::make_2r_planar_chain<Scalar>();
-        auto M = chain.home();
-
-        SECTION("zero config returns home")
-        {
-            Eigen::Vector<Scalar, 2> q = Eigen::Vector<Scalar, 2>::Zero();
-            auto fk = cartan::forward_kinematics(chain, q);
-            Scalar err = (fk.end_effector.inverse() * M).log().norm();
-            REQUIRE(err < tol);
-        }
-
-        SECTION("non-zero config differs from home")
-        {
-            Eigen::Vector<Scalar, 2> q;
-            q << Scalar(0.1), Scalar(0.1);
-            auto fk = cartan::forward_kinematics(chain, q);
-            Scalar diff = (fk.end_effector.inverse() * M).log().norm();
-            REQUIRE(diff > Scalar(0.01));
-        }
-
-        SECTION("fixed vs dynamic")
-        {
-            Eigen::Vector<Scalar, 2> q_fixed;
-            q_fixed << Scalar(0.3), Scalar(-0.2);
-            auto fk_fixed = cartan::forward_kinematics(chain, q_fixed);
-
-            auto dyn_chain = chain.to_dynamic();
-            Eigen::VectorX<Scalar> q_dyn(2);
-            q_dyn << Scalar(0.3), Scalar(-0.2);
-            auto fk_dyn = cartan::forward_kinematics(dyn_chain, q_dyn);
-
-            Scalar err = (fk_fixed.end_effector.inverse() * fk_dyn.end_effector).log().norm();
-            REQUIRE(err < tol);
-        }
+        fk_sweep_robot(
+            cartan::fixtures::make_rppr_signed_chain<double>, "RPPR mixed");
     }
 
-    // ------------------------------------------------------------------
-    // DOF 3
-    // ------------------------------------------------------------------
-    SECTION("DOF 3")
+    SECTION("zero-DOF chain returns the home pose")
     {
-        auto chain = cartan::test::make_3r_planar_chain<Scalar>();
-        auto M = chain.home();
+        auto chain = make_zero_dof_chain<double>();
+        REQUIRE(chain.num_joints() == 0);
 
-        SECTION("zero config returns home")
-        {
-            Eigen::Vector<Scalar, 3> q = Eigen::Vector<Scalar, 3>::Zero();
-            auto fk = cartan::forward_kinematics(chain, q);
-            Scalar err = (fk.end_effector.inverse() * M).log().norm();
-            REQUIRE(err < tol);
-        }
-
-        SECTION("non-zero config differs from home")
-        {
-            Eigen::Vector<Scalar, 3> q;
-            q << Scalar(0.1), Scalar(0.1), Scalar(0.1);
-            auto fk = cartan::forward_kinematics(chain, q);
-            Scalar diff = (fk.end_effector.inverse() * M).log().norm();
-            REQUIRE(diff > Scalar(0.01));
-        }
-
-        SECTION("fixed vs dynamic")
-        {
-            Eigen::Vector<Scalar, 3> q_fixed;
-            q_fixed << Scalar(0.3), Scalar(-0.2), Scalar(0.5);
-            auto fk_fixed = cartan::forward_kinematics(chain, q_fixed);
-
-            auto dyn_chain = chain.to_dynamic();
-            Eigen::VectorX<Scalar> q_dyn(3);
-            q_dyn << Scalar(0.3), Scalar(-0.2), Scalar(0.5);
-            auto fk_dyn = cartan::forward_kinematics(dyn_chain, q_dyn);
-
-            Scalar err = (fk_fixed.end_effector.inverse() * fk_dyn.end_effector).log().norm();
-            REQUIRE(err < tol);
-        }
-    }
-
-    // ------------------------------------------------------------------
-    // DOF 4
-    // ------------------------------------------------------------------
-    SECTION("DOF 4")
-    {
-        auto chain = cartan::test::make_4r_spatial_chain<Scalar>();
-        auto M = chain.home();
-
-        SECTION("zero config returns home")
-        {
-            Eigen::Vector<Scalar, 4> q = Eigen::Vector<Scalar, 4>::Zero();
-            auto fk = cartan::forward_kinematics(chain, q);
-            Scalar err = (fk.end_effector.inverse() * M).log().norm();
-            REQUIRE(err < tol);
-        }
-
-        SECTION("non-zero config differs from home")
-        {
-            Eigen::Vector<Scalar, 4> q;
-            q << Scalar(0.1), Scalar(0.1), Scalar(0.1), Scalar(0.1);
-            auto fk = cartan::forward_kinematics(chain, q);
-            Scalar diff = (fk.end_effector.inverse() * M).log().norm();
-            REQUIRE(diff > Scalar(0.01));
-        }
-
-        SECTION("fixed vs dynamic")
-        {
-            Eigen::Vector<Scalar, 4> q_fixed;
-            q_fixed << Scalar(0.3), Scalar(-0.2), Scalar(0.5), Scalar(-0.1);
-            auto fk_fixed = cartan::forward_kinematics(chain, q_fixed);
-
-            auto dyn_chain = chain.to_dynamic();
-            Eigen::VectorX<Scalar> q_dyn(4);
-            q_dyn << Scalar(0.3), Scalar(-0.2), Scalar(0.5), Scalar(-0.1);
-            auto fk_dyn = cartan::forward_kinematics(dyn_chain, q_dyn);
-
-            Scalar err = (fk_fixed.end_effector.inverse() * fk_dyn.end_effector).log().norm();
-            REQUIRE(err < tol);
-        }
-    }
-
-    // ------------------------------------------------------------------
-    // DOF 5
-    // ------------------------------------------------------------------
-    SECTION("DOF 5")
-    {
-        auto chain = cartan::test::make_puma560_5dof_chain<Scalar>();
-        auto M = chain.home();
-
-        SECTION("zero config returns home")
-        {
-            Eigen::Vector<Scalar, 5> q = Eigen::Vector<Scalar, 5>::Zero();
-            auto fk = cartan::forward_kinematics(chain, q);
-            Scalar err = (fk.end_effector.inverse() * M).log().norm();
-            REQUIRE(err < tol);
-        }
-
-        SECTION("non-zero config differs from home")
-        {
-            Eigen::Vector<Scalar, 5> q;
-            q << Scalar(0.1), Scalar(0.1), Scalar(0.1), Scalar(0.1), Scalar(0.1);
-            auto fk = cartan::forward_kinematics(chain, q);
-            Scalar diff = (fk.end_effector.inverse() * M).log().norm();
-            REQUIRE(diff > Scalar(0.01));
-        }
-
-        SECTION("fixed vs dynamic")
-        {
-            Eigen::Vector<Scalar, 5> q_fixed;
-            q_fixed << Scalar(0.3), Scalar(-0.2), Scalar(0.5), Scalar(-0.1), Scalar(0.4);
-            auto fk_fixed = cartan::forward_kinematics(chain, q_fixed);
-
-            auto dyn_chain = chain.to_dynamic();
-            Eigen::VectorX<Scalar> q_dyn(5);
-            q_dyn << Scalar(0.3), Scalar(-0.2), Scalar(0.5), Scalar(-0.1), Scalar(0.4);
-            auto fk_dyn = cartan::forward_kinematics(dyn_chain, q_dyn);
-
-            Scalar err = (fk_fixed.end_effector.inverse() * fk_dyn.end_effector).log().norm();
-            REQUIRE(err < tol);
-        }
-    }
-
-    // ------------------------------------------------------------------
-    // DOF 6 (UR3e)
-    // ------------------------------------------------------------------
-    SECTION("DOF 6 (UR3e)")
-    {
-        auto chain = cartan::test::make_ur3e_chain<Scalar>();
-        auto M = chain.home();
-
-        SECTION("zero config returns home")
-        {
-            Eigen::Vector<Scalar, 6> q = Eigen::Vector<Scalar, 6>::Zero();
-            auto fk = cartan::forward_kinematics(chain, q);
-            Scalar err = (fk.end_effector.inverse() * M).log().norm();
-            REQUIRE(err < tol);
-        }
-
-        SECTION("non-zero config differs from home")
-        {
-            Eigen::Vector<Scalar, 6> q;
-            q << Scalar(0.1), Scalar(0.1), Scalar(0.1),
-                 Scalar(0.1), Scalar(0.1), Scalar(0.1);
-            auto fk = cartan::forward_kinematics(chain, q);
-            Scalar diff = (fk.end_effector.inverse() * M).log().norm();
-            REQUIRE(diff > Scalar(0.01));
-        }
-
-        SECTION("fixed vs dynamic")
-        {
-            Eigen::Vector<Scalar, 6> q_fixed;
-            q_fixed << Scalar(0.3), Scalar(-0.2), Scalar(0.5),
-                       Scalar(-0.1), Scalar(0.4), Scalar(-0.3);
-            auto fk_fixed = cartan::forward_kinematics(chain, q_fixed);
-
-            auto dyn_chain = chain.to_dynamic();
-            Eigen::VectorX<Scalar> q_dyn(6);
-            q_dyn << Scalar(0.3), Scalar(-0.2), Scalar(0.5),
-                     Scalar(-0.1), Scalar(0.4), Scalar(-0.3);
-            auto fk_dyn = cartan::forward_kinematics(dyn_chain, q_dyn);
-
-            Scalar err = (fk_fixed.end_effector.inverse() * fk_dyn.end_effector).log().norm();
-            REQUIRE(err < tol);
-        }
-    }
-
-    // ------------------------------------------------------------------
-    // DOF 6 (KR6 SIXX)
-    // ------------------------------------------------------------------
-    SECTION("DOF 6 (KR6 SIXX)")
-    {
-        auto chain = cartan::test::make_kr6_sixx_chain<Scalar>();
-        auto M = chain.home();
-
-        SECTION("zero config returns home")
-        {
-            Eigen::Vector<Scalar, 6> q = Eigen::Vector<Scalar, 6>::Zero();
-            auto fk = cartan::forward_kinematics(chain, q);
-            Scalar err = (fk.end_effector.inverse() * M).log().norm();
-            REQUIRE(err < tol);
-        }
-
-        SECTION("non-zero config differs from home")
-        {
-            Eigen::Vector<Scalar, 6> q;
-            q << Scalar(0.1), Scalar(0.1), Scalar(0.1),
-                 Scalar(0.1), Scalar(0.1), Scalar(0.1);
-            auto fk = cartan::forward_kinematics(chain, q);
-            Scalar diff = (fk.end_effector.inverse() * M).log().norm();
-            REQUIRE(diff > Scalar(0.01));
-        }
-
-        SECTION("fixed vs dynamic")
-        {
-            Eigen::Vector<Scalar, 6> q_fixed;
-            q_fixed << Scalar(0.3), Scalar(-0.2), Scalar(0.5),
-                       Scalar(-0.1), Scalar(0.4), Scalar(-0.3);
-            auto fk_fixed = cartan::forward_kinematics(chain, q_fixed);
-
-            auto dyn_chain = chain.to_dynamic();
-            Eigen::VectorX<Scalar> q_dyn(6);
-            q_dyn << Scalar(0.3), Scalar(-0.2), Scalar(0.5),
-                     Scalar(-0.1), Scalar(0.4), Scalar(-0.3);
-            auto fk_dyn = cartan::forward_kinematics(dyn_chain, q_dyn);
-
-            Scalar err = (fk_fixed.end_effector.inverse() * fk_dyn.end_effector).log().norm();
-            REQUIRE(err < tol);
-        }
-    }
-
-    // ------------------------------------------------------------------
-    // DOF 7
-    // ------------------------------------------------------------------
-    SECTION("DOF 7")
-    {
-        auto chain = cartan::test::make_lbr_iiwa_chain<Scalar>();
-        auto M = chain.home();
-
-        SECTION("zero config returns home")
-        {
-            Eigen::Vector<Scalar, 7> q = Eigen::Vector<Scalar, 7>::Zero();
-            auto fk = cartan::forward_kinematics(chain, q);
-            Scalar err = (fk.end_effector.inverse() * M).log().norm();
-            REQUIRE(err < tol);
-        }
-
-        SECTION("non-zero config differs from home")
-        {
-            Eigen::Vector<Scalar, 7> q;
-            q << Scalar(0.1), Scalar(0.1), Scalar(0.1), Scalar(0.1),
-                 Scalar(0.1), Scalar(0.1), Scalar(0.1);
-            auto fk = cartan::forward_kinematics(chain, q);
-            Scalar diff = (fk.end_effector.inverse() * M).log().norm();
-            REQUIRE(diff > Scalar(0.01));
-        }
-
-        SECTION("fixed vs dynamic")
-        {
-            Eigen::Vector<Scalar, 7> q_fixed;
-            q_fixed << Scalar(0.3), Scalar(-0.2), Scalar(0.5), Scalar(-0.1),
-                       Scalar(0.4), Scalar(-0.3), Scalar(0.2);
-            auto fk_fixed = cartan::forward_kinematics(chain, q_fixed);
-
-            auto dyn_chain = chain.to_dynamic();
-            Eigen::VectorX<Scalar> q_dyn(7);
-            q_dyn << Scalar(0.3), Scalar(-0.2), Scalar(0.5), Scalar(-0.1),
-                     Scalar(0.4), Scalar(-0.3), Scalar(0.2);
-            auto fk_dyn = cartan::forward_kinematics(dyn_chain, q_dyn);
-
-            Scalar err = (fk_fixed.end_effector.inverse() * fk_dyn.end_effector).log().norm();
-            REQUIRE(err < tol);
-        }
+        Eigen::VectorX<double> q(0);
+        auto fk = cartan::forward_kinematics(chain, q).end_effector;
+        REQUIRE(pose_error(fk, chain.home()) < sweep_tol);
     }
 }
