@@ -55,6 +55,7 @@ option(CARTAN_BUILD_TRAC_IK "Build TRAC-IK comparison benchmarks (requires oroco
 option(CARTAN_BUILD_PINOCCHIO "Build Pinocchio comparison benchmarks (requires pinocchio)" OFF)
 option(CARTAN_BUILD_PROFILING "Build profiling benchmarks (no external robot library dependencies)" OFF)
 option(CARTAN_BUILD_PYTHON "Build Python bindings via nanobind" OFF)
+option(CARTAN_BUILD_DOC_TESTS "Compile documentation C++ snippets against the headers" OFF)
 option(CARTAN_CMAKE_FETCH_DEPS "Use CMake FetchContent to download and install dependencies" OFF)
 
 set(CARTAN_ARGMIN_SOURCE_DIR "" CACHE PATH "Path to local argmin source checkout")
@@ -76,6 +77,13 @@ else ()
 endif ()
 
 add_subdirectory(lib)
+
+# The doc-snippet compile gate reuses the cartan targets defined by lib/, so it
+# must be added after them. It is a compile-only target with no CTest entries,
+# hence independent of the test/example gates below.
+if (CARTAN_BUILD_DOC_TESTS)
+    add_subdirectory(docs)
+endif ()
 
 if (CARTAN_ENABLE_INSTALL)
     set(CARTAN_INSTALL_CMAKEDIR ${CMAKE_INSTALL_LIBDIR}/cmake/cartan)

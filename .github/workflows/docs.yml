@@ -1,0 +1,45 @@
+name: Docs
+
+# The Linux/Fuzz/Embedded workflows ignore docs/** so a documentation edit never
+# triggers them. This workflow is the counterpart: it compiles the marked C++
+# snippets in the guides against the real headers, so a renamed symbol or a wrong
+# signature -- whether it lands in a doc edit or in a header rename -- fails here.
+on:
+  push:
+    branches: [master, develop, 'milestone/**']
+    paths:
+      - 'docs/**'
+      - 'lib/**'
+      - '**.h'
+      - 'tools/extract_doc_snippets.py'
+      - '.github/workflows/docs.yml'
+  pull_request:
+    branches: [master, develop]
+    paths:
+      - 'docs/**'
+      - 'lib/**'
+      - '**.h'
+      - 'tools/extract_doc_snippets.py'
+      - '.github/workflows/docs.yml'
+  workflow_dispatch:
+
+jobs:
+  doc-snippets:
+    runs-on: ubuntu-24.04
+    name: compile documentation snippets
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Install Eigen
+        run: sudo apt-get update && sudo apt-get install -y libeigen3-dev
+
+      - name: Configure
+        run: >
+          cmake -B build
+          -DCARTAN_BUILD_DOC_TESTS=ON
+          -DCARTAN_BUILD_ARGMIN=ON
+          -DCARTAN_CMAKE_FETCH_DEPS=ON
+
+      - name: Compile documentation snippets
+        run: cmake --build build --target doc_snippets -j$(nproc)
