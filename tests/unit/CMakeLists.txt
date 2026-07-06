@@ -42,6 +42,11 @@ cartan_add_test(projected_lm_test projected_lm_test.cpp)
 cartan_add_test(projected_lm_bit_identity_test projected_lm_bit_identity_test.cpp)
 target_compile_definitions(projected_lm_bit_identity_test
     PRIVATE CARTAN_PLM_GOLDEN_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+cartan_add_test(projected_lm_alloc_free_test projected_lm_alloc_free_test.cpp)
+# The global operator new/delete counter and Eigen's process-global no-malloc
+# flag are shared per process, so this test must not run concurrently with any
+# other test that could perturb them.
+set_tests_properties(projected_lm_alloc_free_test PROPERTIES RUN_SERIAL TRUE)
 cartan_add_test(basic_ik_solver_compile_test basic_ik_solver_compile_test.cpp)
 cartan_add_test(basic_ik_solver_test basic_ik_solver_test.cpp)
 cartan_add_test(bobyqa_solve_policy_test bobyqa_solve_policy_test.cpp)

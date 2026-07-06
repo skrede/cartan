@@ -45,6 +45,17 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   version at `0.4.1`, with explicit `LANGUAGES CXX`. `cartan-lie` installs the
   generated `cartan/version.h` header so `find_package(cartan)` consumers can
   include it alongside the rest of the public API.
+- The shared iterative-solver stall detection now keeps its recent-error window
+  in a fixed-capacity ring buffer instead of a heap-backed growable container,
+  removing per-iteration heap churn from the stall and divergence check. The
+  retained window, and the stall and divergence decisions derived from it, are
+  numerically identical to the previous unbounded history.
+- `projected_lm` is now allocation-free per step on fixed-size chains: its
+  active-set LDLT solve runs over max-size-fixed temporaries, so the documented
+  steady-state IK path performs no heap allocation. This is a storage refactor
+  only; solver outputs are bit-for-bit identical to the previous heap-backed
+  implementation, and a host test proves the steady-state step loop allocates
+  no heap using both an Eigen no-malloc trap and a global new/delete counter.
 
 ### Fixed
 - Prismatic joint axis sign was dropped in the fast-path forward-kinematics and
