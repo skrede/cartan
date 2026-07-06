@@ -42,13 +42,35 @@
 #include <Eigen/Dense>
 
 #include <cmath>
+#include <array>
 #include <vector>
 #include <limits>
 #include <optional>
 #include <algorithm>
+#include <type_traits>
 
 namespace cartan::ik
 {
+
+/// Square storage for the active (free) joint sub-Hessian. For a compile-time
+/// joint count N the storage is max-size-fixed: an N x N capacity buffer held
+/// inline (no heap) that is resized to the runtime free-joint count without
+/// allocating. Because the operand is still dispatched at runtime size, the
+/// factorization operates on the identical n_free x n_free block and yields
+/// bit-identical results to the heap-backed dynamic matrix it replaces. For a
+/// runtime-DOF chain (N == dynamic) it falls back to the dynamic matrix.
+template <typename Scalar, int N>
+using free_matrix = std::conditional_t<
+    N == dynamic,
+    Eigen::MatrixX<Scalar>,
+    Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic, 0, N, N>>;
+
+/// Column-vector counterpart of free_matrix (max-size-fixed N x 1 for fixed N).
+template <typename Scalar, int N>
+using free_vector = std::conditional_t<
+    N == dynamic,
+    Eigen::VectorX<Scalar>,
+    Eigen::Matrix<Scalar, Eigen::Dynamic, 1, 0, N, 1>>;
 
 /// Projected Levenberg-Marquardt IK solve policy with active-set box projection
 /// and built-in Halton-seed re-seed on stall.
@@ -64,6 +86,41 @@ public:
     using position_type = typename joint_state<scalar_type, joints>::position_type;
 
     static_assert(std::is_floating_point_v<scalar_type>, "projected_lm requires a floating-point Scalar type");
+
+private:
+    // Max-size-fixed temporaries for the per-step active-set solve. On a
+    // fixed-N chain these hold their storage inline and resize within the N
+    // bound without heap allocation; the LDLT path therefore performs no
+    // per-step allocation. (dls uses JacobiSVD, which may allocate internally,
+    // so the allocation-free guarantee is scoped to this solver.)
+    static constexpr int active_capacity = (joints == dynamic) ? 1 : joints;
+
+    using free_mat = free_matrix<scalar_type, joints>;
+    using free_vec = free_vector<scalar_type, joints>;
+    using free_jac = std::conditional_t<
+        joints == dynamic,
+        Eigen::Matrix<scalar_type, 6, Eigen::Dynamic>,
+        Eigen::Matrix<scalar_type, 6, Eigen::Dynamic, 0, 6, active_capacity>>;
+
+    using free_index_storage = std::conditional_t<
+        joints == dynamic,
+        std::vector<int>,
+        std::array<int, static_cast<std::size_t>(active_capacity)>>;
+
+    // Active (non-clamped) joint index list. For fixed N this is a std::array
+    // plus a runtime count -- no std::vector, so no per-step heap allocation.
+    struct active_set
+    {
+        free_index_storage indices{};
+        int count{0};
+
+        [[nodiscard]] int operator[](int i) const
+        {
+            return indices[static_cast<std::size_t>(i)];
+        }
+    };
+
+public:
 
     struct options
     {
@@ -274,10 +331,13 @@ private:
         return ik_status::running;
     }
 
-    std::vector<int> identify_active_set(const auto& g, int n)
+    active_set identify_active_set(const auto& g, int n)
     {
-        std::vector<int> free_indices;
-        free_indices.reserve(static_cast<std::size_t>(n));
+        active_set free_indices;
+        if constexpr (joints == dynamic)
+        {
+            free_indices.indices.reserve(static_cast<std::size_t>(n));
+        }
         for (int i = 0; i < n; ++i)
         {
             bool at_lower = (m_q(i) <= m_q_min(i) + std::numeric_limits<scalar_type>::epsilon());
@@ -286,7 +346,15 @@ private:
                           (at_upper && g(i) > scalar_type(0));
             if (!active)
             {
-                free_indices.push_back(i);
+                if constexpr (joints == dynamic)
+                {
+                    free_indices.indices.push_back(i);
+                }
+                else
+                {
+                    free_indices.indices[static_cast<std::size_t>(free_indices.count)] = i;
+                }
+                ++free_indices.count;
             }
         }
         return free_indices;
@@ -297,10 +365,10 @@ private:
         const JacobianType& J_b,
         const HessianType& H,
         const GradientType& g,
-        const std::vector<int>& free_indices,
+        const active_set& free_indices,
         int n)
     {
-        int n_free = static_cast<int>(free_indices.size());
+        int n_free = free_indices.count;
         position_type dq;
         if constexpr (joints == dynamic)
         {
@@ -316,26 +384,25 @@ private:
             return dq;
         }
 
-        Eigen::MatrixX<scalar_type> H_free(n_free, n_free);
-        Eigen::VectorX<scalar_type> g_free(n_free);
+        free_mat H_free(n_free, n_free);
+        free_vec g_free(n_free);
         for (int i = 0; i < n_free; ++i)
         {
-            g_free(i) = g(free_indices[static_cast<std::size_t>(i)]);
+            g_free(i) = g(free_indices[i]);
             for (int j = 0; j < n_free; ++j)
             {
-                H_free(i, j) = H(free_indices[static_cast<std::size_t>(i)],
-                                 free_indices[static_cast<std::size_t>(j)]);
+                H_free(i, j) = H(free_indices[i], free_indices[j]);
             }
         }
 
-        Eigen::VectorX<scalar_type> dq_free;
+        free_vec dq_free;
         if (m_options.use_dogleg)
         {
             dq_free = dogleg_step(J_b, H_free, g_free, free_indices, n_free);
         }
         else
         {
-            Eigen::MatrixX<scalar_type> A = H_free;
+            free_mat A = H_free;
             for (int i = 0; i < n_free; ++i)
             {
                 A(i, i) += m_lambda;
@@ -345,7 +412,7 @@ private:
 
         for (int i = 0; i < n_free; ++i)
         {
-            dq(free_indices[static_cast<std::size_t>(i)]) = dq_free(i);
+            dq(free_indices[i]) = dq_free(i);
         }
         return dq;
     }
@@ -435,20 +502,20 @@ private:
         }
     }
 
-    template <int JRows>
-    Eigen::VectorX<scalar_type> dogleg_step(
-        const Eigen::Matrix<scalar_type, 6, JRows>& J_b,
-        const Eigen::MatrixX<scalar_type>& H_free,
-        const Eigen::VectorX<scalar_type>& g_free,
-        const std::vector<int>& free_indices,
+    template <typename JacobianType>
+    free_vec dogleg_step(
+        const JacobianType& J_b,
+        const free_mat& H_free,
+        const free_vec& g_free,
+        const active_set& free_indices,
         int n_free)
     {
-        Eigen::VectorX<scalar_type> delta_sd = g_free;
+        free_vec delta_sd = g_free;
 
-        Eigen::Matrix<scalar_type, 6, Eigen::Dynamic> J_b_free(6, n_free);
+        free_jac J_b_free(6, n_free);
         for (int i = 0; i < n_free; ++i)
         {
-            J_b_free.col(i) = J_b.col(free_indices[static_cast<std::size_t>(i)]);
+            J_b_free.col(i) = J_b.col(free_indices[i]);
         }
 
         scalar_type g_sq = g_free.squaredNorm();
@@ -458,12 +525,12 @@ private:
             ? g_sq / Jg_sq
             : scalar_type(1);
 
-        Eigen::MatrixX<scalar_type> H_reg = H_free;
+        free_mat H_reg = H_free;
         for (int i = 0; i < n_free; ++i)
         {
             H_reg(i, i) += std::numeric_limits<scalar_type>::epsilon() * scalar_type(100);
         }
-        Eigen::VectorX<scalar_type> delta_gn = H_reg.ldlt().solve(g_free);
+        free_vec delta_gn = H_reg.ldlt().solve(g_free);
 
         scalar_type delta_gn_norm = delta_gn.norm();
         scalar_type sd_scaled_norm = t * delta_sd.norm();
@@ -478,9 +545,9 @@ private:
             return (m_delta / delta_sd.norm()) * delta_sd;
         }
 
-        Eigen::VectorX<scalar_type> a = t * delta_sd;
-        Eigen::VectorX<scalar_type> b = delta_gn;
-        Eigen::VectorX<scalar_type> d = b - a;
+        free_vec a = t * delta_sd;
+        free_vec b = delta_gn;
+        free_vec d = b - a;
 
         scalar_type a_sq = a.squaredNorm();
         scalar_type d_sq = d.squaredNorm();

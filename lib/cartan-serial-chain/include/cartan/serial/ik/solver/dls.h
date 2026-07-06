@@ -32,6 +32,7 @@
 #include <cmath>
 #include <vector>
 #include <algorithm>
+#include <type_traits>
 
 namespace cartan::ik
 {
@@ -55,6 +56,19 @@ public:
     using position_type = typename joint_state<scalar_type, joints>::position_type;
 
     static_assert(std::is_floating_point_v<scalar_type>, "dls requires a floating-point Scalar type");
+
+private:
+    // Max-size-fixed storage for the per-step damped singular-value vector.
+    // For a fixed-N chain this holds its (at most N) entries inline. Note the
+    // JacobiSVD above may still allocate internally, so the per-step
+    // allocation-free guarantee is scoped to the projected_lm LDLT path, not
+    // to this SVD-based solver; the fixed storage here is for consistency.
+    using damped_vector = std::conditional_t<
+        joints == dynamic,
+        Eigen::VectorX<scalar_type>,
+        Eigen::Matrix<scalar_type, Eigen::Dynamic, 1, 0, joints, 1>>;
+
+public:
 
     /// Tunable parameters for the DLS solve policy.
     struct options
@@ -148,7 +162,7 @@ public:
                 lambda_sq = m_options.lambda_max * m_options.lambda_max * ratio;
             }
 
-            Eigen::VectorX<scalar_type> damped(rank);
+            damped_vector damped(rank);
             for (int i = 0; i < rank; ++i)
             {
                 damped(i) = sigma(i) / (sigma(i) * sigma(i) + lambda_sq);
