@@ -38,7 +38,7 @@ struct storage_selector<dynamic, T>
 template <int N, typename T>
 using storage_t = typename storage_selector<N, T>::type;
 
-} // namespace detail
+}
 }
 
 #endif

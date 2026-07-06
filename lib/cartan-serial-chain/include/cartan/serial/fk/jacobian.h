@@ -116,7 +116,7 @@ jacobian_matrix<Scalar, N> space_jacobian_unrolled(
         chain, fk, std::make_index_sequence<static_cast<std::size_t>(N)>{});
 }
 
-} // namespace detail
+}
 
 /// Space Jacobian: J_si(q) = Ad_{T_{i-1}}(S_i).
 ///

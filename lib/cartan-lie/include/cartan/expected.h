@@ -222,7 +222,7 @@ inline constexpr bool is_unexpected_v = false;
 template <typename E>
 inline constexpr bool is_unexpected_v<unexpected<E>> = true;
 
-} // namespace detail
+}
 
 /// expected<T, E> — sum type holding either a value of T or an error of E.
 /// 1:1 API mirror of std::expected from C++23.

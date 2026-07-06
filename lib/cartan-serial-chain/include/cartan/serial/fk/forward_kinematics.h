@@ -114,7 +114,7 @@ fk_result<Scalar, N> fk_unrolled(
     return fk_unrolled_impl(chain, q, std::make_index_sequence<static_cast<std::size_t>(N)>{});
 }
 
-} // namespace detail
+}
 
 /// Compute forward kinematics for a kinematic chain at joint configuration q.
 ///

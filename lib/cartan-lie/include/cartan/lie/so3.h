@@ -103,7 +103,7 @@ template <typename Scalar>
          - half_phi * a_hat;
 }
 
-} // namespace detail
+}
 
 /// 3D rotation group SO(3), parameterized by scalar type and policy.
 /// Internal representation: unit quaternion (Eigen::Quaternion<Scalar>).

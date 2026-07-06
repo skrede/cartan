@@ -351,7 +351,7 @@ public:
     /// first-in-order non-nullopt entry is the terminator that actually
     /// drove the solver's exit, but later criteria also populate the
     /// array so consumers can see which additional criteria would have
-    /// fired. Requires argmin HEAD >= 21a0acf (phase 24.2 delivery).
+    /// fired. Requires argmin HEAD >= 21a0acf.
     ///
     /// Note: reads from the member `m_nab_opts.convergence.last_check_results_`
     /// rather than from `m_solver->convergence()` because basic_solver's

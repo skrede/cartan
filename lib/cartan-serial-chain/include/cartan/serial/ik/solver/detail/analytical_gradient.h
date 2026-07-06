@@ -34,7 +34,7 @@ struct gradient_result
 ///       J_b = body Jacobian,
 ///       W = diag(weights).
 ///
-/// Per Phase 09 fix: the gradient through log() requires J_log_inv.
+/// The gradient through log() requires J_log_inv.
 /// This is the default ObjectivePolicy for L-BFGS-B.
 template <chain Chain>
 struct ik_se3_objective

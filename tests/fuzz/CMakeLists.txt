@@ -1,4 +1,4 @@
-# Fuzz targets will be added as domain code lands in Phase 2+
+# Fuzz corpus population is deferred; targets will be added later.
 # Each fuzz target links cartan::cartan and uses -fsanitize=fuzzer
 
 # Example pattern (uncomment when fuzz targets exist):
