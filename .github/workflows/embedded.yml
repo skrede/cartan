@@ -66,3 +66,13 @@ jobs:
           esp_idf_version: v5.1
           target: ${{ matrix.target }}
           path: tests/embedded/esp32-smoke
+
+      # The bench drives UART2 on GPIO16/17, which is a classic-ESP32 layout;
+      # keep it on the esp32 target only.
+      - name: Build the on-device IK timing bench
+        if: matrix.target == 'esp32'
+        uses: espressif/esp-idf-ci-action@e6f5c74232b1ccd4c97ed641f1e48553853f1fd5 # v1.2.0
+        with:
+          esp_idf_version: v5.1
+          target: esp32
+          path: tests/embedded/esp32-bench
