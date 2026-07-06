@@ -33,6 +33,7 @@
 #include <optional>
 #include "cartan/expected.h"
 #include <concepts>
+#include <functional>
 #include <type_traits>
 
 namespace cartan
@@ -110,7 +111,7 @@ public:
         const convergence_criteria<scalar_type>& criteria,
         const solver_options<scalar_type>& options = {})
     {
-        m_chain = &chain;
+        m_chain = std::cref(chain);
         m_target = target;
         m_criteria = criteria;
         m_objective = options.objective;
@@ -143,8 +144,28 @@ public:
         }
     }
 
+    /// Deleted rvalue overload: the runner borrows the chain without owning it,
+    /// so binding a temporary here would leave a dangling reference the moment
+    /// setup() returns. Rejecting the temporary at the call boundary is the
+    /// only safe guard -- a `const chain_type&` parameter alone would silently
+    /// bind (and then dangle) an rvalue.
+    void setup(
+        chain_type&&,
+        const se3<scalar_type>&,
+        const position_type&,
+        const convergence_criteria<scalar_type>&,
+        const solver_options<scalar_type>& = {}) = delete;
+
+    /// Precondition: setup() must be called before step(). Invoked beforehand,
+    /// step() has no chain to drive and returns a terminal status
+    /// (ik_status::iteration_limit) rather than dereferencing an empty borrow.
     ik_status step()
     {
+        if (!m_chain)
+        {
+            return ik_status::iteration_limit;
+        }
+
         if (m_status != ik_status::running)
         {
             return m_status;
@@ -176,6 +197,12 @@ public:
 
     cartan::expected<ik_result<scalar_type, joints>, ik_error<scalar_type, joints>> solve()
     {
+        if (!m_chain)
+        {
+            return cartan::unexpected(
+                ik_error<scalar_type, joints>{.reason = ik_failure::not_initialized});
+        }
+
         if constexpr (sizeof...(Policies) == 1)
         {
             // Total-budget accumulator loop: ask the inner policy for as many
@@ -250,15 +277,15 @@ private:
     struct parked_result
     {
         position_type q;
-        scalar_type error_norm;
-        int iterations;
-        bool converged;
+        scalar_type error_norm{};
+        int iterations{};
+        bool converged{false};
         ik_termination_reason termination_reason{ik_termination_reason::unknown};
     };
 
     step_result<scalar_type> step_single_metrics(int N)
     {
-        auto inner = std::get<0>(m_policies).step(*m_chain, N);
+        auto inner = std::get<0>(m_policies).step(m_chain->get(), N);
         auto policy_status = inner.status;
         position_type q = std::get<0>(m_policies).solution();
 
@@ -282,7 +309,7 @@ private:
                 return inner;
             }
 
-            std::get<0>(m_policies).setup(*m_chain, m_target, q, m_criteria);
+            std::get<0>(m_policies).setup(m_chain->get(), m_target, q, m_criteria);
             return {ik_status::running, inner.metrics};
         }
 
@@ -332,7 +359,7 @@ private:
             return;
 
         auto& policy = std::get<I>(m_policies);
-        auto status = policy.step(*m_chain, 1).status;
+        auto status = policy.step(m_chain->get(), 1).status;
 
         if (status == ik_status::converged)
         {
@@ -426,8 +453,8 @@ private:
             }
             case ik_objective::max_manipulability:
             {
-                auto fk = forward_kinematics(*m_chain, q);
-                auto J_b = body_jacobian(*m_chain, fk);
+                auto fk = forward_kinematics(m_chain->get(), q);
+                auto J_b = body_jacobian(m_chain->get(), fk);
                 constexpr unsigned int svd_opts = (joints == dynamic)
                     ? (Eigen::ComputeThinU | Eigen::ComputeThinV)
                     : (Eigen::ComputeFullU | Eigen::ComputeFullV);
@@ -447,8 +474,8 @@ private:
             }
             case ik_objective::max_isotropy:
             {
-                auto fk = forward_kinematics(*m_chain, q);
-                auto J_b = body_jacobian(*m_chain, fk);
+                auto fk = forward_kinematics(m_chain->get(), q);
+                auto J_b = body_jacobian(m_chain->get(), fk);
                 constexpr unsigned int svd_opts = (joints == dynamic)
                     ? (Eigen::ComputeThinU | Eigen::ComputeThinV)
                     : (Eigen::ComputeFullU | Eigen::ComputeFullV);
@@ -652,7 +679,7 @@ private:
     }
 
     std::tuple<Policies...> m_policies{};
-    const chain_type* m_chain{nullptr};
+    std::optional<std::reference_wrapper<const chain_type>> m_chain{};
     se3<scalar_type> m_target{se3<scalar_type>::identity()};
     convergence_criteria<scalar_type> m_criteria{};
     position_type m_best_q{};

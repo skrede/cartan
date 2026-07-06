@@ -40,7 +40,8 @@ enum class ik_failure
     stalled,
     iteration_limit,
     joint_limit_violation,
-    aborted
+    aborted,
+    not_initialized
 };
 
 /// Fine-grained termination reason reported by individual solve policies.
