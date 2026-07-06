@@ -223,7 +223,18 @@ public:
 
 private:
     se3<scalar_type> m_target{se3<scalar_type>::identity()};
-    position_type m_q{};
+    // Zero-initialize the fixed-size storage so a size-optimized build cannot
+    // flag the working iterate as maybe-uninitialized before setup() sets it.
+    position_type m_q{[] {
+        if constexpr (joints == dynamic)
+        {
+            return position_type{};
+        }
+        else
+        {
+            return position_type::Zero();
+        }
+    }()};
     convergence_criteria<scalar_type> m_criteria{};
     options m_options{};
     cartan::detail::error_ring<scalar_type> m_error_history;
