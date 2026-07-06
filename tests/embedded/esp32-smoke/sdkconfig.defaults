@@ -1,4 +1,4 @@
-# ESP-IDF defaults for the cartan compile-only smoke. Production firmware
+# ESP-IDF defaults for the cartan on-device smoke. Production firmware
 # should tune these against its own real-time, power, and memory budget.
 
 # Optimize for size by default — cartan's templated Eigen instantiations are
@@ -17,3 +17,8 @@ CONFIG_COMPILER_CXX_RTTI=n
 # Float-only FPU — Eigen will use it; cartan templates default to float in
 # the smoke, so this matches the instantiation footprint.
 CONFIG_ESP_TASK_WDT_INIT=y
+
+# The default 3.5 KB main-task stack is tight for the combination of the IK
+# solver's on-stack 6x6 working set and newlib's stack-hungry %f formatting.
+# 8 KB gives comfortable headroom for the on-device numeric demo.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192

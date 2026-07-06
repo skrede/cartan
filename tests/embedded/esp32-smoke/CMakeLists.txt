@@ -1,20 +1,19 @@
-# Compile-only smoke test verifying cartan headers build under xtensa-esp32-elf
-# and riscv32-esp-elf toolchains via ESP-IDF. No flash, no hardware required;
-# `idf.py reconfigure build` exercises the language-level compatibility.
+# Cartan ESP-IDF smoke: compiles cartan under the xtensa-esp32-elf and
+# riscv32-esp-elf toolchains and, when flashed, runs a live numeric check on the
+# chip. CI runs the compile leg only (no hardware); `idf.py build` proves the
+# language-level compatibility. On a connected board `idf.py flash monitor` also
+# runs app_main, which streams FK, a Paden-Kahan subproblem, and a full float IK
+# solve with cycle/us timing over the console UART for comparison against host.
 #
 # To run:
 #   1. Install ESP-IDF v5.1+ (https://docs.espressif.com/projects/esp-idf/).
 #   2. `. $IDF_PATH/export.sh`
-#   3. `cd tests/embedded/esp32-smoke && idf.py set-target esp32s3 && idf.py reconfigure build`
+#   3. `cd tests/embedded/esp32-smoke && idf.py set-target esp32 && idf.py build`
+#   4. To validate on hardware: `idf.py -p <port> flash monitor`.
 #
-# The smoke confirms three propositions:
-#   - cartan-lie compiles (SE3/SO3 with float scalar)
-#   - cartan-serial-chain compiles (kinematic_chain<float, 3>, FK)
-#   - cartan-analytical compiles (paden_kahan subproblems)
-# Hardware deployment, Eigen alignment audit (Xtensa LX6/LX7 stack alignment
-# vs Eigen's vectorization assumptions), memory + flash sweep, and an actual
-# robot-arm demo are out of scope for this smoke; those land in a future
-# embedded-targeting effort.
+# Exercises cartan-lie (SE3/SO3, float), cartan-serial-chain (kinematic_chain,
+# FK, iterative IK), and cartan-analytical (paden_kahan). A multi-board flash/RAM
+# sweep and a robot-arm demo remain future embedded-targeting work.
 
 cmake_minimum_required(VERSION 3.16)
 
