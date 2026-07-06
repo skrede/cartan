@@ -80,7 +80,7 @@ struct transform
         {
             return cartan::unexpected(result.error());
         }
-        return transform{result.value()};
+        return transform{*result};
     }
 };
 

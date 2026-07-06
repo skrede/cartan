@@ -182,7 +182,7 @@ public:
         }
 
         vector3<Scalar> trans = T.template block<3, 1>(0, 3);
-        return se3(rot_result.value(), trans);
+        return se3(*rot_result, trans);
     }
 
     /// Transform a 3D point: R * p + t.

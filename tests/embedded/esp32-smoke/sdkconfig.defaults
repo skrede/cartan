@@ -6,11 +6,12 @@
 # would typically pick.
 CONFIG_COMPILER_OPTIMIZATION_SIZE=y
 
-# Enable C++ exceptions so std::is_constant_evaluated() in cartan-lie's
-# epsilon traits compiles under the C++20 evaluation rules used by
-# cartan::expected's value() throw path. Production firmware can tighten
-# this depending on the dispatch convention chosen.
-CONFIG_COMPILER_CXX_EXCEPTIONS=y
+# Disable C++ exceptions to match a realistic embedded posture. cartan's
+# checked factories route their success branches through the noexcept
+# operator*, and cartan::expected::value() gates its throw on __cpp_exceptions,
+# trapping through an overridable handler when exceptions are off. Firmware that
+# wants a custom fault path defines CARTAN_ON_BAD_EXPECTED_ACCESS.
+CONFIG_COMPILER_CXX_EXCEPTIONS=n
 CONFIG_COMPILER_CXX_RTTI=n
 
 # Float-only FPU — Eigen will use it; cartan templates default to float in

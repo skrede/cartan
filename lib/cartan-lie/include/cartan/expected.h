@@ -89,6 +89,29 @@ private:
     E m_error;
 };
 
+namespace detail
+{
+
+/// Customization point for the exceptions-disabled fault path. When the
+/// translation unit is compiled without C++ exceptions (`-fno-exceptions`,
+/// the default on ESP-IDF and most bare-metal toolchains), value() on an
+/// errored expected cannot throw; it instead calls the hook below. The
+/// default aborts deterministically via a trap instruction. Firmware that
+/// wants its own fail-stop (log, reset, blink an LED) defines
+/// CARTAN_ON_BAD_EXPECTED_ACCESS() to its own handler at compile time,
+/// e.g. -DCARTAN_ON_BAD_EXPECTED_ACCESS=my_fault_handler.
+#ifndef CARTAN_ON_BAD_EXPECTED_ACCESS
+#  define CARTAN_ON_BAD_EXPECTED_ACCESS() __builtin_trap()
+#endif
+
+[[noreturn]] inline void on_bad_expected_access() noexcept
+{
+    CARTAN_ON_BAD_EXPECTED_ACCESS();
+    __builtin_unreachable();
+}
+
+}
+
 /// unexpected<E> wraps an error value for tag-dispatching expected
 /// construction. Mirrors std::unexpected.
 template <typename E>
@@ -507,25 +530,53 @@ public:
 
     constexpr T& value() &
     {
-        if (!m_has_value) throw bad_expected_access<E>(m_error);
+        if (!m_has_value)
+        {
+#if defined(__cpp_exceptions)
+            throw bad_expected_access<E>(m_error);
+#else
+            detail::on_bad_expected_access();
+#endif
+        }
         return m_value;
     }
 
     constexpr const T& value() const&
     {
-        if (!m_has_value) throw bad_expected_access<E>(m_error);
+        if (!m_has_value)
+        {
+#if defined(__cpp_exceptions)
+            throw bad_expected_access<E>(m_error);
+#else
+            detail::on_bad_expected_access();
+#endif
+        }
         return m_value;
     }
 
     constexpr T&& value() &&
     {
-        if (!m_has_value) throw bad_expected_access<E>(std::move(m_error));
+        if (!m_has_value)
+        {
+#if defined(__cpp_exceptions)
+            throw bad_expected_access<E>(std::move(m_error));
+#else
+            detail::on_bad_expected_access();
+#endif
+        }
         return std::move(m_value);
     }
 
     constexpr const T&& value() const&&
     {
-        if (!m_has_value) throw bad_expected_access<E>(std::move(m_error));
+        if (!m_has_value)
+        {
+#if defined(__cpp_exceptions)
+            throw bad_expected_access<E>(std::move(m_error));
+#else
+            detail::on_bad_expected_access();
+#endif
+        }
         return std::move(m_value);
     }
 
@@ -917,12 +968,26 @@ public:
 
     constexpr void value() const&
     {
-        if (!m_has_value) throw bad_expected_access<E>(m_error);
+        if (!m_has_value)
+        {
+#if defined(__cpp_exceptions)
+            throw bad_expected_access<E>(m_error);
+#else
+            detail::on_bad_expected_access();
+#endif
+        }
     }
 
     constexpr void value() &&
     {
-        if (!m_has_value) throw bad_expected_access<E>(std::move(m_error));
+        if (!m_has_value)
+        {
+#if defined(__cpp_exceptions)
+            throw bad_expected_access<E>(std::move(m_error));
+#else
+            detail::on_bad_expected_access();
+#endif
+        }
     }
 
     [[nodiscard]] constexpr E& error() & noexcept { return m_error; }

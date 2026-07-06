@@ -226,7 +226,7 @@ public:
         }
 
         vector2<Scalar> trans = T.template block<2, 1>(0, 2);
-        return se2(rot_result.value(), trans);
+        return se2(*rot_result, trans);
     }
 
     /// Access the rotation component.

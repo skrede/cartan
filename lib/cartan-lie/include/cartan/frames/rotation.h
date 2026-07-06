@@ -75,7 +75,7 @@ struct rotation
         {
             return cartan::unexpected(result.error());
         }
-        return rotation{result.value()};
+        return rotation{*result};
     }
 
     /// Construct from quaternion with validation.
@@ -87,7 +87,7 @@ struct rotation
         {
             return cartan::unexpected(result.error());
         }
-        return rotation{result.value()};
+        return rotation{*result};
     }
 };
 
