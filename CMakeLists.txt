@@ -1,3 +1,18 @@
+# The repository root serves two build systems. When ESP-IDF processes cartan
+# as a managed component it defines ESP_PLATFORM; in that mode the root registers
+# cartan as a header-only IDF component (public include trees + Eigen) and returns
+# before reaching the host project below. A normal host configure leaves
+# ESP_PLATFORM undefined and runs the full project unchanged.
+if(ESP_PLATFORM)
+    idf_component_register(
+        INCLUDE_DIRS
+            "lib/cartan-lie/include"
+            "lib/cartan-serial-chain/include"
+            "lib/cartan-analytical/include"
+        REQUIRES eigen)
+    return()
+endif()
+
 cmake_minimum_required(VERSION 3.28)
 project(cartan VERSION 0.4.1 LANGUAGES CXX)
 

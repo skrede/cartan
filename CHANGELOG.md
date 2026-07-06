@@ -21,10 +21,13 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 - Python bindings (`cartan._core`) built with nanobind and packaged via
   scikit-build-core, exposing the `cartan` and `cartan.analytical` submodules.
   Gated behind `CARTAN_BUILD_PYTHON`.
-- Embedded packaging manifests — an `idf_component.yml` (ESP-IDF Component
-  Manager) and a `library.properties` (Arduino) at the repository root, plus a
-  compile-only ESP32 smoke scaffold that checks the public headers build under
-  the Espressif xtensa and riscv32 toolchains.
+- Embedded packaging — an `idf_component.yml` ESP-IDF component manifest at the
+  repository root that declares its Eigen dependency and registers cartan's three
+  public include trees, so `idf.py add-dependency "skrede/cartan"` yields a
+  component that builds out of the box. A compile-only ESP32 smoke scaffold checks
+  the public headers build under the Espressif xtensa and riscv32 toolchains, with
+  the exceptions-disabled embedded build and the cross-compile toolchain enforced
+  in continuous integration.
 - Install/export layer — `find_package(cartan CONFIG REQUIRED)` now works: a
   full export set (`cartan::cartan` alongside the per-module targets), installed
   public headers, and generated `cartanConfig.cmake` / `cartanConfigVersion.cmake`
@@ -63,6 +66,13 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   degenerate case through the error channel instead.
 - Kinematic-chain axis access is now bounds-checked and chain sizes are validated
   at runtime, turning previously out-of-range access into a reported error.
+- The compile-only ESP32 smoke invoked the first Paden-Kahan subproblem with the
+  wrong arity and never actually built; it now calls the four-argument overload
+  with a solvable rotation and compiles under the embedded toolchain.
+
+### Removed
+- The Arduino `library.properties` manifest, which advertised a `src/` source
+  layout the header-only repository does not provide.
 
 ## [0.3.0] — 2026-05-13
 

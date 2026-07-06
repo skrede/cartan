@@ -32,9 +32,13 @@ tags:
 
 dependencies:
   idf: ">=5.1"
+  # Hard dependency: every public cartan header includes Eigen, so the component
+  # cannot build without it. Sourced from the ESP Component Registry mirror.
+  espressif/eigen: "^3.4"
 
 files:
   include:
+    - "CMakeLists.txt"
     - "lib/cartan-lie/include/**/*"
     - "lib/cartan-serial-chain/include/**/*"
     - "lib/cartan-analytical/include/**/*"
