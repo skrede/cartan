@@ -58,7 +58,7 @@ subset (idiomatic ranged-`for`).
 
 ### analytical_error
 
-Failure diagnostic returned via `std::expected<..., analytical_error<Scalar>>`.
+Failure diagnostic returned via `cartan::expected<..., analytical_error<Scalar>>`.
 
 ```cpp
 template <typename Scalar>
@@ -135,7 +135,7 @@ concept analytical_solver = requires
 } && requires(const S& s, const se3<typename S::scalar_type>& target)
 {
     { s.solve(target) } -> std::same_as<
-        std::expected<
+        cartan::expected<
             analytical_result<typename S::scalar_type, S::joints, S::max_solutions>,
             analytical_error<typename S::scalar_type>>>;
 };
@@ -155,7 +155,7 @@ are reported to the caller. `planar_2r_solver`, `spatial_3r_solver`, and
 
 ```cpp
 template <typename Scalar>
-std::expected<Scalar, analytical_failure>
+cartan::expected<Scalar, analytical_failure>
 paden_kahan_1(
     const vector3<Scalar>& omega,
     const vector3<Scalar>& q,
@@ -175,7 +175,7 @@ Reference: Murray, Li and Sastry (1994), Section 3.3.1.
 
 ```cpp
 template <typename Scalar>
-std::expected<paden_kahan_2_result<Scalar>, analytical_failure>
+cartan::expected<paden_kahan_2_result<Scalar>, analytical_failure>
 paden_kahan_2(
     const vector3<Scalar>& omega1,
     const vector3<Scalar>& omega2,
@@ -195,7 +195,7 @@ Reference: Murray, Li and Sastry (1994), Section 3.3.2.
 
 ```cpp
 template <typename Scalar>
-std::expected<paden_kahan_3_result<Scalar>, analytical_failure>
+cartan::expected<paden_kahan_3_result<Scalar>, analytical_failure>
 paden_kahan_3(
     const vector3<Scalar>& omega,
     const vector3<Scalar>& q,
@@ -217,16 +217,19 @@ parallel and define a common mechanism plane). Returns up to 2 solutions
 ("elbow up" / "elbow down").
 
 ```cpp
-template <typename Scalar, joint_tag... Joints>
+template <chain Chain>
 class planar_2r_solver;
 ```
 
-The `Joints` parameter pack must contain exactly two joint tags, all
-revolute (`is_revolute == true`). Verified at compile time via
-`static_assert`.
+The `Chain` type must satisfy the `chain` concept (e.g. `static_chain` or a
+`kinematic_chain`, fixed or dynamic). It must model a two-joint mechanism with
+both joints revolute. The joint count and revolute-only requirement are checked
+at construction; a chain that violates them yields a solver that fails every
+`solve` with `analytical_failure::degenerate_geometry`.
 
 ```cpp
-using chain_type = static_chain<Scalar, Joints...>;
+using chain_type = Chain;
+using scalar_type = typename Chain::scalar_type;
 static constexpr int joints = 2;
 static constexpr int max_solutions = 2;
 ```
@@ -244,8 +247,8 @@ is `O(1)` in the chain's joint count.
 ### Method
 
 ```cpp
-std::expected<analytical_result<Scalar, 2, 2>, analytical_error<Scalar>>
-solve(const se3<Scalar>& target) const;
+cartan::expected<analytical_result<scalar_type, 2, 2>, analytical_error<scalar_type>>
+solve(const se3<scalar_type>& target) const;
 ```
 
 Solves position-only IK for the given target end-effector pose. The
@@ -276,17 +279,18 @@ Closed-form IK for spatial 3R mechanisms using Paden-Kahan subproblems.
 Returns up to 4 solutions.
 
 ```cpp
-template <typename Scalar, joint_tag... Joints>
+template <chain Chain>
 class spatial_3r_solver;
 ```
 
-The `Joints` parameter pack must contain exactly three joint tags. The
-solver requires that the first two joint axes intersect at a common point
+The `Chain` type must satisfy the `chain` concept and model a three-joint
+mechanism. The solver requires that the first two joint axes intersect at a common point
 (the standard configuration for 3R mechanisms, e.g. spherical wrists with
 an offset third joint).
 
 ```cpp
-using chain_type = static_chain<Scalar, Joints...>;
+using chain_type = Chain;
+using scalar_type = typename Chain::scalar_type;
 static constexpr int joints = 3;
 static constexpr int max_solutions = 4;
 ```
@@ -312,8 +316,8 @@ decomposition.
 ### Method
 
 ```cpp
-std::expected<analytical_result<Scalar, 3, 4>, analytical_error<Scalar>>
-solve(const se3<Scalar>& target) const;
+cartan::expected<analytical_result<scalar_type, 3, 4>, analytical_error<scalar_type>>
+solve(const se3<scalar_type>& target) const;
 ```
 
 Returns up to 4 verified joint configurations achieving the target pose
@@ -340,17 +344,19 @@ Closed-form IK for 6R mechanisms with Pieper geometry (last three revolute
 axes intersecting at a common wrist center). Returns up to 8 solutions.
 
 ```cpp
-template <typename Scalar, joint_tag... Joints>
+template <chain Chain>
 class pieper_6r_solver;
 ```
 
-The `Joints` parameter pack must contain exactly six joint tags. The wrist
+The `Chain` type must satisfy the `chain` concept and model a six-joint
+mechanism. The wrist
 center decomposition assumes joints 4, 5, 6 share a common intersection
 point (Pieper geometry). Industrial 6R arms commonly satisfy this
 constraint (KR6 R900, UR5, ABB IRB120 with appropriate geometry, etc.).
 
 ```cpp
-using chain_type = static_chain<Scalar, Joints...>;
+using chain_type = Chain;
+using scalar_type = typename Chain::scalar_type;
 static constexpr int joints = 6;
 static constexpr int max_solutions = 8;
 ```
@@ -377,8 +383,8 @@ the joint-4/5/6 screw axes.
 ### Method
 
 ```cpp
-std::expected<analytical_result<Scalar, 6, 8>, analytical_error<Scalar>>
-solve(const se3<Scalar>& target) const;
+cartan::expected<analytical_result<scalar_type, 6, 8>, analytical_error<scalar_type>>
+solve(const se3<scalar_type>& target) const;
 ```
 
 Returns up to 8 verified joint configurations achieving the target SE(3)

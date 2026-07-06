@@ -1,197 +1,281 @@
 # IK Solver Composition Guide
 
-This guide shows how to assemble inverse kinematics solvers from Cartan's composable solve policies. The `basic_ik_solver<Policies...>` template accepts one or more policies: a single policy gives direct solve, multiple policies give cooperative interleaved racing.
+This guide shows how to assemble inverse kinematics solvers from Cartan's
+composable solve policies. The `basic_ik_runner<Policies...>` template accepts
+one or more policies: a single policy gives a direct solve, multiple policies
+give cooperative interleaved racing. Every policy is templated on the chain
+type, so the same runner specializes to a fixed-size or dynamic chain with no
+runtime dispatch.
 
 **Prerequisites:** Familiarity with forward kinematics ([PoE Walkthrough](poe-walkthrough.md)) and basic IK concepts.
 
-## Single Policy
-
-The simplest case: one solve policy, direct solve.
-
+<!-- cartan:preamble -->
 ```cpp
-#include <cartan/ik/basic_ik_solver.h>
-#include <cartan/ik/lm_solve_policy.h>
+#include <cartan/serial_chain.h>
 
-cartan::basic_ik_solver solver{cartan::lm_solve_policy<double, 6>{}};
-
-auto target = cartan::se3<double>( /* desired pose */ );
-cartan::convergence_criteria<double> criteria{1e-6, 1e-6, 200};
-Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
-
-solver.setup(chain, target, q0, criteria);
-auto result = solver.solve();
-
-if (result.has_value())
-{
-    auto& r = result.value();
-    std::cout << "Converged in " << r.iterations << " iterations\n";
-    std::cout << "Solution: " << r.solution.position.transpose() << "\n";
-}
-else
-{
-    auto& e = result.error();
-    std::cout << "Failed: error norm = " << e.last_error_norm << "\n";
-}
+// Every snippet below solves over a fixed-size six-joint chain. Swap this for
+// cartan::kinematic_chain<double, cartan::dynamic> for a runtime-sized arm.
+using Chain = cartan::kinematic_chain<double, 6>;
 ```
 
-The `solve()` method returns `std::expected<ik_result, ik_error>`, giving structured success/failure without exceptions.
+## The Solve Interface
+
+Every runner, regardless of how many policies it composes, exposes the same
+four-step interface:
+
+- `setup(chain, target, q0, criteria)` binds the problem. The runner *borrows*
+  the chain by const reference and does not own it, so the chain must outlive
+  the solve. Binding a temporary chain is rejected at compile time.
+- `solve()` runs to completion and returns
+  `cartan::expected<ik_result<Scalar, N>, ik_error<Scalar, N>>`.
+- `step()` / `step_n(n)` advance the solve incrementally for interactive or
+  budgeted use.
+- On success, `ik_result` carries `solution` (a `joint_state`), `iterations`,
+  `final_error_norm`, and `solver_index` (which policy won the race). On
+  failure, `ik_error` carries `reason`, `last_q`, and `last_error_norm`.
+
+The `cartan::expected` return gives structured success/failure without
+exceptions.
+
+## Single Policy
+
+The simplest case: one solve policy, direct solve. A single-policy runner
+produces identical code to a hand-written non-variadic solver -- zero racing
+overhead.
+
+<!-- cartan:snippet name=single-policy -->
+```cpp
+// Plain Levenberg-Marquardt over the chain, no joint-limit projection.
+cartan::basic_ik_runner solver{cartan::lm<Chain, cartan::no_limits>{}};
+```
+
+The `lm<Chain>`, `dls<Chain>`, `projected_lm<Chain, no_limits>`, and
+`builtin_lbfgsb<Chain, no_limits>` policies are the native (dependency-free)
+steppers. Each takes the chain type as its first template argument and a limit
+policy (`no_limits` or `clamp_limits`) as its second.
 
 ## Restart Wrapping
 
-The `restart_solve_policy` wraps any inner policy with multi-start capability. When the inner policy stalls, diverges, or hits its iteration limit, the wrapper re-seeds from a Halton sequence and retries with warm-start lambda preservation.
+The `restart_wrapper` wraps any inner policy with multi-start capability. When
+the inner policy stalls, diverges, or hits its per-attempt iteration limit, the
+wrapper re-seeds from a Halton sequence and retries, carrying the best lambda
+from near-miss attempts forward to accelerate convergence.
 
+<!-- cartan:snippet name=restart-wrap -->
 ```cpp
-#include <cartan/ik/basic_ik_solver.h>
-#include <cartan/ik/restart_solve_policy.h>
-#include <cartan/ik/lm_solve_policy.h>
-
-// restart_solve_policy wraps lm_solve_policy
-cartan::basic_ik_solver solver{
-    cartan::restart_solve_policy{cartan::lm_solve_policy<double, 6>{}}
-};
-
-solver.setup(chain, target, q0, criteria);
-auto result = solver.solve();
+// restart_wrapper wraps projected_lm with Halton multi-start.
+cartan::basic_ik_runner solver{
+    cartan::restart_wrapper<Chain,
+        cartan::projected_lm<Chain, cartan::no_limits>,
+        cartan::no_limits>{}};
 ```
 
-This is the recommended pattern for production use. Restart+LM achieves 99.9% success rate on standard benchmarks.
+This is the recommended pattern for production use: a single stepper stalls on
+hard targets, but a restart-wrapped stepper recovers by re-seeding. The
+`speed_ik_runner<Chain>` and `robust_ik_runner<Chain>` presets below are exactly
+this wrapper around `projected_lm` and `builtin_lbfgsb` respectively.
+
+When you drive a restart-wrapped policy, give it room to restart: prefer the
+four-argument `convergence_criteria{position_tol, orientation_tol,
+max_iterations_per_attempt, max_total_work_units}` form. The three-argument form
+leaves `max_total_work_units` at its default and can starve the outer restart
+loop.
 
 ## Racing (Multiple Policies)
 
-Pass two or more policies to `basic_ik_solver` for cooperative interleaved racing. Each `step()` performs one round-robin across all active policies, parking converged ones and selecting the best result based on the configured objective.
+Pass two or more policies to `basic_ik_runner` for cooperative interleaved
+racing. Each `step()` performs one round-robin across all active policies,
+parking converged or terminated ones and selecting the best result based on the
+configured objective.
 
+<!-- cartan:snippet name=racing-construct -->
 ```cpp
-#include <cartan/ik/basic_ik_solver.h>
-#include <cartan/ik/restart_solve_policy.h>
-#include <cartan/ik/projected_lm_solve_policy.h>
-#include <cartan/ik/lbfgsb_solve_policy.h>
+// Two restart-wrapped policies racing cooperatively in one runner.
+cartan::basic_ik_runner solver{
+    cartan::speed_ik_runner<Chain>{},
+    cartan::robust_ik_runner<Chain>{}};
+```
 
-// Two restart-wrapped policies racing cooperatively
-cartan::basic_ik_solver solver{
-    cartan::restart_solve_policy{cartan::projected_lm_solve_policy<double, 7>{}},
-    cartan::restart_solve_policy{cartan::lbfgsb_solve_policy<double, 7>{}}
-};
+The first policy receives the user's `q0`; the remaining policies receive
+deterministic Halton seeds within the joint limits. For the `speed` objective
+(the default), the first policy to converge wins and the runner stops the rest.
+For the other objectives (`min_distance`, `max_manipulability`,
+`max_isotropy`), all policies run to completion and the best is selected.
 
-solver.setup(chain, target, q0, criteria);
-auto result = solver.solve();
+This cooperative model is the key differentiator versus TRAC-IK: **all policies
+run in the calling thread**, ticked round-robin, with no thread spawning or
+proliferation. Racing is a scheduling choice, not a concurrency one.
 
-if (result.has_value())
+## Complete Example
+
+A full setup-solve-inspect flow, racing the two preset runners against a
+reachable target generated by forward kinematics. This mirrors
+`examples/tutorials/03_ik_composition.cpp`.
+
+<!-- cartan:snippet name=complete-race tu -->
+```cpp
+#include <cartan/serial_chain.h>
+
+#include <numbers>
+#include <iostream>
+
+int main()
 {
-    std::cout << "Solver " << result.value().solver_index << " won\n";
+    using vec3 = cartan::vector3<double>;
+    using Chain = cartan::kinematic_chain<double, 6>;
+
+    // KUKA KR 6 R900 SIXX screw axes in the space frame at the home pose.
+    auto k1 = cartan::screw_axis<double>::revolute(vec3(0, 0, 1), vec3(0,     0, 0));
+    auto k2 = cartan::screw_axis<double>::revolute(vec3(0, 1, 0), vec3(0,     0, 0.400));
+    auto k3 = cartan::screw_axis<double>::revolute(vec3(0, 1, 0), vec3(0.455, 0, 0.400));
+    auto k4 = cartan::screw_axis<double>::revolute(vec3(1, 0, 0), vec3(0.875, 0, 0.400));
+    auto k5 = cartan::screw_axis<double>::revolute(vec3(0, 1, 0), vec3(0.875, 0, 0.400));
+    auto k6 = cartan::screw_axis<double>::revolute(vec3(1, 0, 0), vec3(0.935, 0, 0.400));
+
+    auto home = cartan::se3<double>(
+        cartan::so3<double>::identity(), vec3(0.935, 0, 0.400));
+    cartan::joint_limits<double> lim{-std::numbers::pi, std::numbers::pi};
+
+    Chain chain(home, {k1, k2, k3, k4, k5, k6},
+                {lim, lim, lim, lim, lim, lim});
+
+    // Target: forward kinematics of a known configuration -- guaranteed reachable.
+    Eigen::Vector<double, 6> q_truth{0.2, -0.4, 0.3, -0.5, 0.6, -0.2};
+    auto target = cartan::forward_kinematics(chain, q_truth).end_effector;
+
+    // Race the speed and robust presets cooperatively in the calling thread.
+    cartan::dual_ik_runner<Chain> solver;
+
+    Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
+    cartan::convergence_criteria<double> criteria{1e-6, 1e-6, 100, 400};
+
+    solver.setup(chain, target, q0, criteria);
+    auto result = solver.solve();
+
+    if (result.has_value())
+    {
+        const auto& r = result.value();
+        std::cout << "Policy " << r.solver_index << " won in "
+                  << r.iterations << " iterations\n";
+        std::cout << "Solution: " << r.solution.position.transpose() << "\n";
+    }
+    else
+    {
+        std::cout << "Failed: error norm = "
+                  << result.error().last_error_norm << "\n";
+    }
+
+    return 0;
 }
 ```
 
-The first policy receives the user's `q0`; remaining policies receive deterministic Halton seeds within joint limits. For the `speed` objective (default), the first policy to converge wins. For other objectives (`min_distance`, `max_manipulability`, `max_isotropy`), all policies run to completion and the best is selected.
-
-This cooperative model is the key differentiator vs TRAC-IK: all policies run in the calling thread without thread spawning or proliferation.
-
 ## CTAD
 
-Class template argument deduction allows constructing `basic_ik_solver` without explicit template arguments. Scalar type and joint count are deduced from the policy traits:
+Class template argument deduction lets you construct `basic_ik_runner` without
+naming its `Policies...` pack. The scalar type and joint count are carried by
+the policies, which are themselves templated on the chain type:
 
+<!-- cartan:snippet name=ctad -->
 ```cpp
-// Scalar=double, N=6 deduced from lm_solve_policy<double, 6>
-cartan::basic_ik_solver solver{cartan::lm_solve_policy<double, 6>{}};
+// Policies... deduced from the constructor arguments via the runner's
+// deduction guide.
+cartan::basic_ik_runner single{cartan::projected_lm<Chain, cartan::no_limits>{}};
 
-// Scalar=double, N=7 deduced from the policies (all must agree)
-cartan::basic_ik_solver solver{
-    cartan::restart_solve_policy{cartan::projected_lm_solve_policy<double, 7>{}},
-    cartan::restart_solve_policy{cartan::lbfgsb_solve_policy<double, 7>{}}
-};
+cartan::basic_ik_runner racing{
+    cartan::speed_ik_runner<Chain>{},
+    cartan::robust_ik_runner<Chain>{}};
 ```
 
-Specify `Scalar` and `N` only at the leaf policy level. Everything above deduces.
+Specify the chain type only at the leaf policy level. The runner deduces
+everything above it.
 
-## Preset Solvers
+## Preset Runners
 
-Three type aliases provide ready-to-use solver configurations:
+Three type aliases provide ready-to-use runner configurations, each templated
+on the chain type:
 
 | Alias | Composition | Use Case |
 |-------|-------------|----------|
-| `speed_solver<double, 7>` | `restart_solve_policy<projected_lm_solve_policy>` | Fast per-iteration, multi-start |
-| `convergence_solver<double, 7>` | `restart_solve_policy<lbfgsb_solve_policy>` | Robust convergence, multi-start |
-| `default_solver<double, 7>` | `basic_ik_solver<speed_solver, convergence_solver>` | Races both, first convergence wins |
+| `speed_ik_runner<Chain>` | `restart_wrapper<Chain, projected_lm<Chain, no_limits>, no_limits>` | Fast per-iteration, multi-start |
+| `robust_ik_runner<Chain>` | `restart_wrapper<Chain, builtin_lbfgsb<Chain, no_limits>, no_limits>` | Robust convergence, multi-start |
+| `dual_ik_runner<Chain>` | `basic_ik_runner<speed_ik_runner<Chain>, robust_ik_runner<Chain>>` | Races both, first convergence wins |
 
+<!-- cartan:snippet name=preset-alias -->
 ```cpp
-#include <cartan/ik/default_solvers.h>
-
-// Use the default racing solver directly
-cartan::default_solver<double, 7> solver;
-solver.setup(chain, target, q0, criteria);
-auto result = solver.solve();
+// Use the default racing runner directly -- it is a basic_ik_runner underneath.
+cartan::dual_ik_runner<Chain> solver;
 ```
 
 ## Builder Pattern
 
-Factory functions return builders requiring `.build()` as the materialization point. This enables future extensions like `.from_config(cfg).build()`.
+Cartan exposes three layers of solver construction: the type aliases above for
+direct use, preset factories that return a builder, and a composable builder for
+custom policy stacks. In every case `.build()` is the materialization point --
+everything before it is configuration, which leaves room for future extensions
+like `.from_config(cfg).build()`.
 
 ### Preset Builders
 
+<!-- cartan:snippet name=preset-builders -->
 ```cpp
-#include <cartan/ik/default_solvers.h>
-
-auto solver = cartan::make_speed_solver<double, 7>().build();
-auto solver = cartan::make_convergence_solver<double, 7>().build();
-auto solver = cartan::make_default_solver<double, 7>().build();
+auto speed  = cartan::make_speed_ik_runner<Chain>().build();
+auto robust = cartan::make_robust_ik_runner<Chain>().build();
+auto dual   = cartan::make_dual_ik_runner<Chain>().build();
 ```
 
 ### Composable Builder
 
-Chain `.policy()` calls to accumulate policies, finish with `.build()`:
+Chain `.policy()` calls to accumulate policies, then finish with `.build()`:
 
+<!-- cartan:snippet name=composable-builder -->
 ```cpp
-auto solver = cartan::make_solver<double, 7>()
-    .policy(cartan::restart_solve_policy{cartan::lm_solve_policy<double, 7>{}})
-    .policy(cartan::dls_solve_policy<double, 7>{})
+auto solver = cartan::make_solver<Chain>()
+    .policy(cartan::restart_wrapper<Chain,
+        cartan::lm<Chain, cartan::no_limits>, cartan::no_limits>{})
+    .policy(cartan::dls<Chain>{})
     .build();
 ```
 
 ## argmin Solvers
 
-The argmin-backed policies (`slsqp_solve_policy`, `bobyqa_solve_policy`) are always available as argmin is a required dependency of `cartan::kinematics`. They provide constrained optimization with joint limits as box bounds.
+The argmin-backed policies (`argmin_slsqp`, `argmin_bobyqa`, and the rest of the
+argmin family) provide constrained optimization with joint limits as box bounds.
+They are compiled only when Cartan is built with argmin support
+(`CARTAN_BUILD_ARGMIN`).
 
+<!-- cartan:snippet name=argmin-slsqp needs=argmin -->
 ```cpp
-#include <cartan/ik/basic_ik_solver.h>
-#include <cartan/ik/slsqp_solve_policy.h>
-
-cartan::basic_ik_solver solver{cartan::slsqp_solve_policy<double, 7>{}};
-solver.setup(chain, target, q0, criteria);
-auto result = solver.solve();
+// SLSQP with box-bounded joint limits.
+cartan::basic_ik_runner solver{cartan::argmin_slsqp<Chain>{}};
 ```
 
 BOBYQA is derivative-free, useful when the gradient is expensive or unreliable:
 
+<!-- cartan:snippet name=argmin-bobyqa needs=argmin -->
 ```cpp
-#include <cartan/ik/basic_ik_solver.h>
-#include <cartan/ik/bobyqa_solve_policy.h>
-
-cartan::basic_ik_solver solver{cartan::bobyqa_solve_policy<double, 7>{}};
+cartan::basic_ik_runner solver{cartan::argmin_bobyqa<Chain>{}};
 ```
 
 ## Mixing Families
 
-Any combination of native, argmin, and NLopt policies can race together in a single `basic_ik_solver`:
+Any combination of native, argmin, and NLopt policies can race together in a
+single `basic_ik_runner`, as long as they all agree on `scalar_type` and
+`joints`:
 
+<!-- cartan:snippet name=mixing-families needs=argmin -->
 ```cpp
-#include <cartan/ik/basic_ik_solver.h>
-#include <cartan/ik/restart_solve_policy.h>
-#include <cartan/ik/projected_lm_solve_policy.h>
-#include <cartan/ik/slsqp_solve_policy.h>
-
-// Race a native restart+projected-LM against argmin SLSQP
-cartan::basic_ik_solver solver{
-    cartan::restart_solve_policy{cartan::projected_lm_solve_policy<double, 7>{}},
-    cartan::slsqp_solve_policy<double, 7>{}
-};
-
-solver.setup(chain, target, q0, criteria);
-auto result = solver.solve();
+// Race a native restart+projected-LM against argmin SLSQP, cooperatively.
+cartan::basic_ik_runner solver{
+    cartan::speed_ik_runner<Chain>{},
+    cartan::argmin_slsqp<Chain>{}};
 ```
 
-All policies in a single `basic_ik_solver` must agree on `scalar_type` and `joints`. The solver enforces this with a `static_assert`.
+Because every policy is templated on the same `Chain`, the runner enforces the
+`scalar_type`/`joints` agreement across the pack with a `static_assert`: a
+mismatched mix fails to compile rather than misbehaving at runtime.
 
 ## Further Reading
 
 - [IK Methods Theory](../background/ik-methods.md) -- mathematical derivation of DLS, LM, convergence criteria, and null-space projection
-- [API Reference: IK](../api/ik.md) -- full function signatures for all IK types and solve policies
+- [API Reference: IK](../api/ik.md) -- full signatures for the runner, policies, and result types
 - [PoE Walkthrough](poe-walkthrough.md) -- building kinematic chains from scratch
