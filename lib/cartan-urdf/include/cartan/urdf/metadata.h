@@ -19,7 +19,7 @@
 #include <vector>
 #include <optional>
 
-namespace cartan::urdf
+namespace cartan
 {
 
 /// Optional overrides for the chain extraction step. When base_link or

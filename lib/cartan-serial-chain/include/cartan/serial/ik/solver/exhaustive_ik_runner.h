@@ -47,7 +47,7 @@ struct exhaustive_result
 };
 
 template <chain Chain, typename Policy>
-    requires ik::solve_policy<Policy>
+    requires solve_policy<Policy>
 class exhaustive_ik_runner
 {
 public:
@@ -79,7 +79,7 @@ public:
 
             for (int i = 0; i < criteria.max_iterations_per_attempt; ++i)
             {
-                auto step_res = ik::step_one(policy, chain);
+                auto step_res = step_one(policy, chain);
                 if (step_res.status != ik_status::running)
                 {
                     if (step_res.status == ik_status::converged)

@@ -79,7 +79,7 @@ constexpr ik_termination_reason policy_termination_reason(const Policy& p) noexc
 /// on the same const chain. A single solver instance must not be
 /// used from multiple threads without synchronization.
 template <typename... Policies>
-    requires (sizeof...(Policies) >= 1) && (ik::solve_policy<Policies> && ...)
+    requires (sizeof...(Policies) >= 1) && (solve_policy<Policies> && ...)
 class basic_ik_runner
 {
     using first_policy = std::tuple_element_t<0, std::tuple<Policies...>>;

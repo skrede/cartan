@@ -4,9 +4,9 @@
 /// Umbrella header for the cartan URDF loader.
 ///
 /// Includes the diagnostic, schema, metadata, parser, and chain-extractor
-/// entry points and exposes the user-facing names directly under namespace
-/// cartan so callers can write cartan::urdf_error, cartan::load_options, and
-/// cartan::load_urdf without reaching into the nested cartan::urdf namespace.
+/// entry points, all of which declare their user-facing names directly under
+/// namespace cartan so callers can write cartan::urdf_error, cartan::load_options,
+/// and cartan::load_urdf.
 
 #include "cartan/urdf/build.h"
 #include "cartan/urdf/error.h"
@@ -21,13 +21,6 @@
 namespace cartan
 {
 
-using urdf::urdf_failure;
-using urdf::urdf_source_location;
-using urdf::urdf_error;
-using urdf::load_options;
-using urdf::urdf_metadata;
-using urdf::urdf_load_result;
-
 /// Load a URDF document from disk and return the extracted kinematic chain
 /// alongside its metadata. Parser failures (malformed XML, unsupported joint
 /// types, unknown link references, mimic joints, non-physical inertials) and
@@ -37,12 +30,12 @@ template <typename Scalar = double>
 [[nodiscard]] inline cartan::expected<urdf_load_result<Scalar>, urdf_error>
 load_urdf(const std::filesystem::path& path, const load_options& opts = {})
 {
-    auto parsed = urdf::parse_urdf_file<Scalar>(path);
+    auto parsed = parse_urdf_file<Scalar>(path);
     if (!parsed)
     {
         return cartan::unexpected(std::move(parsed).error());
     }
-    return urdf::build_chain<Scalar>(*parsed, opts);
+    return build_chain<Scalar>(*parsed, opts);
 }
 
 /// SDF loading is deferred; this entry point exists so the supported input

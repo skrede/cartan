@@ -72,7 +72,7 @@ void run_chain(
     {
         auto target = cartan::fixtures::random_reachable_target(chain, rng);
 
-        cartan::ik::projected_lm<cartan::kinematic_chain<Scalar, N>> stepper;
+        cartan::projected_lm<cartan::kinematic_chain<Scalar, N>> stepper;
         typename cartan::joint_state<Scalar, N>::position_type q0 =
             cartan::joint_state<Scalar, N>::position_type::Zero();
 

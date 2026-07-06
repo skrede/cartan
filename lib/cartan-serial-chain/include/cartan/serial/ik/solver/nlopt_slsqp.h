@@ -34,7 +34,7 @@
 #include <random>
 #include <vector>
 
-namespace cartan::ik
+namespace cartan
 {
 
 /// NLopt SLSQP solve policy for constrained IK with box constraints.

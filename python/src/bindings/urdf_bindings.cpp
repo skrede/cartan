@@ -31,18 +31,18 @@ namespace cartan::python
 
 void register_urdf(nb::module_& m)
 {
-    nb::enum_<cartan::urdf::urdf_failure>(m, "UrdfFailure",
+    nb::enum_<cartan::urdf_failure>(m, "UrdfFailure",
         "Failure mode categories returned by load_urdf.")
-        .value("malformed_xml", cartan::urdf::urdf_failure::malformed_xml)
-        .value("unsupported_joint_type", cartan::urdf::urdf_failure::unsupported_joint_type)
-        .value("unknown_link_reference", cartan::urdf::urdf_failure::unknown_link_reference)
-        .value("unknown_parent_link", cartan::urdf::urdf_failure::unknown_parent_link)
-        .value("branched_kinematic_tree", cartan::urdf::urdf_failure::branched_kinematic_tree)
-        .value("link_not_found", cartan::urdf::urdf_failure::link_not_found)
-        .value("mimic_joint_unsupported", cartan::urdf::urdf_failure::mimic_joint_unsupported)
-        .value("inertial_singular", cartan::urdf::urdf_failure::inertial_singular)
-        .value("sdf_not_supported", cartan::urdf::urdf_failure::sdf_not_supported)
-        .value("unknown_error", cartan::urdf::urdf_failure::unknown_error);
+        .value("malformed_xml", cartan::urdf_failure::malformed_xml)
+        .value("unsupported_joint_type", cartan::urdf_failure::unsupported_joint_type)
+        .value("unknown_link_reference", cartan::urdf_failure::unknown_link_reference)
+        .value("unknown_parent_link", cartan::urdf_failure::unknown_parent_link)
+        .value("branched_kinematic_tree", cartan::urdf_failure::branched_kinematic_tree)
+        .value("link_not_found", cartan::urdf_failure::link_not_found)
+        .value("mimic_joint_unsupported", cartan::urdf_failure::mimic_joint_unsupported)
+        .value("inertial_singular", cartan::urdf_failure::inertial_singular)
+        .value("sdf_not_supported", cartan::urdf_failure::sdf_not_supported)
+        .value("unknown_error", cartan::urdf_failure::unknown_error);
 
     // Create the Python exception class as a true subclass of RuntimeError via
     // the C API. nanobind's nb::class_ with PyExc_RuntimeError as base rejects

@@ -67,7 +67,7 @@ spp::ik_status run_stepper(
 
 TEST_CASE("lbfgsb concept satisfaction", "[ik][lbfgsb]")
 {
-    static_assert(spp::ik::solve_policy<spp::ik::builtin_lbfgsb<spp::kinematic_chain<double, 6>>>);
+    static_assert(spp::solve_policy<spp::builtin_lbfgsb<spp::kinematic_chain<double, 6>>>);
 }
 
 // ============================================================================
@@ -84,7 +84,7 @@ TEST_CASE("lbfgsb FK roundtrip", "[ik][lbfgsb]")
     auto fk_target = spp::forward_kinematics(chain, q_known);
     auto target = fk_target.end_effector;
 
-    spp::ik::builtin_lbfgsb<spp::kinematic_chain<double, 6>> stepper;
+    spp::builtin_lbfgsb<spp::kinematic_chain<double, 6>> stepper;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 200;
@@ -132,7 +132,7 @@ TEST_CASE("lbfgsb with tight limits", "[ik][lbfgsb]")
     auto fk_target = spp::forward_kinematics(chain, q_known);
     auto target = fk_target.end_effector;
 
-    spp::ik::builtin_lbfgsb<spp::kinematic_chain<double, 6>> stepper;
+    spp::builtin_lbfgsb<spp::kinematic_chain<double, 6>> stepper;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 300;
@@ -161,7 +161,7 @@ TEST_CASE("lbfgsb iterations count", "[ik][lbfgsb]")
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
     auto fk_target = spp::forward_kinematics(chain, q_known);
 
-    spp::ik::builtin_lbfgsb<spp::kinematic_chain<double, 6>> stepper;
+    spp::builtin_lbfgsb<spp::kinematic_chain<double, 6>> stepper;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 200;
@@ -185,8 +185,8 @@ TEST_CASE("lbfgsb ObjectivePolicy template", "[ik][lbfgsb]")
     // Verify default ObjectivePolicy is ik_se3_objective
     using chain6 = spp::kinematic_chain<double, 6>;
     static_assert(std::is_same_v<
-        spp::ik::builtin_lbfgsb<chain6>,
-        spp::ik::builtin_lbfgsb<chain6, spp::clamp_limits, spp::ik_se3_objective<chain6>>>);
+        spp::builtin_lbfgsb<chain6>,
+        spp::builtin_lbfgsb<chain6, spp::clamp_limits, spp::ik_se3_objective<chain6>>>);
 }
 
 // ============================================================================
@@ -206,7 +206,7 @@ TEST_CASE("lbfgsb with error weight", "[ik][lbfgsb]")
     spp::error_weight<double> weight;
     weight.weights << 1.0, 1.0, 1.0, 2.0, 2.0, 2.0;
 
-    spp::ik::builtin_lbfgsb<spp::kinematic_chain<double, 6>> stepper;
+    spp::builtin_lbfgsb<spp::kinematic_chain<double, 6>> stepper;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 200;
@@ -247,7 +247,7 @@ TEST_CASE("lbfgsb stall detection", "[ik][lbfgsb]")
     auto fk_target = spp::forward_kinematics(fk_target_chain, q_far);
     auto target = fk_target.end_effector;
 
-    spp::ik::builtin_lbfgsb<spp::kinematic_chain<double, 6>> stepper;
+    spp::builtin_lbfgsb<spp::kinematic_chain<double, 6>> stepper;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 200;

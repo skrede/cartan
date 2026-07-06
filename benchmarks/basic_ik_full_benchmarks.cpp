@@ -373,11 +373,11 @@ void bm_lbfgsb_aggressive(
     const target_set<double, N>& ts)
 {
     using chain_t = cartan::kinematic_chain<double, N>;
-    typename cartan::ik::builtin_lbfgsb<chain_t>::options lbfgsb_opts{
+    typename cartan::builtin_lbfgsb<chain_t>::options lbfgsb_opts{
         .history_depth = 10,
         .stall_window = 20
     };
-    typename cartan::ik::restart_wrapper<chain_t, cartan::ik::builtin_lbfgsb<chain_t>>::options restart_opts{
+    typename cartan::restart_wrapper<chain_t, cartan::builtin_lbfgsb<chain_t>>::options restart_opts{
         .max_restarts = 5
     };
     cartan::convergence_criteria<double> criteria{
@@ -401,8 +401,8 @@ void bm_lbfgsb_aggressive(
         auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
         ++idx;
 
-        cartan::ik::builtin_lbfgsb<chain_t> inner(lbfgsb_opts);
-        cartan::ik::restart_wrapper<chain_t, cartan::ik::builtin_lbfgsb<chain_t>> stepper(
+        cartan::builtin_lbfgsb<chain_t> inner(lbfgsb_opts);
+        cartan::restart_wrapper<chain_t, cartan::builtin_lbfgsb<chain_t>> stepper(
             restart_opts, std::move(inner));
         cartan::basic_ik_runner solver(std::move(stepper));
         solver.setup(chain, target, q_seed, criteria);
@@ -463,7 +463,7 @@ void bm_gauss_newton(
     const target_set<double, N>& ts)
 {
     using chain_t = cartan::kinematic_chain<double, N>;
-    typename cartan::ik::projected_lm<chain_t>::options plm_opts{
+    typename cartan::projected_lm<chain_t>::options plm_opts{
         .initial_lambda_factor = 0.0,
         .max_restarts = 20
     };
@@ -488,7 +488,7 @@ void bm_gauss_newton(
         auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
         ++idx;
 
-        cartan::ik::projected_lm<chain_t> stepper(plm_opts);
+        cartan::projected_lm<chain_t> stepper(plm_opts);
         cartan::basic_ik_runner solver(std::move(stepper));
         solver.setup(chain, target, q_seed, criteria);
         auto result = solver.solve();
@@ -550,35 +550,35 @@ using chain_t = cartan::kinematic_chain<double, N>;
 
 // Individual policies (no restart wrapper)
 template <int N>
-using dls_ik_solver = cartan::basic_ik_runner<cartan::ik::dls<chain_t<N>>>;
+using dls_ik_solver = cartan::basic_ik_runner<cartan::dls<chain_t<N>>>;
 
 template <int N>
-using lm_ik_solver = cartan::basic_ik_runner<cartan::ik::lm<chain_t<N>>>;
+using lm_ik_solver = cartan::basic_ik_runner<cartan::lm<chain_t<N>>>;
 
 template <int N>
-using projected_lm_ik_solver = cartan::basic_ik_runner<cartan::ik::projected_lm<chain_t<N>>>;
+using projected_lm_ik_solver = cartan::basic_ik_runner<cartan::projected_lm<chain_t<N>>>;
 
 template <int N>
-using lbfgsb_ik_solver = cartan::basic_ik_runner<cartan::ik::builtin_lbfgsb<chain_t<N>>>;
+using lbfgsb_ik_solver = cartan::basic_ik_runner<cartan::builtin_lbfgsb<chain_t<N>>>;
 
 // Restart-wrapped variants
 template <int N>
 using speed_ik_solver = cartan::basic_ik_runner<cartan::speed_ik_runner<chain_t<N>>>;
 
 template <int N>
-using tuned_lbfgsb = cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::builtin_lbfgsb<chain_t<N>>>;
+using tuned_lbfgsb = cartan::restart_wrapper<chain_t<N>, cartan::builtin_lbfgsb<chain_t<N>>>;
 
 template <int N>
 using convergence_ik_solver = cartan::basic_ik_runner<tuned_lbfgsb<N>>;
 
 template <int N>
-using restart_lm = cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::lm<chain_t<N>, cartan::no_limits>>;
+using restart_lm = cartan::restart_wrapper<chain_t<N>, cartan::lm<chain_t<N>, cartan::no_limits>>;
 
 template <int N>
 using restart_lm_ik_solver = cartan::basic_ik_runner<restart_lm<N>>;
 
 template <int N>
-using nr_restart = cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::newton_raphson<chain_t<N>, cartan::no_limits>>;
+using nr_restart = cartan::restart_wrapper<chain_t<N>, cartan::newton_raphson<chain_t<N>, cartan::no_limits>>;
 
 template <int N>
 using nr_ik_solver = cartan::basic_ik_runner<nr_restart<N>>;
@@ -586,13 +586,13 @@ using nr_ik_solver = cartan::basic_ik_runner<nr_restart<N>>;
 // NLopt solvers
 #ifdef CARTAN_HAS_NLOPT
 template <int N>
-using bobyqa_restart = cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::nlopt_bobyqa<chain_t<N>>>;
+using bobyqa_restart = cartan::restart_wrapper<chain_t<N>, cartan::nlopt_bobyqa<chain_t<N>>>;
 
 template <int N>
 using bobyqa_ik_solver = cartan::basic_ik_runner<bobyqa_restart<N>>;
 
 template <int N>
-using slsqp_restart = cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::nlopt_slsqp<chain_t<N>>>;
+using slsqp_restart = cartan::restart_wrapper<chain_t<N>, cartan::nlopt_slsqp<chain_t<N>>>;
 
 template <int N>
 using slsqp_ik_solver = cartan::basic_ik_runner<slsqp_restart<N>>;
@@ -601,56 +601,56 @@ using slsqp_ik_solver = cartan::basic_ik_runner<slsqp_restart<N>>;
 #ifdef CARTAN_BUILD_ARGMIN
 // argmin solvers (available when argmin is built)
 template <int N>
-using argmin_slsqp_restart = cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::argmin_slsqp<chain_t<N>>>;
+using argmin_slsqp_restart = cartan::restart_wrapper<chain_t<N>, cartan::argmin_slsqp<chain_t<N>>>;
 
 template <int N>
 using argmin_slsqp_ik_solver = cartan::basic_ik_runner<argmin_slsqp_restart<N>>;
 
 // argmin L-BFGS-B (distinct from native lbfgsb)
 template <int N>
-using argmin_lbfgsb_restart = cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::argmin_lbfgsb<chain_t<N>>>;
+using argmin_lbfgsb_restart = cartan::restart_wrapper<chain_t<N>, cartan::argmin_lbfgsb<chain_t<N>>>;
 template <int N>
 using argmin_lbfgsb_ik_solver = cartan::basic_ik_runner<argmin_lbfgsb_restart<N>>;
 
 // argmin NW-SQP (inequality-constrained)
 template <int N>
-using nw_sqp_restart = cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::nw_sqp<chain_t<N>>>;
+using nw_sqp_restart = cartan::restart_wrapper<chain_t<N>, cartan::nw_sqp<chain_t<N>>>;
 template <int N>
 using nw_sqp_ik_solver = cartan::basic_ik_runner<nw_sqp_restart<N>>;
 
 // argmin LM (via least-squares adapter)
 template <int N>
-using argmin_lm_restart = cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::argmin_lm<chain_t<N>, cartan::no_limits>>;
+using argmin_lm_restart = cartan::restart_wrapper<chain_t<N>, cartan::argmin_lm<chain_t<N>, cartan::no_limits>>;
 template <int N>
 using argmin_lm_ik_solver = cartan::basic_ik_runner<argmin_lm_restart<N>>;
 
 // argmin Augmented Lagrangian (inequality-constrained outer, L-BFGS-B inner)
 template <int N>
-using auglag_restart = cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::augmented_lagrangian<chain_t<N>>>;
+using auglag_restart = cartan::restart_wrapper<chain_t<N>, cartan::augmented_lagrangian<chain_t<N>>>;
 template <int N>
 using auglag_ik_solver = cartan::basic_ik_runner<auglag_restart<N>>;
 
 // argmin filter SLSQP (Fletcher-Leyffer filter acceptance, compact L-BFGS Hessian)
 template <int N>
-using filter_slsqp_restart = cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::filter_slsqp<chain_t<N>>>;
+using filter_slsqp_restart = cartan::restart_wrapper<chain_t<N>, cartan::filter_slsqp<chain_t<N>>>;
 template <int N>
 using filter_slsqp_ik_solver = cartan::basic_ik_runner<filter_slsqp_restart<N>>;
 
 // argmin filter NW-SQP (Fletcher-Leyffer filter acceptance, dense BFGS Hessian)
 template <int N>
-using filter_nw_sqp_restart = cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::filter_nw_sqp<chain_t<N>>>;
+using filter_nw_sqp_restart = cartan::restart_wrapper<chain_t<N>, cartan::filter_nw_sqp<chain_t<N>>>;
 template <int N>
 using filter_nw_sqp_ik_solver = cartan::basic_ik_runner<filter_nw_sqp_restart<N>>;
 
 // argmin projected Gauss-Newton (active-set + Nielsen/dogleg)
 template <int N>
-using argmin_projected_gn_restart = cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::argmin_projected_gn<chain_t<N>>>;
+using argmin_projected_gn_restart = cartan::restart_wrapper<chain_t<N>, cartan::argmin_projected_gn<chain_t<N>>>;
 template <int N>
 using argmin_projected_gn_ik_solver = cartan::basic_ik_runner<argmin_projected_gn_restart<N>>;
 
 // argmin projected gradient Gauss-Newton (full-system + Armijo backtracking)
 template <int N>
-using argmin_projected_gradient_gn_restart = cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::argmin_projected_gradient_gn<chain_t<N>>>;
+using argmin_projected_gradient_gn_restart = cartan::restart_wrapper<chain_t<N>, cartan::argmin_projected_gradient_gn<chain_t<N>>>;
 template <int N>
 using argmin_projected_gradient_gn_ik_solver = cartan::basic_ik_runner<argmin_projected_gradient_gn_restart<N>>;
 #endif
@@ -1197,7 +1197,7 @@ REGISTER_7DOF_ARGMIN(kuka_lwr4,    make_kuka_lwr4_chain)
 #ifdef CARTAN_BUILD_ARGMIN
 using dynamic_chain = cartan::kinematic_chain<double, cartan::dynamic>;
 
-using argmin_slsqp_dynamic_restart = cartan::ik::restart_wrapper<dynamic_chain, cartan::ik::argmin_slsqp<dynamic_chain>>;
+using argmin_slsqp_dynamic_restart = cartan::restart_wrapper<dynamic_chain, cartan::argmin_slsqp<dynamic_chain>>;
 using argmin_slsqp_dynamic_solver = cartan::basic_ik_runner<argmin_slsqp_dynamic_restart>;
 
 // Fixed-size UR3e argmin SLSQP (reference: same as bm_full_ur3e_argmin_slsqp above)

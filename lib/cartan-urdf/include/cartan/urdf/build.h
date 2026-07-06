@@ -32,7 +32,7 @@
 #include <algorithm>
 #include <unordered_map>
 
-namespace cartan::urdf
+namespace cartan
 {
 
 namespace detail

@@ -106,7 +106,7 @@ TEST_CASE("IkSolver with DLS converges via solve()", "[ik][solver]")
     auto fk_target = spp::forward_kinematics(chain, q_known);
     auto target = fk_target.end_effector;
 
-    spp::basic_ik_runner<spp::ik::dls<spp::kinematic_chain<double, 6>>> solver;
+    spp::basic_ik_runner<spp::dls<spp::kinematic_chain<double, 6>>> solver;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 200;
@@ -138,7 +138,7 @@ TEST_CASE("IkSolver with LM converges via solve()", "[ik][solver]")
     auto fk_target = spp::forward_kinematics(chain, q_known);
     auto target = fk_target.end_effector;
 
-    spp::basic_ik_runner<spp::ik::lm<spp::kinematic_chain<double, 6>>> solver;
+    spp::basic_ik_runner<spp::lm<spp::kinematic_chain<double, 6>>> solver;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 200;
@@ -168,7 +168,7 @@ TEST_CASE("IkSolver step-by-step matches solve()", "[ik][solver]")
     auto fk_target = spp::forward_kinematics(chain, q_known);
     auto target = fk_target.end_effector;
 
-    spp::basic_ik_runner<spp::ik::dls<spp::kinematic_chain<double, 6>>> solver;
+    spp::basic_ik_runner<spp::dls<spp::kinematic_chain<double, 6>>> solver;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 200;
@@ -200,7 +200,7 @@ TEST_CASE("IkSolver with clamp_limits enforces bounds", "[ik][solver][limits]")
     auto fk_target = spp::forward_kinematics(chain, q_known);
     auto target = fk_target.end_effector;
 
-    spp::basic_ik_runner<spp::ik::dls<spp::kinematic_chain<double, 6>>> solver;
+    spp::basic_ik_runner<spp::dls<spp::kinematic_chain<double, 6>>> solver;
     // Seed outside limits
     Eigen::Vector<double, 6> q0;
     q0 << 1.0, -1.0, 1.5, -1.5, 2.0, -2.0;
@@ -247,7 +247,7 @@ TEST_CASE("IkSolver returns ik_error on unreachable target", "[ik][solver]")
     far_trans << 100, 100, 100;
     auto target = spp::se3<double>(spp::so3<double>::identity(), far_trans);
 
-    spp::basic_ik_runner<spp::ik::dls<spp::kinematic_chain<double, 6>>> solver;
+    spp::basic_ik_runner<spp::dls<spp::kinematic_chain<double, 6>>> solver;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 50;
@@ -276,7 +276,7 @@ TEST_CASE("IkSolver min_distance objective continues past first convergence", "[
     auto fk_target = spp::forward_kinematics(chain, q_known);
     auto target = fk_target.end_effector;
 
-    spp::basic_ik_runner<spp::ik::dls<spp::kinematic_chain<double, 6>>> solver;
+    spp::basic_ik_runner<spp::dls<spp::kinematic_chain<double, 6>>> solver;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 200;
@@ -302,7 +302,7 @@ TEST_CASE("IkSolver ik_result contains correct fields", "[ik][solver]")
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
     auto fk_target = spp::forward_kinematics(chain, q_known);
 
-    spp::basic_ik_runner<spp::ik::dls<spp::kinematic_chain<double, 6>>> solver;
+    spp::basic_ik_runner<spp::dls<spp::kinematic_chain<double, 6>>> solver;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 200;
@@ -331,7 +331,7 @@ TEST_CASE("IkSolver with LM and null_space_limits on 7-DOF chain", "[ik][solver]
     auto target = fk_target.end_effector;
 
     // Solve with null_space_limits
-    spp::basic_ik_runner<spp::ik::lm<spp::kinematic_chain<double, 7>, spp::null_space_limits>> solver;
+    spp::basic_ik_runner<spp::lm<spp::kinematic_chain<double, 7>, spp::null_space_limits>> solver;
     Eigen::Vector<double, 7> q0 = Eigen::Vector<double, 7>::Zero();
     spp::convergence_criteria<double> criteria;
     criteria.max_iterations_per_attempt = 300;

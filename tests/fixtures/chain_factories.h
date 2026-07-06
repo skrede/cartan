@@ -915,7 +915,7 @@ auto make_cartanbot_chain() -> cartan::kinematic_chain<Scalar, cartan::dynamic>
 // walking each URDF's joint tree from base_link to the unique tool leaf,
 // composing the per-joint <origin rpy/> rotations into the cumulative
 // base-frame and folding fixed joints into the surrounding accumulator
-// (the same procedure cartan::urdf::build_chain executes). They therefore
+// (the same procedure cartan::build_chain executes). They therefore
 // reproduce numerical noise inherited from the upstream xacro arithmetic
 // (e.g. the 2e-10 axis components on the UR variants that come from
 // xacro's exact half-pi handling). Keeping the noise in the factories
@@ -1154,7 +1154,7 @@ auto make_iiwa14_chain_extended() -> cartan::kinematic_chain<Scalar, cartan::dyn
 /// walking the vendored URDF's joint tree from panda_link0 to the
 /// panda_link8 flange, composing the per-joint rpy rotations into the
 /// cumulative base frame and folding the panda_joint8 trailing fixed offset
-/// into the home pose (the same procedure cartan::urdf::build_chain executes
+/// into the home pose (the same procedure cartan::build_chain executes
 /// after the multi-fixed-leaf disambiguation that skips the seven
 /// `panda_link{N}_sc` self-collision wrapper sublinks). The chain therefore
 /// reproduces the float64 noise inherited from xacro's exact half-pi

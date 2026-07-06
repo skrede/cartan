@@ -33,7 +33,7 @@
 #include <vector>
 #include <algorithm>
 
-namespace cartan::ik
+namespace cartan
 {
 
 /// L-BFGS-B IK solve policy: convergence-optimized via analytical gradient.
@@ -396,7 +396,7 @@ using lbfgsb = builtin_lbfgsb<Chain, LimitsPolicy>;
 #ifdef CARTAN_BUILD_ARGMIN
 #include "cartan/serial/ik/solver/argmin_lbfgsb.h"
 
-namespace cartan::ik
+namespace cartan
 {
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 using lbfgsb = argmin_lbfgsb<Chain, LimitsPolicy>;

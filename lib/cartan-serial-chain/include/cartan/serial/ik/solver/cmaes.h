@@ -34,7 +34,7 @@
 #include <optional>
 #include <vector>
 
-namespace cartan::ik
+namespace cartan
 {
 
 /// argmin-backed CMA-ES solve policy for derivative-free IK.

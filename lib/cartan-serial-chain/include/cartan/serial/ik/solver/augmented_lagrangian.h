@@ -36,7 +36,7 @@
 #include <optional>
 #include <vector>
 
-namespace cartan::ik
+namespace cartan
 {
 
 /// argmin-backed augmented Lagrangian solve policy for constrained IK.

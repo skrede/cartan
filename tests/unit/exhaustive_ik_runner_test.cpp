@@ -23,7 +23,7 @@
 namespace spp = cartan;
 
 using ur5_chain = spp::kinematic_chain<double, 6>;
-using ur5_plm = spp::ik::projected_lm<ur5_chain>;
+using ur5_plm = spp::projected_lm<ur5_chain>;
 
 static ur5_chain make_ur5_like_chain()
 {
@@ -282,7 +282,7 @@ TEST_CASE("exhaustive_ik_runner ranking strategies", "[ik][exhaustive]")
 
 #ifdef CARTAN_BUILD_ARGMIN
 
-using ur5_argmin_slsqp = spp::ik::argmin_slsqp<ur5_chain>;
+using ur5_argmin_slsqp = spp::argmin_slsqp<ur5_chain>;
 
 TEST_CASE("exhaustive_ik_runner<argmin_slsqp> concept satisfaction and solve", "[ik][exhaustive][argmin]")
 {

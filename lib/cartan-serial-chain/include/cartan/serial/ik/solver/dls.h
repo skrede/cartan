@@ -34,7 +34,7 @@
 #include <algorithm>
 #include <type_traits>
 
-namespace cartan::ik
+namespace cartan
 {
 
 /// Damped least squares IK solve policy with SVD-based adaptive damping (Nakamura).

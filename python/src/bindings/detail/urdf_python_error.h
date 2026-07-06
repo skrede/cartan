@@ -16,10 +16,10 @@ namespace cartan::detail
 /// class.
 struct urdf_python_error : std::exception
 {
-    cartan::urdf::urdf_failure kind;
+    cartan::urdf_failure kind;
     std::string detail;
 
-    urdf_python_error(cartan::urdf::urdf_failure k, std::string d)
+    urdf_python_error(cartan::urdf_failure k, std::string d)
         : kind(k), detail(std::move(d)) {}
 
     [[nodiscard]] const char* what() const noexcept override

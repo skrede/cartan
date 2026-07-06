@@ -17,7 +17,7 @@
 #include <vector>
 #include <optional>
 
-namespace cartan::urdf
+namespace cartan
 {
 
 /// Joint kinds the loader recognizes. Maps directly to the URDF joint type

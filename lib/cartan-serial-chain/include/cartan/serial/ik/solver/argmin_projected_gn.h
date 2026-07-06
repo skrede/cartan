@@ -43,7 +43,7 @@
 #include <type_traits>
 #include <cstdint>
 
-namespace cartan::ik
+namespace cartan
 {
 
 /// argmin-backed projected Gauss-Newton solve policy for bound-constrained IK.

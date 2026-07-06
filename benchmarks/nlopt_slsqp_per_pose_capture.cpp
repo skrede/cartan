@@ -1,7 +1,7 @@
 /// @file nlopt_slsqp_per_pose_capture.cpp
 /// @brief Per-pose NLopt SLSQP timing/accuracy capture (control to slsqp_per_pose_capture).
 ///
-/// Runs cartan::ik::nlopt_slsqp wrapped in basic_ik_runner + restart_wrapper,
+/// Runs cartan::nlopt_slsqp wrapped in basic_ik_runner + restart_wrapper,
 /// emitting one CSV row per (robot, pose). The pose set, seeds, and convergence
 /// criteria match slsqp_per_pose_capture.cpp exactly so the two CSVs join on
 /// (robot, pose_index) without any further alignment. Schema is identical to
@@ -10,7 +10,7 @@
 /// Stack:
 ///   - convergence_criteria<double>{1e-5, 1e-5, 500}
 ///   - target_set with seed 42, 1000 poses per robot
-///   - cartan::ik::nlopt_slsqp default options + restart_wrapper default
+///   - cartan::nlopt_slsqp default options + restart_wrapper default
 ///
 /// Usage: nlopt_slsqp_per_pose_capture <output.csv>
 
@@ -63,7 +63,7 @@ using chain_t = cartan::kinematic_chain<double, N>;
 
 template <int N>
 using nlopt_slsqp_solver = cartan::basic_ik_runner<
-    cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::nlopt_slsqp<chain_t<N>>>>;
+    cartan::restart_wrapper<chain_t<N>, cartan::nlopt_slsqp<chain_t<N>>>>;
 
 constexpr std::string_view to_string(cartan::ik_failure r) noexcept
 {

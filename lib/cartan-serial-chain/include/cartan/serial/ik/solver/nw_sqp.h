@@ -33,7 +33,7 @@
 #include <optional>
 #include <vector>
 
-namespace cartan::ik
+namespace cartan
 {
 
 /// argmin-backed N&W SQP solve policy for IK with inequality constraints.

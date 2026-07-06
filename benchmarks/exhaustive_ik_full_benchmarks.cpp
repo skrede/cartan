@@ -219,7 +219,7 @@ template <int N>
 using chain_t = cartan::kinematic_chain<double, N>;
 
 template <int N>
-using plm_policy = cartan::ik::projected_lm<chain_t<N>>;
+using plm_policy = cartan::projected_lm<chain_t<N>>;
 
 inline cartan::convergence_criteria<double> exhaustive_criteria()
 {

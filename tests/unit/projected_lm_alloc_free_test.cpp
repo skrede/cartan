@@ -68,7 +68,7 @@ void run_zero_alloc_case()
     criteria.max_iterations_per_attempt = 200;
     criteria.max_total_work_units = 400;
 
-    cartan::ik::projected_lm<chain_type> solver;
+    cartan::projected_lm<chain_type> solver;
     const position_type q0 = position_type::Zero();
 
     // All setup allocation happens here, before the trap and counter are armed.

@@ -32,7 +32,7 @@
 #include <system_error>
 #include <unordered_set>
 
-namespace cartan::urdf
+namespace cartan
 {
 
 namespace detail

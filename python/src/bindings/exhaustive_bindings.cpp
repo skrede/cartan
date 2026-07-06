@@ -34,8 +34,8 @@ using VectorXd = Eigen::Matrix<double, Eigen::Dynamic, 1>;
 /// iteration at exhaustive_ik_runner.h:77. Wrapping the policy in
 /// restart_wrapper here would double the restart loop and silently degrade
 /// the multi-start budget. See CONTEXT.md correction C-08.
-using ExSpeedInner   = cartan::ik::projected_lm<KC, cartan::no_limits>;
-using ExRobustInner  = cartan::ik::builtin_lbfgsb<KC, cartan::no_limits>;
+using ExSpeedInner   = cartan::projected_lm<KC, cartan::no_limits>;
+using ExRobustInner  = cartan::builtin_lbfgsb<KC, cartan::no_limits>;
 using ExSpeedRunner  = cartan::exhaustive_ik_runner<KC, ExSpeedInner>;
 using ExRobustRunner = cartan::exhaustive_ik_runner<KC, ExRobustInner>;
 using ExVariant      = std::variant<ExSpeedRunner, ExRobustRunner>;

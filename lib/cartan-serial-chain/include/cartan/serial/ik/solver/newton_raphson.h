@@ -30,7 +30,7 @@
 #include <vector>
 #include <algorithm>
 
-namespace cartan::ik
+namespace cartan
 {
 
 /// Newton-Raphson IK solve policy with Gauss-Newton Hessian and Armijo line search.

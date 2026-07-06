@@ -32,7 +32,7 @@
 #include <vector>
 #include <algorithm>
 
-namespace cartan::ik
+namespace cartan
 {
 
 /// Levenberg-Marquardt IK solve policy with Nielsen lambda update strategy.
@@ -259,7 +259,7 @@ using lm =builtin_lm<Chain, LimitsPolicy>;
 #ifdef CARTAN_BUILD_ARGMIN
 #include "cartan/serial/ik/solver/argmin_lm.h"
 
-namespace cartan::ik
+namespace cartan
 {
 template <chain Chain, typename LimitsPolicy = no_limits>
 using lm =argmin_lm<Chain, LimitsPolicy>;

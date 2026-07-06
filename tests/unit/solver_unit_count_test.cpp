@@ -41,10 +41,10 @@ using chain_t = cartan::kinematic_chain<double, 6>;
 // stress fixtures keep joint values bounded (raw no_limits drives q to
 // numerically degenerate regions where the SE(3) FK quaternion squared-norm
 // trips the strict-policy assertion).
-using builtin_lm_clamp_t   = cartan::ik::builtin_lm<chain_t, cartan::clamp_limits>;
-using argmin_lm_clamp_t    = cartan::ik::argmin_lm<chain_t, cartan::clamp_limits>;
-using dls_clamp_t          = cartan::ik::dls<chain_t, cartan::clamp_limits>;
-using projected_lm_clamp_t = cartan::ik::projected_lm<chain_t, cartan::clamp_limits>;
+using builtin_lm_clamp_t   = cartan::builtin_lm<chain_t, cartan::clamp_limits>;
+using argmin_lm_clamp_t    = cartan::argmin_lm<chain_t, cartan::clamp_limits>;
+using dls_clamp_t          = cartan::dls<chain_t, cartan::clamp_limits>;
+using projected_lm_clamp_t = cartan::projected_lm<chain_t, cartan::clamp_limits>;
 
 // ============================================================================
 // UR5-like 6R chain fixture (matches restart_wrapper_test.cpp)
@@ -181,13 +181,13 @@ cartan::convergence_criteria<double> make_restart_triggering_criteria()
     builtin_lm_clamp_t,                                                      \
     argmin_lm_clamp_t,                                                       \
     dls_clamp_t,                                                             \
-    cartan::ik::builtin_lbfgsb<chain_t>,                                     \
-    cartan::ik::argmin_lbfgsb<chain_t>,                                      \
-    cartan::ik::argmin_slsqp<chain_t>,                                       \
-    cartan::ik::argmin_bobyqa<chain_t>,                                      \
-    cartan::ik::argmin_projected_gn<chain_t>,                                \
-    cartan::ik::argmin_projected_gradient_gn<chain_t>,                       \
-    cartan::ik::newton_raphson<chain_t>,                                     \
+    cartan::builtin_lbfgsb<chain_t>,                                     \
+    cartan::argmin_lbfgsb<chain_t>,                                      \
+    cartan::argmin_slsqp<chain_t>,                                       \
+    cartan::argmin_bobyqa<chain_t>,                                      \
+    cartan::argmin_projected_gn<chain_t>,                                \
+    cartan::argmin_projected_gradient_gn<chain_t>,                       \
+    cartan::newton_raphson<chain_t>,                                     \
     projected_lm_clamp_t
 
 // ============================================================================
@@ -242,12 +242,12 @@ TEMPLATE_TEST_CASE("solver saturates units_consumed at N on unreachable target",
     "[ik][units][block-b]",
     builtin_lm_clamp_t,
     dls_clamp_t,
-    cartan::ik::builtin_lbfgsb<chain_t>,
-    cartan::ik::newton_raphson<chain_t>,
+    cartan::builtin_lbfgsb<chain_t>,
+    cartan::newton_raphson<chain_t>,
     projected_lm_clamp_t,
-    cartan::ik::argmin_slsqp<chain_t>,
-    cartan::ik::argmin_projected_gn<chain_t>,
-    cartan::ik::argmin_projected_gradient_gn<chain_t>)
+    cartan::argmin_slsqp<chain_t>,
+    cartan::argmin_projected_gn<chain_t>,
+    cartan::argmin_projected_gradient_gn<chain_t>)
 {
     using S = TestType;
     auto chain = make_ur5_like_chain();
@@ -342,12 +342,12 @@ TEMPLATE_TEST_CASE("runner.iterations() lands in [cap-1, cap] on unreachable tar
     "[ik][units][block-c-prime]",
     builtin_lm_clamp_t,
     dls_clamp_t,
-    cartan::ik::builtin_lbfgsb<chain_t>,
-    cartan::ik::argmin_slsqp<chain_t>,
-    cartan::ik::argmin_bobyqa<chain_t>,
-    cartan::ik::argmin_projected_gn<chain_t>,
-    cartan::ik::argmin_projected_gradient_gn<chain_t>,
-    cartan::ik::newton_raphson<chain_t>,
+    cartan::builtin_lbfgsb<chain_t>,
+    cartan::argmin_slsqp<chain_t>,
+    cartan::argmin_bobyqa<chain_t>,
+    cartan::argmin_projected_gn<chain_t>,
+    cartan::argmin_projected_gradient_gn<chain_t>,
+    cartan::newton_raphson<chain_t>,
     projected_lm_clamp_t)
 {
     using S = TestType;
@@ -383,9 +383,9 @@ TEMPLATE_TEST_CASE("runner.iterations() lands in [cap-1, cap] on unreachable tar
 TEMPLATE_TEST_CASE("self-restart events charge zero additional units",
     "[ik][units][block-d][restart]",
     projected_lm_clamp_t,
-    cartan::ik::argmin_slsqp<chain_t>,
-    cartan::ik::argmin_projected_gn<chain_t>,
-    cartan::ik::argmin_projected_gradient_gn<chain_t>)
+    cartan::argmin_slsqp<chain_t>,
+    cartan::argmin_projected_gn<chain_t>,
+    cartan::argmin_projected_gradient_gn<chain_t>)
 {
     using S = TestType;
     auto chain = make_ur5_like_chain();

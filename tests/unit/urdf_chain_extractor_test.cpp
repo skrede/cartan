@@ -277,7 +277,7 @@ TEST_CASE("extractor: bounded walk rejects a cyclic parsed_model", "[urdf_chain_
 {
     // Hand-built cyclic model that bypasses the parser's non-tree guard: the
     // walk base -> a -> b -> a would loop forever without the step bound.
-    using namespace cartan::urdf;
+    using namespace cartan;
     parsed_model<double> model{};
     model.robot_name = "cyclic";
     model.links.push_back(parsed_link<double>{"base_link", {}});
@@ -310,7 +310,7 @@ TEST_CASE("extractor: tool_link off the serial walk path is rejected", "[urdf_ch
     // Valid serial chain base -> a -> tip, plus a fixed-leaf world-frame marker
     // hanging off base that the walk elides. Requesting the marker as the tool
     // link cannot be honored: the walk never reaches it.
-    using namespace cartan::urdf;
+    using namespace cartan;
     parsed_model<double> model{};
     model.robot_name = "off_path_tool";
     model.links.push_back(parsed_link<double>{"base_link", {}});

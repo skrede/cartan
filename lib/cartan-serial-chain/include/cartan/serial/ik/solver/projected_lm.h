@@ -49,7 +49,7 @@
 #include <algorithm>
 #include <type_traits>
 
-namespace cartan::ik
+namespace cartan
 {
 
 /// Square storage for the active (free) joint sub-Hessian. For a compile-time

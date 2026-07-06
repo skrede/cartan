@@ -5,7 +5,7 @@
 ///
 /// Wraps argmin's lbfgsb_policy for bound-constrained IK using
 /// analytical gradient via the SE(3) log Jacobian. Distinct from the
-/// native cartan::ik::lbfgsb which implements L-BFGS-B directly.
+/// native cartan::lbfgsb which implements L-BFGS-B directly.
 ///
 /// Reference: Byrd, Lu, Nocedal, Zhu (1995), L-BFGS-B algorithm.
 
@@ -34,7 +34,7 @@
 #include <optional>
 #include <vector>
 
-namespace cartan::ik
+namespace cartan
 {
 
 /// argmin-backed L-BFGS-B solve policy for bound-constrained IK.
@@ -45,7 +45,7 @@ namespace cartan::ik
 /// scheduling in basic_ik_runner.
 ///
 /// This is the argmin-backed L-BFGS-B. The native cartan implementation
-/// is available as cartan::ik::lbfgsb.
+/// is available as cartan::lbfgsb.
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 class argmin_lbfgsb
 {

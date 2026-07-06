@@ -54,16 +54,16 @@ using py_dual_runner   = cartan::dual_ik_runner<KC>;
 // wrapped in restart_wrapper for parity with the speed/robust runners
 // above (Halton multi-start on stall / divergence / iteration_limit).
 using py_argmin_slsqp_inner =
-    cartan::ik::restart_wrapper<KC,
-        cartan::ik::argmin_slsqp<KC, cartan::clamp_limits>,
+    cartan::restart_wrapper<KC,
+        cartan::argmin_slsqp<KC, cartan::clamp_limits>,
         cartan::clamp_limits>;
 using py_argmin_lm_inner =
-    cartan::ik::restart_wrapper<KC,
-        cartan::ik::argmin_lm<KC, cartan::no_limits>,
+    cartan::restart_wrapper<KC,
+        cartan::argmin_lm<KC, cartan::no_limits>,
         cartan::no_limits>;
 using py_argmin_lbfgsb_inner =
-    cartan::ik::restart_wrapper<KC,
-        cartan::ik::argmin_lbfgsb<KC, cartan::clamp_limits>,
+    cartan::restart_wrapper<KC,
+        cartan::argmin_lbfgsb<KC, cartan::clamp_limits>,
         cartan::clamp_limits>;
 
 using py_argmin_slsqp_runner  = cartan::basic_ik_runner<py_argmin_slsqp_inner>;

@@ -57,7 +57,7 @@ spp::ik_status run_stepper(
 
 TEST_CASE("nlopt_bobyqa_solve_policy satisfies ik_solve_policy concept", "[ik][bobyqa]")
 {
-    static_assert(spp::ik::solve_policy<spp::ik::nlopt_bobyqa<spp::kinematic_chain<double, 6>>>);
+    static_assert(spp::solve_policy<spp::nlopt_bobyqa<spp::kinematic_chain<double, 6>>>);
     SUCCEED();
 }
 
@@ -80,7 +80,7 @@ TEST_CASE("nlopt_bobyqa_solve_policy converges on UR5-like chain", "[ik][bobyqa]
     criteria.position_tol = 1e-4;
     criteria.orientation_tol = 1e-4;
 
-    spp::ik::nlopt_bobyqa<spp::kinematic_chain<double, 6>> stepper;
+    spp::nlopt_bobyqa<spp::kinematic_chain<double, 6>> stepper;
     stepper.setup(chain, target, q_seed, criteria);
 
     run_stepper(stepper, chain, 50);

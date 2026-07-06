@@ -11,7 +11,7 @@
 #include <string>
 #include <optional>
 
-namespace cartan::urdf
+namespace cartan
 {
 
 /// Failure modes for the URDF loader.

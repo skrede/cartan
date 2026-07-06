@@ -50,7 +50,7 @@ TEST_CASE("no_limits returns q unchanged", "[ik][limits]")
 
 TEST_CASE("basic_ik_solver with dls_solve_policy and clamp_limits compiles", "[ik][solver]")
 {
-    using solver_type = spp::basic_ik_runner<spp::ik::dls<spp::kinematic_chain<double, 6>>>;
+    using solver_type = spp::basic_ik_runner<spp::dls<spp::kinematic_chain<double, 6>>>;
     solver_type solver;
     static_assert(std::is_default_constructible_v<solver_type>);
 }

@@ -135,7 +135,7 @@ int main()
     cartan::pieper_6r_solver<chain_t> analytical(chain);
 
     cartan::basic_ik_runner<
-        cartan::ik::projected_lm<chain_t, cartan::no_limits>>
+        cartan::projected_lm<chain_t, cartan::no_limits>>
         iterative;
 
     // Convergence criteria identical to the basic_ik tutorial:

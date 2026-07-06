@@ -1,7 +1,7 @@
 /// @file argmin_solvers.cpp
 /// @brief Demonstrates argmin-backed SLSQP and BOBYQA solve policies.
 ///
-/// Shows: ik::argmin_slsqp, ik::argmin_bobyqa, restart wrapping,
+/// Shows: argmin_slsqp, argmin_bobyqa, restart wrapping,
 /// and racing a argmin solver against a native cartan solver.
 
 #include "cartan/serial_chain.h"
@@ -44,8 +44,8 @@ int main()
     // --- Section 1: argmin SLSQP with restart wrapping ---
 
     cartan::basic_ik_runner slsqp_solver{
-        cartan::ik::restart_wrapper{
-            cartan::ik::argmin_slsqp<cartan::kinematic_chain<double, 6>>{}}};
+        cartan::restart_wrapper{
+            cartan::argmin_slsqp<cartan::kinematic_chain<double, 6>>{}}};
 
     slsqp_solver.setup(chain, target, q0, criteria);
     auto slsqp_result = slsqp_solver.solve();
@@ -65,8 +65,8 @@ int main()
     // --- Section 2: argmin BOBYQA with restart wrapping ---
 
     cartan::basic_ik_runner bobyqa_solver{
-        cartan::ik::restart_wrapper{
-            cartan::ik::argmin_bobyqa<cartan::kinematic_chain<double, 6>>{}}};
+        cartan::restart_wrapper{
+            cartan::argmin_bobyqa<cartan::kinematic_chain<double, 6>>{}}};
 
     bobyqa_solver.setup(chain, target, q0, criteria);
     auto bobyqa_result = bobyqa_solver.solve();
@@ -86,8 +86,8 @@ int main()
     // --- Section 3: Racing argmin SLSQP against native projected LM ---
 
     cartan::basic_ik_runner racing_solver{
-        cartan::ik::restart_wrapper{cartan::ik::argmin_slsqp<cartan::kinematic_chain<double, 6>>{}},
-        cartan::ik::projected_lm<cartan::kinematic_chain<double, 6>>{}};
+        cartan::restart_wrapper{cartan::argmin_slsqp<cartan::kinematic_chain<double, 6>>{}},
+        cartan::projected_lm<cartan::kinematic_chain<double, 6>>{}};
 
     racing_solver.setup(chain, target, q0, criteria);
     auto racing_result = racing_solver.solve();

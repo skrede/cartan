@@ -29,13 +29,13 @@ namespace cartan
 
 /// Speed-optimized: restart-wrapped projected LM (fast per-iteration, multi-start).
 template <chain Chain>
-using speed_ik_runner = ik::restart_wrapper<Chain,
-    ik::projected_lm<Chain, no_limits>, no_limits>;
+using speed_ik_runner = restart_wrapper<Chain,
+    projected_lm<Chain, no_limits>, no_limits>;
 
 /// Convergence-optimized: restart-wrapped L-BFGS-B (robust convergence, multi-start).
 template <chain Chain>
-using robust_ik_runner = ik::restart_wrapper<Chain,
-    ik::builtin_lbfgsb<Chain, no_limits>, no_limits>;
+using robust_ik_runner = restart_wrapper<Chain,
+    builtin_lbfgsb<Chain, no_limits>, no_limits>;
 
 /// Default: races speed_ik_runner against robust_ik_runner via variadic basic_ik_runner.
 template <chain Chain>
@@ -59,7 +59,7 @@ public:
     }
 
     template <typename Policy>
-        requires ik::solve_policy<Policy>
+        requires solve_policy<Policy>
     auto policy(Policy p) &&
     {
         return solver_builder<Chain, Policies..., Policy>{

@@ -41,7 +41,7 @@
 #include <vector>
 #include <algorithm>
 
-namespace cartan::ik
+namespace cartan
 {
 
 /// argmin-backed MMA solve policy for bound-constrained IK.

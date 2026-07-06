@@ -93,17 +93,17 @@ void verify_continuous_wrist_roundtrip(unsigned seed_offset)
 // Solver-tag aliases for TEMPLATE_TEST_CASE. Each tag instantiates a different
 // solver that exercises one or more of the patched +/-inf call sites.
 
-using restart_lm = cartan::ik::restart_wrapper<chain_t,
-    cartan::ik::builtin_lm<chain_t, cartan::no_limits>, cartan::no_limits>;
-using restart_lbfgsb = cartan::ik::restart_wrapper<chain_t,
-    cartan::ik::builtin_lbfgsb<chain_t, cartan::no_limits>, cartan::no_limits>;
+using restart_lm = cartan::restart_wrapper<chain_t,
+    cartan::builtin_lm<chain_t, cartan::no_limits>, cartan::no_limits>;
+using restart_lbfgsb = cartan::restart_wrapper<chain_t,
+    cartan::builtin_lbfgsb<chain_t, cartan::no_limits>, cartan::no_limits>;
 
 #ifdef CARTAN_TEST_HAVE_ARGMIN
-using filter_nw_sqp_solver = cartan::ik::filter_nw_sqp<chain_t>;
-using filter_slsqp_solver = cartan::ik::filter_slsqp<chain_t>;
-using argmin_slsqp_solver = cartan::ik::argmin_slsqp<chain_t>;
-using argmin_projected_gn_solver = cartan::ik::argmin_projected_gn<chain_t>;
-using argmin_projected_gradient_gn_solver = cartan::ik::argmin_projected_gradient_gn<chain_t>;
+using filter_nw_sqp_solver = cartan::filter_nw_sqp<chain_t>;
+using filter_slsqp_solver = cartan::filter_slsqp<chain_t>;
+using argmin_slsqp_solver = cartan::argmin_slsqp<chain_t>;
+using argmin_projected_gn_solver = cartan::argmin_projected_gn<chain_t>;
+using argmin_projected_gradient_gn_solver = cartan::argmin_projected_gradient_gn<chain_t>;
 #endif
 
 TEMPLATE_TEST_CASE("continuous joint: IK roundtrip via builtin restart paths",

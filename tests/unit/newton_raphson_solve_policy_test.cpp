@@ -64,7 +64,7 @@ spp::ik_status run_stepper(
 
 TEST_CASE("newton_raphson_solve_policy satisfies ik_solve_policy", "[ik][newton_raphson]")
 {
-    static_assert(spp::ik::solve_policy<spp::ik::newton_raphson<spp::kinematic_chain<double, 6>>>);
+    static_assert(spp::solve_policy<spp::newton_raphson<spp::kinematic_chain<double, 6>>>);
 }
 
 // ============================================================================
@@ -81,7 +81,7 @@ TEST_CASE("newton_raphson_solve_policy converges on UR5", "[ik][newton_raphson]"
     auto fk_target = spp::forward_kinematics(chain, q_known);
     auto target = fk_target.end_effector;
 
-    spp::ik::newton_raphson<spp::kinematic_chain<double, 6>> stepper;
+    spp::newton_raphson<spp::kinematic_chain<double, 6>> stepper;
 
     // Seed nearby: perturb by 0.1 rad
     Eigen::Vector<double, 6> q0 = q_known;
@@ -117,8 +117,8 @@ TEST_CASE("newton_raphson_solve_policy composes with restart_solve_policy", "[ik
     auto fk_target = spp::forward_kinematics(chain, q_known);
     auto target = fk_target.end_effector;
 
-    using inner_type = spp::ik::newton_raphson<spp::kinematic_chain<double, 6>>;
-    using restart_type = spp::ik::restart_wrapper<spp::kinematic_chain<double, 6>, inner_type>;
+    using inner_type = spp::newton_raphson<spp::kinematic_chain<double, 6>>;
+    using restart_type = spp::restart_wrapper<spp::kinematic_chain<double, 6>, inner_type>;
 
     restart_type::options opts;
     opts.max_restarts = 5;
@@ -152,11 +152,11 @@ TEST_CASE("newton_raphson_solve_policy handles singular configuration", "[ik][ne
     far_trans << 100.0, 100.0, 100.0;
     auto target = spp::se3<double>(spp::so3<double>::identity(), far_trans);
 
-    spp::ik::newton_raphson<spp::kinematic_chain<double, 6>>::options opts;
+    spp::newton_raphson<spp::kinematic_chain<double, 6>>::options opts;
     opts.divergence_factor = 2.0;
     opts.stall_window = 5;
     opts.stall_threshold = 1e-6;
-    spp::ik::newton_raphson<spp::kinematic_chain<double, 6>> stepper(opts);
+    spp::newton_raphson<spp::kinematic_chain<double, 6>> stepper(opts);
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria;

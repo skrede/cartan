@@ -41,7 +41,7 @@
 #include <type_traits>
 #include <cstdint>
 
-namespace cartan::ik
+namespace cartan
 {
 
 /// argmin-backed SLSQP solve policy for constrained IK with box constraints.
@@ -52,7 +52,7 @@ namespace cartan::ik
 /// with other policies in basic_ik_runner.
 ///
 /// This is the default (unprefixed) SLSQP policy. The NLopt-backed variant
-/// is available as cartan::ik::nlopt_slsqp behind CARTAN_HAS_NLOPT.
+/// is available as cartan::nlopt_slsqp behind CARTAN_HAS_NLOPT.
 ///
 /// The Convergence template parameter lets consumers opt out of argmin's
 /// default four-criterion convergence policy in favor of alternatives like

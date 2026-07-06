@@ -34,7 +34,7 @@
 #include <optional>
 #include <vector>
 
-namespace cartan::ik
+namespace cartan
 {
 
 /// argmin-backed Levenberg-Marquardt solve policy for IK.
@@ -45,7 +45,7 @@ namespace cartan::ik
 /// is unconstrained.
 ///
 /// This is the argmin-backed LM. The native cartan implementation
-/// is available as cartan::ik::lm.
+/// is available as cartan::lm.
 template <chain Chain, typename LimitsPolicy = no_limits>
 class argmin_lm
 {

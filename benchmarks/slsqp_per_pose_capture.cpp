@@ -63,7 +63,7 @@ using chain_t = cartan::kinematic_chain<double, N>;
 
 template <int N>
 using argmin_slsqp_solver = cartan::basic_ik_runner<
-    cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::argmin_slsqp<chain_t<N>>>>;
+    cartan::restart_wrapper<chain_t<N>, cartan::argmin_slsqp<chain_t<N>>>>;
 
 constexpr std::string_view to_string(cartan::ik_failure r) noexcept
 {

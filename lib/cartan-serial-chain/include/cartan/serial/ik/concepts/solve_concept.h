@@ -15,7 +15,7 @@
 
 #include <concepts>
 
-namespace cartan::ik
+namespace cartan
 {
 
 /// Concept for a single-parameter IK solve policy.

@@ -31,7 +31,7 @@
 #include <random>
 #include <vector>
 
-namespace cartan::ik
+namespace cartan
 {
 
 /// NLopt BOBYQA solve policy for constrained IK with box constraints.

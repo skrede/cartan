@@ -5,7 +5,7 @@
 ///
 /// Shows: cartan::load_urdf, kinematic_chain<Scalar, dynamic>,
 ///        cartan::forward_kinematics, basic_ik_runner instantiated with
-///        cartan::ik::projected_lm, and the FK back-verification idiom that
+///        cartan::projected_lm, and the FK back-verification idiom that
 ///        turns "did the solver converge?" into a concrete pose-error scalar.
 
 #include "cartan/urdf.h"
@@ -117,7 +117,7 @@ int main(int argc, char** argv)
     cartan::convergence_criteria<double> criteria{1e-6, 1e-6, 200};
 
     cartan::basic_ik_runner<
-        cartan::ik::projected_lm<cartan::kinematic_chain<double, cartan::dynamic>>>
+        cartan::projected_lm<cartan::kinematic_chain<double, cartan::dynamic>>>
             solver;
     solver.setup(chain, target, q0, criteria);
     auto result = solver.solve();

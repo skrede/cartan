@@ -153,12 +153,12 @@ TEST_CASE("default_solver compiles and converges", "[ik][default_solvers]")
 
 TEST_CASE("speed_solver satisfies ik_solve_policy concept", "[ik][default_solvers]")
 {
-    static_assert(spp::ik::solve_policy<spp::speed_ik_runner<spp::kinematic_chain<double, 6>>>);
+    static_assert(spp::solve_policy<spp::speed_ik_runner<spp::kinematic_chain<double, 6>>>);
 }
 
 TEST_CASE("convergence_solver satisfies ik_solve_policy concept", "[ik][default_solvers]")
 {
-    static_assert(spp::ik::solve_policy<spp::robust_ik_runner<spp::kinematic_chain<double, 6>>>);
+    static_assert(spp::solve_policy<spp::robust_ik_runner<spp::kinematic_chain<double, 6>>>);
 }
 
 // ============================================================================

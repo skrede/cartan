@@ -32,7 +32,7 @@ static void bm_ik_cartan_dls_3r_planar(benchmark::State& state)
         auto target = cartan::fixtures::random_reachable_target(chain, rng);
         auto q_seed = cartan::fixtures::random_joint_config(chain, rng);
 
-        cartan::basic_ik_runner<cartan::ik::dls<cartan::kinematic_chain<double, 3>>> solver;
+        cartan::basic_ik_runner<cartan::dls<cartan::kinematic_chain<double, 3>>> solver;
         solver.setup(chain, target, q_seed, criteria);
         auto result = solver.solve();
 
@@ -81,7 +81,7 @@ static void bm_ik_cartan_dls_ur3e(benchmark::State& state)
         auto target = cartan::fixtures::random_reachable_target(chain, rng);
         auto q_seed = cartan::fixtures::random_joint_config(chain, rng);
 
-        cartan::basic_ik_runner<cartan::ik::dls<cartan::kinematic_chain<double, 6>>> solver;
+        cartan::basic_ik_runner<cartan::dls<cartan::kinematic_chain<double, 6>>> solver;
         solver.setup(chain, target, q_seed, criteria);
         auto result = solver.solve();
 
@@ -130,7 +130,7 @@ static void bm_ik_cartan_dls_lbr_med14(benchmark::State& state)
         auto target = cartan::fixtures::random_reachable_target(chain, rng);
         auto q_seed = cartan::fixtures::random_joint_config(chain, rng);
 
-        cartan::basic_ik_runner<cartan::ik::dls<cartan::kinematic_chain<double, 7>>> solver;
+        cartan::basic_ik_runner<cartan::dls<cartan::kinematic_chain<double, 7>>> solver;
         solver.setup(chain, target, q_seed, criteria);
         auto result = solver.solve();
 

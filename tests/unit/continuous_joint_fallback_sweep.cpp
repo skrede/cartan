@@ -37,10 +37,10 @@ namespace
 {
 
 using chain_t = cartan::kinematic_chain<double, cartan::dynamic>;
-using restart_lm = cartan::ik::restart_wrapper<chain_t,
-    cartan::ik::builtin_lm<chain_t, cartan::no_limits>, cartan::no_limits>;
-using argmin_slsqp_t = cartan::ik::argmin_slsqp<chain_t>;
-using argmin_pgn_t = cartan::ik::argmin_projected_gn<chain_t>;
+using restart_lm = cartan::restart_wrapper<chain_t,
+    cartan::builtin_lm<chain_t, cartan::no_limits>, cartan::no_limits>;
+using argmin_slsqp_t = cartan::argmin_slsqp<chain_t>;
+using argmin_pgn_t = cartan::argmin_projected_gn<chain_t>;
 
 /// Replace the continuous joint's bounds with finite values of half-range
 /// (candidate / 2). The PoE chain math is unchanged; only the joint_limits

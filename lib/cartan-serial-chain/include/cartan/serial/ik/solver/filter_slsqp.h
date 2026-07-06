@@ -39,7 +39,7 @@
 #include <type_traits>
 #include <cstdint>
 
-namespace cartan::ik
+namespace cartan
 {
 
 template <chain Chain,

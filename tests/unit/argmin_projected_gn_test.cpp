@@ -35,8 +35,8 @@ static chain_t make_ur5_like_chain()
     return chain_t(home, {s1, s2, s3, s4, s5, s6}, {lim, lim, lim, lim, lim, lim});
 }
 
-static_assert(cartan::ik::solve_policy<cartan::ik::argmin_projected_gn<chain_t>>,
-              "argmin_projected_gn must satisfy cartan::ik::solve_policy");
+static_assert(cartan::solve_policy<cartan::argmin_projected_gn<chain_t>>,
+              "argmin_projected_gn must satisfy cartan::solve_policy");
 
 TEST_CASE("argmin_projected_gn converges on reachable target", "[ik][argmin][projected_gn][basic]")
 {
@@ -46,7 +46,7 @@ TEST_CASE("argmin_projected_gn converges on reachable target", "[ik][argmin][pro
     q_known << 0.3, -0.5, 0.8, -0.3, 0.6, -0.2;
     auto target = cartan::forward_kinematics(chain, q_known).end_effector;
 
-    cartan::ik::argmin_projected_gn<chain_t> solver{};
+    cartan::argmin_projected_gn<chain_t> solver{};
     Eigen::Vector<double, 6> q_seed = Eigen::Vector<double, 6>::Zero();
     cartan::convergence_criteria<double> criteria{1e-4, 1e-4, 500, 1000};
     solver.setup(chain, target, q_seed, criteria);
@@ -64,11 +64,11 @@ TEST_CASE("argmin_projected_gn reports non-converged on unreachable target",
     auto chain = make_ur5_like_chain();
     auto target = cartan::se3<double>(cartan::so3<double>::identity(), {10.0, 10.0, 10.0});
 
-    cartan::ik::argmin_projected_gn<chain_t>::options opts{};
+    cartan::argmin_projected_gn<chain_t>::options opts{};
     opts.max_restarts = 0;
     opts.rng_seed = 7;
 
-    cartan::ik::argmin_projected_gn<chain_t> solver{opts};
+    cartan::argmin_projected_gn<chain_t> solver{opts};
     Eigen::Vector<double, 6> q_seed = Eigen::Vector<double, 6>::Zero();
     cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 500, 1000};
     solver.setup(chain, target, q_seed, criteria);
@@ -86,11 +86,11 @@ TEST_CASE("argmin_projected_gn exhausts configured restarts on unreachable targe
     auto chain = make_ur5_like_chain();
     auto target = cartan::se3<double>(cartan::so3<double>::identity(), {10.0, 10.0, 10.0});
 
-    cartan::ik::argmin_projected_gn<chain_t>::options opts{};
+    cartan::argmin_projected_gn<chain_t>::options opts{};
     opts.max_restarts = 3;
     opts.rng_seed = 42;
 
-    cartan::ik::argmin_projected_gn<chain_t> solver{opts};
+    cartan::argmin_projected_gn<chain_t> solver{opts};
     Eigen::Vector<double, 6> q_seed = Eigen::Vector<double, 6>::Zero();
     // 4th literal: 4 * per_attempt allows max_restarts=3 (initial + 3 restarts = 4 attempts) to fire
     cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 500, 2000};
@@ -111,7 +111,7 @@ TEST_CASE("argmin_projected_gn zero restarts on easy target", "[ik][argmin][proj
     q_known << 0.1, -0.2, 0.3, -0.1, 0.2, -0.05;
     auto target = cartan::forward_kinematics(chain, q_known).end_effector;
 
-    cartan::ik::argmin_projected_gn<chain_t> solver{};
+    cartan::argmin_projected_gn<chain_t> solver{};
     Eigen::Vector<double, 6> q_seed;
     q_seed << 0.05, -0.1, 0.2, -0.05, 0.15, -0.02;
     cartan::convergence_criteria<double> criteria{1e-4, 1e-4, 500, 1000};
@@ -135,11 +135,11 @@ TEST_CASE("argmin_projected_gn deterministic under fixed RNG seed", "[ik][argmin
 
     auto run_solver = [&](unsigned seed)
     {
-        cartan::ik::argmin_projected_gn<chain_t>::options opts{};
+        cartan::argmin_projected_gn<chain_t>::options opts{};
         opts.max_restarts = 2;
         opts.rng_seed = seed;
 
-        cartan::ik::argmin_projected_gn<chain_t> solver{opts};
+        cartan::argmin_projected_gn<chain_t> solver{opts};
         solver.setup(chain, target, q_seed, criteria);
 
         while (solver.status() == cartan::ik_status::running)
@@ -164,7 +164,7 @@ TEST_CASE("argmin_projected_gn abort from running state transitions to stalled",
     q_known << 0.3, -0.5, 0.8, -0.3, 0.6, -0.2;
     auto target = cartan::forward_kinematics(chain, q_known).end_effector;
 
-    cartan::ik::argmin_projected_gn<chain_t> solver{};
+    cartan::argmin_projected_gn<chain_t> solver{};
     Eigen::Vector<double, 6> q_seed = Eigen::Vector<double, 6>::Zero();
     cartan::convergence_criteria<double> criteria{1e-4, 1e-4, 500, 1000};
     solver.setup(chain, target, q_seed, criteria);

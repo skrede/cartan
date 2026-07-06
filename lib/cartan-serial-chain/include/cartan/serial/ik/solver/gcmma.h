@@ -40,7 +40,7 @@
 #include <vector>
 #include <algorithm>
 
-namespace cartan::ik
+namespace cartan
 {
 
 /// argmin-backed GCMMA solve policy for bound-constrained IK.

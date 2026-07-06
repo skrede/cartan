@@ -34,7 +34,7 @@
 #include <memory>
 #include <vector>
 
-namespace cartan::ik
+namespace cartan
 {
 
 /// argmin-backed BOBYQA solve policy for constrained IK with box constraints.
@@ -45,7 +45,7 @@ namespace cartan::ik
 /// iterations for cooperative scheduling in basic_ik_runner.
 ///
 /// This is the default (unprefixed) BOBYQA policy. The NLopt-backed variant
-/// is available as cartan::ik::nlopt_bobyqa behind CARTAN_HAS_NLOPT.
+/// is available as cartan::nlopt_bobyqa behind CARTAN_HAS_NLOPT.
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 class argmin_bobyqa
 {

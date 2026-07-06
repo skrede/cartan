@@ -73,7 +73,7 @@ namespace
     // Projected Levenberg-Marquardt: aim the solver at the just-computed
     // reachable pose from a nearby seed and advance a single work unit. This
     // ODR-uses the allocation-free active-set solve on a fixed-size chain.
-    cartan::ik::projected_lm<cartan::kinematic_chain<float, 3>> solver;
+    cartan::projected_lm<cartan::kinematic_chain<float, 3>> solver;
     cartan::convergence_criteria<float> criteria;
 
     Eigen::Matrix<float, 3, 1> q_seed;

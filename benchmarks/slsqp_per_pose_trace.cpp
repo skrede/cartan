@@ -1,5 +1,5 @@
 /// @file slsqp_per_pose_trace.cpp
-/// @brief Per-outer-step tracer for cartan::ik::argmin_slsqp on a focused
+/// @brief Per-outer-step tracer for cartan::argmin_slsqp on a focused
 ///        pose list. Captures argmin inner-state telemetry per outer step
 ///        to diagnose the 200e287 regressed-cohort failure mode.
 ///
@@ -100,7 +100,7 @@ void trace_pose(
 
     // Replicate basic_ik_runner + restart_wrapper logic in-line so we can
     // read argmin_slsqp's internal telemetry between every call.
-    cartan::ik::argmin_slsqp<chain_t<N>> solver;
+    cartan::argmin_slsqp<chain_t<N>> solver;
     solver.setup(chain, target, q_seed, criteria);
 
     cartan::halton_seed_generator<chain_t<N>> seed_gen(chain);

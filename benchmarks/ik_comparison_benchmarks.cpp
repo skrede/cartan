@@ -107,7 +107,7 @@ void bm_cartan_comparison(
         auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
         ++idx;
 
-        cartan::basic_ik_runner<cartan::ik::lm<cartan::kinematic_chain<double, N>>> solver;
+        cartan::basic_ik_runner<cartan::lm<cartan::kinematic_chain<double, N>>> solver;
         solver.setup(chain, target, q_seed, criteria);
         auto result = solver.solve();
 
@@ -146,8 +146,8 @@ void bm_cartan_restart_lm_comparison(
     const target_set<double, N>& ts)
 {
     using chain_t = cartan::kinematic_chain<double, N>;
-    using restart_lm = cartan::ik::restart_wrapper<
-        chain_t, cartan::ik::lm<chain_t, LimitsPolicy>>;
+    using restart_lm = cartan::restart_wrapper<
+        chain_t, cartan::lm<chain_t, LimitsPolicy>>;
 
     cartan::convergence_criteria<double> criteria{
         .position_tol               = 1e-5,
@@ -925,48 +925,48 @@ using chain_t = cartan::kinematic_chain<double, N>;
 // argmin solver type aliases for comparison benchmarks
 template <int N>
 using argmin_slsqp_solver = cartan::basic_ik_runner<
-    cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::argmin_slsqp<chain_t<N>>>>;
+    cartan::restart_wrapper<chain_t<N>, cartan::argmin_slsqp<chain_t<N>>>>;
 
 // NLopt-compatible convergence variant: same solver, different stopping rules.
 // Uses argmin::slsqp_compatible_convergence (ftol_rel + xtol_rel + stall,
 // no gradient-norm check) via argmin_slsqp_nlopt_compat.
 template <int N>
 using argmin_slsqp_nlopt_compat_solver = cartan::basic_ik_runner<
-    cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::argmin_slsqp_nlopt_compat<chain_t<N>>>>;
+    cartan::restart_wrapper<chain_t<N>, cartan::argmin_slsqp_nlopt_compat<chain_t<N>>>>;
 
 template <int N>
 using argmin_lbfgsb_solver = cartan::basic_ik_runner<
-    cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::argmin_lbfgsb<chain_t<N>>>>;
+    cartan::restart_wrapper<chain_t<N>, cartan::argmin_lbfgsb<chain_t<N>>>>;
 
 template <int N>
 using argmin_nw_sqp_solver = cartan::basic_ik_runner<
-    cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::nw_sqp<chain_t<N>>>>;
+    cartan::restart_wrapper<chain_t<N>, cartan::nw_sqp<chain_t<N>>>>;
 
 template <int N>
 using argmin_projected_gn_comparison_solver = cartan::basic_ik_runner<
-    cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::argmin_projected_gn<chain_t<N>>>>;
+    cartan::restart_wrapper<chain_t<N>, cartan::argmin_projected_gn<chain_t<N>>>>;
 
 template <int N>
 using argmin_projected_gradient_gn_comparison_solver = cartan::basic_ik_runner<
-    cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::argmin_projected_gradient_gn<chain_t<N>>>>;
+    cartan::restart_wrapper<chain_t<N>, cartan::argmin_projected_gradient_gn<chain_t<N>>>>;
 
 template <int N>
 using argmin_mma_solver = cartan::basic_ik_runner<
-    cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::mma<chain_t<N>>>>;
+    cartan::restart_wrapper<chain_t<N>, cartan::mma<chain_t<N>>>>;
 
 template <int N>
 using argmin_gcmma_solver = cartan::basic_ik_runner<
-    cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::gcmma<chain_t<N>>>>;
+    cartan::restart_wrapper<chain_t<N>, cartan::gcmma<chain_t<N>>>>;
 
 // NLopt solver type aliases (gated behind CARTAN_HAS_NLOPT)
 #ifdef CARTAN_HAS_NLOPT
 template <int N>
 using nlopt_slsqp_solver = cartan::basic_ik_runner<
-    cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::nlopt_slsqp<chain_t<N>>>>;
+    cartan::restart_wrapper<chain_t<N>, cartan::nlopt_slsqp<chain_t<N>>>>;
 
 template <int N>
 using nlopt_bobyqa_solver = cartan::basic_ik_runner<
-    cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::nlopt_bobyqa<chain_t<N>>>>;
+    cartan::restart_wrapper<chain_t<N>, cartan::nlopt_bobyqa<chain_t<N>>>>;
 #endif
 
 // Convergence criteria shared across comparison benchmarks.
@@ -1089,7 +1089,7 @@ static void bm_comparison_ur3e_argmin_slsqp_phi_ls_calls_impl(benchmark::State& 
     static const target_set<double, 6> ts(chain, num_targets, 42);
     const auto criteria = argmin_comparison_criteria();
 
-    cartan::ik::argmin_slsqp<chain_t<6>>::options slsqp_opts{};
+    cartan::argmin_slsqp<chain_t<6>>::options slsqp_opts{};
     // budget_per_step removed from argmin_slsqp::options under the work-unit
     // refactor; the per-step inner budget is now driven by step(chain, N) from
     // the runner. BudgetPerStep is retained as a non-type template parameter
@@ -1110,7 +1110,7 @@ static void bm_comparison_ur3e_argmin_slsqp_phi_ls_calls_impl(benchmark::State& 
         auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
         ++idx;
 
-        cartan::ik::argmin_slsqp<chain_t<6>> solver{slsqp_opts};
+        cartan::argmin_slsqp<chain_t<6>> solver{slsqp_opts};
         solver.setup(chain, target, q_seed, criteria);
 
         while (solver.status() == cartan::ik_status::running)
@@ -1185,7 +1185,7 @@ static void bm_comparison_ur3e_argmin_slsqp_last_check_results(benchmark::State&
     static const target_set<double, 6> ts(chain, num_targets, 42);
     const auto criteria = argmin_comparison_criteria();
 
-    cartan::ik::argmin_slsqp<chain_t<6>>::options slsqp_opts{};
+    cartan::argmin_slsqp<chain_t<6>>::options slsqp_opts{};
     // budget_per_step removed from argmin_slsqp::options; per-step inner
     // budget is now runner-driven via step(chain, N).
 
@@ -1199,7 +1199,7 @@ static void bm_comparison_ur3e_argmin_slsqp_last_check_results(benchmark::State&
         auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
         ++idx;
 
-        cartan::ik::argmin_slsqp<chain_t<6>> solver{slsqp_opts};
+        cartan::argmin_slsqp<chain_t<6>> solver{slsqp_opts};
         solver.setup(chain, target, q_seed, criteria);
 
         while (solver.status() == cartan::ik_status::running)
@@ -1257,7 +1257,7 @@ static void bm_comparison_ur3e_argmin_slsqp_grad_sweep(benchmark::State& state)
     static const target_set<double, 6> ts(chain, num_targets, 42);
     const auto criteria = argmin_comparison_criteria();
 
-    cartan::ik::argmin_slsqp<chain_t<6>>::options slsqp_opts{};
+    cartan::argmin_slsqp<chain_t<6>>::options slsqp_opts{};
     // budget_per_step removed from argmin_slsqp::options; per-step inner
     // budget is now runner-driven via step(chain, N).
     slsqp_opts.gradient_threshold = gradient_threshold;
@@ -1274,7 +1274,7 @@ static void bm_comparison_ur3e_argmin_slsqp_grad_sweep(benchmark::State& state)
         auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
         ++idx;
 
-        cartan::ik::argmin_slsqp<chain_t<6>> solver{slsqp_opts};
+        cartan::argmin_slsqp<chain_t<6>> solver{slsqp_opts};
         solver.setup(chain, target, q_seed, criteria);
 
         while (solver.status() == cartan::ik_status::running)
@@ -1353,7 +1353,7 @@ static void bm_comparison_ur3e_argmin_slsqp_budget_sweep(benchmark::State& state
     static const target_set<double, 6> ts(chain, num_targets, 42);
     const auto criteria = argmin_comparison_criteria();
 
-    cartan::ik::argmin_slsqp<chain_t<6>>::options slsqp_opts{};
+    cartan::argmin_slsqp<chain_t<6>>::options slsqp_opts{};
     // budget_per_step removed from argmin_slsqp::options. The state.range(0)
     // sweep parameter is preserved as a local for state.counters output, but
     // no longer flows into the solver — the per-step inner budget is now
@@ -1376,7 +1376,7 @@ static void bm_comparison_ur3e_argmin_slsqp_budget_sweep(benchmark::State& state
         auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
         ++idx;
 
-        cartan::ik::argmin_slsqp<chain_t<6>> solver{slsqp_opts};
+        cartan::argmin_slsqp<chain_t<6>> solver{slsqp_opts};
         solver.setup(chain, target, q_seed, criteria);
 
         while (solver.status() == cartan::ik_status::running)
@@ -1443,7 +1443,7 @@ static void bm_comparison_ur3e_argmin_slsqp_retry(benchmark::State& state)
 
     const auto restart_scale = static_cast<double>(state.range(0)) / 100.0;
 
-    cartan::ik::argmin_slsqp<chain_t<6>>::options slsqp_opts{};
+    cartan::argmin_slsqp<chain_t<6>>::options slsqp_opts{};
     slsqp_opts.max_restarts = 10;
     slsqp_opts.restart_scale = restart_scale;
 
@@ -1460,7 +1460,7 @@ static void bm_comparison_ur3e_argmin_slsqp_retry(benchmark::State& state)
         auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
         ++idx;
 
-        cartan::ik::argmin_slsqp<chain_t<6>> solver{slsqp_opts};
+        cartan::argmin_slsqp<chain_t<6>> solver{slsqp_opts};
         solver.setup(chain, target, q_seed, criteria);
 
         while (solver.status() == cartan::ik_status::running)
@@ -1516,7 +1516,7 @@ static void bm_comparison_ur3e_argmin_slsqp_last_check_results_alias(benchmark::
     static const target_set<double, 6> ts(chain, num_targets, 42);
     const auto criteria = argmin_comparison_criteria();
 
-    cartan::ik::argmin_slsqp_nlopt_compat<chain_t<6>>::options slsqp_opts{};
+    cartan::argmin_slsqp_nlopt_compat<chain_t<6>>::options slsqp_opts{};
     // budget_per_step removed from argmin_slsqp::options (and therefore from
     // the alias); per-step inner budget is now runner-driven via
     // step(chain, N).
@@ -1532,7 +1532,7 @@ static void bm_comparison_ur3e_argmin_slsqp_last_check_results_alias(benchmark::
         auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
         ++idx;
 
-        cartan::ik::argmin_slsqp_nlopt_compat<chain_t<6>> solver{slsqp_opts};
+        cartan::argmin_slsqp_nlopt_compat<chain_t<6>> solver{slsqp_opts};
         solver.setup(chain, target, q_seed, criteria);
 
         while (solver.status() == cartan::ik_status::running)
@@ -1579,7 +1579,7 @@ BENCHMARK(bm_comparison_ur3e_argmin_slsqp_last_check_results_alias)
 #ifdef CARTAN_HAS_NLOPT
 // Direct-drive NLopt SLSQP bench that also captures nlopt's per-pose
 // objective function call count (via the nlopt_objective_calls accessor
-// on cartan::ik::nlopt_slsqp). Purpose: indirect per-inner-iteration
+// on cartan::nlopt_slsqp). Purpose: indirect per-inner-iteration
 // wall measurement for nlopt on UR3e, to compare against argmin's
 // ~11.4 us/inner-step figure. Same 1000 UR3e poses, seed 42, cartan-
 // tight criteria, direct-drive (no restart_wrapper, no basic_ik_runner)
@@ -1597,7 +1597,7 @@ static void bm_comparison_ur3e_nlopt_slsqp_inner_iter_count(benchmark::State& st
     static const target_set<double, 6> ts(chain, num_targets, 42);
     const auto criteria = argmin_comparison_criteria();
 
-    cartan::ik::nlopt_slsqp<chain_t<6>>::options slsqp_opts{};
+    cartan::nlopt_slsqp<chain_t<6>>::options slsqp_opts{};
     slsqp_opts.budget_per_step = 500;
 
     std::size_t idx = 0;
@@ -1611,7 +1611,7 @@ static void bm_comparison_ur3e_nlopt_slsqp_inner_iter_count(benchmark::State& st
         auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
         ++idx;
 
-        cartan::ik::nlopt_slsqp<chain_t<6>> solver{slsqp_opts};
+        cartan::nlopt_slsqp<chain_t<6>> solver{slsqp_opts};
         solver.setup(chain, target, q_seed, criteria);
 
         while (solver.status() == cartan::ik_status::running)
@@ -1668,7 +1668,7 @@ static void bm_comparison_ur3e_nlopt_slsqp_restart_count(benchmark::State& state
     static const target_set<double, 6> ts(chain, num_targets, 42);
     const auto criteria = argmin_comparison_criteria();
 
-    cartan::ik::nlopt_slsqp<chain_t<6>>::options slsqp_opts{};
+    cartan::nlopt_slsqp<chain_t<6>>::options slsqp_opts{};
     slsqp_opts.budget_per_step = 500;
 
     std::size_t idx = 0;
@@ -1686,7 +1686,7 @@ static void bm_comparison_ur3e_nlopt_slsqp_restart_count(benchmark::State& state
         auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
         ++idx;
 
-        cartan::ik::nlopt_slsqp<chain_t<6>> solver{slsqp_opts};
+        cartan::nlopt_slsqp<chain_t<6>> solver{slsqp_opts};
         solver.setup(chain, target, q_seed, criteria);
 
         while (solver.status() == cartan::ik_status::running)
@@ -1765,7 +1765,7 @@ static void bm_comparison_ur3e_argmin_slsqp_grad_sweep_runner(benchmark::State& 
     static const target_set<double, 6> ts(chain, num_targets, 42);
     const auto criteria = argmin_comparison_criteria();
 
-    cartan::ik::argmin_slsqp<chain_t<6>>::options inner_opts{};
+    cartan::argmin_slsqp<chain_t<6>>::options inner_opts{};
     inner_opts.gradient_threshold = gradient_threshold;
 
     std::size_t idx = 0;
@@ -1780,8 +1780,8 @@ static void bm_comparison_ur3e_argmin_slsqp_grad_sweep_runner(benchmark::State& 
         auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
         ++idx;
 
-        cartan::ik::argmin_slsqp<chain_t<6>> inner{inner_opts};
-        cartan::ik::restart_wrapper<chain_t<6>, cartan::ik::argmin_slsqp<chain_t<6>>>
+        cartan::argmin_slsqp<chain_t<6>> inner{inner_opts};
+        cartan::restart_wrapper<chain_t<6>, cartan::argmin_slsqp<chain_t<6>>>
             wrapper{std::move(inner)};
         argmin_slsqp_solver<6> solver{std::move(wrapper)};
 
@@ -1828,7 +1828,7 @@ static void bm_comparison_ur3e_argmin_slsqp_phi_ls_calls_dynamicN(benchmark::Sta
     static const target_set<double, cartan::dynamic> ts(chain, num_targets, 42);
     const auto criteria = argmin_comparison_criteria();
 
-    cartan::ik::argmin_slsqp<dynamic_chain>::options slsqp_opts{};
+    cartan::argmin_slsqp<dynamic_chain>::options slsqp_opts{};
     // budget_per_step removed from argmin_slsqp::options; per-step inner
     // budget is now runner-driven via step(chain, N).
 
@@ -1844,7 +1844,7 @@ static void bm_comparison_ur3e_argmin_slsqp_phi_ls_calls_dynamicN(benchmark::Sta
         auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
         ++idx;
 
-        cartan::ik::argmin_slsqp<dynamic_chain> solver{slsqp_opts};
+        cartan::argmin_slsqp<dynamic_chain> solver{slsqp_opts};
         solver.setup(chain, target, q_seed, criteria);
 
         while (solver.status() == cartan::ik_status::running)

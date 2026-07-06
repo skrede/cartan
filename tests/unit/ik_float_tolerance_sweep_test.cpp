@@ -259,7 +259,7 @@ TEST_CASE("float IK converges at the swept preset but not at a forced 1e-6 gate"
     // RED: force the historical 1e-6 gate. The float residual floors above it,
     // so the runner exhausts its budget without ever reporting convergence.
     {
-        cartan::basic_ik_runner<cartan::ik::lm<Chain>> solver;
+        cartan::basic_ik_runner<cartan::lm<Chain>> solver;
         cartan::convergence_criteria<float> forced;
         forced.position_tol = 1e-6f;
         forced.orientation_tol = 1e-6f;
@@ -277,7 +277,7 @@ TEST_CASE("float IK converges at the swept preset but not at a forced 1e-6 gate"
     // than trusting the solver's self-reported status. In se3::log() the head
     // block is angular (orientation) and the tail block is linear (position).
     {
-        cartan::basic_ik_runner<cartan::ik::lm<Chain>> solver;
+        cartan::basic_ik_runner<cartan::lm<Chain>> solver;
         cartan::convergence_criteria<float> criteria; // swept float preset
         criteria.max_iterations_per_attempt = max_attempt;
         criteria.max_total_work_units = max_units;
@@ -346,7 +346,7 @@ void convergence_contrast(
         ++total;
 
         {
-            cartan::basic_ik_runner<cartan::ik::lm<cartan::kinematic_chain<float, N>>> s;
+            cartan::basic_ik_runner<cartan::lm<cartan::kinematic_chain<float, N>>> s;
             cartan::convergence_criteria<float> c;
             c.position_tol = 1e-6f;
             c.orientation_tol = 1e-6f;
@@ -357,7 +357,7 @@ void convergence_contrast(
                 ++conv_1e6;
         }
         {
-            cartan::basic_ik_runner<cartan::ik::lm<cartan::kinematic_chain<float, N>>> s;
+            cartan::basic_ik_runner<cartan::lm<cartan::kinematic_chain<float, N>>> s;
             cartan::convergence_criteria<float> c; // swept preset
             c.max_iterations_per_attempt = 800;
             c.max_total_work_units = 1600;

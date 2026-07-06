@@ -5,7 +5,7 @@
 ///
 /// Extracts conversion, bounds setup, optimization dispatch, result mapping,
 /// convergence checking, perturbation, and limit enforcement utilities shared
-/// between cartan::ik::nlopt_slsqp and cartan::ik::nlopt_bobyqa.
+/// between cartan::nlopt_slsqp and cartan::nlopt_bobyqa.
 ///
 /// All functions live in cartan::detail and are guarded by CARTAN_HAS_NLOPT.
 ///
