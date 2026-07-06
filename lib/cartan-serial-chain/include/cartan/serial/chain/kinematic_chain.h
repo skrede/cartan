@@ -98,13 +98,19 @@ public:
     }
 
     /// Access a single screw axis by index (bounds-checked, `.at()` semantics).
-    /// Throws std::out_of_range for negative or too-large indices so a bad
-    /// index can never read outside the underlying storage.
+    /// A bad index can never read outside the underlying storage: with
+    /// exceptions enabled it throws std::out_of_range; on exceptions-off targets
+    /// (bare-metal and ESP-IDF default) a bare throw would not compile, so it
+    /// fail-stops deterministically via a trap instruction instead.
     [[nodiscard]] const screw_axis<Scalar>& axis(int i) const
     {
         if (i < 0 || static_cast<std::size_t>(i) >= m_axes.size())
         {
+#if defined(__cpp_exceptions)
             throw std::out_of_range("kinematic_chain::axis: joint index out of range");
+#else
+            __builtin_trap();
+#endif
         }
         return m_axes[static_cast<std::size_t>(i)];
     }
