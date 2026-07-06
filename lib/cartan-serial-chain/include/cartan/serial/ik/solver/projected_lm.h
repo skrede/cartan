@@ -228,14 +228,19 @@ private:
     // error wins. Uses the shared feasibility predicate.
     void update_best(const Chain& chain)
     {
-        bool feasible = cartan::detail::within_limits(
-            m_q, chain, cartan::detail::default_feasibility_tol<scalar_type>());
+        // Rank the pose-equivalence class, not the raw iterate: canonicalize a
+        // COPY into limits (m_q, the working iterate, is left untouched -- wrapping
+        // it would be a clamp) and store the in-limits representative as best. The
+        // pose is invariant under the wrap, so m_error_norm is unchanged.
+        position_type q_canon = m_q;
+        bool feasible = cartan::detail::feasible_after_canonicalization(
+            q_canon, chain, cartan::detail::default_feasibility_tol<scalar_type>());
         bool better = !m_best_valid
             || (feasible && !m_best_feasible)
             || (feasible == m_best_feasible && m_error_norm < m_best_error);
         if (better)
         {
-            m_best_q = m_q;
+            m_best_q = q_canon;
             m_best_error = m_error_norm;
             m_best_feasible = feasible;
             m_best_valid = true;
@@ -341,11 +346,12 @@ private:
         if (cartan::detail::is_converged_unweighted(m_V_b, m_criteria))
         {
             m_error_norm = m_V_b.norm();
-            // Converged implies feasible. The active-set projection keeps m_q
-            // inside the box, so this check passes structurally; it is applied
-            // for uniformity with the unconstrained trust-region solvers and to
-            // stay correct should the projection ever be relaxed. Check only.
-            m_status = cartan::detail::within_limits(
+            // Converged implies feasible as a property of the pose-equivalence
+            // class. The active-set projection keeps m_q inside the box, so the
+            // canonicalization is structurally a no-op here; it is applied for
+            // uniformity with the unconstrained trust-region solvers and to stay
+            // correct should the projection ever be relaxed. Never a clamp.
+            m_status = cartan::detail::feasible_after_canonicalization(
                     m_q, chain, cartan::detail::default_feasibility_tol<scalar_type>())
                 ? ik_status::converged
                 : ik_status::joint_limit_hit;

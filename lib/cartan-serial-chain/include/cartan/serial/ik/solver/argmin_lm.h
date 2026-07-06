@@ -143,10 +143,13 @@ public:
 
             if (cartan::detail::is_converged_unweighted(V_b, m_criteria))
             {
-                // Converged implies feasible: a pose reached only at an
-                // out-of-range configuration is a joint-limit failure, not a
-                // trustworthy solution. Check only, never a clamp.
-                m_status = cartan::detail::within_limits(
+                // Converged implies feasible as a property of the pose-equivalence
+                // class: a pose reached at an unwrapped 2*pi-equivalent angle is
+                // recovered to its in-limits representative and accepted, while a
+                // pose only reachable outside the box is a joint-limit failure.
+                // Canonicalizes the FINAL synced iterate once; never a clamp of
+                // the argmin working state.
+                m_status = cartan::detail::feasible_after_canonicalization(
                         m_q, chain, cartan::detail::default_feasibility_tol<scalar_type>())
                     ? ik_status::converged
                     : ik_status::joint_limit_hit;

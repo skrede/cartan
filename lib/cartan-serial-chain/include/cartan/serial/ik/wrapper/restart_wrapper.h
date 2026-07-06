@@ -249,16 +249,23 @@ private:
     // one, and among equally-feasible attempts the lower pose error wins.
     void update_best_q(scalar_type current_error)
     {
+        // Rank the pose-equivalence class: canonicalize a COPY of the inner
+        // solution into limits and retain the in-limits representative. The inner
+        // iterate is not mutated (this wrapper only reads its solution), and the
+        // pose is invariant under the wrap so current_error is unchanged. When no
+        // chain is bound the class cannot be evaluated, so the raw solution is
+        // retained as before.
+        position_type q_canon = m_inner.solution();
         bool feasible = m_chain != nullptr
-            && cartan::detail::within_limits(
-                m_inner.solution(), *m_chain,
+            && cartan::detail::feasible_after_canonicalization(
+                q_canon, *m_chain,
                 cartan::detail::default_feasibility_tol<scalar_type>());
         bool better = !m_best_valid
             || (feasible && !m_best_feasible)
             || (feasible == m_best_feasible && current_error < m_best_q_error);
         if (better)
         {
-            m_best_q = m_inner.solution();
+            m_best_q = q_canon;
             m_best_q_error = current_error;
             m_best_feasible = feasible;
             m_best_valid = true;

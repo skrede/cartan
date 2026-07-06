@@ -477,14 +477,19 @@ private:
     // error wins. Consulted every synced iteration so the best survives restarts.
     void update_best(const Chain& chain)
     {
-        bool feasible = cartan::detail::within_limits(
-            m_q, chain, cartan::detail::default_feasibility_tol<scalar_type>());
+        // Rank the pose-equivalence class, not the raw iterate: canonicalize a
+        // COPY into limits (the synced working iterate m_q is left untouched --
+        // wrapping it would be a clamp) and store the in-limits representative as
+        // best. The pose is invariant under the wrap, so m_error_norm is unchanged.
+        position_type q_canon = m_q;
+        bool feasible = cartan::detail::feasible_after_canonicalization(
+            q_canon, chain, cartan::detail::default_feasibility_tol<scalar_type>());
         bool better = !m_best_valid
             || (feasible && !m_best_feasible)
             || (feasible == m_best_feasible && m_error_norm < m_best_q_error);
         if (better)
         {
-            m_best_q = m_q;
+            m_best_q = q_canon;
             m_best_q_error = m_error_norm;
             m_best_feasible = feasible;
             m_best_valid = true;

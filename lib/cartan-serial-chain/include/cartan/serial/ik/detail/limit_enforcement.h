@@ -11,15 +11,20 @@
 
 #include "cartan/serial/chain/joint_state.h"
 #include "cartan/serial/fk/jacobian.h"
+#include "cartan/serial/chain/screw_axis.h"
 #include "cartan/serial/chain/chain_concept.h"
 #include "cartan/serial/fk/forward_kinematics.h"
+
+#include "cartan/detail/epsilon.h"
 
 #include <Eigen/SVD>
 
 #include <cmath>
 #include <limits>
+#include <numbers>
 #include <concepts>
 #include <cstddef>
+#include <algorithm>
 
 namespace cartan
 {
@@ -69,6 +74,136 @@ template <chain Chain>
         }
     }
     return true;
+}
+
+/// True iff the screw axis is a zero-pitch revolute joint: |omega| > 0 and the
+/// screw pitch h = (omega . v) / |omega|^2 is ~ 0. Only a zero-pitch revolute
+/// produces a pose that is 2*pi-periodic in its joint angle -- exp(2*pi*S) = I,
+/// so adding a full turn to the angle leaves the end-effector pose unchanged and
+/// the angle may be wrapped into the joint's limit arc without moving the tool.
+///
+/// A prismatic joint (omega = 0) is aperiodic. A helical / nonzero-pitch screw
+/// (omega != 0, h != 0) satisfies exp(2*pi*S) != I -- it translates by 2*pi*h per
+/// revolution -- so its angle is likewise not pose-periodic. Neither may be
+/// wrapped; both are gated out here. The pitch test uses |omega . v| directly:
+/// with |omega| = 1 for a normalized revolute axis, omega . v == h, and a pure
+/// revolute (v = -omega x point) gives omega . v = 0 identically while a helical
+/// axis carries omega . v = h. The threshold scales with |v| so the rounding of
+/// the cross product on a large-reach chain is absorbed without admitting a
+/// physically meaningful (millimeter-scale) pitch as "zero".
+template <typename Scalar>
+[[nodiscard]] inline bool is_zero_pitch_revolute(const screw_axis<Scalar>& s) noexcept
+{
+    if (!s.is_revolute())
+    {
+        return false;
+    }
+    const Scalar wv = std::abs(s.omega().dot(s.v()));
+    const Scalar scale = std::max(Scalar(1), s.v().norm());
+    return wv <= sqrt_epsilon_v<Scalar> * scale;
+}
+
+/// Return the 2*pi-equivalent of theta that lands in the limit arc [lo, hi], or
+/// the nearest representative on the lower (resp. upper) side when the arc is a
+/// proper sub-interval of the circle that theta's equivalence class misses. The
+/// caller must only pass angles of a zero-pitch revolute joint (see
+/// is_zero_pitch_revolute), for which theta and theta + 2*pi*k describe the same
+/// pose for every integer k. This is the general arc test -- NOT a naive wrap to
+/// [-pi, pi]: it anchors to the actual bounds so an asymmetric or offset limit
+/// range is handled correctly.
+///
+/// Bound handling mirrors within_limits: a non-finite bound (an unbounded /
+/// continuous joint modeled with +/-infinity) imposes no constraint on that side.
+///   - lo finite: return the smallest theta + 2*pi*k >= lo (within the tol band).
+///     If hi is finite and the span hi - lo >= 2*pi this always lands in the arc;
+///     if the span is a gap < 2*pi that the class misses, the result is >= lo but
+///     > hi, so the subsequent box check correctly rejects it.
+///   - lo = -inf, hi finite: return the largest theta + 2*pi*k <= hi.
+///   - both non-finite: a fully continuous joint -- theta is already feasible and
+///     is returned unchanged.
+/// The tol band matches within_limits so a bound-hugging angle is not bumped a
+/// full turn by a rounding step across the limit.
+///
+/// An angle already inside the arc is returned UNCHANGED (identity map): the
+/// canonicalization only ever moves a representative the solver returned outside
+/// the box, so a configuration already within limits is left bit-for-bit intact.
+/// Without this guard an angle sitting exactly on the upper bound of a span-2*pi
+/// range would be needlessly re-anchored to the lower bound (e.g. +pi -> -pi).
+template <typename Scalar>
+[[nodiscard]] inline Scalar canonical_angle_in_limits(
+    Scalar theta, Scalar lo, Scalar hi, Scalar tol) noexcept
+{
+    const bool above_lo = !std::isfinite(lo) || theta >= lo - tol;
+    const bool below_hi = !std::isfinite(hi) || theta <= hi + tol;
+    if (above_lo && below_hi)
+    {
+        return theta;
+    }
+
+    constexpr Scalar two_pi = Scalar(2) * std::numbers::pi_v<Scalar>;
+    if (std::isfinite(lo))
+    {
+        const Scalar k = std::ceil((lo - theta - tol) / two_pi);
+        return theta + two_pi * k;
+    }
+    if (std::isfinite(hi))
+    {
+        const Scalar k = std::floor((hi - theta + tol) / two_pi);
+        return theta + two_pi * k;
+    }
+    return theta;
+}
+
+/// Pose-preserving canonicalization of q into the joint limits: every zero-pitch
+/// revolute DOF with at least one finite bound is replaced by its in-arc 2*pi-
+/// equivalent (see canonical_angle_in_limits); prismatic, helical / nonzero-pitch,
+/// general-screw, and fully-continuous DOFs are left untouched. The end-effector
+/// pose is invariant under this map because a full turn of a zero-pitch revolute
+/// joint is the identity displacement.
+///
+/// This is the ONE-SHOT post-convergence canonicalization a no_limits trust-region
+/// solver applies to its FINAL returned iterate. It must never be fed back into the
+/// iteration: it is not a clamp, and clamping the working iterate would destroy the
+/// trust-region geometry the no_limits family exists to preserve. Feasibility is a
+/// property of the pose-equivalence class, not of the arbitrary R^n representative
+/// the unconstrained solver happened to return -- an unwrapped 2*pi-equivalent
+/// angle is recovered to its in-limits representative here.
+template <chain Chain>
+void canonicalize_into_limits(
+    typename joint_state<typename Chain::scalar_type, Chain::joints>::position_type& q,
+    const Chain& chain,
+    typename Chain::scalar_type tol)
+{
+    const auto& limits = chain.limits();
+    int n = chain.num_joints();
+    for (int i = 0; i < n; ++i)
+    {
+        if (!is_zero_pitch_revolute(chain.axis(i)))
+        {
+            continue;
+        }
+        auto idx = static_cast<std::size_t>(i);
+        q(i) = canonical_angle_in_limits(
+            q(i), limits[idx].position_min, limits[idx].position_max, tol);
+    }
+}
+
+/// Canonicalize q into the joint limits (pose-preserving) and report whether the
+/// result is feasible. This is the gate a no_limits trust-region solver consults
+/// at convergence: a pose the unconstrained solver reached at an unwrapped
+/// 2*pi-equivalent angle is recovered to its in-limits representative and accepted,
+/// while a pose genuinely reachable only outside the box (a prismatic joint out of
+/// range, or a revolute whose limit arc < 2*pi excludes the required angle) still
+/// fails. On return q holds the canonical representative regardless of the verdict;
+/// callers store it as the solution only on the feasible (converged) path.
+template <chain Chain>
+[[nodiscard]] bool feasible_after_canonicalization(
+    typename joint_state<typename Chain::scalar_type, Chain::joints>::position_type& q,
+    const Chain& chain,
+    typename Chain::scalar_type tol)
+{
+    canonicalize_into_limits(q, chain, tol);
+    return within_limits(q, chain, tol);
 }
 
 /// Apply limit enforcement to joint configuration q using the given LimitsPolicy.

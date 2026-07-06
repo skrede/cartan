@@ -157,6 +157,164 @@ TEST_CASE("projected_lm converged solutions are feasible", "[ik][semantics][feas
 }
 
 // ============================================================================
+// Pose-equivalence-class feasibility: a converged-at-2*pi-equivalent config is
+// recovered to its in-limits representative; genuinely box-infeasible poses and
+// non-pose-periodic (prismatic / helical) DOFs are handled correctly.
+// ============================================================================
+
+// A single-DOF chain carrying one arbitrary screw axis, used to probe the
+// canonicalization on prismatic / helical joints in isolation.
+static spp::kinematic_chain<double, 1> make_single_axis_chain(
+    const spp::screw_axis<double>& axis, double lo, double hi)
+{
+    auto home = spp::se3<double>::identity();
+    spp::joint_limits<double> lim{lo, hi};
+    return spp::kinematic_chain<double, 1>(home, {axis}, {lim});
+}
+
+TEST_CASE("is_zero_pitch_revolute classifies revolute, prismatic, and helical axes",
+          "[ik][semantics][feasibility]")
+{
+    // Pure revolute: v = -omega x point, so omega . v = 0 identically.
+    auto revolute = spp::screw_axis<double>::revolute({0, 0, 1}, {1, 0, 0});
+    REQUIRE(spp::detail::is_zero_pitch_revolute(revolute));
+
+    // Prismatic: omega = 0, aperiodic -- never wrapped.
+    auto prismatic = spp::screw_axis<double>::prismatic({0, 0, 1});
+    REQUIRE_FALSE(spp::detail::is_zero_pitch_revolute(prismatic));
+
+    // Helical: omega unit but omega . v = pitch != 0 -- exp(2*pi*S) translates.
+    spp::vector6<double> screw;
+    screw << 0, 0, 1, 0, 0, 0.5;  // omega = e_z, v_z = 0.5 => pitch 0.5
+    auto helical = *spp::screw_axis<double>::from_vector(screw);
+    REQUIRE_FALSE(spp::detail::is_zero_pitch_revolute(helical));
+}
+
+TEST_CASE("canonical_angle_in_limits performs the general arc test",
+          "[ik][semantics][feasibility]")
+{
+    const double tol = spp::detail::default_feasibility_tol<double>();
+    const double pi = std::numbers::pi;
+    const double two_pi = 2.0 * pi;
+
+    // A 2*pi-equivalent angle above the range folds back into [-pi, pi].
+    double r = spp::detail::canonical_angle_in_limits(0.5 + two_pi, -pi, pi, tol);
+    REQUIRE(std::abs(r - 0.5) < 1e-9);
+
+    // The arc test anchors to the actual bounds, not a naive wrap to [-pi, pi]:
+    // for the offset range [3, 5], the class of (3.5 - 2*pi) folds up to 3.5,
+    // which sits in the arc -- whereas a naive [-pi, pi] wrap would return the
+    // out-of-arc representative near -2.78.
+    double off = spp::detail::canonical_angle_in_limits(3.5 - two_pi, 3.0, 5.0, tol);
+    REQUIRE(std::abs(off - 3.5) < 1e-9);
+    REQUIRE(off >= 3.0 - tol);
+    REQUIRE(off <= 5.0 + tol);
+
+    // Span >= 2*pi is always satisfiable; the returned representative sits inside.
+    double wide = spp::detail::canonical_angle_in_limits(10.0, -4.0, 4.0, tol);
+    REQUIRE(wide >= -4.0 - tol);
+    REQUIRE(wide <= 4.0 + tol);
+
+    // A gap < 2*pi that the class misses yields a value that stays out of the box
+    // (>= lo but > hi), so the downstream box check rejects it.
+    double gap = spp::detail::canonical_angle_in_limits(2.5, -1.0, 1.0, tol);
+    REQUIRE(gap > 1.0 + tol);
+}
+
+// (a) A no_limits solver seeded at a 2*pi-equivalent of an in-limits solution
+// must converge AND return the in-limits representative, not the unwrapped angle.
+template <typename Solver>
+static void assert_accepts_2pi_equivalent()
+{
+    const double two_pi = 2.0 * std::numbers::pi;
+    auto chain = make_bounded_2r_chain(std::numbers::pi);  // bounds [-pi, pi]
+
+    Eigen::Vector<double, 2> q_in_limits;
+    q_in_limits << 0.5, -0.5;
+
+    // Seed one joint a full turn away: same pose, but outside the box as returned.
+    Eigen::Vector<double, 2> q_seed;
+    q_seed << 0.5 + two_pi, -0.5;
+    auto target = spp::forward_kinematics(chain, q_seed).end_effector;
+
+    spp::convergence_criteria<double> criteria{};
+    criteria.max_iterations_per_attempt = 200;
+
+    Solver solver;
+    solver.setup(chain, target, q_seed, criteria);
+    run_stepper(solver, chain, 400);
+
+    REQUIRE(solver.converged());
+    // The returned configuration is the in-limits 2*pi-equivalent, not the seed.
+    REQUIRE(spp::detail::within_limits(
+        solver.solution(), chain, spp::detail::default_feasibility_tol<double>()));
+    REQUIRE(std::abs(solver.solution()(0) - 0.5) < 1e-6);
+    REQUIRE(std::abs(solver.solution()(1) - (-0.5)) < 1e-6);
+}
+
+TEST_CASE("dls recovers the in-limits 2pi-equivalent solution", "[ik][semantics][feasibility]")
+{
+    assert_accepts_2pi_equivalent<spp::dls<spp::kinematic_chain<double, 2>>>();
+}
+
+TEST_CASE("builtin_lm recovers the in-limits 2pi-equivalent solution", "[ik][semantics][feasibility]")
+{
+    assert_accepts_2pi_equivalent<spp::builtin_lm<spp::kinematic_chain<double, 2>>>();
+}
+
+#ifdef CARTAN_BUILD_ARGMIN
+TEST_CASE("argmin_lm recovers the in-limits 2pi-equivalent solution", "[ik][semantics][feasibility]")
+{
+    assert_accepts_2pi_equivalent<spp::argmin_lm<spp::kinematic_chain<double, 2>>>();
+}
+#endif
+
+// (b) Genuinely box-infeasible poses are still rejected, not force-accepted.
+TEST_CASE("genuinely infeasible configurations are rejected after canonicalization",
+          "[ik][semantics][feasibility]")
+{
+    const double tol = spp::detail::default_feasibility_tol<double>();
+
+    SECTION("revolute with a limit arc < 2*pi that the class misses")
+    {
+        auto chain = make_bounded_2r_chain(1.0);  // bounds [-1, 1], span 2 < 2*pi
+        // 2.5 has no 2*pi-equivalent inside [-1, 1] (nearest are 2.5 and -3.78).
+        Eigen::Vector<double, 2> q;
+        q << 2.5, 0.0;
+        REQUIRE_FALSE(spp::detail::feasible_after_canonicalization(q, chain, tol));
+    }
+
+    SECTION("prismatic out of range is aperiodic and not wrapped")
+    {
+        auto chain = make_single_axis_chain(
+            spp::screw_axis<double>::prismatic({0, 0, 1}), 0.0, 1.0);
+        Eigen::Vector<double, 1> q;
+        q << 5.0;
+        REQUIRE_FALSE(spp::detail::feasible_after_canonicalization(q, chain, tol));
+        // Aperiodic: the value is left untouched by the canonicalization.
+        REQUIRE(q(0) == 5.0);
+    }
+}
+
+// (c) A helical / nonzero-pitch DOF is never wrapped: exp(2*pi*S) translates, so
+// the angle is not pose-periodic and canonicalization must leave it untouched.
+TEST_CASE("helical DOF is not wrapped by canonicalization", "[ik][semantics][feasibility]")
+{
+    const double tol = spp::detail::default_feasibility_tol<double>();
+
+    spp::vector6<double> screw;
+    screw << 0, 0, 1, 0, 0, 0.5;  // pitch 0.5
+    auto helical = *spp::screw_axis<double>::from_vector(screw);
+    auto chain = make_single_axis_chain(helical, -1.0, 1.0);
+
+    Eigen::Vector<double, 1> q;
+    q << 10.0;  // a full-turn shift would change the pose -- must not be applied
+    spp::detail::canonicalize_into_limits(q, chain, tol);
+    REQUIRE(q(0) == 10.0);
+    REQUIRE_FALSE(spp::detail::feasible_after_canonicalization(q, chain, tol));
+}
+
+// ============================================================================
 // D-06: the convergence gate tests raw (unweighted) component norms
 // ============================================================================
 
