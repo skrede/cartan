@@ -72,6 +72,7 @@ cartan_add_test(analytical_solver_2r_test analytical_solver_2r_test.cpp)
 cartan_add_test(analytical_solver_3r_test analytical_solver_3r_test.cpp)
 cartan_add_test(analytical_solver_6r_test analytical_solver_6r_test.cpp)
 cartan_add_test(opw_forward_reconstruction_test opw_forward_reconstruction_test.cpp)
+cartan_add_test(analytical_solver_opw_test analytical_solver_opw_test.cpp)
 
 if(CARTAN_BUILD_ARGMIN)
     cartan_add_test(argmin_adapters_compile_test argmin_adapters_compile_test.cpp)

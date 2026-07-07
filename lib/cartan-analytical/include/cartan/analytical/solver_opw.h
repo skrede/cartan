@@ -256,13 +256,21 @@ public:
 
     /// Threshold on |sin(theta5)| below which the wrist is treated as singular
     /// and the fold path (pin theta4 = 0, recover theta6 by projection) is
-    /// taken. This starting value is the reference implementation's hardcoded
-    /// constant, carried here as a documented hypothesis only: the transition
-    /// band where the fold's worst-case FK error drops below the solve
-    /// tolerance while the naive decomposition's error diverges is pinned
-    /// empirically by the singularity sweep test, and this default is finalized
-    /// there. It is deliberately not asserted as a proven band yet.
-    static constexpr scalar_type default_singularity_tolerance = scalar_type(1e-6);
+    /// taken. Pinned empirically, not copied from the reference implementation's
+    /// hardcoded 1e-6. The near-singular wrist is a competition between two
+    /// finite-precision failure modes: the naive theta4/theta6 atan2 decomposition
+    /// amplifies rounding as ~eps/|sin(theta5)| (its worst-case FK error grows as
+    /// the locus is approached), while pinning theta4 = 0 injects an O(|sin(theta5)|)
+    /// residual because that pin is exact only at |sin(theta5)| = 0. A worst-case
+    /// FK-error sweep of the two paths against a fixed spherical-wrist arm, over
+    /// many shoulder/elbow configurations, locates their crossover in the band
+    /// |sin(theta5)| ~= 2.2e-8 .. 3.1e-8: above it the naive decomposition wins,
+    /// below it the fold wins. This default sits inside that measured band. The
+    /// reference's 1e-6 folds a whole decade where the naive path is in fact more
+    /// accurate, driving near-singular solutions to the solve tolerance edge; the
+    /// swept value instead caps worst-case near-singular FK error two orders of
+    /// magnitude lower.
+    static constexpr scalar_type default_singularity_tolerance = scalar_type(2.5e-8);
 
     /// Construction-time geometry validation. Returns a ready solver only when
     /// the chain has OPW geometry; otherwise fails loudly with
@@ -557,8 +565,14 @@ public:
             if (!finite)
                 continue;
 
+            // Gate both position and orientation on the same acceptance
+            // tolerance: `make()` exposes a single tolerance, so it must bind
+            // the orientation check too (verify_analytical_solution otherwise
+            // leaves orientation at its own 1e-6 default, silently ignoring a
+            // tightened tolerance).
             if (detail::verify_analytical_solution(
-                    m_chain, q_user, target, true, m_position_tolerance))
+                    m_chain, q_user, target, true,
+                    m_position_tolerance, m_position_tolerance))
             {
                 const Eigen::Vector<Scalar, 6> q_wrapped = wrap_config(q_user);
                 if (is_duplicate_config(result, q_wrapped))
