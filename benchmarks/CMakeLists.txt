@@ -211,3 +211,142 @@ else ()
         "cartan benchmarks: pinocchio not found -- skipping Pinocchio comparison benchmarks. "
         "Install pinocchio to enable them.")
 endif ()
+
+# --- OPW closed-form comparison benchmark: opw_kinematics (ROS-Industrial,
+# Apache-2.0) is an external reference implementation for the ortho-parallel 6R
+# closed-form solve. Its own CMake calls
+# find_package(ros_industrial_cmake_boilerplate REQUIRED) in an add_subdirectory
+# that is unavailable here, so the source is populated WITHOUT running that
+# add_subdirectory (SOURCE_SUBDIR points at a nonexistent path) and a manual
+# header-only INTERFACE target is built instead. Obtained from source -- fetched
+# when CARTAN_FETCH_BENCHMARK_DEPS is ON, or from a caller-provided
+# CARTAN_OPW_KINEMATICS_SOURCE_DIR. Absent both, the comparison is omitted with a
+# warning. The reference target links ONLY into this one benchmark executable --
+# never into cartan::cartan, the include root, or any tests/ target. ---
+set(CARTAN_HAVE_OPW_KINEMATICS FALSE)
+if (CARTAN_OPW_KINEMATICS_SOURCE_DIR OR CARTAN_FETCH_BENCHMARK_DEPS)
+    if (CARTAN_OPW_KINEMATICS_SOURCE_DIR)
+        FetchContent_Declare(
+            opw_kinematics
+            SOURCE_DIR "${CARTAN_OPW_KINEMATICS_SOURCE_DIR}"
+            SOURCE_SUBDIR does-not-exist
+            EXCLUDE_FROM_ALL
+            SYSTEM
+        )
+    else ()
+        # Literal SHA pin (v0.5.5), never a moving tag.
+        FetchContent_Declare(
+            opw_kinematics
+            GIT_REPOSITORY https://github.com/Jmeyer1292/opw_kinematics.git
+            GIT_TAG 8a32bda8197c50bd0d60dfe1d12ecb4c13111b72
+            SOURCE_SUBDIR does-not-exist
+            EXCLUDE_FROM_ALL
+            SYSTEM
+        )
+    endif ()
+    FetchContent_MakeAvailable(opw_kinematics)
+    find_package(Eigen3 CONFIG REQUIRED)
+    add_library(opw_kinematics_reference INTERFACE)
+    target_include_directories(opw_kinematics_reference SYSTEM INTERFACE
+        "${opw_kinematics_SOURCE_DIR}/include")
+    target_link_libraries(opw_kinematics_reference INTERFACE Eigen3::Eigen)
+    set(CARTAN_HAVE_OPW_KINEMATICS TRUE)
+else ()
+    message(WARNING
+        "cartan benchmarks: OPW comparison benchmark needs the opw_kinematics source -- skipping. "
+        "Configure with -DCARTAN_FETCH_BENCHMARK_DEPS=ON or provide -DCARTAN_OPW_KINEMATICS_SOURCE_DIR=<path>.")
+endif ()
+
+if (CARTAN_HAVE_OPW_KINEMATICS)
+    # Custom main() drives the branch-for-branch parity receipt (and returns
+    # nonzero on any mismatch), then hands off to google-benchmark for the
+    # solve-timing cells -- so link benchmark::benchmark WITHOUT benchmark_main.
+    # No orocos-kdl: this TU uses the cartan screw model directly, not
+    # benchmark_utils.h.
+    add_executable(opw_comparison_benchmarks opw_comparison_benchmarks.cpp)
+    target_link_libraries(opw_comparison_benchmarks
+        PRIVATE
+        cartan::cartan
+        benchmark::benchmark
+        opw_kinematics_reference
+    )
+    target_compile_options(opw_comparison_benchmarks PRIVATE ${CARTAN_WARNING_FLAGS})
+endif ()
+
+# --- IKFast comparison benchmark: an OpenRAVE-generated closed-form solver for
+# the KR6 R900 (Transform6D). Unlike opw_kinematics, IKFast derives the inverse
+# per-robot by algebraic elimination -- an INDEPENDENT formulation, so it agrees
+# with cartan at ~machine precision rather than bit-for-bit. The generated solver
+# is a VENDORED artifact (benchmarks/third_party/ikfast_kr6r900/), since codegen
+# is a one-shot offline OpenRAVE build; provenance is pinned in its README. It is
+# self-contained: only ikfast.h + LAPACK (it calls dgeev_ for polynomial roots).
+# Compiled into a static library WITHOUT cartan's warning flags (generated code)
+# and linked ONLY into this one benchmark. ---
+find_package(LAPACK QUIET)
+if (TARGET LAPACK::LAPACK OR LAPACK_FOUND)
+    add_library(ikfast_kr6r900_reference STATIC
+        third_party/ikfast_kr6r900/ikfast_kr6r900_transform6d.cpp)
+    # IKFAST_NO_MAIN drops the generated CLI main(). The entry points keep
+    # default (C++) linkage, matching ikfast.h's declarations in the benchmark.
+    target_compile_definitions(ikfast_kr6r900_reference PRIVATE IKFAST_NO_MAIN)
+    target_include_directories(ikfast_kr6r900_reference SYSTEM PUBLIC
+        "${CMAKE_CURRENT_SOURCE_DIR}/third_party/ikfast_kr6r900")
+    if (TARGET LAPACK::LAPACK)
+        target_link_libraries(ikfast_kr6r900_reference PUBLIC LAPACK::LAPACK)
+    else ()
+        target_link_libraries(ikfast_kr6r900_reference PUBLIC ${LAPACK_LIBRARIES})
+    endif ()
+
+    add_executable(ikfast_comparison_benchmarks ikfast_comparison_benchmarks.cpp)
+    target_link_libraries(ikfast_comparison_benchmarks
+        PRIVATE
+        cartan::cartan
+        benchmark::benchmark
+        ikfast_kr6r900_reference
+    )
+    target_compile_options(ikfast_comparison_benchmarks PRIVATE ${CARTAN_WARNING_FLAGS})
+else ()
+    message(WARNING
+        "cartan benchmarks: LAPACK not found -- skipping the IKFast comparison benchmark "
+        "(the generated solver calls LAPACK for polynomial roots).")
+endif ()
+
+# --- ik-geo comparison benchmark: ik-geo (Elias & Wen, RPI) is an independent
+# geometric subproblem-decomposition IK solver. Its C++ port's spherical solver
+# is broken for roll-pitch-roll wrists, so it is driven through the ik-geo Rust
+# crate (vendored under third_party/ikgeo_ffi/, BSD-3-Clause) via a small C FFI
+# shim, built with cargo and linked as a static library into this one benchmark.
+# Provide -DCARTAN_IKGEO_FFI_LIB=<path> to use a prebuilt shim instead of cargo. ---
+if (NOT CARTAN_IKGEO_FFI_LIB)
+    find_program(CARTAN_CARGO_EXECUTABLE cargo)
+    if (CARTAN_CARGO_EXECUTABLE)
+        set(_ikgeo_ffi_dir "${CMAKE_CURRENT_SOURCE_DIR}/third_party/ikgeo_ffi")
+        set(CARTAN_IKGEO_FFI_LIB "${_ikgeo_ffi_dir}/target/release/libikgeo_ffi.a")
+        add_custom_command(
+            OUTPUT "${CARTAN_IKGEO_FFI_LIB}"
+            COMMAND "${CARTAN_CARGO_EXECUTABLE}" build --release
+            WORKING_DIRECTORY "${_ikgeo_ffi_dir}"
+            COMMENT "Building the ik-geo Rust FFI shim (cargo build --release)"
+            VERBATIM)
+        add_custom_target(ikgeo_ffi_build DEPENDS "${CARTAN_IKGEO_FFI_LIB}")
+    endif ()
+endif ()
+
+if (CARTAN_IKGEO_FFI_LIB)
+    add_executable(ikgeo_comparison_benchmarks ikgeo_comparison_benchmarks.cpp)
+    if (TARGET ikgeo_ffi_build)
+        add_dependencies(ikgeo_comparison_benchmarks ikgeo_ffi_build)
+    endif ()
+    target_link_libraries(ikgeo_comparison_benchmarks
+        PRIVATE
+        cartan::cartan
+        benchmark::benchmark
+        "${CARTAN_IKGEO_FFI_LIB}"
+        pthread dl m
+    )
+    target_compile_options(ikgeo_comparison_benchmarks PRIVATE ${CARTAN_WARNING_FLAGS})
+else ()
+    message(WARNING
+        "cartan benchmarks: ik-geo comparison benchmark needs cargo (to build the "
+        "vendored Rust FFI shim) or a prebuilt -DCARTAN_IKGEO_FFI_LIB=<path> -- skipping.")
+endif ()

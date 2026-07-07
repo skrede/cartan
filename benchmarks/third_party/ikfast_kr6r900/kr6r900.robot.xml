@@ -1,0 +1,99 @@
+<!-- KUKA KR6 R900 SIXX kinematics, transcribed from
+     tests/fixtures/urdf/extended/kr6_sixx_r900.urdf (all joint rpy=0, cardinal axes).
+     Geometry reduced to small boxes; only the kinematic chain matters for ikfast. -->
+<Robot name="kuka_kr6r900sixx">
+  <KinBody>
+    <Body name="base_link" type="dynamic">
+      <Geom type="box"><extents>0.05 0.05 0.05</extents></Geom>
+    </Body>
+
+    <Body name="link_1" type="dynamic">
+      <offsetfrom>base_link</offsetfrom>
+      <translation>0 0 0.400</translation>
+      <Geom type="box"><extents>0.04 0.04 0.04</extents></Geom>
+    </Body>
+    <Joint name="joint_a1" type="hinge">
+      <Body>base_link</Body>
+      <Body>link_1</Body>
+      <offsetfrom>link_1</offsetfrom>
+      <anchor>0 0 0</anchor>
+      <axis>0 0 -1</axis>
+      <limitsdeg>-170 170</limitsdeg>
+    </Joint>
+
+    <Body name="link_2" type="dynamic">
+      <offsetfrom>link_1</offsetfrom>
+      <translation>0.025 0 0</translation>
+      <Geom type="box"><extents>0.04 0.04 0.04</extents></Geom>
+    </Body>
+    <Joint name="joint_a2" type="hinge">
+      <Body>link_1</Body>
+      <Body>link_2</Body>
+      <offsetfrom>link_2</offsetfrom>
+      <anchor>0 0 0</anchor>
+      <axis>0 1 0</axis>
+      <limitsdeg>-190 45</limitsdeg>
+    </Joint>
+
+    <Body name="link_3" type="dynamic">
+      <offsetfrom>link_2</offsetfrom>
+      <translation>0.455 0 0</translation>
+      <Geom type="box"><extents>0.04 0.04 0.04</extents></Geom>
+    </Body>
+    <Joint name="joint_a3" type="hinge">
+      <Body>link_2</Body>
+      <Body>link_3</Body>
+      <offsetfrom>link_3</offsetfrom>
+      <anchor>0 0 0</anchor>
+      <axis>0 1 0</axis>
+      <limitsdeg>-120 156</limitsdeg>
+    </Joint>
+
+    <Body name="link_4" type="dynamic">
+      <offsetfrom>link_3</offsetfrom>
+      <translation>0 0 0.035</translation>
+      <Geom type="box"><extents>0.04 0.04 0.04</extents></Geom>
+    </Body>
+    <Joint name="joint_a4" type="hinge">
+      <Body>link_3</Body>
+      <Body>link_4</Body>
+      <offsetfrom>link_4</offsetfrom>
+      <anchor>0 0 0</anchor>
+      <axis>-1 0 0</axis>
+      <limitsdeg>-185 185</limitsdeg>
+    </Joint>
+
+    <Body name="link_5" type="dynamic">
+      <offsetfrom>link_4</offsetfrom>
+      <translation>0.420 0 0</translation>
+      <Geom type="box"><extents>0.04 0.04 0.04</extents></Geom>
+    </Body>
+    <Joint name="joint_a5" type="hinge">
+      <Body>link_4</Body>
+      <Body>link_5</Body>
+      <offsetfrom>link_5</offsetfrom>
+      <anchor>0 0 0</anchor>
+      <axis>0 1 0</axis>
+      <limitsdeg>-120 120</limitsdeg>
+    </Joint>
+
+    <Body name="link_6" type="dynamic">
+      <offsetfrom>link_5</offsetfrom>
+      <translation>0.080 0 0</translation>
+      <Geom type="box"><extents>0.03 0.03 0.03</extents></Geom>
+    </Body>
+    <Joint name="joint_a6" type="hinge">
+      <Body>link_5</Body>
+      <Body>link_6</Body>
+      <offsetfrom>link_6</offsetfrom>
+      <anchor>0 0 0</anchor>
+      <axis>-1 0 0</axis>
+      <limitsdeg>-350 350</limitsdeg>
+    </Joint>
+  </KinBody>
+
+  <Manipulator name="arm">
+    <base>base_link</base>
+    <effector>link_6</effector>
+  </Manipulator>
+</Robot>

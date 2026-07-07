@@ -103,6 +103,9 @@ This runs the full 10,000-iteration benchmark 10 times and reports mean, median,
 | `ik_racing_benchmarks.cpp` | Racing scheduler IK for 6/7-DOF | UR3e, LBR Med 14 |
 | `ik_fallback_benchmarks.cpp` | Fallback scheduler IK for 6/7-DOF | UR3e, LBR Med 14 |
 | `ik_comparison_benchmarks.cpp` | Cartan vs TRAC-IK head-to-head | UR3e, KR6, IRB120, Jaco2, LBR Med 14, Panda, Fetch, Baxter, LWR 4+ |
+| `opw_comparison_benchmarks.cpp` | Cartan `opw_6r_solver` vs `opw_kinematics` reference (same OPW formulation -> bit-identical): branch-for-branch parity + solve timing | KR6 R900 |
+| `ikfast_comparison_benchmarks.cpp` | Cartan `opw_6r_solver` vs an OpenRAVE-generated IKFast solver (independent derivation -> ~1e-10 agreement): branch-for-branch parity + solve timing | KR6 R900 |
+| `ikgeo_comparison_benchmarks.cpp` | Cartan `opw_6r_solver` vs ik-geo (Elias & Wen subproblem method, via a Rust FFI shim; independent formulation -> ~1e-13 agreement): branch-for-branch parity + solve timing | KR6 R900 |
 | `benchmark_utils.h` | Shared chain factories (~10 robots), target generation | All |
 
 ## Methodology
@@ -123,6 +126,10 @@ This runs the full 10,000-iteration benchmark 10 times and reports mean, median,
 | orocos-kdl | System package | Comparison benchmarks |
 | NLopt | System package | Comparison + SQP benchmarks |
 | spdlog | FetchContent (automatic) | TRAC-IK internals |
+| opw_kinematics v0.5.5 | FetchContent (SHA-pinned, source-only) or `CARTAN_OPW_KINEMATICS_SOURCE_DIR` | OPW comparison benchmark |
+| IKFast (generated) | Vendored under `third_party/ikfast_kr6r900/` (see its README for provenance) | IKFast comparison benchmark |
+| LAPACK | System package | IKFast comparison benchmark (polynomial roots) |
+| ik-geo (Rust) | Vendored under `third_party/ikgeo_ffi/`; built with `cargo` | ik-geo comparison benchmark |
 
 ## Results
 

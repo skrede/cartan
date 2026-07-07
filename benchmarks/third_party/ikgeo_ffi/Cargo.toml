@@ -1,0 +1,11 @@
+[package]
+name = "ikgeo_ffi"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+linear-subproblem-solutions-rust = { path = "./ik-geo-rust" }
+nalgebra = "0.32.2"
+
+[lib]
+crate-type = ["staticlib"]
