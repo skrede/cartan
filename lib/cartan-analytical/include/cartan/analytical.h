@@ -8,5 +8,6 @@
 #include "cartan/analytical/solver_2r.h"
 #include "cartan/analytical/solver_3r.h"
 #include "cartan/analytical/solver_6r.h"
+#include "cartan/analytical/solver_opw.h"
 
 #endif
