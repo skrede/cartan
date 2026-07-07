@@ -1,4 +1,12 @@
-if (CARTAN_CMAKE_FETCH_DEPS)
+# Benchmark dependencies are detected here, not hard-required. Under
+# CARTAN_BUILD_BENCHMARKS each third-party dependency is looked for (and, when
+# CARTAN_FETCH_BENCHMARK_DEPS is ON, fetched via FetchContent if missing); any
+# benchmark whose dependency cannot be satisfied is omitted with a warning
+# rather than failing the configure. This is the only place third-party domain
+# libraries are introduced, referenced, or linked -- tests/ stay cartan-only.
+
+# --- Google Benchmark: the harness every benchmark target needs ---
+if (CARTAN_FETCH_BENCHMARK_DEPS)
     FetchContent_Declare(
         benchmark
         GIT_REPOSITORY https://github.com/google/benchmark.git
@@ -9,16 +17,26 @@ if (CARTAN_CMAKE_FETCH_DEPS)
     set(BENCHMARK_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
     FetchContent_MakeAvailable(benchmark)
 else ()
-    find_package(benchmark CONFIG REQUIRED)
+    find_package(benchmark CONFIG QUIET)
 endif ()
 
-# benchmark_utils.h ships KDL chain factories alongside the cartan PoE ones,
-# so every benchmark target that includes it needs orocos-kdl on the link
-# line. KDL is therefore a benchmark-section-wide dependency rather than
-# a CARTAN_BUILD_TRAC_IK-gated one (the trac_ik FetchContent transitively
-# pulls KDL too, but we want the headers and link target available even
-# without trac_ik).
-find_package(orocos_kdl CONFIG REQUIRED)
+if (NOT TARGET benchmark::benchmark)
+    message(WARNING
+        "cartan benchmarks: Google Benchmark not found -- skipping all benchmarks. "
+        "Install it or configure with -DCARTAN_FETCH_BENCHMARK_DEPS=ON.")
+    return ()
+endif ()
+
+# --- orocos-kdl: benchmark_utils.h ships KDL chain factories alongside the
+# cartan PoE ones, so every benchmark target links it. Treat KDL as a
+# suite-wide dependency: absent it, no benchmark can build. ---
+find_package(orocos_kdl CONFIG QUIET)
+if (NOT TARGET orocos-kdl)
+    message(WARNING
+        "cartan benchmarks: orocos-kdl not found -- skipping all benchmarks "
+        "(benchmark_utils.h depends on KDL chain factories). Install orocos-kdl to enable them.")
+    return ()
+endif ()
 
 function(cartan_add_benchmark BENCH_NAME BENCH_SOURCE)
     add_executable(${BENCH_NAME} ${BENCH_SOURCE})
@@ -46,7 +64,8 @@ cartan_add_benchmark(basic_ik_lm_benchmarks basic_ik_lm_benchmarks.cpp)
 # Exhaustive IK solver benchmarks
 cartan_add_benchmark(exhaustive_ik_full_benchmarks exhaustive_ik_full_benchmarks.cpp)
 
-# BOBYQA/SLSQP benchmarks require NLopt
+# BOBYQA/SLSQP benchmarks require NLopt (a library solver backend, not a
+# benchmark-only comparison dependency).
 if (CARTAN_BUILD_NLOPT)
     if (NOT TARGET NLopt::nlopt)
         find_package(NLopt CONFIG REQUIRED)
@@ -56,8 +75,12 @@ if (CARTAN_BUILD_NLOPT)
     target_link_libraries(basic_ik_sqp_benchmarks PRIVATE NLopt::nlopt)
 endif()
 
-# TRAC-IK comparison benchmarks (requires orocos-kdl + NLopt via trac_ik)
-if (CARTAN_BUILD_TRAC_IK)
+# --- TRAC-IK comparison benchmarks: trac_ik ships no find_package config, so it
+# is obtained from source -- fetched when CARTAN_FETCH_BENCHMARK_DEPS is ON, or
+# from a caller-provided CARTAN_TRAC_IK_SOURCE_DIR. Absent both, the comparison
+# benchmarks are omitted with a warning. ---
+set(CARTAN_HAVE_TRAC_IK FALSE)
+if (CARTAN_TRAC_IK_SOURCE_DIR OR CARTAN_FETCH_BENCHMARK_DEPS)
     if (CARTAN_TRAC_IK_SOURCE_DIR)
         FetchContent_Declare(
             trac_ik_lib
@@ -79,7 +102,14 @@ if (CARTAN_BUILD_TRAC_IK)
     set(EIGEN3_FOUND TRUE) # To satisfy orocos-kdl and their wrong capitalization requirement of Eigen3
     set(EIGEN3_INCLUDE_DIR "${EIGEN3_INCLUDE_DIR}")
     FetchContent_MakeAvailable(trac_ik_lib)
+    set(CARTAN_HAVE_TRAC_IK TRUE)
+else ()
+    message(WARNING
+        "cartan benchmarks: TRAC-IK comparison benchmarks need the trac_ik source -- skipping. "
+        "Configure with -DCARTAN_FETCH_BENCHMARK_DEPS=ON or provide -DCARTAN_TRAC_IK_SOURCE_DIR=<path>.")
+endif ()
 
+if (CARTAN_HAVE_TRAC_IK)
     cartan_add_benchmark(ik_comparison_benchmarks ik_comparison_benchmarks.cpp)
     target_link_libraries(ik_comparison_benchmarks PRIVATE trac_ik)
     if(CARTAN_BUILD_NLOPT)
@@ -135,8 +165,11 @@ if (CARTAN_BUILD_TRAC_IK)
     target_link_libraries(jacobian_comparison_benchmarks PRIVATE trac_ik)
 endif ()
 
-if (CARTAN_BUILD_PINOCCHIO)
-    find_package(pinocchio CONFIG REQUIRED)
+# --- Pinocchio comparison benchmarks: pinocchio ships a find_package config, so
+# it is find-only. Absent it, the comparison benchmarks are omitted with a
+# warning. ---
+find_package(pinocchio CONFIG QUIET)
+if (TARGET pinocchio::pinocchio)
     cartan_add_benchmark(fk_pinocchio_benchmarks fk_pinocchio_benchmarks.cpp)
     target_link_libraries(fk_pinocchio_benchmarks PRIVATE pinocchio::pinocchio)
 
@@ -154,7 +187,7 @@ if (CARTAN_BUILD_PINOCCHIO)
 
     cartan_add_benchmark(ik_comparison_pinocchio_benchmarks ik_comparison_pinocchio_benchmarks.cpp)
     target_link_libraries(ik_comparison_pinocchio_benchmarks PRIVATE pinocchio::pinocchio)
-    if (CARTAN_BUILD_TRAC_IK)
+    if (CARTAN_HAVE_TRAC_IK)
         target_link_libraries(ik_comparison_pinocchio_benchmarks PRIVATE trac_ik)
         target_compile_definitions(ik_comparison_pinocchio_benchmarks PRIVATE CARTAN_HAS_TRAC_IK)
     endif ()
@@ -165,7 +198,7 @@ if (CARTAN_BUILD_PINOCCHIO)
 
     cartan_add_benchmark(closed_form_ik_benchmarks closed_form_ik_benchmarks.cpp)
     target_link_libraries(closed_form_ik_benchmarks PRIVATE pinocchio::pinocchio)
-    if (CARTAN_BUILD_TRAC_IK)
+    if (CARTAN_HAVE_TRAC_IK)
         target_link_libraries(closed_form_ik_benchmarks PRIVATE trac_ik)
         target_compile_definitions(closed_form_ik_benchmarks PRIVATE CARTAN_HAS_TRAC_IK)
     endif ()
@@ -173,4 +206,8 @@ if (CARTAN_BUILD_PINOCCHIO)
         target_compile_definitions(closed_form_ik_benchmarks PRIVATE CARTAN_BUILD_ARGMIN)
         target_link_libraries(closed_form_ik_benchmarks PRIVATE argmin::argmin)
     endif ()
+else ()
+    message(WARNING
+        "cartan benchmarks: pinocchio not found -- skipping Pinocchio comparison benchmarks. "
+        "Install pinocchio to enable them.")
 endif ()

@@ -67,9 +67,11 @@ ctest --test-dir build/dev --output-on-failure
 ```
 
 The `dev-full` preset also builds examples, fuzz, and property tests.
-Benchmarks and the pinocchio comparison suite are gated behind separate
-CMake flags (`CARTAN_BUILD_BENCHMARKS`, `CARTAN_BUILD_PINOCCHIO`); they
-need their respective external dependencies installed.
+The benchmark suite is gated behind `CARTAN_BUILD_BENCHMARKS`; each
+third-party comparison dependency (orocos-kdl, TRAC-IK, pinocchio) is
+auto-detected, and any benchmark whose dependency is missing is omitted with
+a warning. Set `CARTAN_FETCH_BENCHMARK_DEPS=ON` to fetch missing benchmark
+dependencies instead of only using installed ones.
 
 ## Coding Conventions
 

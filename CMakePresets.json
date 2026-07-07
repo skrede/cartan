@@ -89,6 +89,7 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
                 "CARTAN_BUILD_BENCHMARKS": "ON",
+                "CARTAN_FETCH_BENCHMARK_DEPS": "ON",
                 "CARTAN_BUILD_ARGMIN": "ON",
                 "CARTAN_CMAKE_FETCH_DEPS": "ON"
             }
@@ -103,7 +104,7 @@
                 "CMAKE_CXX_FLAGS": "-g -fno-omit-frame-pointer",
                 "CMAKE_C_FLAGS": "-g -fno-omit-frame-pointer",
                 "CARTAN_BUILD_BENCHMARKS": "ON",
-                "CARTAN_BUILD_TRAC_IK": "ON",
+                "CARTAN_FETCH_BENCHMARK_DEPS": "ON",
                 "CARTAN_BUILD_NLOPT": "ON",
                 "CARTAN_BUILD_PROFILING": "ON",
                 "CARTAN_BUILD_ARGMIN": "ON",

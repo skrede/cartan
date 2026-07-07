@@ -101,11 +101,8 @@ if(CARTAN_BUILD_NLOPT)
     target_link_libraries(slsqp_solve_policy_test PRIVATE cartan::nlopt)
 endif()
 
-if(CARTAN_BUILD_TRAC_IK)
-    cartan_add_test(kdl_fk_comparison_test kdl_fk_comparison_test.cpp)
-    target_include_directories(kdl_fk_comparison_test PRIVATE "${CMAKE_SOURCE_DIR}/benchmarks")
-    target_link_libraries(kdl_fk_comparison_test PRIVATE trac_ik)
-endif()
+# The cartan-vs-KDL FK comparison is an external-library comparison and lives in
+# benchmarks/, not here: tests/ verify cartan using only cartan.
 
 if (CARTAN_BUILD_URDF)
     cartan_add_test(urdf_parser_test urdf_parser_test.cpp)
