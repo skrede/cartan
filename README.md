@@ -134,6 +134,30 @@ Save any of these snippets as `main.cpp` alongside a `CMakeLists.txt` that pulls
 - **Policy-based IK solvers:** DLS, Levenberg-Marquardt, and SQP steppers composable with racing and fallback schedulers
 - **Header-only:** no compiled library artifacts, Eigen as the sole required dependency
 
+## Scope
+
+Cartan is a Lie-group, forward-kinematics, and inverse-kinematics library — and
+deliberately only that. It stays a small, composable library rather than a
+robotics framework, so the following are **non-goals**, each better served by a
+purpose-built tool cartan composes with:
+
+- **Dynamics** (RNEA, mass matrix, gravity/Coriolis) — a *separate sibling
+  library*, not part of cartan; use [Pinocchio](https://github.com/stack-of-tasks/pinocchio)
+  today.
+- **Collision detection** — use [hpp-fcl / Coal](https://github.com/coal-library/coal).
+- **Motion / trajectory planning** — use a planner (OMPL) or a time-parameterizer
+  ([TOPP-RA](https://github.com/hungpham2511/toppra)).
+- **State estimation / filtering** — belongs one layer up in `ctrlpp`.
+- **Visualization** — use [MeshCat](https://github.com/meshcat-dev/meshcat) or
+  your own renderer; cartan renders nothing.
+- **Middleware bindings** (ROS / KDL / orocos) — zero coupling by design.
+- **Custom linear algebra** — Eigen only; cartan reinvents no matrix math.
+
+Cartan composes with these rather than absorbing them: its `SE3` / `SO3` types
+and FK / Jacobian outputs feed directly into a dynamics solver, a collision
+checker, or a planner. The guiding principle is *library, not framework* —
+cartan owns kinematics and stays out of everything else.
+
 ## Quick Install
 
 ### CMake FetchContent (recommended)
