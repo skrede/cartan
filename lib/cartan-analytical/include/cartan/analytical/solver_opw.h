@@ -22,6 +22,7 @@
 #include "cartan/expected.h"
 #include <numbers>
 #include <algorithm>
+#include <type_traits>
 
 namespace cartan
 {
@@ -239,7 +240,29 @@ opw_branch classify_branch(
 /// Reference: Brandstotter, Angerer, Hofbaur (2014), "An Analytical Solution
 /// of the Inverse Kinematics Problem of Industrial Serial Manipulators with an
 /// Ortho-parallel Basis and a Spherical Wrist."
-template <chain Chain>
+
+/// Verification policy for opw_6r_solver (a compile-time tag, no runtime cost).
+///
+/// opw_verified (the default) FK-verifies every candidate branch against the
+/// chain and collapses coincident configurations, so solve() emits only genuine,
+/// distinct solutions and reports unreachable/singular honestly -- the
+/// load-bearing "verified ranked branches" contract that distinguishes cartan
+/// from an unverified enumerator.
+struct opw_verified
+{
+};
+
+/// opw_raw skips the FK back-check and the duplicate collapse: it emits every
+/// finite branch in canonical key order (up to eight, no dedup). It is faster,
+/// but a branch that does not reach the target -- near a singularity or for an
+/// unreachable pose -- is emitted unfiltered, exactly like an unverified
+/// enumerator. Use only when reachability is guaranteed by the caller or checked
+/// externally; opw_verified remains the default for every general-purpose use.
+struct opw_raw
+{
+};
+
+template <chain Chain, typename Verification = opw_verified>
 class opw_6r_solver
 {
 public:
@@ -565,20 +588,33 @@ public:
             if (!finite)
                 continue;
 
-            // Gate both position and orientation on the same acceptance
-            // tolerance: `make()` exposes a single tolerance, so it must bind
-            // the orientation check too (verify_analytical_solution otherwise
-            // leaves orientation at its own 1e-6 default, silently ignoring a
-            // tightened tolerance).
-            if (detail::verify_analytical_solution(
-                    m_chain, q_user, target, true,
-                    m_position_tolerance, m_position_tolerance))
+            if constexpr (std::is_same_v<Verification, opw_verified>)
             {
-                const Eigen::Vector<Scalar, 6> q_wrapped = wrap_config(q_user);
-                if (is_duplicate_config(result, q_wrapped))
-                    continue;
+                // Gate both position and orientation on the same acceptance
+                // tolerance: `make()` exposes a single tolerance, so it must bind
+                // the orientation check too (verify_analytical_solution otherwise
+                // leaves orientation at its own 1e-6 default, silently ignoring a
+                // tightened tolerance).
+                if (detail::verify_analytical_solution(
+                        m_chain, q_user, target, true,
+                        m_position_tolerance, m_position_tolerance))
+                {
+                    const Eigen::Vector<Scalar, 6> q_wrapped = wrap_config(q_user);
+                    if (is_duplicate_config(result, q_wrapped))
+                        continue;
+                    result.solutions[static_cast<std::size_t>(result.count)] =
+                        q_wrapped;
+                    ++result.count;
+                    if (result.count >= max_solutions)
+                        return result;
+                }
+            }
+            else
+            {
+                // opw_raw: no FK back-check, no duplicate collapse -- emit every
+                // finite branch in canonical key order.
                 result.solutions[static_cast<std::size_t>(result.count)] =
-                    q_wrapped;
+                    wrap_config(q_user);
                 ++result.count;
                 if (result.count >= max_solutions)
                     return result;
@@ -688,6 +724,11 @@ static_assert(analytical_solver<opw_6r_solver<static_chain<double,
 
 static_assert(analytical_solver<opw_6r_solver<kinematic_chain<double, dynamic>>>,
     "opw_6r_solver must also satisfy analytical_solver concept against dynamic chain");
+
+static_assert(analytical_solver<opw_6r_solver<static_chain<double,
+    revolute_z, revolute_y, revolute_y, revolute_z, revolute_y, revolute_z>,
+    opw_raw>>,
+    "opw_6r_solver<opw_raw> must satisfy analytical_solver concept");
 
 }
 
