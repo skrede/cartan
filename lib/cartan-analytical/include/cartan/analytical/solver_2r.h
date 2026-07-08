@@ -247,6 +247,8 @@ public:
         return verified;
     }
 
+    const chain_type& chain() const { return m_chain; }
+
 private:
     /// Alias for the chain's floating-point type. Keeps the constructor and
     /// solve() body verbatim after the class template was re-shaped from

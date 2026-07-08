@@ -635,6 +635,8 @@ public:
             analytical_failure::singular_configuration, scalar_type(0)});
     }
 
+    const chain_type& chain() const { return m_chain; }
+
 private:
     using Scalar = scalar_type;
 

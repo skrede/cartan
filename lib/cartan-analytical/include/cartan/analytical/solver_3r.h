@@ -144,6 +144,8 @@ public:
             (p_target - m_p_ee).norm()});
     }
 
+    const chain_type& chain() const { return m_chain; }
+
 private:
     /// Alias for the chain's floating-point type. Keeps the private helpers and
     /// solve() body verbatim after the class template was re-shaped from
