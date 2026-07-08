@@ -4,13 +4,14 @@
 ///        random targets.
 ///
 /// Shows: cartan::pieper_6r_solver direct construction on a static_chain;
-///        closest-to-seed selection by std::min_element over the populated
+///        branch collapse by cartan::closest_to_seed over the populated
 ///        subset of analytical_result::solutions; projected_lm-based
 ///        iterative IK wrapped in basic_ik_runner; std::chrono per-call
 ///        timing and std::cout/std::setw columnar output. Demonstrates that "which
 ///        solver wins" depends entirely on what the student optimizes for.
 
 #include "cartan/serial_chain.h"
+#include "cartan/analytical/selection.h"
 #include "cartan/analytical/solver_6r.h"
 
 #include <vector>
@@ -195,10 +196,8 @@ int main()
         //
         // pieper_6r_solver.solve(target) returns up to eight IK branches
         // in analytical_result::solutions (the .count member reports how
-        // many were FK-verified). We then pick the branch nearest to
-        // q_seed via std::min_element with an L2-distance comparator;
-        // there is no free closest_to_seed function in the public API --
-        // the iteration is the idiom.
+        // many were FK-verified). cartan::closest_to_seed collapses that
+        // branch set to the one nearest q_seed.
         {
             auto t0 = std::chrono::steady_clock::now();
             auto result = analytical.solve(target);
@@ -210,18 +209,12 @@ int main()
                     t1 - t0).count());
             if (result.has_value())
             {
-                const auto& solns = *result;
-                auto best = std::min_element(
-                    solns.begin(), solns.end(),
-                    [&](const auto& a, const auto& b)
-                    {
-                        return (a - q_seed).norm() < (b - q_seed).norm();
-                    });
+                auto best = cartan::closest_to_seed(*result, q_seed);
                 auto fk_verify = cartan::forward_kinematics(chain, *best);
                 rec.success = true;
                 rec.pos_err = (fk_verify.end_effector.inverse() * target)
                     .log().norm();
-                rec.multi_solutions = solns.count;
+                rec.multi_solutions = result->count;
             }
             cf_records.push_back(rec);
         }

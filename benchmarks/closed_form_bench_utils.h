@@ -4,21 +4,19 @@
 /// @file closed_form_bench_utils.h
 /// @brief Bench-local helpers for closed-form vs iterative IK comparison.
 ///
-/// Provides three things needed by the closed-form-vs-iterative driver TU:
-///   1. closest_to_seed: selects the argmin_q ||q - q_seed||_2 from an
-///      analytical_result, returning it as a cartan::expected so the call site
-///      can fail through with the unchanged analytical_error path when the
-///      solver returned zero solutions.
-///   2. compute_bounding_box / bbox_target_set: a uniform bounding-box
+/// Branch selection uses the public cartan::closest_to_seed from
+/// <cartan/analytical/selection.h>. What lives here:
+///   1. compute_bounding_box / bbox_target_set: a uniform bounding-box
 ///      target generator built from FK-sweep over the joint limits. This is
 ///      the workspace-coverage probe — it intentionally over-samples outside
 ///      the reachable manifold so that "fraction with has_value()" becomes a
 ///      meaningful coverage metric for the chain.
-///   3. bm_closed_form_solver / bm_closed_form_coverage / bm_iterative_solver:
+///   2. bm_closed_form_solver / bm_closed_form_coverage / bm_iterative_solver:
 ///      template benchmark drivers parameterized on the cartan::chain concept.
 
 #include "../tests/fixtures/chain_factories.h"
 
+#include <cartan/analytical/selection.h>
 #include <cartan/analytical/analytical_types.h>
 #include <cartan/analytical/analytical_solver.h>
 #include <cartan/serial/ik/ik_status.h>
@@ -37,35 +35,6 @@
 
 namespace cartan::fixtures
 {
-
-/// Pick the solution branch closest to a seed configuration.
-///
-/// Selects the joint vector in `r.solutions[0 .. r.count)` that minimizes
-/// ||q - q_seed||_2 (compared via squared norm). Returns the unchanged
-/// analytical error path with `analytical_failure::unreachable` if `r.count == 0`
-/// — defensive guard; upstream analytical solvers normally surface this case
-/// via `cartan::unexpected` directly.
-template <typename Scalar, int N, int MaxSolutions>
-[[nodiscard]] auto closest_to_seed(
-    const cartan::analytical_result<Scalar, N, MaxSolutions>& r,
-    const Eigen::Vector<Scalar, N>& q_seed)
-    -> cartan::expected<Eigen::Vector<Scalar, N>, cartan::analytical_error<Scalar>>
-{
-    auto it = std::min_element(
-        r.begin(), r.end(),
-        [&](const Eigen::Vector<Scalar, N>& a, const Eigen::Vector<Scalar, N>& b)
-        {
-            return (a - q_seed).squaredNorm() < (b - q_seed).squaredNorm();
-        });
-
-    if (it == r.end())
-    {
-        return cartan::unexpected(cartan::analytical_error<Scalar>{
-            cartan::analytical_failure::unreachable, Scalar(0)});
-    }
-
-    return *it;
-}
 
 /// Axis-aligned bounding box of the FK image over the joint limits.
 ///
@@ -91,7 +60,7 @@ struct bounding_box
 /// workspace from outside and is meant to be used with `bbox_target_set` to
 /// probe coverage, not to characterize the workspace exactly.
 template <cartan::chain Chain>
-[[nodiscard]] auto compute_bounding_box(
+auto compute_bounding_box(
     const Chain& chain,
     int sample_count = 10000,
     unsigned seed = 4242)
