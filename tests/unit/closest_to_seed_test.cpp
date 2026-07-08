@@ -44,7 +44,8 @@ TEST_CASE("closest_to_seed over unwrapped_result skips a nearer out-of-range bra
 
     auto pick = closest_to_seed(r, Eigen::Vector2d(0.0, 0.0));
     REQUIRE(pick.has_value());
-    REQUIRE((*pick - Eigen::Vector2d(0.5, 0.0)).norm() < 1e-12);
+    REQUIRE(pick->status == range_status::in_range);
+    REQUIRE((pick->q - Eigen::Vector2d(0.5, 0.0)).norm() < 1e-12);
 }
 
 TEST_CASE("closest_to_seed over unwrapped_result returns the nearest when it is in range")
@@ -58,7 +59,8 @@ TEST_CASE("closest_to_seed over unwrapped_result returns the nearest when it is 
 
     auto pick = closest_to_seed(r, Eigen::Vector2d(0.0, 0.0));
     REQUIRE(pick.has_value());
-    REQUIRE((*pick - Eigen::Vector2d(0.2, 0.0)).norm() < 1e-12);
+    REQUIRE(pick->status == range_status::in_range);
+    REQUIRE((pick->q - Eigen::Vector2d(0.2, 0.0)).norm() < 1e-12);
 }
 
 TEST_CASE("closest_to_seed over an all-violated unwrapped_result returns the nearest overall")
@@ -72,7 +74,8 @@ TEST_CASE("closest_to_seed over an all-violated unwrapped_result returns the nea
 
     auto pick = closest_to_seed(r, Eigen::Vector2d(0.0, 0.0));
     REQUIRE(pick.has_value());
-    REQUIRE((*pick - Eigen::Vector2d(0.3, 0.0)).norm() < 1e-12);
+    REQUIRE(pick->status == range_status::joint_limits_violated);
+    REQUIRE((pick->q - Eigen::Vector2d(0.3, 0.0)).norm() < 1e-12);
 }
 
 TEST_CASE("closest_to_seed over an empty unwrapped_result is unreachable")

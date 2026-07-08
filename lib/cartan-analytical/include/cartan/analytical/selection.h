@@ -40,13 +40,23 @@ closest_to_seed(const analytical_result<Scalar, N, MaxSolutions>& r,
     return *it;
 }
 
+/// Pairs a selected joint configuration with the range verdict of the branch it
+/// came from, so a successful pick can still report that no branch was in range.
+template <typename Scalar, int N>
+struct selected_solution
+{
+    Eigen::Vector<Scalar, N> q;
+    range_status status;
+};
+
 /// Range-aware branch collapse: pick the branch nearest q_seed among those
 /// tagged in_range, skipping a nearer branch that no 2*pi-equivalent brings
-/// within limits. Only when no branch is in range does it fall back to the
-/// nearest overall, which the source result already tags joint_limits_violated
-/// (never silently out of range, never silently dropped).
+/// within limits. When no branch is in range it falls back to the nearest
+/// overall and reports status == joint_limits_violated, so a valued result no
+/// longer implies in-range -- the caller inspects .status. Only an empty result
+/// fails, as analytical_failure::unreachable.
 template <typename Scalar, int N, int MaxSolutions>
-cartan::expected<Eigen::Vector<Scalar, N>, analytical_error<Scalar>>
+cartan::expected<selected_solution<Scalar, N>, analytical_error<Scalar>>
 closest_to_seed(const unwrapped_result<Scalar, N, MaxSolutions>& r,
                 const Eigen::Vector<Scalar, N>& q_seed)
 {
@@ -66,14 +76,17 @@ closest_to_seed(const unwrapped_result<Scalar, N, MaxSolutions>& r,
         }
     }
 
-    const int pick = best_in_range >= 0 ? best_in_range : best_overall;
+    const bool in_range_pick = best_in_range >= 0;
+    const int pick = in_range_pick ? best_in_range : best_overall;
     if (pick < 0)
     {
         return cartan::unexpected(analytical_error<Scalar>{
             analytical_failure::unreachable, Scalar(0)});
     }
 
-    return r.solutions[static_cast<std::size_t>(pick)];
+    return selected_solution<Scalar, N>{
+        r.solutions[static_cast<std::size_t>(pick)],
+        in_range_pick ? range_status::in_range : range_status::joint_limits_violated};
 }
 
 }
