@@ -68,6 +68,7 @@ cartan_add_test(static_chain_ik_parity_test static_chain_ik_parity_test.cpp)
 cartan_add_test(specialized_fk_jacobian_test specialized_fk_jacobian_test.cpp)
 
 cartan_add_test(paden_kahan_test paden_kahan_test.cpp)
+cartan_add_test(angle_unwrap_test angle_unwrap_test.cpp)
 cartan_add_test(analytical_solver_2r_test analytical_solver_2r_test.cpp)
 cartan_add_test(analytical_solver_3r_test analytical_solver_3r_test.cpp)
 cartan_add_test(analytical_solver_6r_test analytical_solver_6r_test.cpp)
