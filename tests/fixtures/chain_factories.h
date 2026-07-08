@@ -252,8 +252,8 @@ auto make_abb_irb120_chain() -> cartan::kinematic_chain<Scalar, 6>
     // J1: z at origin
     // J2: y at (0, 0, 0.290)
     // J3: y at (0, 0, 0.560)  [0.290 + 0.270]
-    // J4: x at (0, 0, 0.560)
-    // J5: y at (0, 0, 0.862)  [0.560 + 0.302]
+    // J4: x at (0, 0, 0.862)  [d4=0.302 places the forearm roll at the wrist center]
+    // J5: y at (0, 0, 0.862)
     // J6: x at (0, 0, 0.862)
     auto s1 = cartan::screw_axis<Scalar>::revolute(
         vec3(Scalar(0), Scalar(0), Scalar(1)),
@@ -266,7 +266,7 @@ auto make_abb_irb120_chain() -> cartan::kinematic_chain<Scalar, 6>
         vec3(Scalar(0), Scalar(0), Scalar(0.560)));
     auto s4 = cartan::screw_axis<Scalar>::revolute(
         vec3(Scalar(1), Scalar(0), Scalar(0)),
-        vec3(Scalar(0), Scalar(0), Scalar(0.560)));
+        vec3(Scalar(0), Scalar(0), Scalar(0.862)));
     auto s5 = cartan::screw_axis<Scalar>::revolute(
         vec3(Scalar(0), Scalar(1), Scalar(0)),
         vec3(Scalar(0), Scalar(0), Scalar(0.862)));
@@ -578,20 +578,13 @@ struct spatial_3r_geometry
     }
 };
 
-// --- ABB IRB 120 (Pieper-anchored variant of make_abb_irb120_chain) ---
+// --- ABB IRB 120 (static_chain twin of make_abb_irb120_chain) ---
 //
-// Wrist-decoupling note: this static_chain geometry deliberately diverges from
-// the paired kinematic_chain `make_abb_irb120_chain` factory. The kinematic
-// variant keeps the original IRB120 link offsets (wrist axes 4-5 anchored at
-// z = 0.560, axis 6 at z = 0.862). The static variant below anchors all three
-// wrist axes (4, 5, 6) at the axis-6 wrist-center point (0, 0, 0.862) so that
-// pieper_6r_solver::find_wrist_intersection succeeds. The home pose is
-// preserved (end-effector at (0, 0, 0.934)) and joint axis directions match
-// the kinematic chain, so the two factories agree on FK at the home
-// configuration; they diverge for non-zero joint angles. This asymmetry is
-// what permits closed-form Pieper-decoupled solves on the static side while
-// keeping FK-walked target generation and matched iterative cells running on
-// the unmodified source geometry.
+// All three wrist axes (4, 5, 6) meet at the wrist center (0, 0, 0.862) per the
+// ABB spec (d4 = 0.302 places the forearm roll there), so the wrist is spherical
+// and pieper_6r_solver::find_wrist_intersection succeeds. This matches the paired
+// kinematic_chain `make_abb_irb120_chain` factory axis-for-axis, so the two agree
+// on FK at every configuration.
 template <typename Scalar>
 struct abb_irb120_geometry
 {

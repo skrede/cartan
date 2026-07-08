@@ -76,6 +76,7 @@ cartan_add_test(opw_forward_reconstruction_test opw_forward_reconstruction_test.
 cartan_add_test(analytical_solver_opw_test analytical_solver_opw_test.cpp)
 cartan_add_test(unwrapped_solver_test unwrapped_solver_test.cpp)
 cartan_add_test(closest_to_seed_test closest_to_seed_test.cpp)
+cartan_add_test(abb_irb120_reconciliation_test abb_irb120_reconciliation_test.cpp)
 
 if(CARTAN_BUILD_ARGMIN)
     cartan_add_test(argmin_adapters_compile_test argmin_adapters_compile_test.cpp)
