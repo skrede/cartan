@@ -90,25 +90,25 @@ public:
         m_basis_u = (q1 - q0).normalized();
         // Second in-plane basis: complete the right-handed frame
         m_basis_v = m_plane_normal.cross(m_basis_u);
+
+        // Signed in-plane angle from the first-link direction to the second at
+        // the home configuration; carried into the joint-2 solutions so a bent
+        // home reconstructs. Zero when the home arm is straight.
+        vector3<Scalar> link1 = q1 - q0;
+        vector3<Scalar> link2 = p_ee - q1;
+        m_home_bend = std::atan2(
+            m_plane_normal.dot(link1.cross(link2)), link1.dot(link2));
         m_valid = true;
     }
 
-    /// Construction-time validation of the planar-2R straight-home assumption.
-    /// This closed form measures the base angle from the first-link direction
-    /// and applies the law of cosines about a single mechanism plane; that only
-    /// holds when the two links are collinear in the home configuration. A bent
-    /// home (second link not aligned with the first) silently mis-solves, so it
-    /// is rejected here with `degenerate_geometry` rather than being solved
-    /// wrong.
-    ///
-    /// This is VALIDATION ONLY: the closed form for a bent-home 2R is deferred
-    /// feature work and intentionally not implemented. `collinearity_tolerance`
-    /// gates sin(angle) between the two link directions (dimensionless), so the
-    /// default rejects any home bend beyond numerical noise while admitting a
-    /// genuinely straight arm.
+    /// Constructs a validated planar-2R solver. Rejects a chain that is not two
+    /// revolute joints or that has a zero-length link. A bent home (second link
+    /// at a nonzero angle to the first) is admitted: the constant home-bend
+    /// angle is carried into the joint-2 solutions by the constructor, so the
+    /// closed form reconstructs a bent-home arm and recovers the straight case
+    /// when the bend is zero.
     static cartan::expected<planar_2r_solver, analytical_error<scalar_type>>
-    make(const Chain& chain,
-         scalar_type collinearity_tolerance = scalar_type(1e-6))
+    make(const Chain& chain)
     {
         if (chain.num_joints() != 2)
         {
@@ -130,25 +130,13 @@ public:
         vector3<scalar_type> q1 = s1.omega().cross(s1.v());
         vector3<scalar_type> p_ee = chain.home().translation();
 
-        vector3<scalar_type> link1 = q1 - q0;
-        vector3<scalar_type> link2 = p_ee - q1;
-        scalar_type n1 = link1.norm();
-        scalar_type n2 = link2.norm();
+        scalar_type n1 = (q1 - q0).norm();
+        scalar_type n2 = (p_ee - q1).norm();
         if (n1 < detail::sqrt_epsilon_v<scalar_type>
             || n2 < detail::sqrt_epsilon_v<scalar_type>)
         {
             return cartan::unexpected(analytical_error<scalar_type>{
                 analytical_failure::degenerate_geometry, scalar_type(0)});
-        }
-
-        // sin(angle) between the two link directions; zero iff the home arm is
-        // straight (links collinear and same sense).
-        scalar_type bend = link1.cross(link2).norm() / (n1 * n2);
-        bool anti_parallel = link1.dot(link2) < scalar_type(0);
-        if (bend > collinearity_tolerance || anti_parallel)
-        {
-            return cartan::unexpected(analytical_error<scalar_type>{
-                analytical_failure::degenerate_geometry, bend});
         }
 
         return planar_2r_solver(chain);
@@ -204,15 +192,17 @@ public:
 
         analytical_result<Scalar, 2, 2> result;
 
+        // The collinear closed form measures joint 2 from a straight home; a
+        // bent home shifts that reference by m_home_bend, so subtract it.
         // Solution 1 (elbow "up" / righty)
         result.solutions[0] = Eigen::Vector<Scalar, 2>(
             gamma - alpha,
-            std::numbers::pi_v<Scalar> - beta);
+            std::numbers::pi_v<Scalar> - beta - m_home_bend);
 
         // Solution 2 (elbow "down" / lefty)
         result.solutions[1] = Eigen::Vector<Scalar, 2>(
             gamma + alpha,
-            beta - std::numbers::pi_v<Scalar>);
+            beta - std::numbers::pi_v<Scalar> - m_home_bend);
 
         // Boundary case: both solutions converge when alpha ~ 0
         if (alpha < detail::sqrt_epsilon_v<Scalar>)
@@ -258,6 +248,7 @@ private:
     chain_type m_chain;
     Scalar m_link_length_1{};
     Scalar m_link_length_2{};
+    Scalar m_home_bend{};
     vector3<Scalar> m_base_point{vector3<Scalar>::Zero()};
     vector3<Scalar> m_plane_normal{vector3<Scalar>::Zero()};
     vector3<Scalar> m_basis_u{vector3<Scalar>::Zero()};

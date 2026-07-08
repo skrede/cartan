@@ -130,9 +130,9 @@ TEST_CASE("2R solver: CTAD deduction guide works")
     REQUIRE(result.has_value());
 }
 
-// 2R chain with a BENT home: the second link is perpendicular to the first at
-// the home configuration, so the planar law-of-cosines about a single plane
-// mis-measures the base angle. The straight-home closed form does not apply.
+// 2R chain with a BENT home: the second link leaves the first-link direction
+// at a known angle at the home configuration. The closed form carries this
+// constant home-bend angle into the joint-2 solutions.
 static auto make_bent_home_2r_chain(double L1, double L2)
 {
     auto s0 = screw_axis<double>::revolute({0, 1, 0}, {0, 0, 0});
@@ -158,15 +158,46 @@ TEST_CASE("2R solver: factory validates a straight-home chain")
     CHECK(result->count == 2);
 }
 
-TEST_CASE("2R solver: bent home is rejected at construction")
+TEST_CASE("2R solver: bent home is solved and FK-reconstructs the target")
 {
-    // Validation only: the bent-home 2R closed form is deferred feature work.
-    // The factory must reject the bent geometry rather than mis-solve it.
     auto chain = make_bent_home_2r_chain(1.0, 1.0);
     auto solver = planar_2r_solver<decltype(chain)>::make(chain);
 
-    REQUIRE_FALSE(solver.has_value());
-    CHECK(solver.error().reason == analytical_failure::degenerate_geometry);
+    // The bent geometry is now admitted rather than rejected.
+    REQUIRE(solver.has_value());
+
+    // Home EE sits at (L1, 0, L2); its neighborhood is reachable.
+    auto target = target_at(0.8, 0, 0.9);
+    auto result = solver->solve(target);
+
+    REQUIRE(result.has_value());
+    REQUIRE(result->count > 0);
+    for (std::size_t i = 0; i < static_cast<std::size_t>(result->count); ++i)
+    {
+        auto fk = forward_kinematics(chain, result->solutions[i]);
+        double error = (fk.end_effector.translation()
+            - Eigen::Vector3d(0.8, 0, 0.9)).norm();
+        CHECK(error < tolerance);
+    }
+}
+
+TEST_CASE("2R solver: bent home recovers the target at the home configuration")
+{
+    auto chain = make_bent_home_2r_chain(1.0, 1.0);
+    auto solver = planar_2r_solver<decltype(chain)>::make(chain);
+    REQUIRE(solver.has_value());
+
+    // Zero joints must map back to the bent home end-effector (1, 0, 1).
+    auto result = solver->solve(target_at(1.0, 0, 1.0));
+    REQUIRE(result.has_value());
+    REQUIRE(result->count > 0);
+    for (std::size_t i = 0; i < static_cast<std::size_t>(result->count); ++i)
+    {
+        auto fk = forward_kinematics(chain, result->solutions[i]);
+        double error = (fk.end_effector.translation()
+            - Eigen::Vector3d(1.0, 0, 1.0)).norm();
+        CHECK(error < tolerance);
+    }
 }
 
 TEST_CASE("2R solver: different link lengths")
