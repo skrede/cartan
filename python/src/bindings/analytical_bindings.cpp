@@ -404,7 +404,9 @@ void register_analytical(nb::module_ &m)
             "ortho-parallel, spherical-wrist 6R arms. Returns up to 8 "
             "FK-verified branches through the same AnalyticalResult contract as "
             "the other analytical solvers.",
-            nb::arg("chain"), nb::arg("params"), nb::arg("target").noconvert(), nb::arg("position_tolerance") = 1e-9, nb::arg("singularity_tolerance") = 1e-9);
+            nb::arg("chain"), nb::arg("params"), nb::arg("target").noconvert(),
+            nb::arg("position_tolerance") = cartan::opw_6r_solver<KC>::default_position_tolerance,
+            nb::arg("singularity_tolerance") = cartan::opw_6r_solver<KC>::default_singularity_tolerance);
 
     analytical.def(
             "solve_unwrapped_opw_6r",
@@ -420,8 +422,9 @@ void register_analytical(nb::module_ &m)
             "Solve OPW IK and return every branch with a per-solution range tag. "
             "q_seed selects the nearest 2*pi representative when a joint range "
             "spans multiple turns.",
-            nb::arg("chain"), nb::arg("params"), nb::arg("target").noconvert(), nb::kw_only(), nb::arg("q_seed") = nb::none(), nb::arg("position_tolerance") = 1e-9,
-            nb::arg("singularity_tolerance") = 1e-9);
+            nb::arg("chain"), nb::arg("params"), nb::arg("target").noconvert(), nb::kw_only(), nb::arg("q_seed") = nb::none(),
+            nb::arg("position_tolerance") = cartan::opw_6r_solver<KC>::default_position_tolerance,
+            nb::arg("singularity_tolerance") = cartan::opw_6r_solver<KC>::default_singularity_tolerance);
 
     analytical.def(
             "solve_unwrapped_pieper_6r",
