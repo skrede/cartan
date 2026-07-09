@@ -11,6 +11,7 @@
 - [chain](api/chain.md) -- kinematic chain, screw axis, joint limits, joint state
 - [kinematics](api/kinematics.md) -- forward kinematics, space/body Jacobians, velocity kinematics
 - [ik](api/ik.md) -- IK solver, steppers (DLS, LM, SQP), schedulers (racing, fallback), policies
+- [python](python.md) -- Python install, API parity, tutorial mirrors, and example counterpart status
 
 ## Background
 

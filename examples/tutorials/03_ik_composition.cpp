@@ -1,7 +1,8 @@
 /// @file 03_ik_composition.cpp
 /// @brief Tradeoff table -- closed-form pieper_6r_solver vs iterative
 ///        projected_lm on a Pieper-class 6R, aggregated over N FK-walked
-///        random targets.
+///        random targets. Pass `--csv <path>` to write per-target rows for
+///        cross-language parity checks.
 ///
 /// Shows: cartan::pieper_6r_solver direct construction on a static_chain;
 ///        branch collapse by cartan::closest_to_seed over the populated
@@ -14,11 +15,13 @@
 #include "cartan/analytical/selection.h"
 #include "cartan/analytical/solver_6r.h"
 
-#include <vector>
-#include <chrono>
-#include <iomanip>
 #include <ios>
-#include <random>
+#include <chrono>
+#include <string>
+#include <vector>
+#include <cstdint>
+#include <fstream>
+#include <iomanip>
 #include <numbers>
 #include <iostream>
 #include <algorithm>
@@ -43,6 +46,24 @@ struct aggregate
     double mean_pos_err{0.0};
     double success_rate{0.0};
     double mean_multi_solutions{0.0};
+};
+
+class deterministic_rng
+{
+public:
+    explicit deterministic_rng(std::uint64_t seed) : m_state(seed) {}
+
+    double uniform(double lo, double hi)
+    {
+        m_state = (m_state * 6364136223846793005ULL) + 1442695040888963407ULL;
+        const auto bits = m_state >> 11U;
+        const auto unit = static_cast<double>(bits)
+            * (1.0 / 9007199254740992.0);
+        return lo + ((hi - lo) * unit);
+    }
+
+private:
+    std::uint64_t m_state;
 };
 
 aggregate summarize(const std::vector<call_record>& records)
@@ -82,10 +103,66 @@ aggregate summarize(const std::vector<call_record>& records)
     return out;
 }
 
+int write_csv(
+    const std::string& path,
+    const std::vector<call_record>& closed_form,
+    const std::vector<call_record>& iterative)
+{
+    std::ofstream out(path);
+    if (!out)
+    {
+        std::cerr << "failed to open CSV output path: " << path << "\n";
+        return 1;
+    }
+
+    out << "target_index,solver,success,wall_us,pos_err,multi_solutions\n";
+    out << std::setprecision(17);
+    for (std::size_t i = 0; i < closed_form.size(); ++i)
+    {
+        const auto& r = closed_form[i];
+        out << i << ",pieper_6r_solver,"
+            << (r.success ? 1 : 0) << ","
+            << r.wall_us << ","
+            << r.pos_err << ","
+            << r.multi_solutions << "\n";
+    }
+    for (std::size_t i = 0; i < iterative.size(); ++i)
+    {
+        const auto& r = iterative[i];
+        out << i << ",projected_lm,"
+            << (r.success ? 1 : 0) << ","
+            << r.wall_us << ","
+            << r.pos_err << ","
+            << r.multi_solutions << "\n";
+    }
+
+    return 0;
 }
 
-int main()
+}
+
+int main(int argc, char** argv)
 {
+    std::string csv_path;
+    for (int i = 1; i < argc; ++i)
+    {
+        const std::string arg(argv[i]);
+        if (arg == "--csv")
+        {
+            if (i + 1 >= argc)
+            {
+                std::cerr << "usage: 03_ik_composition [--csv path]\n";
+                return 2;
+            }
+            csv_path = argv[++i];
+        }
+        else
+        {
+            std::cerr << "usage: 03_ik_composition [--csv path]\n";
+            return 2;
+        }
+    }
+
     using vec3 = cartan::vector3<double>;
 
     // --- KUKA KR 6 R900 SIXX as a static_chain -----------------------------
@@ -151,12 +228,12 @@ int main()
     // walk each through forward kinematics, and use the resulting pose as
     // the IK target. Because each target comes from a known joint
     // configuration, both solvers face problems with a guaranteed solution.
-    // The deterministic seed (42) keeps the table reproducible; bumping N
-    // to 100 or 200 sharpens the statistical signal at the cost of wall.
+    // The deterministic seed (42) keeps the table reproducible. The small
+    // local generator deliberately avoids std::uniform_real_distribution so
+    // the Python tutorial can generate byte-for-byte matching target indices.
+    // Bumping N to 100 or 200 sharpens the statistical signal at the cost of wall.
     constexpr int N = 50;
-    std::mt19937 rng{42};
-    std::uniform_real_distribution<double> dist(
-        -std::numbers::pi, std::numbers::pi);
+    deterministic_rng rng{42};
 
     std::vector<Eigen::Vector<double, 6>> targets_q;
     std::vector<cartan::se3<double>> targets;
@@ -167,7 +244,7 @@ int main()
         Eigen::Vector<double, 6> q_truth;
         for (int j = 0; j < 6; ++j)
         {
-            q_truth(j) = dist(rng);
+            q_truth(j) = rng.uniform(-std::numbers::pi, std::numbers::pi);
         }
         targets_q.push_back(q_truth);
         targets.push_back(
@@ -248,6 +325,11 @@ int main()
             }
             it_records.push_back(rec);
         }
+    }
+
+    if (!csv_path.empty())
+    {
+        return write_csv(csv_path, cf_records, it_records);
     }
 
     // --- Aggregation + tradeoff table --------------------------------------

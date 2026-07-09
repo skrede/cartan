@@ -37,6 +37,9 @@ target_link_libraries(_core
 
 target_compile_features(_core PRIVATE cxx_std_20)
 
+set_target_properties(_core PROPERTIES
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/cartan")
+
 if (TARGET cartan::urdf)
     target_compile_definitions(_core PRIVATE CARTAN_PY_HAS_URDF=1)
 endif ()
@@ -74,3 +77,29 @@ install(FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/cartan/py.typed
     DESTINATION cartan
 )
+
+set(_cartan_python_tutorial_env
+    "PYTHONPATH=$<TARGET_FILE_DIR:_core>:${CMAKE_CURRENT_SOURCE_DIR}"
+    "PYTHONNOUSERSITE=1")
+
+function(cartan_add_python_tutorial_test test_name script_name)
+    add_test(
+        NAME ${test_name}
+        COMMAND "${Python_EXECUTABLE}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tutorials/${script_name}")
+    set_tests_properties(${test_name} PROPERTIES
+        ENVIRONMENT "${_cartan_python_tutorial_env}")
+endfunction()
+
+if (TARGET cartan::urdf)
+    cartan_add_python_tutorial_test(
+        python_tutorial_01_urdf_walkthrough
+        01_urdf_walkthrough.py)
+endif ()
+
+cartan_add_python_tutorial_test(
+    python_tutorial_02_fk_and_jacobians
+    02_fk_and_jacobians.py)
+cartan_add_python_tutorial_test(
+    python_tutorial_03_ik_composition
+    03_ik_composition.py)
