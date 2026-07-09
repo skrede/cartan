@@ -15,9 +15,16 @@ endif ()
 list(APPEND CMAKE_PREFIX_PATH "${_nanobind_cmake_dir}")
 find_package(nanobind CONFIG REQUIRED)
 
+option(CARTAN_PYTHON_STABLE_ABI "Build Python extension with nanobind stable ABI" OFF)
+
+set(_cartan_python_module_options NB_STATIC)
+if (CARTAN_PYTHON_STABLE_ABI)
+    list(APPEND _cartan_python_module_options STABLE_ABI)
+endif ()
+
 nanobind_add_module(
     _core
-    NB_STATIC
+    ${_cartan_python_module_options}
     src/_core.cpp
     src/bindings/lie_bindings.cpp
     src/bindings/chain_bindings.cpp

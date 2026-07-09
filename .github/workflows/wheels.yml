@@ -1,0 +1,371 @@
+name: Wheels
+
+on:
+  push:
+    branches: [master, develop, "milestone/**"]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - ".planning/**"
+  pull_request:
+    branches: [develop]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - ".planning/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CIBW_BUILD: "cp310-* cp311-* cp312-* cp313-* cp314-*"
+  CIBW_SKIP: "cp3??t-* pp* *-musllinux_* *-win32 *-manylinux_i686"
+  CIBW_TEST_REQUIRES: "pytest numpy"
+  CIBW_TEST_COMMAND: "python -m pytest {project}/python/tests/test_wheel_smoke.py -q"
+  CIBW_ENVIRONMENT_LINUX: >-
+    CFLAGS="-Os -ffunction-sections -fdata-sections"
+    CXXFLAGS="-D_GLIBCXX_USE_CXX11_ABI=1 -Os -ffunction-sections -fdata-sections"
+    LDFLAGS="-static-libstdc++ -static-libgcc -Wl,--gc-sections"
+
+jobs:
+  baseline-probe:
+    name: baseline probe (${{ matrix.manylinux_image }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        manylinux_image: [manylinux2014, manylinux_2_28]
+
+    env:
+      CIBW_BUILD: "cp312-manylinux_x86_64"
+      CIBW_ARCHS_LINUX: x86_64
+      CIBW_MANYLINUX_X86_64_IMAGE: ${{ matrix.manylinux_image }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install audit tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install auditwheel
+          sudo apt-get update
+          sudo apt-get install -y binutils
+
+      - name: Build probe wheel
+        uses: pypa/cibuildwheel@v3.4.1
+        with:
+          output-dir: wheelhouse
+
+      - name: Audit probe artifact
+        run: |
+          mkdir -p reports
+          python tools/wheel_artifact_report.py \
+            --wheel-dir wheelhouse \
+            --output reports/baseline-${{ matrix.manylinux_image }}.md \
+            --require-no-libstdcxx \
+            --require-no-libgcc-s
+
+      - name: Upload baseline probe artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: baseline-probe-${{ matrix.manylinux_image }}
+          path: |
+            wheelhouse/*.whl
+            reports/*.md
+
+  abi3-probe:
+    name: abi3 probe
+    runs-on: ubuntu-latest
+
+    env:
+      CIBW_BUILD: "cp312-manylinux_x86_64"
+      CIBW_ARCHS_LINUX: x86_64
+      CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build per-CPython probe wheel
+        uses: pypa/cibuildwheel@v3.4.1
+        with:
+          output-dir: wheelhouse-per-cpython
+
+      - name: Enable stable ABI tag for probe artifact
+        run: |
+          python -c "from pathlib import Path; p=Path('pyproject.toml'); t=p.read_text(); p.write_text(t.replace('[tool.scikit-build]\n', '[tool.scikit-build]\nwheel.py-api = \"cp312\"\n', 1))"
+
+      - name: Build abi3 probe wheel
+        uses: pypa/cibuildwheel@v3.4.1
+        env:
+          CIBW_CONFIG_SETTINGS: "cmake.define.CARTAN_PYTHON_STABLE_ABI=ON"
+        with:
+          output-dir: wheelhouse-abi3
+
+      - name: Benchmark per-CPython wheel on CPython 3.12
+        run: |
+          python -m venv .venv-per-cpython
+          . .venv-per-cpython/bin/activate
+          python -m pip install --upgrade pip
+          python -m pip install numpy
+          python -m pip install --no-index --find-links wheelhouse-per-cpython --no-deps cartan
+          mkdir -p reports
+          python tools/wheel_abi_bench.py --repeats 5 --iterations 1000 > reports/per-cpython-cp312.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Benchmark abi3 wheel on CPython 3.12
+        run: |
+          python -m venv .venv-abi3-cp312
+          . .venv-abi3-cp312/bin/activate
+          python -m pip install --upgrade pip
+          python -m pip install numpy
+          python -m pip install --no-index --find-links wheelhouse-abi3 --no-deps cartan
+          python tools/wheel_abi_bench.py --repeats 5 --iterations 1000 > reports/abi3-cp312.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Import abi3 wheel on CPython 3.13
+        run: |
+          python -m venv .venv-abi3-cp313
+          . .venv-abi3-cp313/bin/activate
+          python -m pip install --upgrade pip
+          python -m pip install numpy pytest
+          python -m pip install --no-index --find-links wheelhouse-abi3 --no-deps cartan
+          python -m pytest python/tests/test_wheel_smoke.py -q
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Import abi3 wheel on CPython 3.14
+        run: |
+          python -m venv .venv-abi3-cp314
+          . .venv-abi3-cp314/bin/activate
+          python -m pip install --upgrade pip
+          python -m pip install numpy pytest
+          python -m pip install --no-index --find-links wheelhouse-abi3 --no-deps cartan
+          python -m pytest python/tests/test_wheel_smoke.py -q
+
+      - name: Summarize ABI overhead
+        run: |
+          python -c "import json, pathlib; p=json.loads(pathlib.Path('reports/per-cpython-cp312.json').read_text()); a=json.loads(pathlib.Path('reports/abi3-cp312.json').read_text()); overhead=(a['median_us_per_call']/p['median_us_per_call']-1.0)*100.0; pathlib.Path('reports/abi-overhead.json').write_text(json.dumps({'overhead_percent': overhead, 'per_cpython': p, 'abi3': a}, indent=2, sort_keys=True))"
+
+      - name: Upload ABI probe artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: abi3-probe
+          path: |
+            wheelhouse-per-cpython/*.whl
+            wheelhouse-abi3/*.whl
+            reports/*.json
+
+  build-wheels:
+    name: build ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64-manylinux2014
+            os: ubuntu-latest
+            linux_arch: x86_64
+            macos_arch: auto
+            windows_arch: AMD64
+            manylinux_image: manylinux2014
+          - name: linux-x86_64-manylinux_2_28
+            os: ubuntu-latest
+            linux_arch: x86_64
+            macos_arch: auto
+            windows_arch: AMD64
+            manylinux_image: manylinux_2_28
+          - name: linux-aarch64-manylinux2014
+            os: ubuntu-24.04-arm
+            linux_arch: aarch64
+            macos_arch: auto
+            windows_arch: AMD64
+            manylinux_image: manylinux2014
+          - name: linux-aarch64-manylinux_2_28
+            os: ubuntu-24.04-arm
+            linux_arch: aarch64
+            macos_arch: auto
+            windows_arch: AMD64
+            manylinux_image: manylinux_2_28
+          - name: macos-arm64
+            os: macos-latest
+            linux_arch: x86_64
+            macos_arch: arm64
+            windows_arch: AMD64
+            manylinux_image: manylinux_2_28
+          - name: macos-x86_64
+            os: macos-15-intel
+            linux_arch: x86_64
+            macos_arch: x86_64
+            windows_arch: AMD64
+            manylinux_image: manylinux_2_28
+          - name: windows-x64
+            os: windows-latest
+            linux_arch: x86_64
+            macos_arch: auto
+            windows_arch: AMD64
+            manylinux_image: manylinux_2_28
+
+    env:
+      CIBW_ARCHS_LINUX: ${{ matrix.linux_arch }}
+      CIBW_ARCHS_MACOS: ${{ matrix.macos_arch }}
+      CIBW_ARCHS_WINDOWS: ${{ matrix.windows_arch }}
+      CIBW_MANYLINUX_X86_64_IMAGE: ${{ matrix.manylinux_image }}
+      CIBW_MANYLINUX_AARCH64_IMAGE: ${{ matrix.manylinux_image }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v3.4.1
+        with:
+          output-dir: wheelhouse
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.name }}
+          path: wheelhouse/*.whl
+
+  test-wheel-artifacts:
+    name: test downloaded wheels (${{ matrix.name }})
+    needs: build-wheels
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            os: ubuntu-latest
+          - name: macos-arm64
+            os: macos-latest
+          - name: macos-x86_64
+            os: macos-15-intel
+          - name: windows-x64
+            os: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Download wheel artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: downloaded-wheels
+          pattern: wheels-*
+          merge-multiple: true
+
+      - name: Test exact downloaded wheel
+        shell: bash
+        run: |
+          python -m venv .venv-wheel-test
+          . .venv-wheel-test/Scripts/activate 2>/dev/null || . .venv-wheel-test/bin/activate
+          python -m pip install --upgrade pip
+          python -m pip install numpy pytest
+          python -m pip install --no-index --find-links downloaded-wheels --no-deps cartan
+          python -m pytest python/tests/test_wheel_smoke.py -q
+
+  numpy-compat:
+    name: NumPy compatibility (${{ matrix.python-version }})
+    needs: build-wheels
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Download wheel artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: downloaded-wheels
+          pattern: wheels-linux-x86_64-*
+          merge-multiple: true
+
+      - name: Run pinned NumPy sweep
+        run: |
+          python -m venv .venv-numpy
+          . .venv-numpy/bin/activate
+          python -m pip install --upgrade pip
+          python -m pip install pytest
+          python -m pip install --no-index --find-links downloaded-wheels --no-deps cartan
+          for pin in numpy==1.23 numpy==1.26 numpy==2.0 numpy==2.4; do
+            python -m pip install --force-reinstall "$pin"
+            python -m pytest python/tests/test_numpy_compat.py -q
+          done
+
+  linux-portability-smoke:
+    name: Linux portability smoke (${{ matrix.name }})
+    needs: build-wheels
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: manylinux2014-centos7
+            image: quay.io/pypa/manylinux2014_x86_64
+            python: /opt/python/cp312-cp312/bin/python
+            setup: "true"
+          - name: manylinux2014-ubuntu1804
+            image: python:3.10-bionic
+            python: python
+            setup: "true"
+          - name: manylinux_2_28-bookworm
+            image: python:3.12-bookworm
+            python: python
+            setup: "true"
+          - name: manylinux_2_28-ubuntu2204
+            image: ubuntu:22.04
+            python: python3
+            setup: "apt-get update && apt-get install -y python3 python3-venv python3-pip"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Linux wheel artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: downloaded-wheels
+          pattern: wheels-linux-x86_64-*
+          merge-multiple: true
+
+      - name: Run container smoke
+        run: |
+          mkdir -p reports
+          docker run --rm \
+            -v "${{ github.workspace }}:/work" \
+            -w /work \
+            "${{ matrix.image }}" \
+            bash -lc '${{ matrix.setup }} && "${{ matrix.python }}" -m pip install --upgrade pip && "${{ matrix.python }}" -m pip install numpy pytest && "${{ matrix.python }}" -m pip install --no-index --find-links /work/downloaded-wheels --no-deps cartan && "${{ matrix.python }}" -m pytest python/tests/test_wheel_smoke.py -q' \
+            | tee reports/${{ matrix.name }}.log
+
+      - name: Upload portability report
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-portability-smoke-${{ matrix.name }}
+          path: reports/*.log
