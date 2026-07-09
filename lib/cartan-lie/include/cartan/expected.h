@@ -17,12 +17,14 @@
 ///   - Sy Brand, "tl::expected — A single-header reference implementation"
 ///   - libstdc++ <expected> in GCC 12+
 
-#include <exception>
-#include <initializer_list>
+#include "cartan/detail/compat.h"
+
 #include <memory>
-#include <type_traits>
 #include <utility>
 #include <version>
+#include <exception>
+#include <type_traits>
+#include <initializer_list>
 
 #if defined(__cpp_lib_expected) && __cpp_lib_expected >= 202211L
 #  include <expected>
@@ -96,18 +98,18 @@ namespace detail
 /// translation unit is compiled without C++ exceptions (`-fno-exceptions`,
 /// the default on ESP-IDF and most bare-metal toolchains), value() on an
 /// errored expected cannot throw; it instead calls the hook below. The
-/// default aborts deterministically via a trap instruction. Firmware that
+/// default fail-stops deterministically. Firmware that
 /// wants its own fail-stop (log, reset, blink an LED) defines
 /// CARTAN_ON_BAD_EXPECTED_ACCESS() to its own handler at compile time,
 /// e.g. -DCARTAN_ON_BAD_EXPECTED_ACCESS=my_fault_handler.
 #ifndef CARTAN_ON_BAD_EXPECTED_ACCESS
-#  define CARTAN_ON_BAD_EXPECTED_ACCESS() __builtin_trap()
+#  define CARTAN_ON_BAD_EXPECTED_ACCESS() ::cartan::detail::fail_stop()
 #endif
 
 [[noreturn]] inline void on_bad_expected_access() noexcept
 {
     CARTAN_ON_BAD_EXPECTED_ACCESS();
-    __builtin_unreachable();
+    ::cartan::detail::assume_unreachable();
 }
 
 }

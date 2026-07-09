@@ -1,6 +1,7 @@
 #ifndef HPP_GUARD_CARTAN_DETAIL_COMPAT_H
 #define HPP_GUARD_CARTAN_DETAIL_COMPAT_H
 
+#include <cstdlib>
 #include <version>
 
 // constexpr std::acos, std::asin, std::sqrt, etc.
@@ -13,5 +14,32 @@
 #  define CARTAN_HAS_CONSTEXPR_CMATH 0
 #  define CARTAN_CONSTEXPR_CMATH
 #endif
+
+namespace cartan
+{
+namespace detail
+{
+
+[[noreturn]] inline void fail_stop() noexcept
+{
+#if defined(__clang__) || defined(__GNUC__)
+    __builtin_trap();
+    __builtin_unreachable();
+#else
+    std::abort();
+#endif
+}
+
+[[noreturn]] inline void assume_unreachable() noexcept
+{
+#if defined(__clang__) || defined(__GNUC__)
+    __builtin_unreachable();
+#else
+    std::abort();
+#endif
+}
+
+}
+}
 
 #endif

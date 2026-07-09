@@ -12,13 +12,15 @@
 ///
 /// Reference: Lynch & Park, Modern Robotics, Ch. 4, p. 119-158.
 
-#include "cartan/serial/chain/screw_axis.h"
-#include "cartan/serial/chain/joint_limits.h"
-#include "cartan/serial/chain/joint_kind.h"
-#include "cartan/serial/chain/storage_trait.h"
-#include "cartan/serial/chain/chain_concept.h"
+#include "cartan/detail/compat.h"
 
 #include "cartan/lie/se3.h"
+
+#include "cartan/serial/chain/joint_kind.h"
+#include "cartan/serial/chain/screw_axis.h"
+#include "cartan/serial/chain/joint_limits.h"
+#include "cartan/serial/chain/chain_concept.h"
+#include "cartan/serial/chain/storage_trait.h"
 
 #include <vector>
 #include <cstddef>
@@ -60,8 +62,8 @@ public:
         // -DNDEBUG (Release), letting a malformed chain construct silently in
         // a shipped build. With exceptions enabled we fail loudly by throwing;
         // on exceptions-off targets (bare-metal and ESP-IDF default) a bare
-        // throw would not even compile, so we fail-stop deterministically via a
-        // trap instruction instead. Either way a malformed chain never
+        // throw would not even compile, so we use the deterministic fail-stop
+        // path instead. Either way a malformed chain never
         // constructs silently.
         if (m_axes.size() != m_limits.size())
         {
@@ -69,7 +71,7 @@ public:
             throw std::invalid_argument(
                 "kinematic_chain: screw-axis count must match joint-limit count");
 #else
-            __builtin_trap();
+            ::cartan::detail::fail_stop();
 #endif
         }
         if constexpr (N == dynamic)
@@ -101,7 +103,7 @@ public:
     /// A bad index can never read outside the underlying storage: with
     /// exceptions enabled it throws std::out_of_range; on exceptions-off targets
     /// (bare-metal and ESP-IDF default) a bare throw would not compile, so it
-    /// fail-stops deterministically via a trap instruction instead.
+    /// uses the deterministic fail-stop path instead.
     const screw_axis<Scalar>& axis(int i) const
     {
         if (i < 0 || static_cast<std::size_t>(i) >= m_axes.size())
@@ -109,7 +111,7 @@ public:
 #if defined(__cpp_exceptions)
             throw std::out_of_range("kinematic_chain::axis: joint index out of range");
 #else
-            __builtin_trap();
+            ::cartan::detail::fail_stop();
 #endif
         }
         return m_axes[static_cast<std::size_t>(i)];

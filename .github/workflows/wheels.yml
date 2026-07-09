@@ -21,12 +21,14 @@ permissions:
 env:
   CIBW_BUILD: "cp310-* cp311-* cp312-* cp313-* cp314-*"
   CIBW_SKIP: "cp3??t-* pp* *-musllinux_* *-win32 *-manylinux_i686"
-  CIBW_TEST_REQUIRES: "pytest numpy"
+  CIBW_TEST_REQUIRES: "pytest numpy<2.5"
   CIBW_TEST_COMMAND: "python -m pytest {project}/python/tests/test_wheel_smoke.py -q"
   CIBW_ENVIRONMENT_LINUX: >-
     CFLAGS="-Os -ffunction-sections -fdata-sections"
     CXXFLAGS="-D_GLIBCXX_USE_CXX11_ABI=1 -Os -ffunction-sections -fdata-sections"
     LDFLAGS="-static-libstdc++ -static-libgcc -Wl,--gc-sections"
+  CIBW_ENVIRONMENT_MACOS: >-
+    MACOSX_DEPLOYMENT_TARGET=10.13
 
 jobs:
   baseline-probe:
@@ -115,7 +117,7 @@ jobs:
           python -m venv .venv-per-cpython
           . .venv-per-cpython/bin/activate
           python -m pip install --upgrade pip
-          python -m pip install numpy
+          python -m pip install "numpy<2.5"
           python -m pip install --no-index --find-links wheelhouse-per-cpython --no-deps cartan
           mkdir -p reports
           python tools/wheel_abi_bench.py --repeats 5 --iterations 1000 > reports/per-cpython-cp312.json
@@ -129,7 +131,7 @@ jobs:
           python -m venv .venv-abi3-cp312
           . .venv-abi3-cp312/bin/activate
           python -m pip install --upgrade pip
-          python -m pip install numpy
+          python -m pip install "numpy<2.5"
           python -m pip install --no-index --find-links wheelhouse-abi3 --no-deps cartan
           python tools/wheel_abi_bench.py --repeats 5 --iterations 1000 > reports/abi3-cp312.json
 
@@ -138,11 +140,13 @@ jobs:
           python-version: "3.13"
 
       - name: Import abi3 wheel on CPython 3.13
+        id: abi3_cp313
+        continue-on-error: true
         run: |
           python -m venv .venv-abi3-cp313
           . .venv-abi3-cp313/bin/activate
           python -m pip install --upgrade pip
-          python -m pip install numpy pytest
+          python -m pip install "numpy<2.5" pytest
           python -m pip install --no-index --find-links wheelhouse-abi3 --no-deps cartan
           python -m pytest python/tests/test_wheel_smoke.py -q
 
@@ -151,19 +155,61 @@ jobs:
           python-version: "3.14"
 
       - name: Import abi3 wheel on CPython 3.14
+        id: abi3_cp314
+        if: always()
+        continue-on-error: true
         run: |
           python -m venv .venv-abi3-cp314
           . .venv-abi3-cp314/bin/activate
           python -m pip install --upgrade pip
-          python -m pip install numpy pytest
+          python -m pip install "numpy<2.5" pytest
           python -m pip install --no-index --find-links wheelhouse-abi3 --no-deps cartan
           python -m pytest python/tests/test_wheel_smoke.py -q
 
       - name: Summarize ABI overhead
+        if: always()
         run: |
-          python -c "import json, pathlib; p=json.loads(pathlib.Path('reports/per-cpython-cp312.json').read_text()); a=json.loads(pathlib.Path('reports/abi3-cp312.json').read_text()); overhead=(a['median_us_per_call']/p['median_us_per_call']-1.0)*100.0; pathlib.Path('reports/abi-overhead.json').write_text(json.dumps({'overhead_percent': overhead, 'per_cpython': p, 'abi3': a}, indent=2, sort_keys=True))"
+          python - <<'PY'
+          import json
+          import os
+          import pathlib
+
+          reports = pathlib.Path("reports")
+          reports.mkdir(exist_ok=True)
+          summary = {
+              "cp313_import": os.environ["ABI3_CP313_OUTCOME"],
+              "cp314_import": os.environ["ABI3_CP314_OUTCOME"],
+              "eligible": False,
+          }
+
+          try:
+              per_cpython = json.loads((reports / "per-cpython-cp312.json").read_text())
+              abi3 = json.loads((reports / "abi3-cp312.json").read_text())
+          except FileNotFoundError as exc:
+              summary["error"] = f"missing benchmark report: {exc.filename}"
+          else:
+              overhead = (abi3["median_us_per_call"] / per_cpython["median_us_per_call"] - 1.0) * 100.0
+              summary.update({
+                  "overhead_percent": overhead,
+                  "per_cpython": per_cpython,
+                  "abi3": abi3,
+                  "eligible": (
+                      overhead <= 15.0
+                      and summary["cp313_import"] == "success"
+                      and summary["cp314_import"] == "success"
+                  ),
+              })
+
+          (reports / "abi-overhead.json").write_text(
+              json.dumps(summary, indent=2, sort_keys=True)
+          )
+          PY
+        env:
+          ABI3_CP313_OUTCOME: ${{ steps.abi3_cp313.outcome }}
+          ABI3_CP314_OUTCOME: ${{ steps.abi3_cp314.outcome }}
 
       - name: Upload ABI probe artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: abi3-probe
@@ -280,7 +326,7 @@ jobs:
           python -m venv .venv-wheel-test
           . .venv-wheel-test/Scripts/activate 2>/dev/null || . .venv-wheel-test/bin/activate
           python -m pip install --upgrade pip
-          python -m pip install numpy pytest
+          python -m pip install "numpy<2.5" pytest
           python -m pip install --no-index --find-links downloaded-wheels --no-deps cartan
           python -m pytest python/tests/test_wheel_smoke.py -q
 
@@ -361,7 +407,7 @@ jobs:
             -v "${{ github.workspace }}:/work" \
             -w /work \
             "${{ matrix.image }}" \
-            bash -lc '${{ matrix.setup }} && "${{ matrix.python }}" -m pip install --upgrade pip && "${{ matrix.python }}" -m pip install numpy pytest && "${{ matrix.python }}" -m pip install --no-index --find-links /work/downloaded-wheels --no-deps cartan && "${{ matrix.python }}" -m pytest python/tests/test_wheel_smoke.py -q' \
+            bash -lc '${{ matrix.setup }} && "${{ matrix.python }}" -m pip install --upgrade pip && "${{ matrix.python }}" -m pip install "numpy<2.5" pytest && "${{ matrix.python }}" -m pip install --no-index --find-links /work/downloaded-wheels --no-deps cartan && "${{ matrix.python }}" -m pytest python/tests/test_wheel_smoke.py -q' \
             | tee reports/${{ matrix.name }}.log
 
       - name: Upload portability report

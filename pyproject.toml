@@ -16,7 +16,7 @@ authors = [
     { name = "Aleksander Skrede", email = "code@skrede.me" },
 ]
 dependencies = [
-    "numpy>=1.23",
+    "numpy>=1.23,<2.5",
 ]
 
 [project.optional-dependencies]
@@ -41,7 +41,7 @@ CARTAN_BUILD_ARGMIN = { env = "CARTAN_BUILD_ARGMIN", default = "OFF" }
 [tool.cibuildwheel]
 build = "cp310-* cp311-* cp312-* cp313-* cp314-*"
 skip = "cp3??t-* pp* *-musllinux_* *-win32 *-manylinux_i686"
-test-requires = ["pytest", "numpy"]
+test-requires = ["pytest", "numpy<2.5"]
 test-command = "python -m pytest {project}/python/tests/test_wheel_smoke.py -q"
 
 [tool.pytest.ini_options]
