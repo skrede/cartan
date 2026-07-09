@@ -209,13 +209,29 @@ body_jacobian(
     return Ad_inv * J_s;
 }
 
+namespace detail
+{
+
+// kinematic_chain and static_chain each carry their own space_jacobian /
+// body_jacobian overload. MSVC does not rank the concrete-type overload ahead of
+// this concept-constrained one by partial ordering and reports the call ambiguous
+// (C2668), so the generic overloads exclude those two types explicitly.
+template <typename T>
+inline constexpr bool is_jacobian_specialized_v = false;
+template <typename Scalar, int N>
+inline constexpr bool is_jacobian_specialized_v<kinematic_chain<Scalar, N>> = true;
+template <typename Scalar, joint_tag... Joints>
+inline constexpr bool is_jacobian_specialized_v<static_chain<Scalar, Joints...>> = true;
+
+}
+
 /// Generic space Jacobian for any chain type satisfying the chain concept.
 ///
 /// J_si(q) = Ad_{T_{i-1}}(S_i), where T_0 = I (identity).
-/// The existing kinematic_chain overload wins via partial ordering.
 ///
 /// Reference: Lynch & Park, Modern Robotics, Eq. 5.11, p. 178.
 template <chain Chain>
+    requires (!detail::is_jacobian_specialized_v<Chain>)
 jacobian_matrix<typename Chain::scalar_type, Chain::joints>
 space_jacobian(
     const Chain& chain,
@@ -253,6 +269,7 @@ space_jacobian(
 ///
 /// Reference: Lynch & Park, Modern Robotics, Eq. 5.22, p. 185.
 template <chain Chain>
+    requires (!detail::is_jacobian_specialized_v<Chain>)
 jacobian_matrix<typename Chain::scalar_type, Chain::joints>
 body_jacobian(
     const Chain& chain,
