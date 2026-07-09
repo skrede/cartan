@@ -27,6 +27,10 @@ from ._core import (
 
 AnalyticalStatus = analytical.AnalyticalStatus
 AnalyticalResult = analytical.AnalyticalResult
+OPWParameters = analytical.OPWParameters
+OPWBranch = analytical.OPWBranch
+RangeStatus = analytical.RangeStatus
+UnwrappedResult = analytical.UnwrappedResult
 
 __all__ = [
     "SE3",
@@ -44,6 +48,10 @@ __all__ = [
     "ExhaustiveIKRunner",
     "AnalyticalStatus",
     "AnalyticalResult",
+    "OPWParameters",
+    "OPWBranch",
+    "RangeStatus",
+    "UnwrappedResult",
     "__version__",
     "analytical",
     "has_argmin",

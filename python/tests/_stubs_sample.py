@@ -195,9 +195,30 @@ ik_failure_enum: cartan.IkFailure = cartan.IkFailure.unreachable
 _analytical = getattr(cartan, "analytical")  # opaque to strict pyright
 
 _PieperLike = Callable[[cartan.KinematicChain, cartan.SE3], cartan.AnalyticalResult]
+_OPWLike = Callable[..., cartan.AnalyticalResult]
+_UnwrappedLike = Callable[..., cartan.UnwrappedResult]
+_OPWParamsLike = Callable[
+    [float, float, float, float, float, float, float, list[float], list[int]],
+    cartan.OPWParameters,
+]
+_make_opw_parameters: _OPWParamsLike = cast(
+    _OPWParamsLike, getattr(_analytical, "OPWParameters"))
 _solve_pieper_6r: _PieperLike = cast(_PieperLike, getattr(_analytical, "solve_pieper_6r"))
 _solve_planar_2r: _PieperLike = cast(_PieperLike, getattr(_analytical, "solve_planar_2r"))
 _solve_3r: _PieperLike = cast(_PieperLike, getattr(_analytical, "solve_3r"))
+_solve_opw_6r: _OPWLike = cast(_OPWLike, getattr(_analytical, "solve_opw_6r"))
+_solve_unwrapped_opw_6r: _UnwrappedLike = cast(
+    _UnwrappedLike, getattr(_analytical, "solve_unwrapped_opw_6r"),
+)
+_solve_unwrapped_pieper_6r: _UnwrappedLike = cast(
+    _UnwrappedLike, getattr(_analytical, "solve_unwrapped_pieper_6r"),
+)
+_solve_unwrapped_3r: _UnwrappedLike = cast(
+    _UnwrappedLike, getattr(_analytical, "solve_unwrapped_3r"),
+)
+_solve_unwrapped_planar_2r: _UnwrappedLike = cast(
+    _UnwrappedLike, getattr(_analytical, "solve_unwrapped_planar_2r"),
+)
 
 _VerifyLike = Callable[..., bool]
 _verify_solution: _VerifyLike = cast(_VerifyLike, getattr(_analytical, "verify_solution"))
@@ -229,6 +250,37 @@ analytical_ranked: cartan.AnalyticalResult = _solve_all(
 
 analytical_planar: cartan.AnalyticalResult = _solve_planar_2r(ik_chain, ik_target)
 analytical_spatial: cartan.AnalyticalResult = _solve_3r(ik_chain, ik_target)
+opw_params: cartan.OPWParameters = _make_opw_parameters(
+    0.025,
+    -0.035,
+    0.0,
+    0.400,
+    0.455,
+    0.420,
+    0.080,
+    [0.0, -1.5707963267948966, 0.0, 0.0, 0.0, 0.0],
+    [-1, 1, 1, -1, 1, -1],
+)
+opw_branch: cartan.OPWBranch = cartan.OPWBranch.front_up_no_flip
+opw_a1: float = opw_params.a1
+opw_offsets: list[float] = opw_params.offsets
+opw_signs: list[int] = opw_params.sign_corrections
+analytical_opw: cartan.AnalyticalResult = _solve_opw_6r(
+    ik_chain, opw_params, ik_target)
+
+range_status: cartan.RangeStatus = cartan.RangeStatus.in_range
+unwrapped_result: cartan.UnwrappedResult = _solve_unwrapped_opw_6r(
+    ik_chain, opw_params, ik_target, q_seed=ik_q_seed)
+unwrapped_status: cartan.AnalyticalStatus = unwrapped_result.status
+unwrapped_error_metric: float = unwrapped_result.error_metric
+unwrapped_solutions = unwrapped_result.solutions
+unwrapped_tags: list[cartan.RangeStatus] = unwrapped_result.tags
+unwrapped_pieper: cartan.UnwrappedResult = _solve_unwrapped_pieper_6r(
+    ik_chain, ik_target, q_seed=ik_q_seed)
+unwrapped_spatial: cartan.UnwrappedResult = _solve_unwrapped_3r(
+    ik_chain, ik_target, q_seed=ik_q_seed)
+unwrapped_planar: cartan.UnwrappedResult = _solve_unwrapped_planar_2r(
+    ik_chain, ik_target, q_seed=ik_q_seed)
 
 # Paden-Kahan subproblem 1 / 2 / 3 free functions.
 pk_omega = np.array([0.0, 0.0, 1.0], dtype=np.float64)

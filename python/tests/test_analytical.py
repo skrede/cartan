@@ -9,7 +9,7 @@ either degenerate_geometry (UR5e — the wrist-axis intersection finder fails
 during ctor) or unreachable (KR6 — the wrist construction succeeds but the
 downstream workspace check rejects FK-walked targets). Those non-IRB
 arms are exercised as soft-fail-path coverage rather than as happy-path
-parity cases (see Plan SUMMARY for the empirical sweep that surfaced this).
+parity cases.
 """
 
 from __future__ import annotations
@@ -21,6 +21,91 @@ import cartan
 
 
 POS_TOL = 1e-6
+STRICT_TOL = 1e-9
+
+
+def _se3_from_rotation_translation(
+    rotation: cartan.SO3, translation: np.ndarray,
+) -> cartan.SE3:
+    matrix = np.eye(4, dtype=np.float64)
+    matrix[:3, :3] = rotation.matrix()
+    matrix[:3, 3] = translation
+    return cartan.SE3.from_matrix(matrix)
+
+
+def _make_kr6_opw_chain() -> cartan.KinematicChain:
+    a1, a2, c1, c2, c3, c4 = 0.025, -0.035, 0.400, 0.455, 0.420, 0.080
+    shoulder = np.array([a1, 0.0, c1], dtype=np.float64)
+    elbow = np.array([a1 + c2, 0.0, c1], dtype=np.float64)
+    wrist = np.array([a1 + c2 + c3, 0.0, c1 - a2], dtype=np.float64)
+    axes = [
+        cartan.ScrewAxis.revolute(
+            np.array([0.0, 0.0, -1.0], dtype=np.float64),
+            np.zeros(3, dtype=np.float64),
+        ),
+        cartan.ScrewAxis.revolute(
+            np.array([0.0, 1.0, 0.0], dtype=np.float64), shoulder),
+        cartan.ScrewAxis.revolute(
+            np.array([0.0, 1.0, 0.0], dtype=np.float64), elbow),
+        cartan.ScrewAxis.revolute(
+            np.array([-1.0, 0.0, 0.0], dtype=np.float64), wrist),
+        cartan.ScrewAxis.revolute(
+            np.array([0.0, 1.0, 0.0], dtype=np.float64), wrist),
+        cartan.ScrewAxis.revolute(
+            np.array([-1.0, 0.0, 0.0], dtype=np.float64), wrist),
+    ]
+    home = _se3_from_rotation_translation(
+        cartan.SO3.exp(np.array([0.0, np.pi / 2.0, 0.0], dtype=np.float64)),
+        np.array([a1 + c2 + c3 + c4, 0.0, c1 - a2], dtype=np.float64),
+    )
+    limits = [cartan.JointLimits(-np.pi, np.pi)] * 6
+    return cartan.KinematicChain(home, axes, limits)
+
+
+def _kr6_opw_params() -> cartan.OPWParameters:
+    return cartan.OPWParameters(
+        0.025,
+        -0.035,
+        0.0,
+        0.400,
+        0.455,
+        0.420,
+        0.080,
+        offsets=[0.0, -np.pi / 2.0, 0.0, 0.0, 0.0, 0.0],
+        sign_corrections=[-1, 1, 1, -1, 1, -1],
+    )
+
+
+def _make_3r_zyz_chain(lo: float, hi: float) -> cartan.KinematicChain:
+    axes = [
+        cartan.ScrewAxis.revolute(
+            np.array([0.0, 0.0, 1.0], dtype=np.float64),
+            np.zeros(3, dtype=np.float64),
+        ),
+        cartan.ScrewAxis.revolute(
+            np.array([0.0, 1.0, 0.0], dtype=np.float64),
+            np.zeros(3, dtype=np.float64),
+        ),
+        cartan.ScrewAxis.revolute(
+            np.array([0.0, 0.0, 1.0], dtype=np.float64),
+            np.array([0.5, 0.0, 0.0], dtype=np.float64),
+        ),
+    ]
+    home = _se3_from_rotation_translation(
+        cartan.SO3.identity(), np.array([0.8, 0.0, 0.0], dtype=np.float64))
+    limits = [cartan.JointLimits(lo, hi)] * 3
+    return cartan.KinematicChain(home, axes, limits)
+
+
+def _fk_pose_error(
+    chain: cartan.KinematicChain, q: np.ndarray, target: cartan.SE3,
+) -> float:
+    fk = cartan.forward_kinematics(chain, q)
+    pos_err = float(np.linalg.norm(fk.translation - target.translation))
+    rot_err = float((fk.rotation.inverse() * target.rotation).log().dot(
+        (fk.rotation.inverse() * target.rotation).log()
+    ) ** 0.5)
+    return max(pos_err, rot_err)
 
 
 def _draw_q(chain: cartan.KinematicChain, rng: np.random.Generator) -> np.ndarray:
@@ -68,9 +153,18 @@ def test_analytical_submodule_surface() -> None:
     for name in (
         "AnalyticalResult",
         "AnalyticalStatus",
+        "OPWBranch",
+        "OPWParameters",
+        "RangeStatus",
+        "UnwrappedResult",
+        "solve_opw_6r",
         "solve_pieper_6r",
         "solve_planar_2r",
         "solve_3r",
+        "solve_unwrapped_opw_6r",
+        "solve_unwrapped_pieper_6r",
+        "solve_unwrapped_3r",
+        "solve_unwrapped_planar_2r",
         "paden_kahan_1",
         "paden_kahan_2",
         "paden_kahan_3",
@@ -82,6 +176,145 @@ def test_analytical_submodule_surface() -> None:
         assert hasattr(cartan.analytical, name), (
             f"cartan.analytical missing {name}"
         )
+
+
+# ---------------------------------------------------------------------------
+# OPW + unwrapped analytical parity.
+# ---------------------------------------------------------------------------
+
+
+def test_opw_parameters_accept_kr6_values() -> None:
+    params = _kr6_opw_params()
+    assert params.a1 == pytest.approx(0.025)
+    assert params.a2 == pytest.approx(-0.035)
+    assert params.b == pytest.approx(0.0)
+    assert params.c1 == pytest.approx(0.400)
+    assert params.c2 == pytest.approx(0.455)
+    assert params.c3 == pytest.approx(0.420)
+    assert params.c4 == pytest.approx(0.080)
+    assert params.offsets == pytest.approx(
+        [0.0, -np.pi / 2.0, 0.0, 0.0, 0.0, 0.0])
+    assert params.sign_corrections == [-1, 1, 1, -1, 1, -1]
+
+
+def test_opw_parameters_reject_bad_sign_correction() -> None:
+    with pytest.raises(ValueError):
+        cartan.OPWParameters(
+            0.025,
+            -0.035,
+            0.0,
+            0.400,
+            0.455,
+            0.420,
+            0.080,
+            offsets=[0.0, -np.pi / 2.0, 0.0, 0.0, 0.0, 0.0],
+            sign_corrections=[-1, 1, 1, 0, 1, -1],
+        )
+
+
+def test_solve_opw_6r_kr6_round_trip() -> None:
+    chain = _make_kr6_opw_chain()
+    params = _kr6_opw_params()
+    q_known = np.array([0.3, -0.4, 0.5, 0.2, -0.3, 0.1], dtype=np.float64)
+    target = cartan.forward_kinematics(chain, q_known)
+
+    result = cartan.analytical.solve_opw_6r(
+        chain,
+        params,
+        target,
+        position_tolerance=STRICT_TOL,
+        singularity_tolerance=STRICT_TOL,
+    )
+
+    assert result.status == cartan.AnalyticalStatus.ok
+    assert len(result.solutions) >= 1
+    for q in result.solutions:
+        assert q.shape == (6,)
+        assert _fk_pose_error(chain, q, target) < STRICT_TOL
+
+
+def test_unwrapped_opw_tags_in_range_branch() -> None:
+    chain = _make_kr6_opw_chain()
+    params = _kr6_opw_params()
+    q_known = np.array([0.3, -0.4, 0.5, 0.2, -0.3, 0.1], dtype=np.float64)
+    target = cartan.forward_kinematics(chain, q_known)
+
+    raw = cartan.analytical.solve_opw_6r(
+        chain, params, target, position_tolerance=STRICT_TOL)
+    unwrapped = cartan.analytical.solve_unwrapped_opw_6r(
+        chain, params, target, position_tolerance=STRICT_TOL)
+
+    assert raw.status == cartan.AnalyticalStatus.ok
+    assert unwrapped.status == cartan.AnalyticalStatus.ok
+    assert len(unwrapped.solutions) == len(raw.solutions)
+    assert len(unwrapped.tags) == len(unwrapped.solutions)
+    assert cartan.RangeStatus.in_range in unwrapped.tags
+    for q, tag in zip(unwrapped.solutions, unwrapped.tags):
+        if tag == cartan.RangeStatus.in_range:
+            assert np.all(q >= -np.pi - STRICT_TOL)
+            assert np.all(q <= np.pi + STRICT_TOL)
+            assert _fk_pose_error(chain, q, target) < STRICT_TOL
+
+
+def test_unwrapped_3r_honors_q_seed_reference() -> None:
+    chain = _make_3r_zyz_chain(-3.0 * np.pi, 3.0 * np.pi)
+    q_known = np.array([0.3, 0.5, -0.2], dtype=np.float64)
+    target = cartan.forward_kinematics(chain, q_known)
+    seed = np.array([0.3 + 2.0 * np.pi, 0.5, -0.2], dtype=np.float64)
+
+    toward_zero = cartan.analytical.solve_unwrapped_3r(chain, target)
+    toward_seed = cartan.analytical.solve_unwrapped_3r(
+        chain, target, q_seed=seed)
+
+    assert toward_zero.status == cartan.AnalyticalStatus.ok
+    assert toward_seed.status == cartan.AnalyticalStatus.ok
+    assert len(toward_zero.solutions) == len(toward_seed.solutions)
+    assert len(toward_zero.tags) == len(toward_seed.tags)
+    assert any(
+        abs(qs[0] - qz[0] - 2.0 * np.pi) < 1e-6
+        for qz, qs in zip(toward_zero.solutions, toward_seed.solutions)
+    )
+
+
+def test_unwrapped_tight_range_tags_violations_without_dropping() -> None:
+    chain = _make_3r_zyz_chain(0.1, 0.2)
+    q_known = np.array([0.3, 0.5, -0.2], dtype=np.float64)
+    target = cartan.forward_kinematics(chain, q_known)
+
+    raw = cartan.analytical.solve_3r(chain, target)
+    unwrapped = cartan.analytical.solve_unwrapped_3r(chain, target)
+
+    assert raw.status == cartan.AnalyticalStatus.ok
+    assert unwrapped.status == cartan.AnalyticalStatus.ok
+    assert len(unwrapped.solutions) == len(raw.solutions)
+    assert len(unwrapped.tags) == len(unwrapped.solutions)
+    assert unwrapped.tags
+    assert all(tag == cartan.RangeStatus.joint_limits_violated
+               for tag in unwrapped.tags)
+
+
+def test_unwrapped_planar_2r_and_pieper_preserve_counts(
+    planar_2r_chain: cartan.KinematicChain,
+    irb120_chain: cartan.KinematicChain,
+) -> None:
+    q_2r = np.array([0.3, -0.4], dtype=np.float64)
+    target_2r = cartan.forward_kinematics(planar_2r_chain, q_2r)
+    raw_2r = cartan.analytical.solve_planar_2r(planar_2r_chain, target_2r)
+    unwrapped_2r = cartan.analytical.solve_unwrapped_planar_2r(
+        planar_2r_chain, target_2r, q_seed=q_2r)
+    assert unwrapped_2r.status == raw_2r.status
+    assert len(unwrapped_2r.solutions) == len(raw_2r.solutions)
+    assert len(unwrapped_2r.tags) == len(unwrapped_2r.solutions)
+
+    rng = np.random.default_rng(seed=123)
+    q_6r = _draw_q(irb120_chain, rng)
+    target_6r = cartan.forward_kinematics(irb120_chain, q_6r)
+    raw_6r = cartan.analytical.solve_pieper_6r(irb120_chain, target_6r)
+    unwrapped_6r = cartan.analytical.solve_unwrapped_pieper_6r(
+        irb120_chain, target_6r, q_seed=q_6r)
+    assert unwrapped_6r.status == raw_6r.status
+    assert len(unwrapped_6r.solutions) == len(raw_6r.solutions)
+    assert len(unwrapped_6r.tags) == len(unwrapped_6r.solutions)
 
 
 # ---------------------------------------------------------------------------
@@ -136,8 +369,7 @@ def test_solve_pieper_6r_irb120_returns_multiple_branches(
 # ---------------------------------------------------------------------------
 # Pieper soft-fail path: UR5e + KR6 vendored URDFs carry wrist offsets that
 # violate the strict Pieper-intersection precondition. Documented behavior is
-# a non-ok status with empty solutions (Rule-1 deviation from the plan's
-# must_haves item — see SUMMARY). The test asserts the surface contract holds.
+# a non-ok status with empty solutions. The test asserts the surface contract.
 # ---------------------------------------------------------------------------
 
 
@@ -151,8 +383,7 @@ def test_solve_pieper_6r_ur5e_soft_fails_on_wrist_offset(
     result = cartan.analytical.solve_pieper_6r(chain, target)
     # UR5e vendored URDF has an offset wrist; the strict Pieper solver
     # rejects it at ctor (degenerate_geometry) or during decomposition
-    # (unreachable / verification_failed). The plan's must_haves item
-    # asserting ok is empirically wrong for the URDF-loaded UR5e.
+    # (unreachable / verification_failed).
     assert result.status in (
         cartan.AnalyticalStatus.degenerate_geometry,
         cartan.AnalyticalStatus.unreachable,

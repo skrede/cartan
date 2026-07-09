@@ -22,16 +22,16 @@
 /// reason and workspace_distance.
 
 #include "cartan/expected.h"
+#include "cartan/analytical/range_status.h"
 #include "cartan/analytical/analytical_types.h"
 
 #include <Eigen/Core>
 
 #include <vector>
-#include <utility>
 #include <cstddef>
+#include <utility>
 
-namespace cartan::python
-{
+namespace cartan::python {
 
 enum class py_analytical_status : int
 {
@@ -44,7 +44,7 @@ enum class py_analytical_status : int
 
 inline py_analytical_status to_py_status(cartan::analytical_failure f)
 {
-    switch (f)
+    switch(f)
     {
         case cartan::analytical_failure::unreachable:
             return py_analytical_status::unreachable;
@@ -65,26 +65,37 @@ struct AnalyticalResult
     double error_metric{0.0};
 };
 
-template <int N, int MaxSolutions>
-inline AnalyticalResult to_analytical_result(
-    cartan::expected<cartan::analytical_result<double, N, MaxSolutions>,
-                     cartan::analytical_error<double>>&& r)
+struct UnwrappedResult
 {
-    if (!r)
+    std::vector<Eigen::VectorXd> solutions;
+    std::vector<cartan::range_status> tags;
+    py_analytical_status status{py_analytical_status::ok};
+    double error_metric{0.0};
+};
+
+inline AnalyticalResult to_analytical_error_result(const cartan::analytical_error<double> &err)
+{
+    AnalyticalResult out;
+    out.status       = to_py_status(err.reason);
+    out.error_metric = err.workspace_distance;
+    return out;
+}
+
+template<int N, int MaxSolutions>
+inline AnalyticalResult to_analytical_result(cartan::expected<cartan::analytical_result<double, N, MaxSolutions>, cartan::analytical_error<double>> &&r)
+{
+    if(!r)
     {
         auto err = std::move(r).error();
-        AnalyticalResult out;
-        out.status = to_py_status(err.reason);
-        out.error_metric = err.workspace_distance;
-        return out;
+        return to_analytical_error_result(err);
     }
     AnalyticalResult out;
     out.solutions.reserve(static_cast<std::size_t>(r->count));
-    for (int i = 0; i < r->count; ++i)
+    for(int i = 0; i < r->count; ++i)
     {
         out.solutions.emplace_back(r->solutions[static_cast<std::size_t>(i)]);
     }
-    out.status = py_analytical_status::ok;
+    out.status       = py_analytical_status::ok;
     out.error_metric = 0.0;
     return out;
 }

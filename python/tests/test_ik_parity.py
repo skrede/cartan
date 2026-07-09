@@ -18,8 +18,7 @@ The parity matrix exercised here:
     returns canonical representatives), so the parity assertion is on
     workspace pose agreement, not on joint-vector equality. KR6 and UR5e
     are excluded from the Pieper branch because their vendored URDFs do
-    not satisfy the strict wrist-intersection precondition (Plan 06
-    summary captures the 20-seed sweep that surfaced this).
+    not satisfy the strict wrist-intersection precondition.
 
 (c) **`solve_all` ranking correctness.** `solve_all(chain, target, q_seed=seed)`
     returns the surviving Pieper branches sorted by ascending L2 distance
@@ -120,11 +119,11 @@ def test_iterative_trio_parity_on_fk_walked_target(
 # ---------------------------------------------------------------------------
 # (b) Analytical-as-FK-verified-subset-of-iterative on Pieper geometry.
 #
-# Per Plan 06 SUMMARY: only the IRB120 vendored URDF satisfies the strict
-# wrist-axis-intersection precondition. UR5e returns degenerate_geometry
-# and KR6 returns unreachable on FK-walked random targets, so they are
-# excluded from this parity branch (their iterative IK works fine -- see
-# test (a) above -- but their closed-form branch is empty by design).
+# Only the IRB120 vendored URDF satisfies the strict wrist-axis-intersection
+# precondition. UR5e returns degenerate_geometry and KR6 returns unreachable
+# on FK-walked random targets, so they are excluded from this parity branch
+# (their iterative IK works fine -- see test (a) above -- but their closed-form
+# branch is empty by design).
 # ---------------------------------------------------------------------------
 
 
