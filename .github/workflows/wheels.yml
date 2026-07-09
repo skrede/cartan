@@ -8,12 +8,23 @@ on:
       - "docs/**"
       - ".planning/**"
   pull_request:
-    branches: [develop]
+    branches: [master, develop]
     paths-ignore:
       - "**.md"
       - "docs/**"
       - ".planning/**"
   workflow_dispatch:
+    inputs:
+      tier:
+        description: "Wheel CI tier for the selected branch"
+        required: true
+        default: full
+        type: choice
+        options:
+          - full
+          - limited
+          - smoke
+          - auto
 
 permissions:
   contents: read
@@ -31,13 +42,126 @@ env:
     MACOSX_DEPLOYMENT_TARGET=10.15
 
 jobs:
+  select:
+    name: select wheel matrix
+    runs-on: ubuntu-latest
+    outputs:
+      tier: ${{ steps.tier.outputs.tier }}
+      build_matrix: ${{ steps.tier.outputs.build_matrix }}
+      baseline_matrix: ${{ steps.tier.outputs.baseline_matrix }}
+      artifact_test_matrix: ${{ steps.tier.outputs.artifact_test_matrix }}
+      numpy_matrix: ${{ steps.tier.outputs.numpy_matrix }}
+      portability_matrix: ${{ steps.tier.outputs.portability_matrix }}
+      run_baseline: ${{ steps.tier.outputs.run_baseline }}
+      run_abi3: ${{ steps.tier.outputs.run_abi3 }}
+      run_artifact_tests: ${{ steps.tier.outputs.run_artifact_tests }}
+      run_numpy: ${{ steps.tier.outputs.run_numpy }}
+      run_portability: ${{ steps.tier.outputs.run_portability }}
+    steps:
+      - id: tier
+        shell: bash
+        run: |
+          linux_x86_64_2014='{"name":"linux-x86_64-manylinux2014","os":"ubuntu-latest","linux_arch":"x86_64","macos_arch":"auto","windows_arch":"AMD64","manylinux_image":"manylinux2014"}'
+          linux_x86_64_228='{"name":"linux-x86_64-manylinux_2_28","os":"ubuntu-latest","linux_arch":"x86_64","macos_arch":"auto","windows_arch":"AMD64","manylinux_image":"manylinux_2_28"}'
+          linux_aarch64_2014='{"name":"linux-aarch64-manylinux2014","os":"ubuntu-24.04-arm","linux_arch":"aarch64","macos_arch":"auto","windows_arch":"AMD64","manylinux_image":"manylinux2014"}'
+          linux_aarch64_228='{"name":"linux-aarch64-manylinux_2_28","os":"ubuntu-24.04-arm","linux_arch":"aarch64","macos_arch":"auto","windows_arch":"AMD64","manylinux_image":"manylinux_2_28"}'
+          macos_arm64='{"name":"macos-arm64","os":"macos-latest","linux_arch":"x86_64","macos_arch":"arm64","windows_arch":"AMD64","manylinux_image":"manylinux_2_28"}'
+          macos_x86_64='{"name":"macos-x86_64","os":"macos-15-intel","linux_arch":"x86_64","macos_arch":"x86_64","windows_arch":"AMD64","manylinux_image":"manylinux_2_28"}'
+          windows_x64='{"name":"windows-x64","os":"windows-latest","linux_arch":"x86_64","macos_arch":"auto","windows_arch":"AMD64","manylinux_image":"manylinux_2_28"}'
+
+          full_build="$linux_x86_64_2014,$linux_x86_64_228,$linux_aarch64_2014,$linux_aarch64_228,$macos_arm64,$macos_x86_64,$windows_x64"
+          limited_build="$linux_x86_64_2014,$linux_x86_64_228"
+          smoke_build="$linux_x86_64_228"
+
+          full_baseline='{"manylinux_image":"manylinux2014"},{"manylinux_image":"manylinux_2_28"}'
+          full_artifact_tests='{"name":"linux-x86_64","os":"ubuntu-latest"},{"name":"macos-arm64","os":"macos-latest"},{"name":"macos-x86_64","os":"macos-15-intel"},{"name":"windows-x64","os":"windows-latest"}'
+          limited_artifact_tests='{"name":"linux-x86_64","os":"ubuntu-latest"}'
+          numpy_versions='{"python-version":"3.10"},{"python-version":"3.11"}'
+          portability='{"name":"manylinux2014-centos7","image":"quay.io/pypa/manylinux2014_x86_64","python":"/opt/python/cp312-cp312/bin/python","setup":"true"},{"name":"manylinux2014-ubuntu1804","image":"python:3.10-bionic","python":"python","setup":"true"},{"name":"manylinux_2_28-bookworm","image":"python:3.12-bookworm","python":"python","setup":"true"},{"name":"manylinux_2_28-ubuntu2204","image":"ubuntu:22.04","python":"python3","setup":"apt-get update && apt-get install -y python3 python3-venv python3-pip"}'
+
+          event='${{ github.event_name }}'
+          ref='${{ github.ref }}'
+          base='${{ github.base_ref }}'
+          requested='${{ github.event.inputs.tier }}'
+
+          if [ "$event" = "workflow_dispatch" ] && [ "$requested" != "auto" ]; then
+            tier="$requested"
+          elif [ "$event" = "push" ] && [ "$ref" = "refs/heads/master" ]; then
+            tier="full"
+          elif [ "$event" = "pull_request" ] && [ "$base" = "master" ]; then
+            tier="full"
+          elif [ "$event" = "push" ] && [ "$ref" = "refs/heads/develop" ]; then
+            tier="limited"
+          elif [ "$event" = "pull_request" ] && [ "$base" = "develop" ]; then
+            tier="limited"
+          elif [ "$event" = "push" ] && [ "${ref#refs/heads/milestone/}" != "$ref" ]; then
+            tier="smoke"
+          else
+            tier="smoke"
+          fi
+
+          case "$tier" in
+            full)
+              build="$full_build"
+              baseline="$full_baseline"
+              artifact_tests="$full_artifact_tests"
+              numpy="$numpy_versions"
+              run_baseline=true
+              run_abi3=true
+              run_artifact_tests=true
+              run_numpy=true
+              run_portability=true
+              ;;
+            limited)
+              build="$limited_build"
+              baseline="$full_baseline"
+              artifact_tests="$limited_artifact_tests"
+              numpy="$numpy_versions"
+              run_baseline=true
+              run_abi3=false
+              run_artifact_tests=true
+              run_numpy=true
+              run_portability=false
+              ;;
+            smoke)
+              build="$smoke_build"
+              baseline="$full_baseline"
+              artifact_tests="$limited_artifact_tests"
+              numpy="$numpy_versions"
+              run_baseline=false
+              run_abi3=false
+              run_artifact_tests=false
+              run_numpy=false
+              run_portability=false
+              ;;
+            *)
+              echo "unsupported tier: $tier" >&2
+              exit 1
+              ;;
+          esac
+
+          {
+            echo "tier=$tier"
+            echo "build_matrix={\"include\":[$build]}"
+            echo "baseline_matrix={\"include\":[$baseline]}"
+            echo "artifact_test_matrix={\"include\":[$artifact_tests]}"
+            echo "numpy_matrix={\"include\":[$numpy]}"
+            echo "portability_matrix={\"include\":[$portability]}"
+            echo "run_baseline=$run_baseline"
+            echo "run_abi3=$run_abi3"
+            echo "run_artifact_tests=$run_artifact_tests"
+            echo "run_numpy=$run_numpy"
+            echo "run_portability=$run_portability"
+          } >> "$GITHUB_OUTPUT"
+
   baseline-probe:
+    needs: select
+    if: needs.select.outputs.run_baseline == 'true'
     name: baseline probe (${{ matrix.manylinux_image }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix:
-        manylinux_image: [manylinux2014, manylinux_2_28]
+      matrix: ${{ fromJSON(needs.select.outputs.baseline_matrix) }}
 
     env:
       CIBW_BUILD: "cp312-manylinux_x86_64"
@@ -81,6 +205,8 @@ jobs:
             reports/*.md
 
   abi3-probe:
+    needs: select
+    if: needs.select.outputs.run_abi3 == 'true'
     name: abi3 probe
     runs-on: ubuntu-latest
 
@@ -219,54 +345,12 @@ jobs:
             reports/*.json
 
   build-wheels:
+    needs: select
     name: build ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - name: linux-x86_64-manylinux2014
-            os: ubuntu-latest
-            linux_arch: x86_64
-            macos_arch: auto
-            windows_arch: AMD64
-            manylinux_image: manylinux2014
-          - name: linux-x86_64-manylinux_2_28
-            os: ubuntu-latest
-            linux_arch: x86_64
-            macos_arch: auto
-            windows_arch: AMD64
-            manylinux_image: manylinux_2_28
-          - name: linux-aarch64-manylinux2014
-            os: ubuntu-24.04-arm
-            linux_arch: aarch64
-            macos_arch: auto
-            windows_arch: AMD64
-            manylinux_image: manylinux2014
-          - name: linux-aarch64-manylinux_2_28
-            os: ubuntu-24.04-arm
-            linux_arch: aarch64
-            macos_arch: auto
-            windows_arch: AMD64
-            manylinux_image: manylinux_2_28
-          - name: macos-arm64
-            os: macos-latest
-            linux_arch: x86_64
-            macos_arch: arm64
-            windows_arch: AMD64
-            manylinux_image: manylinux_2_28
-          - name: macos-x86_64
-            os: macos-15-intel
-            linux_arch: x86_64
-            macos_arch: x86_64
-            windows_arch: AMD64
-            manylinux_image: manylinux_2_28
-          - name: windows-x64
-            os: windows-latest
-            linux_arch: x86_64
-            macos_arch: auto
-            windows_arch: AMD64
-            manylinux_image: manylinux_2_28
+      matrix: ${{ fromJSON(needs.select.outputs.build_matrix) }}
 
     env:
       CIBW_ARCHS_LINUX: ${{ matrix.linux_arch }}
@@ -290,21 +374,13 @@ jobs:
           path: wheelhouse/*.whl
 
   test-wheel-artifacts:
+    if: needs.select.outputs.run_artifact_tests == 'true'
     name: test downloaded wheels (${{ matrix.name }})
-    needs: build-wheels
+    needs: [select, build-wheels]
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - name: linux-x86_64
-            os: ubuntu-latest
-          - name: macos-arm64
-            os: macos-latest
-          - name: macos-x86_64
-            os: macos-15-intel
-          - name: windows-x64
-            os: windows-latest
+      matrix: ${{ fromJSON(needs.select.outputs.artifact_test_matrix) }}
 
     steps:
       - uses: actions/checkout@v4
@@ -331,13 +407,13 @@ jobs:
           python -m pytest python/tests/test_wheel_smoke.py -q
 
   numpy-compat:
+    if: needs.select.outputs.run_numpy == 'true'
     name: NumPy compatibility (${{ matrix.python-version }})
-    needs: build-wheels
+    needs: [select, build-wheels]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix:
-        python-version: ["3.10", "3.11"]
+      matrix: ${{ fromJSON(needs.select.outputs.numpy_matrix) }}
 
     steps:
       - uses: actions/checkout@v4
@@ -366,29 +442,13 @@ jobs:
           done
 
   linux-portability-smoke:
+    if: needs.select.outputs.run_portability == 'true'
     name: Linux portability smoke (${{ matrix.name }})
-    needs: build-wheels
+    needs: [select, build-wheels]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - name: manylinux2014-centos7
-            image: quay.io/pypa/manylinux2014_x86_64
-            python: /opt/python/cp312-cp312/bin/python
-            setup: "true"
-          - name: manylinux2014-ubuntu1804
-            image: python:3.10-bionic
-            python: python
-            setup: "true"
-          - name: manylinux_2_28-bookworm
-            image: python:3.12-bookworm
-            python: python
-            setup: "true"
-          - name: manylinux_2_28-ubuntu2204
-            image: ubuntu:22.04
-            python: python3
-            setup: "apt-get update && apt-get install -y python3 python3-venv python3-pip"
+      matrix: ${{ fromJSON(needs.select.outputs.portability_matrix) }}
 
     steps:
       - uses: actions/checkout@v4
