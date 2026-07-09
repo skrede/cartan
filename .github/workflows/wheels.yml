@@ -28,7 +28,7 @@ env:
     CXXFLAGS="-D_GLIBCXX_USE_CXX11_ABI=1 -Os -ffunction-sections -fdata-sections"
     LDFLAGS="-static-libstdc++ -static-libgcc -Wl,--gc-sections"
   CIBW_ENVIRONMENT_MACOS: >-
-    MACOSX_DEPLOYMENT_TARGET=10.13
+    MACOSX_DEPLOYMENT_TARGET=10.15
 
 jobs:
   baseline-probe:

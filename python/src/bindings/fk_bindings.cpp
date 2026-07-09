@@ -38,7 +38,7 @@ void register_fk(nb::module_& m)
              const nb::DRef<const VectorXd>& q) -> JacobianMatrixd {
               VectorXd q_owned(q);
               auto fk = cartan::forward_kinematics(chain, q_owned);
-              return cartan::space_jacobian(chain, fk);
+              return cartan::space_jacobian<double, cartan::dynamic>(chain, fk);
           },
           "Space-frame Jacobian J_s(q) such that V_s = J_s(q) * dq.",
           nb::arg("chain"), nb::arg("q").noconvert());
@@ -48,7 +48,7 @@ void register_fk(nb::module_& m)
              const nb::DRef<const VectorXd>& q) -> JacobianMatrixd {
               VectorXd q_owned(q);
               auto fk = cartan::forward_kinematics(chain, q_owned);
-              return cartan::body_jacobian(chain, fk);
+              return cartan::body_jacobian<double, cartan::dynamic>(chain, fk);
           },
           "Body-frame Jacobian J_b(q) such that V_b = J_b(q) * dq.",
           nb::arg("chain"), nb::arg("q").noconvert());
