@@ -534,7 +534,7 @@ public:
     {
         if (!m_has_value)
         {
-#if defined(__cpp_exceptions)
+#if defined(__cpp_exceptions) || defined(_CPPUNWIND)
             throw bad_expected_access<E>(m_error);
 #else
             detail::on_bad_expected_access();
@@ -547,7 +547,7 @@ public:
     {
         if (!m_has_value)
         {
-#if defined(__cpp_exceptions)
+#if defined(__cpp_exceptions) || defined(_CPPUNWIND)
             throw bad_expected_access<E>(m_error);
 #else
             detail::on_bad_expected_access();
@@ -560,7 +560,7 @@ public:
     {
         if (!m_has_value)
         {
-#if defined(__cpp_exceptions)
+#if defined(__cpp_exceptions) || defined(_CPPUNWIND)
             throw bad_expected_access<E>(std::move(m_error));
 #else
             detail::on_bad_expected_access();
@@ -573,7 +573,7 @@ public:
     {
         if (!m_has_value)
         {
-#if defined(__cpp_exceptions)
+#if defined(__cpp_exceptions) || defined(_CPPUNWIND)
             throw bad_expected_access<E>(std::move(m_error));
 #else
             detail::on_bad_expected_access();
@@ -972,7 +972,7 @@ public:
     {
         if (!m_has_value)
         {
-#if defined(__cpp_exceptions)
+#if defined(__cpp_exceptions) || defined(_CPPUNWIND)
             throw bad_expected_access<E>(m_error);
 #else
             detail::on_bad_expected_access();
@@ -984,7 +984,7 @@ public:
     {
         if (!m_has_value)
         {
-#if defined(__cpp_exceptions)
+#if defined(__cpp_exceptions) || defined(_CPPUNWIND)
             throw bad_expected_access<E>(std::move(m_error));
 #else
             detail::on_bad_expected_access();
