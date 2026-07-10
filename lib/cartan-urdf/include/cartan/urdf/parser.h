@@ -19,14 +19,14 @@
 #include "cartan/lie/so3.h"
 
 #include "cartan/types.h"
+#include "cartan/expected.h"
 
 #include <pugixml.hpp>
 
 #include <cmath>
 #include <string>
 #include <vector>
-#include <sstream>
-#include "cartan/expected.h"
+#include <charconv>
 #include <filesystem>
 #include <string_view>
 #include <system_error>
@@ -95,19 +95,51 @@ inline std::optional<double> as_finite_double(const pugi::xml_attribute& attr)
     return raw;
 }
 
-/// Parse a whitespace-separated triple ("x y z") into a vector3. Returns
-/// false on parse failure; the caller is responsible for raising the
-/// appropriate urdf_failure.
+/// Consume and return the next whitespace-delimited token from s, advancing s
+/// past it. Returns an empty view when only whitespace remains.
+inline std::string_view next_field(std::string_view& s)
+{
+    constexpr std::string_view ws = " \t\r\n\f\v";
+    const std::size_t begin = s.find_first_not_of(ws);
+    if (begin == std::string_view::npos)
+    {
+        s = {};
+        return {};
+    }
+    s.remove_prefix(begin);
+    const std::size_t end = s.find_first_of(ws);
+    const std::string_view token = s.substr(0, end);
+    s.remove_prefix(end == std::string_view::npos ? s.size() : end);
+    return token;
+}
+
+/// Parse a whitespace-separated triple ("x y z") into a vector3. from_chars
+/// keeps parsing locale-independent; stream extraction routes through the
+/// std::num_get facet, which crashes when a static-libstdc++ wheel and numpy
+/// pull in two libstdc++ runtimes. Returns false on any field failure or a
+/// count other than three; out is written only on full success.
 template <typename Scalar>
 bool parse_triple(std::string_view s, vector3<Scalar>& out)
 {
-    std::stringstream ss{std::string(s)};
-    Scalar x{}, y{}, z{};
-    if (!(ss >> x >> y >> z))
+    Scalar values[3];
+    for (std::size_t i = 0; i < 3; ++i)
+    {
+        const std::string_view field = next_field(s);
+        if (field.empty())
+        {
+            return false;
+        }
+        const auto [ptr, ec] = std::from_chars(field.data(), field.data() + field.size(), values[i]);
+        if (ec != std::errc{} || ptr != field.data() + field.size())
+        {
+            return false;
+        }
+    }
+    if (!next_field(s).empty())
     {
         return false;
     }
-    out << x, y, z;
+    out << values[0], values[1], values[2];
     return true;
 }
 
