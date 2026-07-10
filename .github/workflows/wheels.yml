@@ -369,6 +369,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # TestPyPI needs a unique PEP 440 dev version per run; inject it before
+      # cibuildwheel reads pyproject.toml so the wheels carry it. develop only.
+      - name: Inject dev version for TestPyPI
+        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+        run: sed -i 's/^version = "0.4.2"$/version = "0.4.2.dev${{ github.run_number }}"/' pyproject.toml
+
       - name: Build wheels
         uses: pypa/cibuildwheel@v3.4.1
         with:
@@ -482,3 +488,54 @@ jobs:
         with:
           name: linux-portability-smoke-${{ matrix.name }}
           path: reports/*.log
+
+  sdist:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    name: build sdist
+    needs: select
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Inject dev version for TestPyPI
+        run: sed -i 's/^version = "0.4.2"$/version = "0.4.2.dev${{ github.run_number }}"/' pyproject.toml
+
+      - name: Build sdist
+        run: pipx run build --sdist
+
+      - name: Upload sdist
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+
+  publish-testpypi:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    name: publish to TestPyPI
+    needs: [select, build-wheels, test-wheel-artifacts, sdist]
+    runs-on: ubuntu-latest
+    environment: testpypi
+    permissions:
+      id-token: write
+    steps:
+      - name: Download built wheels
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: wheels-*
+          merge-multiple: true
+
+      - name: Download sdist
+        uses: actions/download-artifact@v4
+        with:
+          name: sdist
+          path: dist
+
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
