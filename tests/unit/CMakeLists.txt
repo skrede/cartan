@@ -6,7 +6,7 @@ function(cartan_add_test TEST_NAME TEST_SOURCE)
         Catch2::Catch2WithMain
     )
     target_compile_options(${TEST_NAME} PRIVATE ${CARTAN_WARNING_FLAGS})
-    if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    if (CARTAN_HAS_WNO_C2Y_EXTENSIONS)
         target_compile_options(${TEST_NAME} PRIVATE -Wno-c2y-extensions)
     endif ()
     add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})

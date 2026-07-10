@@ -12,6 +12,14 @@ if (CARTAN_BUILD_TESTS)
         find_package(Catch2 CONFIG REQUIRED)
     endif ()
 
+    # AppleClang matches "Clang" but lacks -Wno-c2y-extensions, so probe support
+    # rather than the compiler name. -Werror=unknown-warning-option makes the
+    # probe fail on compilers that reject the flag.
+    include(CheckCXXCompilerFlag)
+    set(CMAKE_REQUIRED_FLAGS "-Werror=unknown-warning-option")
+    check_cxx_compiler_flag("-Wno-c2y-extensions" CARTAN_HAS_WNO_C2Y_EXTENSIONS)
+    unset(CMAKE_REQUIRED_FLAGS)
+
     if (CARTAN_BUILD_PROPERTY_TESTS)
         FetchContent_Declare(
             rapidcheck
