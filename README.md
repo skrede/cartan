@@ -1,4 +1,9 @@
-# Cartan
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/cartan-banner-dark.svg">
+    <img alt="Cartan" src="docs/cartan-banner.svg" width="640">
+  </picture>
+</p>
 
 ![Linux](https://github.com/skrede/cartan/actions/workflows/linux.yml/badge.svg)
 ![macOS](https://github.com/skrede/cartan/actions/workflows/macos.yml/badge.svg)
