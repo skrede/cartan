@@ -157,7 +157,7 @@ jobs:
   baseline-probe:
     needs: select
     if: needs.select.outputs.run_baseline == 'true'
-    name: baseline probe (${{ matrix.manylinux_image }})
+    name: baseline probe
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -182,7 +182,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y binutils
 
-      - name: Build probe wheel
+      - name: Build probe wheel (${{ matrix.manylinux_image }})
         uses: pypa/cibuildwheel@v3.4.1
         with:
           output-dir: wheelhouse
@@ -375,7 +375,7 @@ jobs:
 
   test-wheel-artifacts:
     if: needs.select.outputs.run_artifact_tests == 'true'
-    name: test downloaded wheels (${{ matrix.name }})
+    name: test downloaded wheels
     needs: [select, build-wheels]
     runs-on: ${{ matrix.os }}
     strategy:
@@ -396,7 +396,7 @@ jobs:
           pattern: wheels-*
           merge-multiple: true
 
-      - name: Test exact downloaded wheel
+      - name: Test exact downloaded wheel (${{ matrix.name }})
         shell: bash
         run: |
           python -m venv .venv-wheel-test
@@ -408,7 +408,7 @@ jobs:
 
   numpy-compat:
     if: needs.select.outputs.run_numpy == 'true'
-    name: NumPy compatibility (${{ matrix.python-version }})
+    name: NumPy compatibility
     needs: [select, build-wheels]
     runs-on: ubuntu-latest
     strategy:
@@ -429,7 +429,7 @@ jobs:
           pattern: wheels-linux-x86_64-*
           merge-multiple: true
 
-      - name: Run pinned NumPy sweep
+      - name: Run pinned NumPy sweep (${{ matrix.python-version }})
         run: |
           python -m venv .venv-numpy
           . .venv-numpy/bin/activate
@@ -443,7 +443,7 @@ jobs:
 
   linux-portability-smoke:
     if: needs.select.outputs.run_portability == 'true'
-    name: Linux portability smoke (${{ matrix.name }})
+    name: Linux portability smoke
     needs: [select, build-wheels]
     runs-on: ubuntu-latest
     strategy:
@@ -460,7 +460,7 @@ jobs:
           pattern: wheels-linux-x86_64-*
           merge-multiple: true
 
-      - name: Run container smoke
+      - name: Run container smoke (${{ matrix.name }})
         run: |
           mkdir -p reports
           docker run --rm \
