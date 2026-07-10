@@ -6,8 +6,13 @@
 [![codecov](https://codecov.io/gh/skrede/cartan/branch/master/graph/badge.svg)](https://codecov.io/gh/skrede/cartan)
 ![License](https://img.shields.io/badge/license-Apache_2.0-blue.svg)
 ![C++20](https://img.shields.io/badge/C%2B%2B-20-blue.svg)
+![Status](https://img.shields.io/badge/status-public%20preview-orange.svg)
 
 C++ Lie group and kinematics library for robotics.
+
+## Status
+
+**Public preview.** The C++ API and Python bindings are stabilizing; expect breaking changes through the `v0.4.x` line. The library builds and tests on Linux, macOS, and Windows, but is not yet published to PyPI — install from source or via `FetchContent` for now (see below).
 
 ### Rotations on SO(3)
 
