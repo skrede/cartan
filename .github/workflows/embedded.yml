@@ -60,12 +60,19 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
+      # Eigen sits outside ESP-IDF's component graph; provide it as a local
+      # checkout and hand it to the containerized build via CARTAN_EIGEN_DIR.
+      # The action mounts the workspace at /app/${{ github.repository }}.
+      - name: Fetch Eigen for the ESP builds
+        run: git clone --depth 1 --branch 3.4.0 https://gitlab.com/libeigen/eigen.git "${{ github.workspace }}/eigen-esp"
+
       - name: Build the exceptions-off smoke
         uses: espressif/esp-idf-ci-action@e6f5c74232b1ccd4c97ed641f1e48553853f1fd5 # v1.2.0
         with:
           esp_idf_version: v5.1
           target: ${{ matrix.target }}
           path: tests/embedded/esp32-smoke
+          extra_docker_args: -e CARTAN_EIGEN_DIR=/app/${{ github.repository }}/eigen-esp
 
       # The bench drives UART2 on GPIO16/17, which is a classic-ESP32 layout;
       # keep it on the esp32 target only.
@@ -76,3 +83,4 @@ jobs:
           esp_idf_version: v5.1
           target: esp32
           path: tests/embedded/esp32-bench
+          extra_docker_args: -e CARTAN_EIGEN_DIR=/app/${{ github.repository }}/eigen-esp
