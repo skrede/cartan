@@ -6,7 +6,7 @@ requires = [
 build-backend = "scikit_build_core.build"
 
 [project]
-name = "cartan"
+name = "cartan-python"
 version = "0.4.2"
 description = "Python bindings for cartan — C++20 Lie group, kinematics, and IK library"
 readme = "README.md"

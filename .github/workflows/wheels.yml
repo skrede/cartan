@@ -251,7 +251,7 @@ jobs:
           . .venv-per-cpython/bin/activate
           python -m pip install --upgrade pip
           python -m pip install "numpy<2.5"
-          python -m pip install --no-index --find-links wheelhouse-per-cpython --no-deps cartan
+          python -m pip install --no-index --find-links wheelhouse-per-cpython --no-deps cartan-bindings
           mkdir -p reports
           python tools/wheel_abi_bench.py --repeats 5 --iterations 1000 > reports/per-cpython-cp312.json
 
@@ -265,7 +265,7 @@ jobs:
           . .venv-abi3-cp312/bin/activate
           python -m pip install --upgrade pip
           python -m pip install "numpy<2.5"
-          python -m pip install --no-index --find-links wheelhouse-abi3 --no-deps cartan
+          python -m pip install --no-index --find-links wheelhouse-abi3 --no-deps cartan-bindings
           python tools/wheel_abi_bench.py --repeats 5 --iterations 1000 > reports/abi3-cp312.json
 
       - uses: actions/setup-python@v5
@@ -280,7 +280,7 @@ jobs:
           . .venv-abi3-cp313/bin/activate
           python -m pip install --upgrade pip
           python -m pip install "numpy<2.5" pytest
-          python -m pip install --no-index --find-links wheelhouse-abi3 --no-deps cartan
+          python -m pip install --no-index --find-links wheelhouse-abi3 --no-deps cartan-bindings
           python -m pytest python/tests/test_wheel_smoke.py -q
 
       - uses: actions/setup-python@v5
@@ -296,7 +296,7 @@ jobs:
           . .venv-abi3-cp314/bin/activate
           python -m pip install --upgrade pip
           python -m pip install "numpy<2.5" pytest
-          python -m pip install --no-index --find-links wheelhouse-abi3 --no-deps cartan
+          python -m pip install --no-index --find-links wheelhouse-abi3 --no-deps cartan-bindings
           python -m pytest python/tests/test_wheel_smoke.py -q
 
       - name: Summarize ABI overhead
@@ -416,7 +416,7 @@ jobs:
           . .venv-wheel-test/Scripts/activate 2>/dev/null || . .venv-wheel-test/bin/activate
           python -m pip install --upgrade pip
           python -m pip install "numpy<2.5" pytest
-          python -m pip install --no-index --find-links downloaded-wheels --no-deps cartan
+          python -m pip install --no-index --find-links downloaded-wheels --no-deps cartan-bindings
           python -m pytest python/tests/test_wheel_smoke.py -q
 
   numpy-compat:
@@ -448,7 +448,7 @@ jobs:
           . .venv-numpy/bin/activate
           python -m pip install --upgrade pip
           python -m pip install pytest
-          python -m pip install --no-index --find-links downloaded-wheels --no-deps cartan
+          python -m pip install --no-index --find-links downloaded-wheels --no-deps cartan-bindings
           pins="numpy==1.23 numpy==1.26 numpy==2.0"
           # numpy 2.3+ requires python >=3.11, so 3.10 tops out at the 2.2 series
           if [ "${{ matrix.python-version }}" = "3.10" ]; then
@@ -487,7 +487,7 @@ jobs:
             -v "${{ github.workspace }}:/work" \
             -w /work \
             "${{ matrix.image }}" \
-            bash -lc '${{ matrix.setup }} && "${{ matrix.python }}" -m pip install --upgrade pip && "${{ matrix.python }}" -m pip install "numpy<2.5" pytest && "${{ matrix.python }}" -m pip install --no-index --find-links /work/downloaded-wheels --no-deps cartan && "${{ matrix.python }}" -m pytest python/tests/test_wheel_smoke.py -q' \
+            bash -lc '${{ matrix.setup }} && "${{ matrix.python }}" -m pip install --upgrade pip && "${{ matrix.python }}" -m pip install "numpy<2.5" pytest && "${{ matrix.python }}" -m pip install --no-index --find-links /work/downloaded-wheels --no-deps cartan-bindings && "${{ matrix.python }}" -m pytest python/tests/test_wheel_smoke.py -q' \
             | tee reports/${{ matrix.name }}.log
 
       - name: Upload portability report
