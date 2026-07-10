@@ -25,6 +25,11 @@ on:
           - limited
           - smoke
           - auto
+  schedule:
+    # Weekly full-matrix drift check: catches runner-image / toolchain changes
+    # that turn a green build red with no code change. Scheduled runs use the
+    # default branch (master). Sunday 23:59 UTC.
+    - cron: "59 23 * * 0"
 
 permissions:
   contents: read
@@ -86,6 +91,8 @@ jobs:
 
           if [ "$event" = "workflow_dispatch" ] && [ "$requested" != "auto" ]; then
             tier="$requested"
+          elif [ "$event" = "schedule" ]; then
+            tier="full"
           elif [ "$event" = "push" ] && [ "$ref" = "refs/heads/master" ]; then
             tier="full"
           elif [ "$event" = "pull_request" ] && [ "$base" = "master" ]; then
@@ -95,7 +102,7 @@ jobs:
           elif [ "$event" = "pull_request" ] && [ "$base" = "develop" ]; then
             tier="limited"
           elif [ "$event" = "push" ] && [ "${ref#refs/heads/milestone/}" != "$ref" ]; then
-            tier="smoke"
+            tier="limited"
           else
             tier="smoke"
           fi
