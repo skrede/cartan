@@ -129,6 +129,15 @@ TEST_CASE("projected_lm outputs are bitwise identical to the golden record", "[i
 {
     const golden_blob blob = build_blob();
 
+    // Floating-point results are not bit-portable across compilers, so the
+    // bitwise golden gate is only valid on the build that captured the record.
+    // The solver still runs everywhere via build_blob above; the exact
+    // comparison runs on the reference build (Linux, GCC) and is skipped
+    // elsewhere.
+#if !(defined(__linux__) && defined(__GNUC__) && !defined(__clang__))
+    SKIP("bitwise golden gate runs on the reference build only (Linux/GCC)");
+#endif
+
     REQUIRE(blob.double_scalars.size() == cartan_plm_golden::double_scalar_count);
     REQUIRE(blob.double_ints.size() == cartan_plm_golden::double_int_count);
     REQUIRE(blob.float_scalars.size() == cartan_plm_golden::float_scalar_count);
