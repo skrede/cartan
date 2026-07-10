@@ -22,10 +22,11 @@
 #include <nanobind/stl/string.h>
 #include <nanobind/nanobind.h>
 
-#include <sstream>
-#include <utility>
-#include <optional>
+#include <array>
 #include <string>
+#include <utility>
+#include <charconv>
+#include <optional>
 
 namespace nb = nanobind;
 
@@ -71,6 +72,16 @@ using py_argmin_lm_runner     = cartan::basic_ik_runner<py_argmin_lm_inner>;
 using py_argmin_lbfgsb_runner = cartan::basic_ik_runner<py_argmin_lbfgsb_inner>;
 #endif
 
+/// Format a double locale-free. std::to_chars sidesteps the num_put / ctype
+/// facets that crash when a static-libstdc++ wheel and numpy load two
+/// libstdc++ runtimes; ostream formatting routes through those facets.
+inline std::string format_double(double value)
+{
+    std::array<char, 32> buffer{};
+    const auto result = std::to_chars(buffer.data(), buffer.data() + buffer.size(), value);
+    return std::string(buffer.data(), result.ptr);
+}
+
 /// Validate target finiteness + q_seed.size() == chain.num_joints().
 /// Raises Python ValueError on failure (per the iterative IK hard-fail contract).
 inline void validate_ik_inputs(const char* fn_name,
@@ -81,22 +92,16 @@ inline void validate_ik_inputs(const char* fn_name,
     if (target.translation().array().isNaN().any() ||
         !target.translation().array().isFinite().all())
     {
-        std::ostringstream s;
-        s << fn_name << ": target contains NaN or non-finite translation";
-        throw nb::value_error(s.str().c_str());
+        throw nb::value_error((std::string(fn_name) + ": target contains NaN or non-finite translation").c_str());
     }
     if (!target.rotation().matrix().array().isFinite().all())
     {
-        std::ostringstream s;
-        s << fn_name << ": target contains NaN or non-finite rotation";
-        throw nb::value_error(s.str().c_str());
+        throw nb::value_error((std::string(fn_name) + ": target contains NaN or non-finite rotation").c_str());
     }
     if (q_seed.size() != chain.num_joints())
     {
-        std::ostringstream s;
-        s << fn_name << ": q_seed.size() (" << q_seed.size()
-          << ") does not match chain.num_joints() (" << chain.num_joints() << ")";
-        throw nb::value_error(s.str().c_str());
+        throw nb::value_error((std::string(fn_name) + ": q_seed.size() (" + std::to_string(q_seed.size())
+                               + ") does not match chain.num_joints() (" + std::to_string(chain.num_joints()) + ")").c_str());
     }
 }
 
@@ -224,14 +229,12 @@ void register_ik(nb::module_& m)
         .def_rw("halton_seed",                &IkConfig::halton_seed)
         .def("__repr__",
             [](const IkConfig& c) {
-                std::ostringstream s;
-                s << "IkConfig(max_iterations_per_attempt=" << c.max_iterations_per_attempt
-                  << ", max_total_work_units=" << c.max_total_work_units
-                  << ", position_tol=" << c.position_tol
-                  << ", orientation_tol=" << c.orientation_tol
-                  << ", max_total_iterations=" << c.max_total_iterations
-                  << ", halton_seed=" << c.halton_seed << ")";
-                return s.str();
+                return "IkConfig(max_iterations_per_attempt=" + std::to_string(c.max_iterations_per_attempt)
+                     + ", max_total_work_units=" + std::to_string(c.max_total_work_units)
+                     + ", position_tol=" + format_double(c.position_tol)
+                     + ", orientation_tol=" + format_double(c.orientation_tol)
+                     + ", max_total_iterations=" + std::to_string(c.max_total_iterations)
+                     + ", halton_seed=" + std::to_string(c.halton_seed) + ")";
             });
 
     // ------------------------------------------------------------------
@@ -261,15 +264,13 @@ void register_ik(nb::module_& m)
         .def_ro("condition_number",   &IkResult::condition_number)
         .def("__repr__",
             [](const IkResult& r) {
-                std::ostringstream s;
-                s << "IkResult(converged=" << (r.converged ? "True" : "False")
-                  << ", iterations=" << r.iterations
-                  << ", error_norm=" << r.error_norm
-                  << ", solver_index=" << r.solver_index
-                  << ", failure_reason='" << r.failure_reason << "'"
-                  << ", near_singular=" << (r.near_singular ? "True" : "False")
-                  << ", condition_number=" << r.condition_number << ")";
-                return s.str();
+                return std::string("IkResult(converged=") + (r.converged ? "True" : "False")
+                     + ", iterations=" + std::to_string(r.iterations)
+                     + ", error_norm=" + format_double(r.error_norm)
+                     + ", solver_index=" + std::to_string(r.solver_index)
+                     + ", failure_reason='" + r.failure_reason + "'"
+                     + ", near_singular=" + (r.near_singular ? "True" : "False")
+                     + ", condition_number=" + format_double(r.condition_number) + ")";
             });
 
     // ------------------------------------------------------------------

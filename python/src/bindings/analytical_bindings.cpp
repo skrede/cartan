@@ -33,10 +33,11 @@
 
 #include <array>
 #include <limits>
+#include <string>
 #include <cstddef>
 #include <utility>
+#include <charconv>
 #include <optional>
-#include <sstream>
 #include <algorithm>
 
 namespace nb = nanobind;
@@ -54,6 +55,16 @@ using cartan::python::py_analytical_status;
 using cartan::python::to_analytical_error_result;
 using cartan::python::to_analytical_result;
 
+/// Format a double locale-free. std::to_chars sidesteps the num_put / ctype
+/// facets that crash when a static-libstdc++ wheel and numpy load two
+/// libstdc++ runtimes; ostream formatting routes through those facets.
+inline std::string format_double(double value)
+{
+    std::array<char, 32> buffer{};
+    const auto result = std::to_chars(buffer.data(), buffer.data() + buffer.size(), value);
+    return std::string(buffer.data(), result.ptr);
+}
+
 /// Guard each solver lambda against NaN / non-finite target components.
 /// Hard fails raise Python ValueError per the input contract;
 /// joint-count / geometry mismatches are soft fails that flow through the
@@ -62,15 +73,11 @@ inline void validate_target_finite(const char *fn_name, const SE3d &target)
 {
     if(!target.translation().array().isFinite().all())
     {
-        std::ostringstream s;
-        s << fn_name << ": target contains NaN or non-finite translation";
-        throw nb::value_error(s.str().c_str());
+        throw nb::value_error((std::string(fn_name) + ": target contains NaN or non-finite translation").c_str());
     }
     if(!target.rotation().matrix().array().isFinite().all())
     {
-        std::ostringstream s;
-        s << fn_name << ": target contains NaN or non-finite rotation";
-        throw nb::value_error(s.str().c_str());
+        throw nb::value_error((std::string(fn_name) + ": target contains NaN or non-finite rotation").c_str());
     }
 }
 
@@ -167,9 +174,7 @@ inline VectorXd validated_reference(const char *fn_name, const KC &chain, const 
     }
     if(q_seed->size() != n)
     {
-        std::ostringstream s;
-        s << fn_name << ": q_seed.size() (" << q_seed->size() << ") does not match chain.num_joints() (" << n << ")";
-        throw nb::value_error(s.str().c_str());
+        throw nb::value_error((std::string(fn_name) + ": q_seed.size() (" + std::to_string(q_seed->size()) + ") does not match chain.num_joints() (" + std::to_string(n) + ")").c_str());
     }
     reference = q_seed.value();
     return reference;
@@ -210,9 +215,7 @@ inline UnwrappedResult unwrap_analytical_result(const char *fn_name, const KC &c
     {
         if(q.size() != n)
         {
-            std::ostringstream s;
-            s << fn_name << ": solver returned solution size " << q.size() << " for chain.num_joints() " << n;
-            throw nb::value_error(s.str().c_str());
+            throw nb::value_error((std::string(fn_name) + ": solver returned solution size " + std::to_string(q.size()) + " for chain.num_joints() " + std::to_string(n)).c_str());
         }
         VectorXd unwrapped = unwrap_solution(chain, q, reference);
         out.tags.push_back(cartan::detail::within_limits(unwrapped, chain, tol) ? cartan::range_status::in_range : cartan::range_status::joint_limits_violated);
@@ -290,9 +293,8 @@ void register_analytical(nb::module_ &m)
             .def("__repr__",
                  [](const AnalyticalResult &r)
                  {
-                     std::ostringstream s;
-                     s << "AnalyticalResult(num_solutions=" << r.solutions.size() << ", status=" << static_cast<int>(r.status) << ", error_metric=" << r.error_metric << ")";
-                     return s.str();
+                     return "AnalyticalResult(num_solutions=" + std::to_string(r.solutions.size()) + ", status=" + std::to_string(static_cast<int>(r.status))
+                          + ", error_metric=" + format_double(r.error_metric) + ")";
                  });
 
     nb::class_<OPWParametersd>(analytical, "OPWParameters", "Geometric OPW parameters for an ortho-parallel spherical-wrist 6R arm.")
@@ -315,9 +317,8 @@ void register_analytical(nb::module_ &m)
             .def("__repr__",
                  [](const OPWParametersd &p)
                  {
-                     std::ostringstream s;
-                     s << "OPWParameters(a1=" << p.a1 << ", a2=" << p.a2 << ", b=" << p.b << ", c1=" << p.c1 << ", c2=" << p.c2 << ", c3=" << p.c3 << ", c4=" << p.c4 << ")";
-                     return s.str();
+                     return "OPWParameters(a1=" + format_double(p.a1) + ", a2=" + format_double(p.a2) + ", b=" + format_double(p.b) + ", c1=" + format_double(p.c1)
+                          + ", c2=" + format_double(p.c2) + ", c3=" + format_double(p.c3) + ", c4=" + format_double(p.c4) + ")";
                  });
 
     nb::enum_<cartan::opw_branch>(analytical, "OPWBranch", "Stable OPW branch key in ascending shoulder/elbow/wrist order.")
@@ -342,9 +343,8 @@ void register_analytical(nb::module_ &m)
             .def("__repr__",
                  [](const UnwrappedResult &r)
                  {
-                     std::ostringstream s;
-                     s << "UnwrappedResult(num_solutions=" << r.solutions.size() << ", status=" << static_cast<int>(r.status) << ", error_metric=" << r.error_metric << ")";
-                     return s.str();
+                     return "UnwrappedResult(num_solutions=" + std::to_string(r.solutions.size()) + ", status=" + std::to_string(static_cast<int>(r.status))
+                          + ", error_metric=" + format_double(r.error_metric) + ")";
                  });
 
     // ------------------------------------------------------------------
@@ -569,9 +569,9 @@ void register_analytical(nb::module_ &m)
                 validate_target_finite("verify_solution", target);
                 if(q.size() != chain.num_joints())
                 {
-                    std::ostringstream s;
-                    s << "verify_solution: q.size() (" << q.size() << ") does not match chain.num_joints() (" << chain.num_joints() << ")";
-                    throw nb::value_error(s.str().c_str());
+                    throw nb::value_error(("verify_solution: q.size() (" + std::to_string(q.size()) + ") does not match chain.num_joints() ("
+                                           + std::to_string(chain.num_joints()) + ")")
+                                                  .c_str());
                 }
                 cartan::convergence_criteria<double> criteria{tolerance, tolerance, 0, 0};
                 return cartan::verify_solution(chain, target, VectorXd(q), criteria);
