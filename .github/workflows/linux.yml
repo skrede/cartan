@@ -47,20 +47,22 @@ jobs:
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
         run: |
+          # argmin is an optional additive backend; it is not yet consumable as
+          # an embedded FetchContent target (its CMake requires an installed
+          # Eigen3 config), so CI builds the default native-only configuration.
+          # Restore -DCARTAN_BUILD_ARGMIN=ON once argmin builds embeddably.
           if [ "${{ matrix.coverage }}" = "true" ]; then
             cmake . -B build -DCMAKE_BUILD_TYPE=Debug \
               -DCMAKE_CXX_FLAGS="-Werror --coverage" \
               -DCMAKE_C_FLAGS="--coverage" \
               -DCARTAN_BUILD_TESTS=ON \
               -DCARTAN_BUILD_EXAMPLES=OFF \
-              -DCARTAN_BUILD_ARGMIN=ON \
               -DCARTAN_CMAKE_FETCH_DEPS=ON
           else
             cmake . -B build -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_CXX_FLAGS="-Werror" \
               -DCARTAN_BUILD_TESTS=ON \
               -DCARTAN_BUILD_EXAMPLES=OFF \
-              -DCARTAN_BUILD_ARGMIN=ON \
               -DCARTAN_CMAKE_FETCH_DEPS=ON
           fi
 
