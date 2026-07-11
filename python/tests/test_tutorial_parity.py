@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import importlib.machinery
 import os
 import subprocess
 import sys
@@ -16,10 +17,22 @@ PYTHON_ROOT = REPO_ROOT / "python"
 TUTORIALS = PYTHON_ROOT / "tutorials"
 
 
+def _source_tree_has_core() -> bool:
+    cartan_pkg = PYTHON_ROOT / "cartan"
+    return any(
+        (cartan_pkg / f"_core{suffix}").exists()
+        for suffix in importlib.machinery.EXTENSION_SUFFIXES
+    )
+
+
 def _env() -> dict[str, str]:
     env = os.environ.copy()
     env["PYTHONNOUSERSITE"] = "1"
-    env["PYTHONPATH"] = str(PYTHON_ROOT)
+    # Prefer the source tree only when it carries a freshly built _core; a clean
+    # wheel-test checkout has none, and its bare __init__ would shadow the
+    # installed wheel and fail to import the extension.
+    if _source_tree_has_core():
+        env["PYTHONPATH"] = str(PYTHON_ROOT)
     return env
 
 
