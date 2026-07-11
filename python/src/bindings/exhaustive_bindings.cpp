@@ -14,11 +14,11 @@
 #include <nanobind/stl/optional.h>
 #include <nanobind/nanobind.h>
 
-#include <variant>
-#include <utility>
-#include <optional>
-#include <sstream>
+#include <string>
 #include <vector>
+#include <utility>
+#include <variant>
+#include <optional>
 
 namespace nb = nanobind;
 
@@ -137,17 +137,13 @@ void register_exhaustive(nb::module_& m)
                 // Hard-fail guards: NaN / non-finite target components.
                 if (!target.translation().array().isFinite().all())
                 {
-                    std::ostringstream s;
-                    s << "ExhaustiveIKRunner.solve: target contains NaN or "
-                         "non-finite translation";
-                    throw nb::value_error(s.str().c_str());
+                    throw nb::value_error("ExhaustiveIKRunner.solve: target contains NaN or "
+                                          "non-finite translation");
                 }
                 if (!target.rotation().matrix().array().isFinite().all())
                 {
-                    std::ostringstream s;
-                    s << "ExhaustiveIKRunner.solve: target contains NaN or "
-                         "non-finite rotation";
-                    throw nb::value_error(s.str().c_str());
+                    throw nb::value_error("ExhaustiveIKRunner.solve: target contains NaN or "
+                                          "non-finite rotation");
                 }
 
                 VectorXd seed = q_seed
@@ -155,11 +151,8 @@ void register_exhaustive(nb::module_& m)
                     : VectorXd::Zero(self.chain.num_joints());
                 if (seed.size() != self.chain.num_joints())
                 {
-                    std::ostringstream s;
-                    s << "ExhaustiveIKRunner.solve: q_seed.size() ("
-                      << seed.size() << ") does not match chain.num_joints() ("
-                      << self.chain.num_joints() << ")";
-                    throw nb::value_error(s.str().c_str());
+                    throw nb::value_error(("ExhaustiveIKRunner.solve: q_seed.size() (" + std::to_string(seed.size())
+                                           + ") does not match chain.num_joints() (" + std::to_string(self.chain.num_joints()) + ")").c_str());
                 }
 
                 cartan::convergence_criteria<double> criteria{

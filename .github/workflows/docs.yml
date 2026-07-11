@@ -34,11 +34,13 @@ jobs:
       - name: Install Eigen
         run: sudo apt-get update && sudo apt-get install -y libeigen3-dev
 
+      # argmin is an optional additive backend not yet embeddable via
+      # FetchContent; build the docs against the native-only configuration.
+      # Restore -DCARTAN_BUILD_ARGMIN=ON once argmin builds embeddably.
       - name: Configure
         run: >
           cmake -B build
           -DCARTAN_BUILD_DOC_TESTS=ON
-          -DCARTAN_BUILD_ARGMIN=ON
           -DCARTAN_CMAKE_FETCH_DEPS=ON
 
       - name: Compile documentation snippets

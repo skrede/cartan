@@ -19,14 +19,15 @@
 #include "cartan/lie/so3.h"
 
 #include "cartan/types.h"
+#include "cartan/expected.h"
 
 #include <pugixml.hpp>
 
 #include <cmath>
 #include <string>
 #include <vector>
-#include <sstream>
-#include "cartan/expected.h"
+#include <cstdlib>
+#include <fstream>
 #include <filesystem>
 #include <string_view>
 #include <system_error>
@@ -67,16 +68,17 @@ inline std::string slurp_file(const std::filesystem::path& path)
     {
         return {};
     }
-    std::string text;
-    text.resize(static_cast<std::size_t>(size));
-    FILE* fp = std::fopen(path.c_str(), "rb");
-    if (!fp)
+    // std::ifstream takes the path directly, so wide-char paths on Windows are
+    // handled without the narrowing that std::fopen(path.c_str()) would force.
+    std::ifstream in(path, std::ios::binary);
+    if (!in)
     {
         return {};
     }
-    const auto read = std::fread(text.data(), 1, text.size(), fp);
-    std::fclose(fp);
-    text.resize(read);
+    std::string text;
+    text.resize(static_cast<std::size_t>(size));
+    in.read(text.data(), static_cast<std::streamsize>(text.size()));
+    text.resize(static_cast<std::size_t>(in.gcount()));
     return text;
 }
 
@@ -95,19 +97,58 @@ inline std::optional<double> as_finite_double(const pugi::xml_attribute& attr)
     return raw;
 }
 
-/// Parse a whitespace-separated triple ("x y z") into a vector3. Returns
-/// false on parse failure; the caller is responsible for raising the
-/// appropriate urdf_failure.
+/// Consume and return the next whitespace-delimited token from s, advancing s
+/// past it. Returns an empty view when only whitespace remains.
+inline std::string_view next_field(std::string_view& s)
+{
+    constexpr std::string_view ws = " \t\r\n\f\v";
+    const std::size_t begin = s.find_first_not_of(ws);
+    if (begin == std::string_view::npos)
+    {
+        s = {};
+        return {};
+    }
+    s.remove_prefix(begin);
+    const std::size_t end = s.find_first_of(ws);
+    const std::string_view token = s.substr(0, end);
+    s.remove_prefix(end == std::string_view::npos ? s.size() : end);
+    return token;
+}
+
+/// Parse a whitespace-separated triple ("x y z") into a vector3. strtod keeps
+/// parsing off the std::num_get facet, which crashes when a static-libstdc++
+/// wheel and numpy pull in two libstdc++ runtimes, and matches the strtod-backed
+/// pugixml attribute reader the rest of this parser relies on (both require a
+/// "C" numeric locale, as ROS does). std::from_chars would be locale-free but
+/// its floating-point overload is unavailable below a very recent macOS SDK.
+/// Returns false on any field that fails to parse, is non-finite, or leaves
+/// trailing characters, and on a count other than three; out is written only on
+/// full success.
 template <typename Scalar>
 bool parse_triple(std::string_view s, vector3<Scalar>& out)
 {
-    std::stringstream ss{std::string(s)};
-    Scalar x{}, y{}, z{};
-    if (!(ss >> x >> y >> z))
+    Scalar values[3];
+    for (std::size_t i = 0; i < 3; ++i)
+    {
+        const std::string_view field = next_field(s);
+        if (field.empty())
+        {
+            return false;
+        }
+        const std::string token(field);
+        char* end = nullptr;
+        const double parsed = std::strtod(token.c_str(), &end);
+        if (end != token.c_str() + token.size() || !std::isfinite(parsed))
+        {
+            return false;
+        }
+        values[i] = static_cast<Scalar>(parsed);
+    }
+    if (!next_field(s).empty())
     {
         return false;
     }
-    out << x, y, z;
+    out << values[0], values[1], values[2];
     return true;
 }
 

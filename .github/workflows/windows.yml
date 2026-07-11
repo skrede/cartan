@@ -27,7 +27,7 @@ jobs:
             -DCARTAN_BUILD_TESTS=ON `
             -DCARTAN_BUILD_EXAMPLES=OFF `
             -DCARTAN_CMAKE_FETCH_DEPS=ON `
-            '-DCMAKE_CXX_FLAGS=/std:c++latest /W4'
+            '-DCMAKE_CXX_FLAGS=/std:c++latest /W4 /EHsc'
 
       - name: Build
         run: cmake --build build --config Release
@@ -49,7 +49,7 @@ jobs:
             -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/install" `
             -DCARTAN_CMAKE_FETCH_DEPS=OFF `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
-            '-DCMAKE_CXX_FLAGS=/std:c++latest'
+            '-DCMAKE_CXX_FLAGS=/std:c++latest /EHsc'
 
       - name: Build and install
         run: |
@@ -61,7 +61,7 @@ jobs:
           cmake tests/integration/consumer -B build-consumer -A x64 `
             -DCMAKE_PREFIX_PATH="${{ github.workspace }}/install" `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
-            '-DCMAKE_CXX_FLAGS=/std:c++latest'
+            '-DCMAKE_CXX_FLAGS=/std:c++latest /EHsc'
           cmake --build build-consumer --config Release
 
       - name: Run consumer test

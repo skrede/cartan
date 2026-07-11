@@ -25,6 +25,16 @@ on:
           - limited
           - smoke
           - auto
+      publish_pypi:
+        description: "Publish the built wheels to PyPI (production release). Bump the version in pyproject.toml first; runs the full matrix and only from master."
+        required: false
+        default: false
+        type: boolean
+  schedule:
+    # Weekly full-matrix drift check: catches runner-image / toolchain changes
+    # that turn a green build red with no code change. Scheduled runs use the
+    # default branch (master). Sunday 23:59 UTC.
+    - cron: "59 23 * * 0"
 
 permissions:
   contents: read
@@ -32,8 +42,11 @@ permissions:
 env:
   CIBW_BUILD: "cp310-* cp311-* cp312-* cp313-* cp314-*"
   CIBW_SKIP: "cp3??t-* pp* *-musllinux_* *-win32 *-manylinux_i686"
-  CIBW_TEST_REQUIRES: "pytest numpy<2.5"
-  CIBW_TEST_COMMAND: "python -m pytest {project}/python/tests/test_wheel_smoke.py -q"
+  # numpy is intentionally omitted: the wheel's own runtime dependency already
+  # pins numpy>=1.23,<2.5, and a bare "<" here is parsed as stdin redirection by
+  # the Windows test shell, breaking the wheel test step.
+  CIBW_TEST_REQUIRES: "pytest hypothesis"
+  CIBW_TEST_COMMAND: 'python -m pytest {project}/python/tests/ -q -m "not slow"'
   CIBW_ENVIRONMENT_LINUX: >-
     CFLAGS="-Os -ffunction-sections -fdata-sections"
     CXXFLAGS="-D_GLIBCXX_USE_CXX11_ABI=1 -Os -ffunction-sections -fdata-sections"
@@ -61,31 +74,34 @@ jobs:
       - id: tier
         shell: bash
         run: |
-          linux_x86_64_2014='{"name":"linux-x86_64-manylinux2014","os":"ubuntu-latest","linux_arch":"x86_64","macos_arch":"auto","windows_arch":"AMD64","manylinux_image":"manylinux2014"}'
           linux_x86_64_228='{"name":"linux-x86_64-manylinux_2_28","os":"ubuntu-latest","linux_arch":"x86_64","macos_arch":"auto","windows_arch":"AMD64","manylinux_image":"manylinux_2_28"}'
-          linux_aarch64_2014='{"name":"linux-aarch64-manylinux2014","os":"ubuntu-24.04-arm","linux_arch":"aarch64","macos_arch":"auto","windows_arch":"AMD64","manylinux_image":"manylinux2014"}'
           linux_aarch64_228='{"name":"linux-aarch64-manylinux_2_28","os":"ubuntu-24.04-arm","linux_arch":"aarch64","macos_arch":"auto","windows_arch":"AMD64","manylinux_image":"manylinux_2_28"}'
           macos_arm64='{"name":"macos-arm64","os":"macos-latest","linux_arch":"x86_64","macos_arch":"arm64","windows_arch":"AMD64","manylinux_image":"manylinux_2_28"}'
           macos_x86_64='{"name":"macos-x86_64","os":"macos-15-intel","linux_arch":"x86_64","macos_arch":"x86_64","windows_arch":"AMD64","manylinux_image":"manylinux_2_28"}'
           windows_x64='{"name":"windows-x64","os":"windows-latest","linux_arch":"x86_64","macos_arch":"auto","windows_arch":"AMD64","manylinux_image":"manylinux_2_28"}'
 
-          full_build="$linux_x86_64_2014,$linux_x86_64_228,$linux_aarch64_2014,$linux_aarch64_228,$macos_arm64,$macos_x86_64,$windows_x64"
-          limited_build="$linux_x86_64_2014,$linux_x86_64_228"
+          full_build="$linux_x86_64_228,$linux_aarch64_228,$macos_arm64,$macos_x86_64,$windows_x64"
+          limited_build="$linux_x86_64_228"
           smoke_build="$linux_x86_64_228"
 
-          full_baseline='{"manylinux_image":"manylinux2014"},{"manylinux_image":"manylinux_2_28"}'
+          full_baseline='{"manylinux_image":"manylinux_2_28"}'
           full_artifact_tests='{"name":"linux-x86_64","os":"ubuntu-latest"},{"name":"macos-arm64","os":"macos-latest"},{"name":"macos-x86_64","os":"macos-15-intel"},{"name":"windows-x64","os":"windows-latest"}'
           limited_artifact_tests='{"name":"linux-x86_64","os":"ubuntu-latest"}'
           numpy_versions='{"python-version":"3.10"},{"python-version":"3.11"}'
-          portability='{"name":"manylinux2014-centos7","image":"quay.io/pypa/manylinux2014_x86_64","python":"/opt/python/cp312-cp312/bin/python","setup":"true"},{"name":"manylinux2014-ubuntu1804","image":"python:3.10-bionic","python":"python","setup":"true"},{"name":"manylinux_2_28-bookworm","image":"python:3.12-bookworm","python":"python","setup":"true"},{"name":"manylinux_2_28-ubuntu2204","image":"ubuntu:22.04","python":"python3","setup":"apt-get update && apt-get install -y python3 python3-venv python3-pip"}'
+          portability='{"name":"manylinux_2_28-bookworm","image":"python:3.12-bookworm","python":"python","setup":"true"},{"name":"manylinux_2_28-ubuntu2204","image":"ubuntu:22.04","python":"python3","setup":"apt-get update && apt-get install -y python3 python3-venv python3-pip"}'
 
           event='${{ github.event_name }}'
           ref='${{ github.ref }}'
           base='${{ github.base_ref }}'
           requested='${{ github.event.inputs.tier }}'
+          publish='${{ github.event.inputs.publish_pypi }}'
 
-          if [ "$event" = "workflow_dispatch" ] && [ "$requested" != "auto" ]; then
+          if [ "$event" = "workflow_dispatch" ] && [ "$publish" = "true" ]; then
+            tier="full"
+          elif [ "$event" = "workflow_dispatch" ] && [ "$requested" != "auto" ]; then
             tier="$requested"
+          elif [ "$event" = "schedule" ]; then
+            tier="full"
           elif [ "$event" = "push" ] && [ "$ref" = "refs/heads/master" ]; then
             tier="full"
           elif [ "$event" = "pull_request" ] && [ "$base" = "master" ]; then
@@ -95,7 +111,7 @@ jobs:
           elif [ "$event" = "pull_request" ] && [ "$base" = "develop" ]; then
             tier="limited"
           elif [ "$event" = "push" ] && [ "${ref#refs/heads/milestone/}" != "$ref" ]; then
-            tier="smoke"
+            tier="limited"
           else
             tier="smoke"
           fi
@@ -157,7 +173,7 @@ jobs:
   baseline-probe:
     needs: select
     if: needs.select.outputs.run_baseline == 'true'
-    name: baseline probe (${{ matrix.manylinux_image }})
+    name: baseline probe
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -182,7 +198,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y binutils
 
-      - name: Build probe wheel
+      - name: Build probe wheel (${{ matrix.manylinux_image }})
         uses: pypa/cibuildwheel@v3.4.1
         with:
           output-dir: wheelhouse
@@ -244,7 +260,7 @@ jobs:
           . .venv-per-cpython/bin/activate
           python -m pip install --upgrade pip
           python -m pip install "numpy<2.5"
-          python -m pip install --no-index --find-links wheelhouse-per-cpython --no-deps cartan
+          python -m pip install --no-index --find-links wheelhouse-per-cpython --no-deps cartan-bindings
           mkdir -p reports
           python tools/wheel_abi_bench.py --repeats 5 --iterations 1000 > reports/per-cpython-cp312.json
 
@@ -258,7 +274,7 @@ jobs:
           . .venv-abi3-cp312/bin/activate
           python -m pip install --upgrade pip
           python -m pip install "numpy<2.5"
-          python -m pip install --no-index --find-links wheelhouse-abi3 --no-deps cartan
+          python -m pip install --no-index --find-links wheelhouse-abi3 --no-deps cartan-bindings
           python tools/wheel_abi_bench.py --repeats 5 --iterations 1000 > reports/abi3-cp312.json
 
       - uses: actions/setup-python@v5
@@ -273,7 +289,7 @@ jobs:
           . .venv-abi3-cp313/bin/activate
           python -m pip install --upgrade pip
           python -m pip install "numpy<2.5" pytest
-          python -m pip install --no-index --find-links wheelhouse-abi3 --no-deps cartan
+          python -m pip install --no-index --find-links wheelhouse-abi3 --no-deps cartan-bindings
           python -m pytest python/tests/test_wheel_smoke.py -q
 
       - uses: actions/setup-python@v5
@@ -289,7 +305,7 @@ jobs:
           . .venv-abi3-cp314/bin/activate
           python -m pip install --upgrade pip
           python -m pip install "numpy<2.5" pytest
-          python -m pip install --no-index --find-links wheelhouse-abi3 --no-deps cartan
+          python -m pip install --no-index --find-links wheelhouse-abi3 --no-deps cartan-bindings
           python -m pytest python/tests/test_wheel_smoke.py -q
 
       - name: Summarize ABI overhead
@@ -362,6 +378,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # TestPyPI needs a unique PEP 440 dev version per run; inject it before
+      # cibuildwheel reads pyproject.toml so the wheels carry it. develop only.
+      - name: Inject dev version for TestPyPI
+        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+        run: sed -i -E 's/^version = "([^"]+)"/version = "\1.dev${{ github.run_number }}"/' pyproject.toml
+
       - name: Build wheels
         uses: pypa/cibuildwheel@v3.4.1
         with:
@@ -375,7 +397,7 @@ jobs:
 
   test-wheel-artifacts:
     if: needs.select.outputs.run_artifact_tests == 'true'
-    name: test downloaded wheels (${{ matrix.name }})
+    name: test downloaded wheels
     needs: [select, build-wheels]
     runs-on: ${{ matrix.os }}
     strategy:
@@ -396,19 +418,23 @@ jobs:
           pattern: wheels-*
           merge-multiple: true
 
-      - name: Test exact downloaded wheel
+      - name: Test exact downloaded wheel (${{ matrix.name }})
         shell: bash
         run: |
+          set -euxo pipefail
           python -m venv .venv-wheel-test
-          . .venv-wheel-test/Scripts/activate 2>/dev/null || . .venv-wheel-test/bin/activate
-          python -m pip install --upgrade pip
-          python -m pip install "numpy<2.5" pytest
-          python -m pip install --no-index --find-links downloaded-wheels --no-deps cartan
-          python -m pytest python/tests/test_wheel_smoke.py -q
+          # Drive the venv interpreter by path rather than sourcing activate; the
+          # activate script is the one macOS-fragile step and hides its own errors.
+          venv_py=.venv-wheel-test/bin/python
+          [ -x "$venv_py" ] || venv_py=.venv-wheel-test/Scripts/python.exe
+          "$venv_py" -m pip install --upgrade pip
+          "$venv_py" -m pip install "numpy<2.5" pytest hypothesis
+          "$venv_py" -m pip install --no-index --find-links downloaded-wheels --no-deps cartan-bindings
+          "$venv_py" -m pytest python/tests/ -q -m "not slow"
 
   numpy-compat:
     if: needs.select.outputs.run_numpy == 'true'
-    name: NumPy compatibility (${{ matrix.python-version }})
+    name: NumPy compatibility
     needs: [select, build-wheels]
     runs-on: ubuntu-latest
     strategy:
@@ -429,21 +455,28 @@ jobs:
           pattern: wheels-linux-x86_64-*
           merge-multiple: true
 
-      - name: Run pinned NumPy sweep
+      - name: Run pinned NumPy sweep (${{ matrix.python-version }})
         run: |
           python -m venv .venv-numpy
           . .venv-numpy/bin/activate
           python -m pip install --upgrade pip
           python -m pip install pytest
-          python -m pip install --no-index --find-links downloaded-wheels --no-deps cartan
-          for pin in numpy==1.23 numpy==1.26 numpy==2.0 numpy==2.4; do
+          python -m pip install --no-index --find-links downloaded-wheels --no-deps cartan-bindings
+          pins="numpy==1.23 numpy==1.26 numpy==2.0"
+          # numpy 2.3+ requires python >=3.11, so 3.10 tops out at the 2.2 series
+          if [ "${{ matrix.python-version }}" = "3.10" ]; then
+            pins="$pins numpy==2.2"
+          else
+            pins="$pins numpy==2.4"
+          fi
+          for pin in $pins; do
             python -m pip install --force-reinstall "$pin"
             python -m pytest python/tests/test_numpy_compat.py -q
           done
 
   linux-portability-smoke:
     if: needs.select.outputs.run_portability == 'true'
-    name: Linux portability smoke (${{ matrix.name }})
+    name: Linux portability smoke
     needs: [select, build-wheels]
     runs-on: ubuntu-latest
     strategy:
@@ -460,14 +493,14 @@ jobs:
           pattern: wheels-linux-x86_64-*
           merge-multiple: true
 
-      - name: Run container smoke
+      - name: Run container smoke (${{ matrix.name }})
         run: |
           mkdir -p reports
           docker run --rm \
             -v "${{ github.workspace }}:/work" \
             -w /work \
             "${{ matrix.image }}" \
-            bash -lc '${{ matrix.setup }} && "${{ matrix.python }}" -m pip install --upgrade pip && "${{ matrix.python }}" -m pip install "numpy<2.5" pytest && "${{ matrix.python }}" -m pip install --no-index --find-links /work/downloaded-wheels --no-deps cartan && "${{ matrix.python }}" -m pytest python/tests/test_wheel_smoke.py -q' \
+            bash -lc '${{ matrix.setup }} && "${{ matrix.python }}" -m pip install --upgrade pip && "${{ matrix.python }}" -m pip install "numpy<2.5" pytest && "${{ matrix.python }}" -m pip install --no-index --find-links /work/downloaded-wheels --no-deps cartan-bindings && "${{ matrix.python }}" -m pytest python/tests/test_wheel_smoke.py -q' \
             | tee reports/${{ matrix.name }}.log
 
       - name: Upload portability report
@@ -475,3 +508,88 @@ jobs:
         with:
           name: linux-portability-smoke-${{ matrix.name }}
           path: reports/*.log
+
+  sdist:
+    if: >-
+      (github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/master')) ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_pypi == 'true' && github.ref == 'refs/heads/master')
+    name: build sdist
+    needs: select
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Inject dev version for TestPyPI
+        if: github.ref == 'refs/heads/develop'
+        run: sed -i -E 's/^version = "([^"]+)"/version = "\1.dev${{ github.run_number }}"/' pyproject.toml
+
+      - name: Build sdist
+        run: pipx run build --sdist
+
+      - name: Upload sdist
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+
+  publish-testpypi:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    name: publish to TestPyPI
+    needs: [select, build-wheels, test-wheel-artifacts, sdist]
+    runs-on: ubuntu-latest
+    environment: testpypi
+    permissions:
+      id-token: write
+    steps:
+      - name: Download built wheels
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: wheels-*
+          merge-multiple: true
+
+      - name: Download sdist
+        uses: actions/download-artifact@v4
+        with:
+          name: sdist
+          path: dist
+
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  publish-pypi:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish_pypi == 'true' && github.ref == 'refs/heads/master'
+    name: publish to PyPI
+    needs: [select, build-wheels, test-wheel-artifacts, sdist]
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - name: Download built wheels
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: wheels-*
+          merge-multiple: true
+
+      - name: Download sdist
+        uses: actions/download-artifact@v4
+        with:
+          name: sdist
+          path: dist
+
+      # Releases are manual: dispatch this workflow from master with
+      # publish_pypi=true after bumping the version in pyproject.toml. No push
+      # or PR publishes. skip-existing keeps a re-dispatched unchanged version a
+      # no-op rather than failing on PyPI's rule against re-uploading a version.
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true

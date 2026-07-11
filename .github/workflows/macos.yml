@@ -31,11 +31,13 @@ jobs:
 
       - name: Configure
         run: |
+          # argmin is an optional additive backend not yet embeddable via
+          # FetchContent (its CMake requires an installed Eigen3 config), so CI
+          # builds native-only. Restore -DCARTAN_BUILD_ARGMIN=ON when embeddable.
           cmake . -B build -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_FLAGS="-Werror" \
             -DCARTAN_BUILD_TESTS=ON \
             -DCARTAN_BUILD_EXAMPLES=OFF \
-            -DCARTAN_BUILD_ARGMIN=ON \
             -DCARTAN_CMAKE_FETCH_DEPS=ON
 
       - name: Build

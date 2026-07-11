@@ -56,6 +56,25 @@ def test_urdf_metadata_joint_index_raises_keyerror_on_unknown() -> None:
         meta.joint_index("no_such_joint_42")
 
 
+def test_urdf_numeric_values_parse_correctly_with_numpy_present() -> None:
+    repo_root = Path(__file__).resolve().parent.parent.parent
+    chain = cartan.load_urdf(
+        str(repo_root / "tests" / "fixtures" / "urdf" / "cartanbot.urdf")
+    ).chain
+    assert chain.num_joints() == 6
+    home = cartan.forward_kinematics(chain, np.zeros(chain.num_joints()))
+    np.testing.assert_allclose(home.translation, [0.0, 0.05, 1.40], atol=1e-12)
+
+
+def test_irb120_axes_parse_correctly_with_numpy_present(
+    irb120_chain: cartan.KinematicChain,
+) -> None:
+    assert irb120_chain.num_joints() == 6
+    expected = [[0, 0, 1], [0, 1, 0], [0, 1, 0], [1, 0, 0], [0, 1, 0], [1, 0, 0]]
+    for i, omega in enumerate(expected):
+        np.testing.assert_allclose(irb120_chain.axis(i).omega(), omega, atol=1e-12)
+
+
 def test_ur3e_loads_and_fk_is_reproducible(ur3e_chain: cartan.KinematicChain) -> None:
     rng = np.random.default_rng(7)
     q = rng.uniform(-1.0, 1.0, ur3e_chain.num_joints())

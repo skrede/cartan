@@ -67,7 +67,7 @@ public:
         // constructs silently.
         if (m_axes.size() != m_limits.size())
         {
-#if defined(__cpp_exceptions)
+#if defined(__cpp_exceptions) || defined(_CPPUNWIND)
             throw std::invalid_argument(
                 "kinematic_chain: screw-axis count must match joint-limit count");
 #else
@@ -108,7 +108,7 @@ public:
     {
         if (i < 0 || static_cast<std::size_t>(i) >= m_axes.size())
         {
-#if defined(__cpp_exceptions)
+#if defined(__cpp_exceptions) || defined(_CPPUNWIND)
             throw std::out_of_range("kinematic_chain::axis: joint index out of range");
 #else
             ::cartan::detail::fail_stop();

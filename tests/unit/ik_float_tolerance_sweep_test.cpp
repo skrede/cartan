@@ -289,8 +289,8 @@ TEST_CASE("float IK converges at the swept preset but not at a forced 1e-6 gate"
 
         auto fk_sol = cartan::forward_kinematics(chain, result->solution.position);
         auto err = (fk_sol.end_effector.inverse() * target).log();
-        const double ori_err = err.head<3>().norm();
-        const double pos_err = err.tail<3>().norm();
+        const double ori_err = static_cast<double>(err.head<3>().norm());
+        const double pos_err = static_cast<double>(err.tail<3>().norm());
 
         std::printf(
             "[ik-float-conv] re-verified pose error: pos=%.3e m, ori=%.3e rad "
