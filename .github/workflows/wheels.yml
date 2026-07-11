@@ -371,7 +371,7 @@ jobs:
       # cibuildwheel reads pyproject.toml so the wheels carry it. develop only.
       - name: Inject dev version for TestPyPI
         if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
-        run: sed -i 's/^version = "0.4.2"$/version = "0.4.2.dev${{ github.run_number }}"/' pyproject.toml
+        run: sed -i -E 's/^version = "([^"]+)"/version = "\1.dev${{ github.run_number }}"/' pyproject.toml
 
       - name: Build wheels
         uses: pypa/cibuildwheel@v3.4.1
@@ -495,7 +495,7 @@ jobs:
           path: reports/*.log
 
   sdist:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/master')
     name: build sdist
     needs: select
     runs-on: ubuntu-latest
@@ -507,7 +507,8 @@ jobs:
           python-version: "3.12"
 
       - name: Inject dev version for TestPyPI
-        run: sed -i 's/^version = "0.4.2"$/version = "0.4.2.dev${{ github.run_number }}"/' pyproject.toml
+        if: github.ref == 'refs/heads/develop'
+        run: sed -i -E 's/^version = "([^"]+)"/version = "\1.dev${{ github.run_number }}"/' pyproject.toml
 
       - name: Build sdist
         run: pipx run build --sdist
@@ -544,3 +545,33 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
+
+  publish-pypi:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    name: publish to PyPI
+    needs: [select, build-wheels, test-wheel-artifacts, sdist]
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - name: Download built wheels
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: wheels-*
+          merge-multiple: true
+
+      - name: Download sdist
+        uses: actions/download-artifact@v4
+        with:
+          name: sdist
+          path: dist
+
+      # A master push is a release: bump the version in pyproject.toml first.
+      # skip-existing keeps a re-pushed unchanged version a no-op rather than
+      # failing on PyPI's rule that a version can never be re-uploaded.
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true
