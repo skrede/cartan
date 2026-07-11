@@ -26,8 +26,8 @@
 #include <cmath>
 #include <string>
 #include <vector>
+#include <cstdlib>
 #include <fstream>
-#include <charconv>
 #include <filesystem>
 #include <string_view>
 #include <system_error>
@@ -115,11 +115,15 @@ inline std::string_view next_field(std::string_view& s)
     return token;
 }
 
-/// Parse a whitespace-separated triple ("x y z") into a vector3. from_chars
-/// keeps parsing locale-independent; stream extraction routes through the
-/// std::num_get facet, which crashes when a static-libstdc++ wheel and numpy
-/// pull in two libstdc++ runtimes. Returns false on any field failure or a
-/// count other than three; out is written only on full success.
+/// Parse a whitespace-separated triple ("x y z") into a vector3. strtod keeps
+/// parsing off the std::num_get facet, which crashes when a static-libstdc++
+/// wheel and numpy pull in two libstdc++ runtimes, and matches the strtod-backed
+/// pugixml attribute reader the rest of this parser relies on (both require a
+/// "C" numeric locale, as ROS does). std::from_chars would be locale-free but
+/// its floating-point overload is unavailable below a very recent macOS SDK.
+/// Returns false on any field that fails to parse, is non-finite, or leaves
+/// trailing characters, and on a count other than three; out is written only on
+/// full success.
 template <typename Scalar>
 bool parse_triple(std::string_view s, vector3<Scalar>& out)
 {
@@ -131,11 +135,14 @@ bool parse_triple(std::string_view s, vector3<Scalar>& out)
         {
             return false;
         }
-        const auto [ptr, ec] = std::from_chars(field.data(), field.data() + field.size(), values[i]);
-        if (ec != std::errc{} || ptr != field.data() + field.size())
+        const std::string token(field);
+        char* end = nullptr;
+        const double parsed = std::strtod(token.c_str(), &end);
+        if (end != token.c_str() + token.size() || !std::isfinite(parsed))
         {
             return false;
         }
+        values[i] = static_cast<Scalar>(parsed);
     }
     if (!next_field(s).empty())
     {
