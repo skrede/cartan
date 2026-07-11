@@ -14,9 +14,12 @@
 
 #include <cartan/serial/fk/forward_kinematics.h>
 
+#include "../fixtures/chain_factories.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
+#include <limits>
 #include <numbers>
 
 namespace spp = cartan;
@@ -300,4 +303,141 @@ TEST_CASE("restart_wrapper composes with racing_scheduler", "[ik][restart]")
     using solver_type = spp::basic_ik_runner<restart_type>;
     solver_type solver;
     (void)solver;
+}
+
+// ============================================================================
+// projected_lm inner policy: step() after abort() short-circuits
+// ============================================================================
+
+TEST_CASE("restart_wrapper step after abort short-circuits", "[ik][restart]")
+{
+    auto chain = make_ur5_like_chain();
+
+    Eigen::Vector<double, 6> q_known;
+    q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
+    auto target = spp::forward_kinematics(chain, q_known).end_effector;
+
+    spp::restart_wrapper<spp::kinematic_chain<double, 6>> stepper;
+    Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
+    spp::convergence_criteria<double> criteria;
+
+    stepper.setup(chain, target, q0, criteria);
+    stepper.abort();
+
+    auto r = stepper.step(chain, 5);
+    REQUIRE(r.status == spp::ik_status::stalled);
+    REQUIRE(r.metrics.units_consumed == 0);
+}
+
+// ============================================================================
+// projected_lm inner policy: best-so-far retention on a terminal solve
+// ============================================================================
+
+TEST_CASE("restart_wrapper retains best-so-far on terminal solve", "[ik][restart]")
+{
+    auto chain = make_ur5_like_chain();
+
+    // Unreachable target: the wrapper can never converge, so every attempt is
+    // terminal and folds into the feasibility-first best-so-far. solution()
+    // must then return that retained iterate (not the last discarded seed) and
+    // error_norm() must equal the pose error that solution() actually produces.
+    spp::vector3<double> far_trans;
+    far_trans << 100.0, 100.0, 100.0;
+    auto target = spp::se3<double>(spp::so3<double>::identity(), far_trans);
+
+    spp::restart_wrapper<spp::kinematic_chain<double, 6>>::options opts;
+    opts.max_restarts = 5;
+    spp::restart_wrapper<spp::kinematic_chain<double, 6>> stepper(opts);
+
+    Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
+    spp::convergence_criteria<double> criteria;
+    criteria.max_iterations_per_attempt = 20;
+    criteria.max_total_work_units = 300;
+
+    stepper.setup(chain, target, q0, criteria);
+    auto status = run_stepper(stepper, chain, 300);
+
+    REQUIRE(status != spp::ik_status::converged);
+
+    double reported = stepper.error_norm();
+    REQUIRE(std::isfinite(reported));
+    REQUIRE(reported < std::numeric_limits<double>::max());
+
+    auto sol = stepper.solution();
+    auto fk_sol = spp::forward_kinematics(chain, sol);
+    double actual = (fk_sol.end_effector.inverse() * target).log().norm();
+    REQUIRE(std::abs(actual - reported) < 1e-6);
+}
+
+// ============================================================================
+// projected_lm inner policy: retained solution respects joint limits
+// ============================================================================
+
+TEST_CASE("restart_wrapper retained best is feasible in limits", "[ik][restart]")
+{
+    // A real chain with [-pi, pi] limits. A tight per-attempt cap forces the
+    // inner policy into terminal attempts, so the wrapper's feasibility-first
+    // best-so-far bookkeeping (feasible_after_canonicalization) runs. The
+    // retained solution() must lie within the chain's joint limits.
+    auto chain = cartan::fixtures::make_kr6_sixx_chain<double>();
+
+    Eigen::Vector<double, 6> q_known;
+    q_known << 2.6, -1.4, 1.1, -2.2, 1.3, 2.9;
+    auto target = spp::forward_kinematics(chain, q_known).end_effector;
+
+    spp::restart_wrapper<spp::kinematic_chain<double, 6>>::options opts;
+    opts.max_restarts = 6;
+    spp::restart_wrapper<spp::kinematic_chain<double, 6>> stepper(opts);
+
+    Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
+    spp::convergence_criteria<double> criteria;
+    criteria.max_iterations_per_attempt = 8;
+    criteria.max_total_work_units = 400;
+
+    stepper.setup(chain, target, q0, criteria);
+    run_stepper(stepper, chain, 400);
+
+    auto sol = stepper.solution();
+    const double slack = 1e-6;
+    for (int i = 0; i < 6; ++i)
+    {
+        double lo = chain.limits()[static_cast<std::size_t>(i)].position_min;
+        double hi = chain.limits()[static_cast<std::size_t>(i)].position_max;
+        CHECK(sol(i) >= lo - slack);
+        CHECK(sol(i) <= hi + slack);
+    }
+}
+
+// ============================================================================
+// projected_lm inner policy: weighted setup drives the weighted restart path
+// ============================================================================
+
+TEST_CASE("restart_wrapper weighted setup restarts and progresses", "[ik][restart]")
+{
+    auto chain = make_ur5_like_chain();
+
+    Eigen::Vector<double, 6> q_known;
+    q_known << 2.5, -1.8, 1.2, -2.0, 1.5, -1.0;
+    auto target = spp::forward_kinematics(chain, q_known).end_effector;
+
+    // De-weight orientation (angular head), keep full position (linear tail).
+    spp::error_weight<double> weight;
+    weight.weights << 0.05, 0.05, 0.05, 1.0, 1.0, 1.0;
+
+    spp::restart_wrapper<spp::kinematic_chain<double, 6>>::options opts;
+    opts.max_restarts = 20;
+    spp::restart_wrapper<spp::kinematic_chain<double, 6>> stepper(opts);
+
+    Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
+    spp::convergence_criteria<double> criteria;
+    criteria.max_iterations_per_attempt = 15;   // tight cap forces >=1 restart
+    criteria.max_total_work_units = 4000;
+
+    stepper.setup(chain, target, q0, criteria, weight);
+    run_stepper(stepper, chain, 4000);
+
+    // The weighted restart path must have billed inner work and produced a
+    // finite best error via the weighted setup/restart branches.
+    REQUIRE(stepper.iterations() > criteria.max_iterations_per_attempt);
+    REQUIRE(std::isfinite(stepper.error_norm()));
 }

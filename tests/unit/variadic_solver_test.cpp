@@ -2,6 +2,7 @@
 #include <cartan/serial/ik/policy/limits_policy.h>
 #include <cartan/serial/ik/basic_ik_runner.h>
 #include <cartan/serial/ik/solvers.h>
+#include <cartan/serial/ik/solver/lm.h>
 #include <cartan/serial/ik/solver/lbfgsb.h>
 #include <cartan/serial/ik/wrapper/restart_wrapper.h>
 #include <cartan/serial/ik/solver/projected_lm.h>
@@ -21,6 +22,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
+#include <limits>
 #include <concepts>
 #include <numbers>
 
@@ -292,4 +294,187 @@ TEST_CASE("harder target benefits from racing", "[ik][variadic_solver]")
     auto fk_sol = spp::forward_kinematics(chain, result->solution.position);
     auto err = (fk_sol.end_effector.inverse() * target).log();
     REQUIRE(err.norm() < 1e-3);
+}
+
+// ============================================================================
+// min_distance objective selects the lowest-error winner across policies
+// ============================================================================
+
+TEST_CASE("min_distance objective picks the lowest-error solution", "[ik][variadic_solver]")
+{
+    auto chain = make_ur5_like_chain();
+
+    Eigen::Vector<double, 6> q_known;
+    q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
+    auto target = reachable_target(chain, q_known);
+
+    spp::basic_ik_runner solver{
+        spp::speed_ik_runner<spp::kinematic_chain<double, 6>>{},
+        spp::robust_ik_runner<spp::kinematic_chain<double, 6>>{}
+    };
+
+    Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
+    spp::convergence_criteria<double> criteria{1e-6, 1e-6, 200, 400};
+    spp::solver_options<double> opts{.objective = spp::ik_objective::min_distance};
+    solver.setup(chain, target, q0, criteria, opts);
+
+    auto result = solver.solve();
+    REQUIRE(result.has_value());
+
+    // select_best_result(min_distance) returns the converged policy with the
+    // lowest error norm, which is exactly what error_norm() reports as best.
+    REQUIRE(result->final_error_norm == solver.error_norm());
+
+    auto fk_sol = spp::forward_kinematics(chain, result->solution.position);
+    auto err = (fk_sol.end_effector.inverse() * target).log();
+    REQUIRE(err.norm() < 1e-4);
+}
+
+// ============================================================================
+// all policies fail: build_error reports iteration_limit with finite error
+// ============================================================================
+
+TEST_CASE("multi-policy all-fail yields iteration_limit and finite error", "[ik][variadic_solver]")
+{
+    auto chain = make_ur5_like_chain();
+
+    // Unreachable target: both policies exhaust and park with a recorded error.
+    spp::vector3<double> far_trans;
+    far_trans << 100.0, 100.0, 100.0;
+    auto target = spp::se3<double>(spp::so3<double>::identity(), far_trans);
+
+    // Plain (non-restarting) policies so each reaches a terminal state and
+    // parks a finite error_norm the multi-policy build_error can report.
+    spp::basic_ik_runner solver{
+        spp::lm<spp::kinematic_chain<double, 6>>{},
+        spp::lm<spp::kinematic_chain<double, 6>>{}
+    };
+
+    Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
+    spp::convergence_criteria<double> criteria{1e-6, 1e-6, 30, 400};
+    spp::solver_options<double> opts{.max_total_iterations = 3000};
+    solver.setup(chain, target, q0, criteria, opts);
+
+    auto result = solver.solve();
+    REQUIRE_FALSE(result.has_value());
+    CHECK(result.error().reason == spp::ik_failure::iteration_limit);
+    CHECK(std::isfinite(result.error().last_error_norm));
+    CHECK(result.error().last_error_norm < std::numeric_limits<double>::max());
+}
+
+// ============================================================================
+// single-policy max_manipulability keeps a valid, converged solution
+// ============================================================================
+
+TEST_CASE("single-policy max_manipulability converges to a valid pose", "[ik][variadic_solver]")
+{
+    auto chain = make_ur5_like_chain();
+
+    Eigen::Vector<double, 6> q_known;
+    q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
+    auto target = reachable_target(chain, q_known);
+
+    spp::basic_ik_runner<spp::lm<spp::kinematic_chain<double, 6>>> solver;
+
+    Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
+    // Large total budget so the runner re-seeds after each convergence and the
+    // max_manipulability update keeps the higher-manipulability configuration.
+    spp::convergence_criteria<double> criteria{1e-6, 1e-6, 200, 3000};
+    spp::solver_options<double> opts{.objective = spp::ik_objective::max_manipulability};
+    solver.setup(chain, target, q0, criteria, opts);
+
+    auto result = solver.solve();
+    REQUIRE(result.has_value());
+
+    auto fk_sol = spp::forward_kinematics(chain, result->solution.position);
+    auto err = (fk_sol.end_effector.inverse() * target).log();
+    REQUIRE(err.norm() < 1e-4);
+}
+
+// ============================================================================
+// single-policy max_isotropy keeps a valid, converged solution
+// ============================================================================
+
+TEST_CASE("single-policy max_isotropy converges to a valid pose", "[ik][variadic_solver]")
+{
+    auto chain = make_ur5_like_chain();
+
+    Eigen::Vector<double, 6> q_known;
+    q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
+    auto target = reachable_target(chain, q_known);
+
+    spp::basic_ik_runner<spp::lm<spp::kinematic_chain<double, 6>>> solver;
+
+    Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
+    spp::convergence_criteria<double> criteria{1e-6, 1e-6, 200, 3000};
+    spp::solver_options<double> opts{.objective = spp::ik_objective::max_isotropy};
+    solver.setup(chain, target, q0, criteria, opts);
+
+    auto result = solver.solve();
+    REQUIRE(result.has_value());
+
+    auto fk_sol = spp::forward_kinematics(chain, result->solution.position);
+    auto err = (fk_sol.end_effector.inverse() * target).log();
+    REQUIRE(err.norm() < 1e-4);
+}
+
+// ============================================================================
+// multi-policy abort resets status to running and does not crash
+// ============================================================================
+
+TEST_CASE("multi-policy abort resets status to running", "[ik][variadic_solver]")
+{
+    auto chain = make_ur5_like_chain();
+
+    Eigen::Vector<double, 6> q_known;
+    q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
+    auto target = reachable_target(chain, q_known);
+
+    spp::basic_ik_runner solver{
+        spp::speed_ik_runner<spp::kinematic_chain<double, 6>>{},
+        spp::robust_ik_runner<spp::kinematic_chain<double, 6>>{}
+    };
+
+    Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
+    spp::convergence_criteria<double> criteria{1e-6, 1e-6, 200, 400};
+    solver.setup(chain, target, q0, criteria);
+
+    solver.abort();
+    REQUIRE(solver.status() == spp::ik_status::running);
+
+    // A subsequent step after abort must not crash and returns a valid status.
+    auto s = solver.step();
+    REQUIRE((s == spp::ik_status::running
+             || s == spp::ik_status::converged
+             || s == spp::ik_status::iteration_limit
+             || s == spp::ik_status::stalled
+             || s == spp::ik_status::diverged));
+}
+
+// ============================================================================
+// multi-policy error_norm() reports the best parked error after convergence
+// ============================================================================
+
+TEST_CASE("multi-policy error_norm matches the winning result", "[ik][variadic_solver]")
+{
+    auto chain = make_ur5_like_chain();
+
+    Eigen::Vector<double, 6> q_known;
+    q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
+    auto target = reachable_target(chain, q_known);
+
+    spp::basic_ik_runner solver{
+        spp::speed_ik_runner<spp::kinematic_chain<double, 6>>{},
+        spp::robust_ik_runner<spp::kinematic_chain<double, 6>>{}
+    };
+
+    Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
+    spp::convergence_criteria<double> criteria{1e-6, 1e-6, 200, 400};
+    spp::solver_options<double> opts{.objective = spp::ik_objective::min_distance};
+    solver.setup(chain, target, q0, criteria, opts);
+
+    auto result = solver.solve();
+    REQUIRE(result.has_value());
+    REQUIRE(solver.error_norm() == result->final_error_norm);
+    REQUIRE(std::isfinite(solver.error_norm()));
 }

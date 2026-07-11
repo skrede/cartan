@@ -67,6 +67,55 @@ static auto make_non_pieper_chain()
         home, {s0, s1, s2, s3, s4, s5}, limits);
 }
 
+/// Build a PUMA-type 6R chain whose wrist is an ASYMMETRIC (ZYX) triple:
+/// axes 4, 5, 6 point along z, y, x through the common wrist center. The
+/// canonical PUMA fixtures all use a symmetric ZYZ wrist, so this is the only
+/// chain that drives extract_asymmetric_euler.
+static auto make_asymmetric_wrist_puma()
+{
+    double d1 = 0.5, a2 = 0.4, a3 = 0.3, d6 = 0.1;
+    Eigen::Vector3d wrist_point(a2 + a3, 0, d1);
+    Eigen::Vector3d ee_point(a2 + a3 + d6, 0, d1);
+
+    auto s0 = screw_axis<double>::revolute({0, 0, 1}, {0, 0, 0});
+    auto s1 = screw_axis<double>::revolute({0, 1, 0}, {0, 0, d1});
+    auto s2 = screw_axis<double>::revolute({0, 1, 0}, {a2, 0, d1});
+    auto s3 = screw_axis<double>::revolute({0, 0, 1}, wrist_point);
+    auto s4 = screw_axis<double>::revolute({0, 1, 0}, wrist_point);
+    auto s5 = screw_axis<double>::revolute({1, 0, 0}, wrist_point);
+
+    auto home = se3<double>(so3<double>::identity(), ee_point);
+    joint_limits<double> no_limits{-10.0, 10.0};
+    std::array<joint_limits<double>, 6> limits = {
+        no_limits, no_limits, no_limits, no_limits, no_limits, no_limits};
+
+    return static_chain<double, revolute_z, revolute_y, revolute_y,
+                        revolute_z, revolute_y, revolute_x>(
+        home, {s0, s1, s2, s3, s4, s5}, limits);
+}
+
+/// Build a 6-joint chain whose third axis is PRISMATIC. Geometry is otherwise
+/// PUMA-like; the point is that the joint-kind guard must reject it.
+static auto make_prismatic_third_joint_chain()
+{
+    double d1 = 0.5, a2 = 0.4, a3 = 0.3, d6 = 0.1;
+    Eigen::Vector3d wrist_point(a2 + a3, 0, d1);
+    Eigen::Vector3d ee_point(a2 + a3 + d6, 0, d1);
+
+    auto s0 = screw_axis<double>::revolute({0, 0, 1}, {0, 0, 0});
+    auto s1 = screw_axis<double>::revolute({0, 1, 0}, {0, 0, d1});
+    auto s2 = screw_axis<double>::prismatic({0, 0, 1});
+    auto s3 = screw_axis<double>::revolute({0, 0, 1}, wrist_point);
+    auto s4 = screw_axis<double>::revolute({0, 1, 0}, wrist_point);
+    auto s5 = screw_axis<double>::revolute({0, 0, 1}, wrist_point);
+
+    auto home = se3<double>(so3<double>::identity(), ee_point);
+    joint_limits<double> lim{-10.0, 10.0};
+    std::array<joint_limits<double>, 6> limits = {lim, lim, lim, lim, lim, lim};
+
+    return kinematic_chain<double, 6>(home, {s0, s1, s2, s3, s4, s5}, limits);
+}
+
 TEST_CASE("6R Pieper: reachable target from known FK returns solutions")
 {
     auto chain = make_puma_chain();
@@ -498,4 +547,101 @@ TEST_CASE("6R Pieper: wrist-intersection tolerance sweep (construction gate)")
         auto solver = pieper_6r_solver<decltype(chain)>::make(chain, pos_tol);
         CHECK(solver.has_value() == s.expect_solvable);
     }
+}
+
+TEST_CASE("6R Pieper: asymmetric ZYX wrist solves via Euler extraction")
+{
+    // The ZYX wrist (w4 || z, w6 || x) is not symmetric, so the solver routes
+    // through extract_asymmetric_euler rather than the ZYZ closed form. Every
+    // returned solution must FK-back-verify (never trust the success report).
+    auto chain = make_asymmetric_wrist_puma();
+    Eigen::Vector<double, 6> q_known;
+    q_known << 0.3, -0.4, 0.5, 0.2, -0.3, 0.1;
+
+    auto fk = forward_kinematics(chain, q_known);
+    auto result = pieper_6r_solver(chain).solve(fk.end_effector);
+
+    REQUIRE(result.has_value());
+    REQUIRE(result->count >= 1);
+
+    bool found_match = false;
+    for (int i = 0; i < result->count; ++i)
+    {
+        auto& sol = result->solutions[static_cast<std::size_t>(i)];
+        for (int k = 0; k < 6; ++k)
+            REQUIRE_FALSE(std::isnan(sol(k)));
+
+        auto fk_check = forward_kinematics(chain, sol);
+        double position_error = (fk_check.end_effector.translation()
+            - fk.end_effector.translation()).norm();
+        double orientation_error = (fk_check.end_effector.rotation().inverse()
+            * fk.end_effector.rotation()).log().norm();
+        CHECK(position_error < tolerance);
+        CHECK(orientation_error < tolerance);
+        if (position_error < tolerance && orientation_error < tolerance)
+            found_match = true;
+    }
+    CHECK(found_match);
+}
+
+TEST_CASE("6R Pieper: theta5 near pi drives the symmetric gimbal branch")
+{
+    // A symmetric ZYZ wrist at theta5 = pi lands in the gimbal-lock case with
+    // cos(theta5) < 0, exercising the R_mid_pi correction. The pose is
+    // reachable, so a solution must be returned and FK-back-verify.
+    auto chain = make_puma_chain();
+    Eigen::Vector<double, 6> q_gimbal;
+    q_gimbal << 0.3, -0.4, 0.5, 0.0, std::numbers::pi, 0.0;
+
+    auto fk = forward_kinematics(chain, q_gimbal);
+    auto result = pieper_6r_solver(chain).solve(fk.end_effector);
+
+    REQUIRE(result.has_value());
+    REQUIRE(result->count >= 1);
+
+    bool found_match = false;
+    for (int i = 0; i < result->count; ++i)
+    {
+        auto& sol = result->solutions[static_cast<std::size_t>(i)];
+        for (int k = 0; k < 6; ++k)
+            REQUIRE_FALSE(std::isnan(sol(k)));
+
+        auto fk_check = forward_kinematics(chain, sol);
+        double position_error = (fk_check.end_effector.translation()
+            - fk.end_effector.translation()).norm();
+        double orientation_error = (fk_check.end_effector.rotation().inverse()
+            * fk.end_effector.rotation()).log().norm();
+        CHECK(position_error < tolerance);
+        CHECK(orientation_error < tolerance);
+        if (position_error < tolerance && orientation_error < tolerance)
+            found_match = true;
+    }
+    CHECK(found_match);
+}
+
+TEST_CASE("6R Pieper: prismatic joint fails the constructor validity guard")
+{
+    // The bare constructor's joint-kind guard sets the solver invalid when any
+    // axis is not revolute; solve() then reports degenerate_geometry rather
+    // than a misleading per-pose unreachable.
+    auto chain = make_prismatic_third_joint_chain();
+    pieper_6r_solver solver(chain);
+
+    auto target = se3<double>(so3<double>::identity(),
+        Eigen::Vector3d(0.6, 0.0, 0.5));
+    auto result = solver.solve(target);
+
+    REQUIRE_FALSE(result.has_value());
+    CHECK(result.error().reason == analytical_failure::degenerate_geometry);
+}
+
+TEST_CASE("6R Pieper: make() rejects a prismatic joint up front")
+{
+    // The validating factory's joint-kind gate rejects a non-revolute axis with
+    // degenerate_geometry before ever attempting a solve.
+    auto chain = make_prismatic_third_joint_chain();
+    auto solver = pieper_6r_solver<decltype(chain)>::make(chain);
+
+    REQUIRE_FALSE(solver.has_value());
+    CHECK(solver.error().reason == analytical_failure::degenerate_geometry);
 }
