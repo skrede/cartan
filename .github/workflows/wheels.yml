@@ -413,12 +413,16 @@ jobs:
       - name: Test exact downloaded wheel (${{ matrix.name }})
         shell: bash
         run: |
+          set -euxo pipefail
           python -m venv .venv-wheel-test
-          . .venv-wheel-test/Scripts/activate 2>/dev/null || . .venv-wheel-test/bin/activate
-          python -m pip install --upgrade pip
-          python -m pip install "numpy<2.5" pytest hypothesis
-          python -m pip install --no-index --find-links downloaded-wheels --no-deps cartan-bindings
-          python -m pytest python/tests/ -q -m "not slow"
+          # Drive the venv interpreter by path rather than sourcing activate; the
+          # activate script is the one macOS-fragile step and hides its own errors.
+          venv_py=.venv-wheel-test/bin/python
+          [ -x "$venv_py" ] || venv_py=.venv-wheel-test/Scripts/python.exe
+          "$venv_py" -m pip install --upgrade pip
+          "$venv_py" -m pip install "numpy<2.5" pytest hypothesis
+          "$venv_py" -m pip install --no-index --find-links downloaded-wheels --no-deps cartan-bindings
+          "$venv_py" -m pytest python/tests/ -q -m "not slow"
 
   numpy-compat:
     if: needs.select.outputs.run_numpy == 'true'
