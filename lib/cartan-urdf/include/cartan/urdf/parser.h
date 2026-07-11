@@ -26,6 +26,7 @@
 #include <cmath>
 #include <string>
 #include <vector>
+#include <fstream>
 #include <charconv>
 #include <filesystem>
 #include <string_view>
@@ -67,16 +68,17 @@ inline std::string slurp_file(const std::filesystem::path& path)
     {
         return {};
     }
-    std::string text;
-    text.resize(static_cast<std::size_t>(size));
-    FILE* fp = std::fopen(path.c_str(), "rb");
-    if (!fp)
+    // std::ifstream takes the path directly, so wide-char paths on Windows are
+    // handled without the narrowing that std::fopen(path.c_str()) would force.
+    std::ifstream in(path, std::ios::binary);
+    if (!in)
     {
         return {};
     }
-    const auto read = std::fread(text.data(), 1, text.size(), fp);
-    std::fclose(fp);
-    text.resize(read);
+    std::string text;
+    text.resize(static_cast<std::size_t>(size));
+    in.read(text.data(), static_cast<std::streamsize>(text.size()));
+    text.resize(static_cast<std::size_t>(in.gcount()));
     return text;
 }
 

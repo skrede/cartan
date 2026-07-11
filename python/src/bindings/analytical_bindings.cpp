@@ -22,6 +22,7 @@
 #include "registrations.h"
 
 #include "detail/expected_caster.h"
+#include "detail/format_double.h"
 #include "detail/analytical_python_helpers.h"
 
 #include <nanobind/eigen/dense.h>
@@ -36,7 +37,6 @@
 #include <string>
 #include <cstddef>
 #include <utility>
-#include <charconv>
 #include <optional>
 #include <algorithm>
 
@@ -55,15 +55,7 @@ using cartan::python::py_analytical_status;
 using cartan::python::to_analytical_error_result;
 using cartan::python::to_analytical_result;
 
-/// Format a double locale-free. std::to_chars sidesteps the num_put / ctype
-/// facets that crash when a static-libstdc++ wheel and numpy load two
-/// libstdc++ runtimes; ostream formatting routes through those facets.
-inline std::string format_double(double value)
-{
-    std::array<char, 32> buffer{};
-    const auto result = std::to_chars(buffer.data(), buffer.data() + buffer.size(), value);
-    return std::string(buffer.data(), result.ptr);
-}
+using cartan::python::format_double;
 
 /// Guard each solver lambda against NaN / non-finite target components.
 /// Hard fails raise Python ValueError per the input contract;

@@ -16,16 +16,15 @@
 #include "registrations.h"
 #include "detail/ik_python_helpers.h"
 #include "detail/expected_caster.h"
+#include "detail/format_double.h"
 
 #include <nanobind/eigen/dense.h>
 #include <nanobind/stl/optional.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/nanobind.h>
 
-#include <array>
 #include <string>
 #include <utility>
-#include <charconv>
 #include <optional>
 
 namespace nb = nanobind;
@@ -72,15 +71,7 @@ using py_argmin_lm_runner     = cartan::basic_ik_runner<py_argmin_lm_inner>;
 using py_argmin_lbfgsb_runner = cartan::basic_ik_runner<py_argmin_lbfgsb_inner>;
 #endif
 
-/// Format a double locale-free. std::to_chars sidesteps the num_put / ctype
-/// facets that crash when a static-libstdc++ wheel and numpy load two
-/// libstdc++ runtimes; ostream formatting routes through those facets.
-inline std::string format_double(double value)
-{
-    std::array<char, 32> buffer{};
-    const auto result = std::to_chars(buffer.data(), buffer.data() + buffer.size(), value);
-    return std::string(buffer.data(), result.ptr);
-}
+using cartan::python::format_double;
 
 /// Validate target finiteness + q_seed.size() == chain.num_joints().
 /// Raises Python ValueError on failure (per the iterative IK hard-fail contract).
