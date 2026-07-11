@@ -25,6 +25,11 @@ on:
           - limited
           - smoke
           - auto
+      publish_pypi:
+        description: "Publish the built wheels to PyPI (production release). Bump the version in pyproject.toml first; runs the full matrix and only from master."
+        required: false
+        default: false
+        type: boolean
   schedule:
     # Weekly full-matrix drift check: catches runner-image / toolchain changes
     # that turn a green build red with no code change. Scheduled runs use the
@@ -89,8 +94,11 @@ jobs:
           ref='${{ github.ref }}'
           base='${{ github.base_ref }}'
           requested='${{ github.event.inputs.tier }}'
+          publish='${{ github.event.inputs.publish_pypi }}'
 
-          if [ "$event" = "workflow_dispatch" ] && [ "$requested" != "auto" ]; then
+          if [ "$event" = "workflow_dispatch" ] && [ "$publish" = "true" ]; then
+            tier="full"
+          elif [ "$event" = "workflow_dispatch" ] && [ "$requested" != "auto" ]; then
             tier="$requested"
           elif [ "$event" = "schedule" ]; then
             tier="full"
@@ -502,7 +510,9 @@ jobs:
           path: reports/*.log
 
   sdist:
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/master')
+    if: >-
+      (github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/master')) ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_pypi == 'true' && github.ref == 'refs/heads/master')
     name: build sdist
     needs: select
     runs-on: ubuntu-latest
@@ -554,7 +564,7 @@ jobs:
           repository-url: https://test.pypi.org/legacy/
 
   publish-pypi:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish_pypi == 'true' && github.ref == 'refs/heads/master'
     name: publish to PyPI
     needs: [select, build-wheels, test-wheel-artifacts, sdist]
     runs-on: ubuntu-latest
@@ -575,9 +585,10 @@ jobs:
           name: sdist
           path: dist
 
-      # A master push is a release: bump the version in pyproject.toml first.
-      # skip-existing keeps a re-pushed unchanged version a no-op rather than
-      # failing on PyPI's rule that a version can never be re-uploaded.
+      # Releases are manual: dispatch this workflow from master with
+      # publish_pypi=true after bumping the version in pyproject.toml. No push
+      # or PR publishes. skip-existing keeps a re-dispatched unchanged version a
+      # no-op rather than failing on PyPI's rule against re-uploading a version.
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
