@@ -10,10 +10,21 @@
 
 #include <benchmark/benchmark.h>
 
+#include <array>
 #include <random>
+#include <cstddef>
 
 namespace
 {
+
+// Two cartan cells per variant: the primary cell runs the full q -> Jacobian
+// pipeline (FK inside the timed loop) so it does the same work as KDL's
+// JntToJac, which recomputes FK internally; the "_jacobian_given_fk" cell caches
+// FK and times only the marginal Jacobian cost. Both draw inputs from a table
+// indexed by the iteration counter and DoNotOptimize the chosen input before the
+// op, so the optimizer cannot hoist a loop-invariant result out of the loop.
+// Power-of-two size wraps the index with a mask.
+constexpr std::size_t kInputs = 1024;
 
 // ============================================================================
 // Static chain factories (mirrored from test infrastructure)
@@ -151,15 +162,35 @@ static void bm_jac_##ROBOT##_kinematic_chain(benchmark::State& state)    \
 {                                                                        \
     auto chain = cartan::fixtures::FACTORY<double>();                    \
     std::mt19937 rng(42);                                                \
-    auto q = cartan::fixtures::random_joint_config(chain, rng);         \
-    auto fk = cartan::forward_kinematics(chain, q);                       \
+    std::array<decltype(cartan::fixtures::random_joint_config(chain, rng)), kInputs> qs; \
+    for (auto& q : qs) q = cartan::fixtures::random_joint_config(chain, rng); \
+    std::size_t i = 0;                                                   \
     for (auto _ : state)                                                 \
     {                                                                    \
+        auto& q = qs[i++ & (kInputs - 1)];                              \
+        benchmark::DoNotOptimize(q);                                    \
+        auto fk = cartan::forward_kinematics(chain, q);                   \
         auto J = cartan::space_jacobian(chain, fk);                       \
         benchmark::DoNotOptimize(J.data());                              \
     }                                                                    \
 }                                                                        \
-BENCHMARK(bm_jac_##ROBOT##_kinematic_chain)
+BENCHMARK(bm_jac_##ROBOT##_kinematic_chain);                             \
+static void bm_jac_##ROBOT##_kinematic_chain_jacobian_given_fk(benchmark::State& state) \
+{                                                                        \
+    auto chain = cartan::fixtures::FACTORY<double>();                    \
+    std::mt19937 rng(42);                                                \
+    std::array<decltype(cartan::forward_kinematics(chain, cartan::fixtures::random_joint_config(chain, rng))), kInputs> fks; \
+    for (auto& f : fks) f = cartan::forward_kinematics(chain, cartan::fixtures::random_joint_config(chain, rng)); \
+    std::size_t i = 0;                                                   \
+    for (auto _ : state)                                                 \
+    {                                                                    \
+        auto& fk = fks[i++ & (kInputs - 1)];                            \
+        benchmark::DoNotOptimize(fk);                                    \
+        auto J = cartan::space_jacobian(chain, fk);                       \
+        benchmark::DoNotOptimize(J.data());                              \
+    }                                                                    \
+}                                                                        \
+BENCHMARK(bm_jac_##ROBOT##_kinematic_chain_jacobian_given_fk)
 
 #define JAC_BENCHMARK_STATIC_GENERIC(ROBOT, STATIC_FACTORY)              \
 static void bm_jac_##ROBOT##_static_generic(benchmark::State& state)     \
@@ -167,30 +198,71 @@ static void bm_jac_##ROBOT##_static_generic(benchmark::State& state)     \
     auto sc = STATIC_FACTORY<double>();                                   \
     cartan::detail::generic_chain_wrapper wrapped{sc};                     \
     std::mt19937 rng(42);                                                \
-    auto q = random_config_static(sc, rng);                              \
-    auto fk = cartan::forward_kinematics(wrapped, q);                     \
+    std::array<decltype(random_config_static(sc, rng)), kInputs> qs;      \
+    for (auto& q : qs) q = random_config_static(sc, rng);                 \
+    std::size_t i = 0;                                                   \
     for (auto _ : state)                                                 \
     {                                                                    \
+        auto& q = qs[i++ & (kInputs - 1)];                              \
+        benchmark::DoNotOptimize(q);                                    \
+        auto fk = cartan::forward_kinematics(wrapped, q);                 \
         auto J = cartan::space_jacobian(wrapped, fk);                     \
         benchmark::DoNotOptimize(J.data());                              \
     }                                                                    \
 }                                                                        \
-BENCHMARK(bm_jac_##ROBOT##_static_generic)
+BENCHMARK(bm_jac_##ROBOT##_static_generic);                              \
+static void bm_jac_##ROBOT##_static_generic_jacobian_given_fk(benchmark::State& state) \
+{                                                                        \
+    auto sc = STATIC_FACTORY<double>();                                   \
+    cartan::detail::generic_chain_wrapper wrapped{sc};                     \
+    std::mt19937 rng(42);                                                \
+    std::array<decltype(cartan::forward_kinematics(wrapped, random_config_static(sc, rng))), kInputs> fks; \
+    for (auto& f : fks) f = cartan::forward_kinematics(wrapped, random_config_static(sc, rng)); \
+    std::size_t i = 0;                                                   \
+    for (auto _ : state)                                                 \
+    {                                                                    \
+        auto& fk = fks[i++ & (kInputs - 1)];                            \
+        benchmark::DoNotOptimize(fk);                                    \
+        auto J = cartan::space_jacobian(wrapped, fk);                     \
+        benchmark::DoNotOptimize(J.data());                              \
+    }                                                                    \
+}                                                                        \
+BENCHMARK(bm_jac_##ROBOT##_static_generic_jacobian_given_fk)
 
 #define JAC_BENCHMARK_STATIC_SPECIALIZED(ROBOT, STATIC_FACTORY)          \
 static void bm_jac_##ROBOT##_static_specialized(benchmark::State& state) \
 {                                                                        \
     auto sc = STATIC_FACTORY<double>();                                   \
     std::mt19937 rng(42);                                                \
-    auto q = random_config_static(sc, rng);                              \
-    auto fk = cartan::forward_kinematics(sc, q);                          \
+    std::array<decltype(random_config_static(sc, rng)), kInputs> qs;      \
+    for (auto& q : qs) q = random_config_static(sc, rng);                 \
+    std::size_t i = 0;                                                   \
     for (auto _ : state)                                                 \
     {                                                                    \
+        auto& q = qs[i++ & (kInputs - 1)];                              \
+        benchmark::DoNotOptimize(q);                                    \
+        auto fk = cartan::forward_kinematics(sc, q);                      \
         auto J = cartan::space_jacobian(sc, fk);                          \
         benchmark::DoNotOptimize(J.data());                              \
     }                                                                    \
 }                                                                        \
-BENCHMARK(bm_jac_##ROBOT##_static_specialized)
+BENCHMARK(bm_jac_##ROBOT##_static_specialized);                          \
+static void bm_jac_##ROBOT##_static_specialized_jacobian_given_fk(benchmark::State& state) \
+{                                                                        \
+    auto sc = STATIC_FACTORY<double>();                                   \
+    std::mt19937 rng(42);                                                \
+    std::array<decltype(cartan::forward_kinematics(sc, random_config_static(sc, rng))), kInputs> fks; \
+    for (auto& f : fks) f = cartan::forward_kinematics(sc, random_config_static(sc, rng)); \
+    std::size_t i = 0;                                                   \
+    for (auto _ : state)                                                 \
+    {                                                                    \
+        auto& fk = fks[i++ & (kInputs - 1)];                            \
+        benchmark::DoNotOptimize(fk);                                    \
+        auto J = cartan::space_jacobian(sc, fk);                          \
+        benchmark::DoNotOptimize(J.data());                              \
+    }                                                                    \
+}                                                                        \
+BENCHMARK(bm_jac_##ROBOT##_static_specialized_jacobian_given_fk)
 
 #define JAC_BENCHMARK_KDL(ROBOT, KDL_FACTORY, N_JOINTS)                  \
 static void bm_jac_##ROBOT##_kdl(benchmark::State& state)                \

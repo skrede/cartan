@@ -142,39 +142,45 @@ void bm_closed_form_solver(
     using Scalar = typename Chain::scalar_type;
 
     Solver solver(static_chain_for_solver);
+    const auto target_count = ts.targets.size();
 
-    std::size_t idx = 0;
+    // Accuracy pass (untimed): FK-gated success and error means over the
+    // distinct targets. Kept out of the timed loop so the cell measures solve
+    // cost only; the 1e-5 gate mirrors bm_iterative_solver for a comparable
+    // success definition across the two drivers.
     int successes = 0;
     Scalar total_pos = Scalar(0);
     Scalar total_ori = Scalar(0);
+    for (std::size_t i = 0; i < target_count; ++i)
+    {
+        auto result = solver.solve(ts.targets[i]);
+        if (!result.has_value())
+            continue;
+        auto pick = closest_to_seed(*result, ts.seeds[i]);
+        if (!pick.has_value())
+            continue;
+        auto [pos_err, ori_err] = cartan::fixtures::compute_pose_errors(
+            chain_for_fk_check, *pick, ts.targets[i]);
+        if (pos_err < Scalar(1e-5) && ori_err < Scalar(1e-5))
+        {
+            ++successes;
+            total_pos += pos_err;
+            total_ori += ori_err;
+        }
+    }
 
-    const auto target_count = ts.targets.size();
+    std::size_t idx = 0;
     for (auto _ : state)
     {
         const auto i = idx % std::max<std::size_t>(target_count, 1);
-        const auto& target = ts.targets[i];
-        const auto& q_seed = ts.seeds[i];
         ++idx;
-
-        auto result = solver.solve(target);
-        if (result.has_value())
-        {
-            auto pick = closest_to_seed(*result, q_seed);
-            if (pick.has_value())
-            {
-                ++successes;
-                auto [pos_err, ori_err] = cartan::fixtures::compute_pose_errors(
-                    chain_for_fk_check, *pick, target);
-                total_pos += pos_err;
-                total_ori += ori_err;
-            }
-        }
+        auto result = solver.solve(ts.targets[i]);
         benchmark::DoNotOptimize(result);
     }
 
-    auto total = static_cast<int>(idx);
+    auto denom = static_cast<int>(std::max<std::size_t>(target_count, 1));
     state.counters["Success_pct"] = benchmark::Counter(
-        100.0 * static_cast<double>(successes) / std::max(total, 1));
+        100.0 * static_cast<double>(successes) / denom);
     state.counters["pos_err"] = benchmark::Counter(
         static_cast<double>(total_pos) / std::max(successes, 1));
     state.counters["ori_err"] = benchmark::Counter(
@@ -239,40 +245,50 @@ void bm_iterative_solver(
     using Scalar = typename Chain::scalar_type;
     cartan::convergence_criteria<Scalar> criteria{
         Scalar(1e-5), Scalar(1e-5), max_iter};
+    const auto target_count = ts.targets.size();
 
-    std::size_t idx = 0;
+    // Runner reused across setup() calls (setup fully re-initializes state), so
+    // the timed loop pays no per-iteration construction — matching the
+    // closed-form driver's build-solver-once cost for a fair comparison.
+    cartan::basic_ik_runner<Solver> solver;
+
+    // Accuracy pass (untimed): FK-gated success, iteration and error means over
+    // the distinct targets, kept out of the timed loop and gated to match
+    // bm_closed_form_solver's success definition.
     int successes = 0;
     int total_iter = 0;
     Scalar total_pos = Scalar(0);
     Scalar total_ori = Scalar(0);
-    const auto target_count = ts.targets.size();
-
-    for (auto _ : state)
+    for (std::size_t i = 0; i < target_count; ++i)
     {
-        const auto i = idx % std::max<std::size_t>(target_count, 1);
-        const auto& target = ts.targets[i];
-        const auto& q_seed = ts.seeds[i];
-        ++idx;
-
-        cartan::basic_ik_runner<Solver> solver;
-        solver.setup(chain, target, q_seed, criteria);
+        solver.setup(chain, ts.targets[i], ts.seeds[i], criteria);
         auto result = solver.solve();
-
-        if (result.has_value())
+        if (!result.has_value())
+            continue;
+        auto [pos_err, ori_err] = cartan::fixtures::compute_pose_errors(
+            chain, result->solution.position, ts.targets[i]);
+        if (pos_err < Scalar(1e-5) && ori_err < Scalar(1e-5))
         {
             ++successes;
             total_iter += result->iterations;
-            auto [pos_err, ori_err] = cartan::fixtures::compute_pose_errors(
-                chain, result->solution.position, target);
             total_pos += pos_err;
             total_ori += ori_err;
         }
+    }
+
+    std::size_t idx = 0;
+    for (auto _ : state)
+    {
+        const auto i = idx % std::max<std::size_t>(target_count, 1);
+        ++idx;
+        solver.setup(chain, ts.targets[i], ts.seeds[i], criteria);
+        auto result = solver.solve();
         benchmark::DoNotOptimize(result);
     }
 
-    auto total = static_cast<int>(idx);
+    auto denom = static_cast<int>(std::max<std::size_t>(target_count, 1));
     state.counters["Success_pct"] = benchmark::Counter(
-        100.0 * static_cast<double>(successes) / std::max(total, 1));
+        100.0 * static_cast<double>(successes) / denom);
     state.counters["avg_iter"] = benchmark::Counter(
         static_cast<double>(total_iter) / std::max(successes, 1));
     state.counters["pos_err"] = benchmark::Counter(

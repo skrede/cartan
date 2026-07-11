@@ -16,8 +16,38 @@
 #include <kdl/segment.hpp>
 #include <kdl/jntarray.hpp>
 
+#include <vector>
+#include <random>
+
 namespace cartan::fixtures
 {
+
+/// Pre-generated reachable targets paired with independent random seed configs.
+///
+/// Hoists FK-based target generation out of IK timing loops: each entry pairs a
+/// guaranteed-reachable target (FK of a random config) with a random seed config
+/// drawn independently. Index with `i % targets.size()` inside the timed loop so
+/// the loop measures solve cost only.
+template <typename Scalar, int N>
+struct target_seed_pool
+{
+    using position_type = typename cartan::joint_state<Scalar, N>::position_type;
+
+    std::vector<cartan::se3<Scalar>> targets;
+    std::vector<position_type> seeds;
+
+    target_seed_pool(const cartan::kinematic_chain<Scalar, N>& chain, int count, unsigned seed = 42)
+    {
+        std::mt19937 rng(seed);
+        targets.reserve(static_cast<std::size_t>(count));
+        seeds.reserve(static_cast<std::size_t>(count));
+        for (int i = 0; i < count; ++i)
+        {
+            targets.push_back(random_reachable_target(chain, rng));
+            seeds.push_back(random_joint_config(chain, rng));
+        }
+    }
+};
 
 // ===========================================================================
 // KDL chain factories

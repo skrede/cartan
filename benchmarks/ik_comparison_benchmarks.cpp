@@ -1,9 +1,13 @@
 /// @file ik_comparison_benchmarks.cpp
 /// @brief Head-to-head comparison of cartan IK vs TRAC-IK for ~9 robots.
 ///
-/// Both solvers use the same random seed (42), same 10,000 targets (FK-generated,
-/// guaranteed reachable), and same convergence tolerance (eps = 1e-5).
-/// TRAC-IK uses maxtime=10.0 for convergence-based termination (Pitfall 3).
+/// Both solvers use the same random seed (42) and the same 2,000 targets
+/// (FK-generated, guaranteed reachable), one solve per distinct target. Success
+/// is FK-verified for every solver: the returned q is passed back through cartan
+/// FK and gated on a 2-norm body-twist error below 1e-5 in both position and
+/// orientation. TRAC-IK's component-wise eps is set to 1e-5/sqrt(3) so its gate
+/// is no looser than that 2-norm; its raw CartToJnt rc rate is reported alongside.
+/// TRAC-IK uses maxtime=10.0 for convergence-based termination.
 /// cartan uses LM stepper (closest algorithmic match to TRAC-IK's Newton methods)
 /// and restart+LM (random-restart wrapper, closer to TRAC-IK's actual strategy).
 ///
@@ -47,13 +51,15 @@
 
 #include <random>
 #include <vector>
+#include <limits>
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 
 namespace
 {
 
-constexpr int num_targets = 10000;
+constexpr int num_targets = 2000;
 
 // ============================================================================
 // Template helpers to reduce boilerplate across 9 robots x 2 solvers
@@ -318,15 +324,20 @@ void bm_cartan_racing_comparison(
 }
 
 /// TRAC-IK benchmark for a given KDL chain + pre-generated targets.
+///
+/// CartToJnt's rc>=0 is a self-report and can pass solutions outside tolerance,
+/// so success is FK-verified: recompute cartan FK on the returned q and gate on
+/// the same 2-norm body-twist error (position and orientation) at 1e-5 that the
+/// cartan and pinocchio cells use. The raw rc rate is reported separately.
 template <int N>
 void bm_trac_ik_comparison(
     benchmark::State& state,
+    const cartan::kinematic_chain<double, N>& chain,
     const KDL::Chain& kdl_chain,
     KDL::JntArray q_min,
     KDL::JntArray q_max,
     const target_set<double, N>& ts)
 {
-    // Convert cartan targets to KDL frames and seeds to KDL JntArrays
     auto count = static_cast<std::size_t>(num_targets);
     std::vector<KDL::Frame> kdl_targets;
     std::vector<KDL::JntArray> kdl_seeds;
@@ -344,18 +355,31 @@ void bm_trac_ik_comparison(
         kdl_seeds.push_back(kdl_seed);
     }
 
-    // TRAC-IK with large timeout for convergence-based termination (Pitfall 3)
-    // eps=1e-5 matches cartan convergence tolerance
+    // TRAC-IK converges via KDL::Equal, a component-wise infinity-norm at eps,
+    // while verification uses a 2-norm body-twist error. A component-wise gate
+    // at eps admits a 2-norm up to sqrt(3)*eps, so eps = tol/sqrt(3) keeps
+    // TRAC-IK's component gate no looser than the 2-norm tol we verify against.
+    // maxtime is large so termination is convergence-driven, not time-driven.
+    constexpr double tol = 1e-5;
+    const double trac_eps = tol / std::sqrt(3.0);
+    // TRAC-IK's Speed mode seeds internal random restarts from rand().
+    std::srand(42);
     TRAC_IK::TRAC_IK solver(kdl_chain, q_min, q_max,
-                             /*maxtime=*/10.0, /*eps=*/1e-5, TRAC_IK::Speed);
+                             /*maxtime=*/10.0, /*eps=*/trac_eps, TRAC_IK::Speed);
+
+    using position_type = typename cartan::joint_state<double, N>::position_type;
 
     std::size_t idx = 0;
-    int successes = 0;
+    int rc_ok = 0;
+    int verified_ok = 0;
+    double total_pos = 0.0;
+    double total_ori = 0.0;
 
     for (auto _ : state)
     {
-        auto& target = kdl_targets[idx % count];
-        auto& q_init = kdl_seeds[idx % count];
+        std::size_t cur = idx % count;
+        auto& target = kdl_targets[cur];
+        auto& q_init = kdl_seeds[cur];
         ++idx;
 
         KDL::JntArray q_out(static_cast<unsigned int>(N));
@@ -363,18 +387,36 @@ void bm_trac_ik_comparison(
 
         if (rc >= 0)
         {
-            ++successes;
+            ++rc_ok;
+            position_type q_cartan;
+            for (int j = 0; j < N; ++j)
+                q_cartan(j) = q_out(static_cast<unsigned int>(j));
+            auto [pos_err, ori_err] = cartan::fixtures::compute_pose_errors(
+                chain, q_cartan, ts.targets[cur]);
+            if (pos_err < tol && ori_err < tol)
+            {
+                ++verified_ok;
+                total_pos += pos_err;
+                total_ori += ori_err;
+            }
         }
         benchmark::DoNotOptimize(q_out);
     }
 
     auto total = static_cast<int>(idx);
     state.counters["Success_rate"] = benchmark::Counter(
-        100.0 * static_cast<double>(successes) / std::max(total, 1),
+        100.0 * static_cast<double>(verified_ok) / std::max(total, 1),
         benchmark::Counter::kAvgThreads);
-    state.counters["avg_iterations"] = benchmark::Counter(0, benchmark::Counter::kAvgThreads);
-    state.counters["avg_position_error"] = benchmark::Counter(0, benchmark::Counter::kAvgThreads);
-    state.counters["avg_orientation_error"] = benchmark::Counter(0, benchmark::Counter::kAvgThreads);
+    state.counters["rc_pct"] = benchmark::Counter(
+        100.0 * static_cast<double>(rc_ok) / std::max(total, 1),
+        benchmark::Counter::kAvgThreads);
+    // TRAC-IK does not expose an iteration count: not measured, not zero.
+    state.counters["avg_iterations"] = benchmark::Counter(
+        std::numeric_limits<double>::quiet_NaN(), benchmark::Counter::kAvgThreads);
+    state.counters["avg_position_error"] = benchmark::Counter(
+        total_pos / std::max(verified_ok, 1), benchmark::Counter::kAvgThreads);
+    state.counters["avg_orientation_error"] = benchmark::Counter(
+        total_ori / std::max(verified_ok, 1), benchmark::Counter::kAvgThreads);
 }
 
 // ============================================================================
@@ -389,7 +431,7 @@ static void bm_comparison_ur3e_cartan(benchmark::State& state)
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_comparison<6>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_ur3e_cartan)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_ur3e_cartan)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_ur3e_trac_ik(benchmark::State& state)
 {
@@ -398,9 +440,9 @@ static void bm_comparison_ur3e_trac_ik(benchmark::State& state)
     KDL::JntArray q_min(6), q_max(6);
     cartan::fixtures::make_ur3e_kdl_limits(q_min, q_max);
     static const target_set<double, 6> ts(cartan_chain, num_targets, 42);
-    bm_trac_ik_comparison<6>(state, kdl_chain, q_min, q_max, ts);
+    bm_trac_ik_comparison<6>(state, cartan_chain, kdl_chain, q_min, q_max, ts);
 }
-BENCHMARK(bm_comparison_ur3e_trac_ik)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_ur3e_trac_ik)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_ur3e_cartan_restart_lm(benchmark::State& state)
 {
@@ -408,7 +450,7 @@ static void bm_comparison_ur3e_cartan_restart_lm(benchmark::State& state)
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_restart_lm_comparison<6>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_ur3e_cartan_restart_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_ur3e_cartan_restart_lm)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_ur3e_cartan_restart_lm_clamped(benchmark::State& state)
 {
@@ -416,7 +458,7 @@ static void bm_comparison_ur3e_cartan_restart_lm_clamped(benchmark::State& state
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_restart_lm_comparison<6, cartan::clamp_limits>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_ur3e_cartan_restart_lm_clamped)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_ur3e_cartan_restart_lm_clamped)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_ur3e_cartan_speed(benchmark::State& state)
 {
@@ -424,7 +466,7 @@ static void bm_comparison_ur3e_cartan_speed(benchmark::State& state)
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_speed_comparison<6>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_ur3e_cartan_speed)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_ur3e_cartan_speed)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_ur3e_cartan_racing(benchmark::State& state)
 {
@@ -432,7 +474,7 @@ static void bm_comparison_ur3e_cartan_racing(benchmark::State& state)
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_racing_comparison<6>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_ur3e_cartan_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_ur3e_cartan_racing)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 // --- KR 6 SIXX ---
 
@@ -442,7 +484,7 @@ static void bm_comparison_kr6_sixx_cartan(benchmark::State& state)
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_comparison<6>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_kr6_sixx_cartan)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_kr6_sixx_cartan)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_kr6_sixx_trac_ik(benchmark::State& state)
 {
@@ -451,9 +493,9 @@ static void bm_comparison_kr6_sixx_trac_ik(benchmark::State& state)
     KDL::JntArray q_min(6), q_max(6);
     cartan::fixtures::make_kr6_sixx_kdl_limits(q_min, q_max);
     static const target_set<double, 6> ts(cartan_chain, num_targets, 42);
-    bm_trac_ik_comparison<6>(state, kdl_chain, q_min, q_max, ts);
+    bm_trac_ik_comparison<6>(state, cartan_chain, kdl_chain, q_min, q_max, ts);
 }
-BENCHMARK(bm_comparison_kr6_sixx_trac_ik)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_kr6_sixx_trac_ik)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_kr6_sixx_cartan_restart_lm(benchmark::State& state)
 {
@@ -461,7 +503,7 @@ static void bm_comparison_kr6_sixx_cartan_restart_lm(benchmark::State& state)
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_restart_lm_comparison<6>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_kr6_sixx_cartan_restart_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_kr6_sixx_cartan_restart_lm)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_kr6_sixx_cartan_restart_lm_clamped(benchmark::State& state)
 {
@@ -469,7 +511,7 @@ static void bm_comparison_kr6_sixx_cartan_restart_lm_clamped(benchmark::State& s
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_restart_lm_comparison<6, cartan::clamp_limits>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_kr6_sixx_cartan_restart_lm_clamped)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_kr6_sixx_cartan_restart_lm_clamped)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_kr6_sixx_cartan_speed(benchmark::State& state)
 {
@@ -477,7 +519,7 @@ static void bm_comparison_kr6_sixx_cartan_speed(benchmark::State& state)
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_speed_comparison<6>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_kr6_sixx_cartan_speed)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_kr6_sixx_cartan_speed)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_kr6_sixx_cartan_racing(benchmark::State& state)
 {
@@ -485,7 +527,7 @@ static void bm_comparison_kr6_sixx_cartan_racing(benchmark::State& state)
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_racing_comparison<6>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_kr6_sixx_cartan_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_kr6_sixx_cartan_racing)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 // --- ABB IRB 120 ---
 
@@ -495,7 +537,7 @@ static void bm_comparison_abb_irb120_cartan(benchmark::State& state)
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_comparison<6>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_abb_irb120_cartan)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_abb_irb120_cartan)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_abb_irb120_trac_ik(benchmark::State& state)
 {
@@ -504,9 +546,9 @@ static void bm_comparison_abb_irb120_trac_ik(benchmark::State& state)
     KDL::JntArray q_min(6), q_max(6);
     cartan::fixtures::make_abb_irb120_kdl_limits(q_min, q_max);
     static const target_set<double, 6> ts(cartan_chain, num_targets, 42);
-    bm_trac_ik_comparison<6>(state, kdl_chain, q_min, q_max, ts);
+    bm_trac_ik_comparison<6>(state, cartan_chain, kdl_chain, q_min, q_max, ts);
 }
-BENCHMARK(bm_comparison_abb_irb120_trac_ik)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_abb_irb120_trac_ik)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_abb_irb120_cartan_restart_lm(benchmark::State& state)
 {
@@ -514,7 +556,7 @@ static void bm_comparison_abb_irb120_cartan_restart_lm(benchmark::State& state)
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_restart_lm_comparison<6>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_abb_irb120_cartan_restart_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_abb_irb120_cartan_restart_lm)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_abb_irb120_cartan_restart_lm_clamped(benchmark::State& state)
 {
@@ -522,7 +564,7 @@ static void bm_comparison_abb_irb120_cartan_restart_lm_clamped(benchmark::State&
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_restart_lm_comparison<6, cartan::clamp_limits>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_abb_irb120_cartan_restart_lm_clamped)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_abb_irb120_cartan_restart_lm_clamped)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_abb_irb120_cartan_speed(benchmark::State& state)
 {
@@ -530,7 +572,7 @@ static void bm_comparison_abb_irb120_cartan_speed(benchmark::State& state)
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_speed_comparison<6>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_abb_irb120_cartan_speed)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_abb_irb120_cartan_speed)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_abb_irb120_cartan_racing(benchmark::State& state)
 {
@@ -538,7 +580,7 @@ static void bm_comparison_abb_irb120_cartan_racing(benchmark::State& state)
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_racing_comparison<6>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_abb_irb120_cartan_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_abb_irb120_cartan_racing)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 // --- Jaco2 ---
 
@@ -548,7 +590,7 @@ static void bm_comparison_jaco2_cartan(benchmark::State& state)
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_comparison<6>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_jaco2_cartan)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_jaco2_cartan)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_jaco2_trac_ik(benchmark::State& state)
 {
@@ -557,9 +599,9 @@ static void bm_comparison_jaco2_trac_ik(benchmark::State& state)
     KDL::JntArray q_min(6), q_max(6);
     cartan::fixtures::make_jaco2_kdl_limits(q_min, q_max);
     static const target_set<double, 6> ts(cartan_chain, num_targets, 42);
-    bm_trac_ik_comparison<6>(state, kdl_chain, q_min, q_max, ts);
+    bm_trac_ik_comparison<6>(state, cartan_chain, kdl_chain, q_min, q_max, ts);
 }
-BENCHMARK(bm_comparison_jaco2_trac_ik)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_jaco2_trac_ik)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_jaco2_cartan_restart_lm(benchmark::State& state)
 {
@@ -567,7 +609,7 @@ static void bm_comparison_jaco2_cartan_restart_lm(benchmark::State& state)
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_restart_lm_comparison<6>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_jaco2_cartan_restart_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_jaco2_cartan_restart_lm)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_jaco2_cartan_restart_lm_clamped(benchmark::State& state)
 {
@@ -575,7 +617,7 @@ static void bm_comparison_jaco2_cartan_restart_lm_clamped(benchmark::State& stat
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_restart_lm_comparison<6, cartan::clamp_limits>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_jaco2_cartan_restart_lm_clamped)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_jaco2_cartan_restart_lm_clamped)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_jaco2_cartan_speed(benchmark::State& state)
 {
@@ -583,7 +625,7 @@ static void bm_comparison_jaco2_cartan_speed(benchmark::State& state)
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_speed_comparison<6>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_jaco2_cartan_speed)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_jaco2_cartan_speed)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_jaco2_cartan_racing(benchmark::State& state)
 {
@@ -591,7 +633,7 @@ static void bm_comparison_jaco2_cartan_racing(benchmark::State& state)
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_cartan_racing_comparison<6>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_jaco2_cartan_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_jaco2_cartan_racing)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 // ============================================================================
 // 7-DOF robots
@@ -605,7 +647,7 @@ static void bm_comparison_lbr_med14_cartan(benchmark::State& state)
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_comparison<7>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_lbr_med14_cartan)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_lbr_med14_cartan)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_lbr_med14_trac_ik(benchmark::State& state)
 {
@@ -614,9 +656,9 @@ static void bm_comparison_lbr_med14_trac_ik(benchmark::State& state)
     KDL::JntArray q_min(7), q_max(7);
     cartan::fixtures::make_lbr_med14_kdl_limits(q_min, q_max);
     static const target_set<double, 7> ts(cartan_chain, num_targets, 42);
-    bm_trac_ik_comparison<7>(state, kdl_chain, q_min, q_max, ts);
+    bm_trac_ik_comparison<7>(state, cartan_chain, kdl_chain, q_min, q_max, ts);
 }
-BENCHMARK(bm_comparison_lbr_med14_trac_ik)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_lbr_med14_trac_ik)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_lbr_med14_cartan_restart_lm(benchmark::State& state)
 {
@@ -624,7 +666,7 @@ static void bm_comparison_lbr_med14_cartan_restart_lm(benchmark::State& state)
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_restart_lm_comparison<7>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_lbr_med14_cartan_restart_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_lbr_med14_cartan_restart_lm)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_lbr_med14_cartan_restart_lm_clamped(benchmark::State& state)
 {
@@ -632,7 +674,7 @@ static void bm_comparison_lbr_med14_cartan_restart_lm_clamped(benchmark::State& 
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_restart_lm_comparison<7, cartan::clamp_limits>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_lbr_med14_cartan_restart_lm_clamped)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_lbr_med14_cartan_restart_lm_clamped)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_lbr_med14_cartan_speed(benchmark::State& state)
 {
@@ -640,7 +682,7 @@ static void bm_comparison_lbr_med14_cartan_speed(benchmark::State& state)
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_speed_comparison<7>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_lbr_med14_cartan_speed)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_lbr_med14_cartan_speed)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_lbr_med14_cartan_racing(benchmark::State& state)
 {
@@ -648,7 +690,7 @@ static void bm_comparison_lbr_med14_cartan_racing(benchmark::State& state)
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_racing_comparison<7>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_lbr_med14_cartan_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_lbr_med14_cartan_racing)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 // --- Panda ---
 
@@ -658,7 +700,7 @@ static void bm_comparison_panda_cartan(benchmark::State& state)
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_comparison<7>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_panda_cartan)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_panda_cartan)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_panda_trac_ik(benchmark::State& state)
 {
@@ -667,9 +709,9 @@ static void bm_comparison_panda_trac_ik(benchmark::State& state)
     KDL::JntArray q_min(7), q_max(7);
     cartan::fixtures::make_panda_kdl_limits(q_min, q_max);
     static const target_set<double, 7> ts(cartan_chain, num_targets, 42);
-    bm_trac_ik_comparison<7>(state, kdl_chain, q_min, q_max, ts);
+    bm_trac_ik_comparison<7>(state, cartan_chain, kdl_chain, q_min, q_max, ts);
 }
-BENCHMARK(bm_comparison_panda_trac_ik)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_panda_trac_ik)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_panda_cartan_restart_lm(benchmark::State& state)
 {
@@ -677,7 +719,7 @@ static void bm_comparison_panda_cartan_restart_lm(benchmark::State& state)
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_restart_lm_comparison<7>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_panda_cartan_restart_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_panda_cartan_restart_lm)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_panda_cartan_restart_lm_clamped(benchmark::State& state)
 {
@@ -685,7 +727,7 @@ static void bm_comparison_panda_cartan_restart_lm_clamped(benchmark::State& stat
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_restart_lm_comparison<7, cartan::clamp_limits>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_panda_cartan_restart_lm_clamped)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_panda_cartan_restart_lm_clamped)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_panda_cartan_speed(benchmark::State& state)
 {
@@ -693,7 +735,7 @@ static void bm_comparison_panda_cartan_speed(benchmark::State& state)
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_speed_comparison<7>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_panda_cartan_speed)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_panda_cartan_speed)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_panda_cartan_racing(benchmark::State& state)
 {
@@ -701,7 +743,7 @@ static void bm_comparison_panda_cartan_racing(benchmark::State& state)
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_racing_comparison<7>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_panda_cartan_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_panda_cartan_racing)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 // --- Fetch ---
 
@@ -711,7 +753,7 @@ static void bm_comparison_fetch_cartan(benchmark::State& state)
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_comparison<7>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_fetch_cartan)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_fetch_cartan)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_fetch_trac_ik(benchmark::State& state)
 {
@@ -720,9 +762,9 @@ static void bm_comparison_fetch_trac_ik(benchmark::State& state)
     KDL::JntArray q_min(7), q_max(7);
     cartan::fixtures::make_fetch_kdl_limits(q_min, q_max);
     static const target_set<double, 7> ts(cartan_chain, num_targets, 42);
-    bm_trac_ik_comparison<7>(state, kdl_chain, q_min, q_max, ts);
+    bm_trac_ik_comparison<7>(state, cartan_chain, kdl_chain, q_min, q_max, ts);
 }
-BENCHMARK(bm_comparison_fetch_trac_ik)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_fetch_trac_ik)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_fetch_cartan_restart_lm(benchmark::State& state)
 {
@@ -730,7 +772,7 @@ static void bm_comparison_fetch_cartan_restart_lm(benchmark::State& state)
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_restart_lm_comparison<7>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_fetch_cartan_restart_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_fetch_cartan_restart_lm)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_fetch_cartan_restart_lm_clamped(benchmark::State& state)
 {
@@ -738,7 +780,7 @@ static void bm_comparison_fetch_cartan_restart_lm_clamped(benchmark::State& stat
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_restart_lm_comparison<7, cartan::clamp_limits>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_fetch_cartan_restart_lm_clamped)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_fetch_cartan_restart_lm_clamped)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_fetch_cartan_speed(benchmark::State& state)
 {
@@ -746,7 +788,7 @@ static void bm_comparison_fetch_cartan_speed(benchmark::State& state)
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_speed_comparison<7>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_fetch_cartan_speed)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_fetch_cartan_speed)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_fetch_cartan_racing(benchmark::State& state)
 {
@@ -754,7 +796,7 @@ static void bm_comparison_fetch_cartan_racing(benchmark::State& state)
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_racing_comparison<7>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_fetch_cartan_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_fetch_cartan_racing)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 // --- Baxter ---
 
@@ -764,7 +806,7 @@ static void bm_comparison_baxter_cartan(benchmark::State& state)
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_comparison<7>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_baxter_cartan)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_baxter_cartan)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_baxter_trac_ik(benchmark::State& state)
 {
@@ -773,9 +815,9 @@ static void bm_comparison_baxter_trac_ik(benchmark::State& state)
     KDL::JntArray q_min(7), q_max(7);
     cartan::fixtures::make_baxter_kdl_limits(q_min, q_max);
     static const target_set<double, 7> ts(cartan_chain, num_targets, 42);
-    bm_trac_ik_comparison<7>(state, kdl_chain, q_min, q_max, ts);
+    bm_trac_ik_comparison<7>(state, cartan_chain, kdl_chain, q_min, q_max, ts);
 }
-BENCHMARK(bm_comparison_baxter_trac_ik)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_baxter_trac_ik)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_baxter_cartan_restart_lm(benchmark::State& state)
 {
@@ -783,7 +825,7 @@ static void bm_comparison_baxter_cartan_restart_lm(benchmark::State& state)
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_restart_lm_comparison<7>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_baxter_cartan_restart_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_baxter_cartan_restart_lm)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_baxter_cartan_restart_lm_clamped(benchmark::State& state)
 {
@@ -791,7 +833,7 @@ static void bm_comparison_baxter_cartan_restart_lm_clamped(benchmark::State& sta
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_restart_lm_comparison<7, cartan::clamp_limits>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_baxter_cartan_restart_lm_clamped)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_baxter_cartan_restart_lm_clamped)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_baxter_cartan_speed(benchmark::State& state)
 {
@@ -799,7 +841,7 @@ static void bm_comparison_baxter_cartan_speed(benchmark::State& state)
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_speed_comparison<7>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_baxter_cartan_speed)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_baxter_cartan_speed)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_baxter_cartan_racing(benchmark::State& state)
 {
@@ -807,7 +849,7 @@ static void bm_comparison_baxter_cartan_racing(benchmark::State& state)
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_racing_comparison<7>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_baxter_cartan_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_baxter_cartan_racing)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 // --- KUKA LWR 4+ ---
 
@@ -817,7 +859,7 @@ static void bm_comparison_kuka_lwr4_cartan(benchmark::State& state)
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_comparison<7>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_kuka_lwr4_cartan)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_kuka_lwr4_cartan)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_kuka_lwr4_trac_ik(benchmark::State& state)
 {
@@ -826,9 +868,9 @@ static void bm_comparison_kuka_lwr4_trac_ik(benchmark::State& state)
     KDL::JntArray q_min(7), q_max(7);
     cartan::fixtures::make_kuka_lwr4_kdl_limits(q_min, q_max);
     static const target_set<double, 7> ts(cartan_chain, num_targets, 42);
-    bm_trac_ik_comparison<7>(state, kdl_chain, q_min, q_max, ts);
+    bm_trac_ik_comparison<7>(state, cartan_chain, kdl_chain, q_min, q_max, ts);
 }
-BENCHMARK(bm_comparison_kuka_lwr4_trac_ik)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_kuka_lwr4_trac_ik)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_kuka_lwr4_cartan_restart_lm(benchmark::State& state)
 {
@@ -836,7 +878,7 @@ static void bm_comparison_kuka_lwr4_cartan_restart_lm(benchmark::State& state)
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_restart_lm_comparison<7>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_kuka_lwr4_cartan_restart_lm)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_kuka_lwr4_cartan_restart_lm)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_kuka_lwr4_cartan_restart_lm_clamped(benchmark::State& state)
 {
@@ -844,7 +886,7 @@ static void bm_comparison_kuka_lwr4_cartan_restart_lm_clamped(benchmark::State& 
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_restart_lm_comparison<7, cartan::clamp_limits>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_kuka_lwr4_cartan_restart_lm_clamped)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_kuka_lwr4_cartan_restart_lm_clamped)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_kuka_lwr4_cartan_speed(benchmark::State& state)
 {
@@ -852,7 +894,7 @@ static void bm_comparison_kuka_lwr4_cartan_speed(benchmark::State& state)
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_speed_comparison<7>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_kuka_lwr4_cartan_speed)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_kuka_lwr4_cartan_speed)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_kuka_lwr4_cartan_racing(benchmark::State& state)
 {
@@ -860,7 +902,7 @@ static void bm_comparison_kuka_lwr4_cartan_racing(benchmark::State& state)
     static const target_set<double, 7> ts(chain, num_targets, 42);
     bm_cartan_racing_comparison<7>(state, chain, ts);
 }
-BENCHMARK(bm_comparison_kuka_lwr4_cartan_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_kuka_lwr4_cartan_racing)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 #ifdef CARTAN_BUILD_ARGMIN
 // ============================================================================
@@ -994,7 +1036,7 @@ static void bm_comparison_ur3e_argmin_slsqp_bounded(benchmark::State& state)
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_argmin_comparison<6, argmin_slsqp_solver<6>>(state, chain, ts, argmin_comparison_criteria());
 }
-BENCHMARK(bm_comparison_ur3e_argmin_slsqp_bounded)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_ur3e_argmin_slsqp_bounded)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_ur3e_nw_sqp_inequality(benchmark::State& state)
 {
@@ -1002,7 +1044,7 @@ static void bm_comparison_ur3e_nw_sqp_inequality(benchmark::State& state)
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_argmin_comparison<6, argmin_nw_sqp_solver<6>>(state, chain, ts, argmin_comparison_criteria());
 }
-BENCHMARK(bm_comparison_ur3e_nw_sqp_inequality)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_ur3e_nw_sqp_inequality)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 // ============================================================================
 // Axis 2: Backend head-to-head (argmin vs NLopt same-algorithm)
@@ -1014,7 +1056,7 @@ static void bm_comparison_ur3e_argmin_slsqp(benchmark::State& state)
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_argmin_comparison<6, argmin_slsqp_solver<6>>(state, chain, ts, argmin_comparison_criteria());
 }
-BENCHMARK(bm_comparison_ur3e_argmin_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_ur3e_argmin_slsqp)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_ur3e_argmin_projected_gn(benchmark::State& state)
 {
@@ -1023,7 +1065,7 @@ static void bm_comparison_ur3e_argmin_projected_gn(benchmark::State& state)
     bm_argmin_comparison<6, argmin_projected_gn_comparison_solver<6>>(
         state, chain, ts, argmin_comparison_criteria());
 }
-BENCHMARK(bm_comparison_ur3e_argmin_projected_gn)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_ur3e_argmin_projected_gn)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_ur3e_argmin_projected_gradient_gn(benchmark::State& state)
 {
@@ -1032,7 +1074,7 @@ static void bm_comparison_ur3e_argmin_projected_gradient_gn(benchmark::State& st
     bm_argmin_comparison<6, argmin_projected_gradient_gn_comparison_solver<6>>(
         state, chain, ts, argmin_comparison_criteria());
 }
-BENCHMARK(bm_comparison_ur3e_argmin_projected_gradient_gn)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_ur3e_argmin_projected_gradient_gn)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 // MMA / GCMMA entries for UR3e.
 static void bm_comparison_ur3e_argmin_mma(benchmark::State& state)
@@ -1041,7 +1083,7 @@ static void bm_comparison_ur3e_argmin_mma(benchmark::State& state)
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_argmin_comparison<6, argmin_mma_solver<6>>(state, chain, ts, argmin_comparison_criteria());
 }
-BENCHMARK(bm_comparison_ur3e_argmin_mma)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_ur3e_argmin_mma)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_ur3e_argmin_gcmma(benchmark::State& state)
 {
@@ -1049,7 +1091,7 @@ static void bm_comparison_ur3e_argmin_gcmma(benchmark::State& state)
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_argmin_comparison<6, argmin_gcmma_solver<6>>(state, chain, ts, argmin_comparison_criteria());
 }
-BENCHMARK(bm_comparison_ur3e_argmin_gcmma)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_ur3e_argmin_gcmma)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 // NLopt-compatible convergence variant of the UR3e SLSQP bench.
 // Uses argmin_slsqp_nlopt_compat which instantiates argmin_slsqp with
@@ -1064,7 +1106,7 @@ static void bm_comparison_ur3e_argmin_slsqp_nlopt_compat(benchmark::State& state
     bm_argmin_comparison<6, argmin_slsqp_nlopt_compat_solver<6>>(
         state, chain, ts, argmin_comparison_criteria());
 }
-BENCHMARK(bm_comparison_ur3e_argmin_slsqp_nlopt_compat)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_ur3e_argmin_slsqp_nlopt_compat)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 // Standalone phi_ls counter read — diagnostic only.
 //
@@ -1152,13 +1194,13 @@ static void bm_comparison_ur3e_argmin_slsqp_phi_ls_calls_budget50(benchmark::Sta
 {
     bm_comparison_ur3e_argmin_slsqp_phi_ls_calls_impl<50>(state);
 }
-BENCHMARK(bm_comparison_ur3e_argmin_slsqp_phi_ls_calls_budget50)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_ur3e_argmin_slsqp_phi_ls_calls_budget50)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_ur3e_argmin_slsqp_phi_ls_calls_budget500(benchmark::State& state)
 {
     bm_comparison_ur3e_argmin_slsqp_phi_ls_calls_impl<500>(state);
 }
-BENCHMARK(bm_comparison_ur3e_argmin_slsqp_phi_ls_calls_budget500)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_ur3e_argmin_slsqp_phi_ls_calls_budget500)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 // Dynamic-N variant: construct argmin_slsqp against a kinematic_chain
 // with runtime-known joint count. This instantiates
@@ -1236,7 +1278,7 @@ static void bm_comparison_ur3e_argmin_slsqp_last_check_results(benchmark::State&
     state.counters["total_solves"] = benchmark::Counter(
         static_cast<double>(total), benchmark::Counter::kDefaults);
 }
-BENCHMARK(bm_comparison_ur3e_argmin_slsqp_last_check_results)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_ur3e_argmin_slsqp_last_check_results)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 // Gradient-threshold sweep on UR3e SLSQP with default_convergence, direct-
 // drive (no runner, no restart wrapper). Parameterizes cartan's
@@ -1327,7 +1369,7 @@ static void bm_comparison_ur3e_argmin_slsqp_grad_sweep(benchmark::State& state)
 }
 BENCHMARK(bm_comparison_ur3e_argmin_slsqp_grad_sweep)
     ->Arg(6)->Arg(8)->Arg(10)->Arg(12)
-    ->Iterations(1000)->Unit(benchmark::kMicrosecond);
+    ->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 // Budget-per-step sweep on UR3e SLSQP with cartan-tight default_
 // convergence, direct-drive (no runner, no restart wrapper).
@@ -1433,7 +1475,7 @@ static void bm_comparison_ur3e_argmin_slsqp_budget_sweep(benchmark::State& state
 }
 BENCHMARK(bm_comparison_ur3e_argmin_slsqp_budget_sweep)
     ->Arg(500)->Arg(1000)->Arg(2000)->Arg(4000)
-    ->Iterations(1000)->Unit(benchmark::kMicrosecond);
+    ->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_ur3e_argmin_slsqp_retry(benchmark::State& state)
 {
@@ -1502,7 +1544,7 @@ static void bm_comparison_ur3e_argmin_slsqp_retry(benchmark::State& state)
 }
 BENCHMARK(bm_comparison_ur3e_argmin_slsqp_retry)
     ->Arg(10)->Arg(30)->Arg(50)->Arg(70)->Arg(100)
-    ->Iterations(1000)->Unit(benchmark::kMicrosecond);
+    ->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 // Alias-path companion to bm_comparison_ur3e_argmin_slsqp_last_check_results.
 // Same direct-drive pattern, but instantiates argmin_slsqp_nlopt_compat
@@ -1574,7 +1616,7 @@ static void bm_comparison_ur3e_argmin_slsqp_last_check_results_alias(benchmark::
         static_cast<double>(total), benchmark::Counter::kDefaults);
 }
 BENCHMARK(bm_comparison_ur3e_argmin_slsqp_last_check_results_alias)
-    ->Iterations(1000)->Unit(benchmark::kMicrosecond);
+    ->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 #ifdef CARTAN_HAS_NLOPT
 // Direct-drive NLopt SLSQP bench that also captures nlopt's per-pose
@@ -1640,7 +1682,7 @@ static void bm_comparison_ur3e_nlopt_slsqp_inner_iter_count(benchmark::State& st
         static_cast<double>(total), benchmark::Counter::kDefaults);
 }
 BENCHMARK(bm_comparison_ur3e_nlopt_slsqp_inner_iter_count)
-    ->Iterations(1000)->Unit(benchmark::kMicrosecond);
+    ->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 // Direct-drive NLopt SLSQP bench that captures how often the cartan-
 // side `needs_restart` perturbation loop fires per pose during a
@@ -1744,7 +1786,7 @@ static void bm_comparison_ur3e_nlopt_slsqp_restart_count(benchmark::State& state
         static_cast<double>(total), benchmark::Counter::kDefaults);
 }
 BENCHMARK(bm_comparison_ur3e_nlopt_slsqp_restart_count)
-    ->Iterations(1000)->Unit(benchmark::kMicrosecond);
+    ->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 #endif
 
 // Runner-wrapped companion to bm_comparison_ur3e_argmin_slsqp_grad_sweep.
@@ -1818,7 +1860,7 @@ static void bm_comparison_ur3e_argmin_slsqp_grad_sweep_runner(benchmark::State& 
 }
 BENCHMARK(bm_comparison_ur3e_argmin_slsqp_grad_sweep_runner)
     ->Arg(6)->Arg(8)->Arg(10)->Arg(12)
-    ->Iterations(1000)->Unit(benchmark::kMicrosecond);
+    ->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_ur3e_argmin_slsqp_phi_ls_calls_dynamicN(benchmark::State& state)
 {
@@ -1879,7 +1921,7 @@ static void bm_comparison_ur3e_argmin_slsqp_phi_ls_calls_dynamicN(benchmark::Sta
         static_cast<double>(total_cartan_outer) / std::max(total, 1),
         benchmark::Counter::kDefaults);
 }
-BENCHMARK(bm_comparison_ur3e_argmin_slsqp_phi_ls_calls_dynamicN)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_ur3e_argmin_slsqp_phi_ls_calls_dynamicN)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 #ifdef CARTAN_HAS_NLOPT
 static void bm_comparison_ur3e_nlopt_slsqp(benchmark::State& state)
@@ -1888,7 +1930,7 @@ static void bm_comparison_ur3e_nlopt_slsqp(benchmark::State& state)
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_argmin_comparison<6, nlopt_slsqp_solver<6>>(state, chain, ts, argmin_comparison_criteria());
 }
-BENCHMARK(bm_comparison_ur3e_nlopt_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_ur3e_nlopt_slsqp)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 static void bm_comparison_ur3e_nlopt_bobyqa(benchmark::State& state)
 {
@@ -1896,7 +1938,7 @@ static void bm_comparison_ur3e_nlopt_bobyqa(benchmark::State& state)
     static const target_set<double, 6> ts(chain, num_targets, 42);
     bm_argmin_comparison<6, nlopt_bobyqa_solver<6>>(state, chain, ts, argmin_comparison_criteria());
 }
-BENCHMARK(bm_comparison_ur3e_nlopt_bobyqa)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_ur3e_nlopt_bobyqa)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 #endif
 
 // ============================================================================
@@ -1913,7 +1955,7 @@ static void bm_comparison_##ROBOT##_argmin_slsqp(benchmark::State& state)       
     static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
     bm_argmin_comparison<6, argmin_slsqp_solver<6>>(state, chain, ts, argmin_comparison_criteria()); \
 }                                                                                                     \
-BENCHMARK(bm_comparison_##ROBOT##_argmin_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);    \
+BENCHMARK(bm_comparison_##ROBOT##_argmin_slsqp)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);    \
                                                                                                       \
 static void bm_comparison_##ROBOT##_argmin_lbfgsb(benchmark::State& state)                          \
 {                                                                                                     \
@@ -1921,7 +1963,7 @@ static void bm_comparison_##ROBOT##_argmin_lbfgsb(benchmark::State& state)      
     static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
     bm_argmin_comparison<6, argmin_lbfgsb_solver<6>>(state, chain, ts, argmin_comparison_criteria()); \
 }                                                                                                     \
-BENCHMARK(bm_comparison_##ROBOT##_argmin_lbfgsb)->Iterations(1000)->Unit(benchmark::kMicrosecond);   \
+BENCHMARK(bm_comparison_##ROBOT##_argmin_lbfgsb)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);   \
                                                                                                       \
 static void bm_comparison_##ROBOT##_nw_sqp(benchmark::State& state)                                  \
 {                                                                                                     \
@@ -1929,7 +1971,7 @@ static void bm_comparison_##ROBOT##_nw_sqp(benchmark::State& state)             
     static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
     bm_argmin_comparison<6, argmin_nw_sqp_solver<6>>(state, chain, ts, argmin_comparison_criteria()); \
 }                                                                                                     \
-BENCHMARK(bm_comparison_##ROBOT##_nw_sqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);           \
+BENCHMARK(bm_comparison_##ROBOT##_nw_sqp)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);           \
                                                                                                       \
 static void bm_comparison_##ROBOT##_argmin_mma(benchmark::State& state)                              \
 {                                                                                                     \
@@ -1937,7 +1979,7 @@ static void bm_comparison_##ROBOT##_argmin_mma(benchmark::State& state)         
     static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
     bm_argmin_comparison<6, argmin_mma_solver<6>>(state, chain, ts, argmin_comparison_criteria()); \
 }                                                                                                     \
-BENCHMARK(bm_comparison_##ROBOT##_argmin_mma)->Iterations(1000)->Unit(benchmark::kMicrosecond);      \
+BENCHMARK(bm_comparison_##ROBOT##_argmin_mma)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);      \
                                                                                                       \
 static void bm_comparison_##ROBOT##_argmin_gcmma(benchmark::State& state)                            \
 {                                                                                                     \
@@ -1945,7 +1987,7 @@ static void bm_comparison_##ROBOT##_argmin_gcmma(benchmark::State& state)       
     static const target_set<double, 6> ts(chain, num_targets, 42);                                    \
     bm_argmin_comparison<6, argmin_gcmma_solver<6>>(state, chain, ts, argmin_comparison_criteria()); \
 }                                                                                                     \
-BENCHMARK(bm_comparison_##ROBOT##_argmin_gcmma)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_##ROBOT##_argmin_gcmma)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 #define REGISTER_7DOF_ARGMIN_COMPARISON(ROBOT, CHAIN_FN)                                             \
                                                                                                       \
@@ -1955,7 +1997,7 @@ static void bm_comparison_##ROBOT##_argmin_slsqp(benchmark::State& state)       
     static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
     bm_argmin_comparison<7, argmin_slsqp_solver<7>>(state, chain, ts, argmin_comparison_criteria()); \
 }                                                                                                     \
-BENCHMARK(bm_comparison_##ROBOT##_argmin_slsqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);    \
+BENCHMARK(bm_comparison_##ROBOT##_argmin_slsqp)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);    \
                                                                                                       \
 static void bm_comparison_##ROBOT##_argmin_lbfgsb(benchmark::State& state)                          \
 {                                                                                                     \
@@ -1963,7 +2005,7 @@ static void bm_comparison_##ROBOT##_argmin_lbfgsb(benchmark::State& state)      
     static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
     bm_argmin_comparison<7, argmin_lbfgsb_solver<7>>(state, chain, ts, argmin_comparison_criteria()); \
 }                                                                                                     \
-BENCHMARK(bm_comparison_##ROBOT##_argmin_lbfgsb)->Iterations(1000)->Unit(benchmark::kMicrosecond);   \
+BENCHMARK(bm_comparison_##ROBOT##_argmin_lbfgsb)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);   \
                                                                                                       \
 static void bm_comparison_##ROBOT##_nw_sqp(benchmark::State& state)                                  \
 {                                                                                                     \
@@ -1971,7 +2013,7 @@ static void bm_comparison_##ROBOT##_nw_sqp(benchmark::State& state)             
     static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
     bm_argmin_comparison<7, argmin_nw_sqp_solver<7>>(state, chain, ts, argmin_comparison_criteria()); \
 }                                                                                                     \
-BENCHMARK(bm_comparison_##ROBOT##_nw_sqp)->Iterations(1000)->Unit(benchmark::kMicrosecond);           \
+BENCHMARK(bm_comparison_##ROBOT##_nw_sqp)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);           \
                                                                                                       \
 static void bm_comparison_##ROBOT##_argmin_mma(benchmark::State& state)                              \
 {                                                                                                     \
@@ -1979,7 +2021,7 @@ static void bm_comparison_##ROBOT##_argmin_mma(benchmark::State& state)         
     static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
     bm_argmin_comparison<7, argmin_mma_solver<7>>(state, chain, ts, argmin_comparison_criteria()); \
 }                                                                                                     \
-BENCHMARK(bm_comparison_##ROBOT##_argmin_mma)->Iterations(1000)->Unit(benchmark::kMicrosecond);      \
+BENCHMARK(bm_comparison_##ROBOT##_argmin_mma)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);      \
                                                                                                       \
 static void bm_comparison_##ROBOT##_argmin_gcmma(benchmark::State& state)                            \
 {                                                                                                     \
@@ -1987,7 +2029,7 @@ static void bm_comparison_##ROBOT##_argmin_gcmma(benchmark::State& state)       
     static const target_set<double, 7> ts(chain, num_targets, 42);                                    \
     bm_argmin_comparison<7, argmin_gcmma_solver<7>>(state, chain, ts, argmin_comparison_criteria()); \
 }                                                                                                     \
-BENCHMARK(bm_comparison_##ROBOT##_argmin_gcmma)->Iterations(1000)->Unit(benchmark::kMicrosecond);
+BENCHMARK(bm_comparison_##ROBOT##_argmin_gcmma)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
 // 6-DOF headline argmin entries
 REGISTER_6DOF_ARGMIN_COMPARISON(kr6_sixx,   make_kr6_sixx_chain)

@@ -50,8 +50,10 @@
 
 #include <benchmark/benchmark.h>
 
+#include <cmath>
 #include <vector>
 #include <random>
+#include <cstdlib>
 #include <numbers>
 #include <algorithm>
 
@@ -178,8 +180,6 @@ void bm_racing_solver(
         .max_iterations_per_attempt = 500,
         .max_total_work_units       = 500
     };
-    std::mt19937 rng(42);
-
     std::size_t idx = 0;
     int successes = 0;
     int fk_valid = 0;
@@ -188,24 +188,12 @@ void bm_racing_solver(
     double total_position_error = 0.0;
     double total_orientation_error = 0.0;
 
-    int n_joints = chain.num_joints();
-
     for (auto _ : state)
     {
-        auto& target = ts.targets[idx % static_cast<std::size_t>(num_targets)];
+        const auto i = idx % static_cast<std::size_t>(num_targets);
         ++idx;
-
-        // Generate random q0 within joint limits
-        typename cartan::joint_state<double, N>::position_type q0;
-        if constexpr (N == cartan::dynamic)
-            q0.resize(n_joints);
-        for (int j = 0; j < n_joints; ++j)
-        {
-            auto lo = chain.limits()[static_cast<std::size_t>(j)].position_min;
-            auto hi = chain.limits()[static_cast<std::size_t>(j)].position_max;
-            std::uniform_real_distribution<double> dist(lo, hi);
-            q0(j) = dist(rng);
-        }
+        auto& target = ts.targets[i];
+        const auto& q0 = ts.seeds[i];
 
         Solver solver;
         cartan::solver_options<double> opts;
@@ -291,13 +279,20 @@ void bm_trac_ik_baseline(
         kdl_seeds.push_back(kdl_seed);
     }
 
-    TRAC_IK::TRAC_IK solver(kdl_chain, q_min, q_max,
-                             /*maxtime=*/0.005, /*eps=*/1e-5, TRAC_IK::Speed);
-
+    // TRAC-IK converges via KDL::Equal, a component-wise infinity-norm at eps,
+    // while we FK-verify with a 2-norm body-twist error. A component gate at
+    // eps admits a 2-norm up to sqrt(3)*eps, so eps = tol/sqrt(3) keeps its
+    // gate no looser than the 2-norm tol we verify against.
     constexpr double trac_ik_tol = 1e-5;
+    const double trac_eps = trac_ik_tol / std::sqrt(3.0);
+
+    // TRAC-IK's Speed mode seeds internal random restarts from rand().
+    std::srand(42);
+    TRAC_IK::TRAC_IK solver(kdl_chain, q_min, q_max,
+                             /*maxtime=*/0.005, /*eps=*/trac_eps, TRAC_IK::Speed);
 
     std::size_t idx = 0;
-    int successes = 0;
+    int rc_ok = 0;
     int fk_valid = 0;
     int nearest_minima = 0;
     double total_position_error = 0.0;
@@ -305,28 +300,33 @@ void bm_trac_ik_baseline(
 
     for (auto _ : state)
     {
-        auto& target = kdl_targets[idx % count];
-        auto& q_init = kdl_seeds[idx % count];
+        const auto i = idx % count;
         ++idx;
+        auto& target = kdl_targets[i];
+        auto& q_init = kdl_seeds[i];
 
         KDL::JntArray q_out(static_cast<unsigned int>(N));
         int rc = solver.CartToJnt(q_init, target, q_out);
-
-        if (rc >= 0)
+        if (rc < 0)
         {
-            ++successes;
-            typename cartan::joint_state<double, N>::position_type q_solution;
-            for (unsigned int j = 0; j < static_cast<unsigned int>(N); ++j)
-            {
-                q_solution(static_cast<int>(j)) = q_out(j);
-            }
-            auto [position_error, orientation_error] = cartan::fixtures::compute_pose_errors(
-                chain, q_solution, ts.targets[idx - 1]);
+            benchmark::DoNotOptimize(q_out);
+            continue;
+        }
+        ++rc_ok;
+
+        typename cartan::joint_state<double, N>::position_type q_solution;
+        for (unsigned int j = 0; j < static_cast<unsigned int>(N); ++j)
+        {
+            q_solution(static_cast<int>(j)) = q_out(j);
+        }
+        auto [position_error, orientation_error] = cartan::fixtures::compute_pose_errors(
+            chain, q_solution, ts.targets[i]);
+
+        if (position_error <= trac_ik_tol && orientation_error <= trac_ik_tol)
+        {
+            ++fk_valid;
             total_position_error += position_error;
             total_orientation_error += orientation_error;
-
-            if (position_error <= trac_ik_tol && orientation_error <= trac_ik_tol)
-                ++fk_valid;
 
             bool is_nearest = true;
             for (unsigned int j = 0; j < static_cast<unsigned int>(N); ++j)
@@ -344,19 +344,19 @@ void bm_trac_ik_baseline(
 
     auto total = static_cast<int>(idx);
     state.counters["Success_rate"] = benchmark::Counter(
-        100.0 * static_cast<double>(successes) / std::max(total, 1),
-        benchmark::Counter::kAvgThreads);
-    state.counters["Valid_fk_rate"] = benchmark::Counter(
         100.0 * static_cast<double>(fk_valid) / std::max(total, 1),
         benchmark::Counter::kAvgThreads);
+    state.counters["rc_pct"] = benchmark::Counter(
+        100.0 * static_cast<double>(rc_ok) / std::max(total, 1),
+        benchmark::Counter::kAvgThreads);
     state.counters["Wrap_free_rate"] = benchmark::Counter(
-        100.0 * static_cast<double>(nearest_minima) / std::max(successes, 1),
+        100.0 * static_cast<double>(nearest_minima) / std::max(fk_valid, 1),
         benchmark::Counter::kAvgThreads);
     state.counters["avg_position_error"] = benchmark::Counter(
-        total_position_error / std::max(successes, 1),
+        total_position_error / std::max(fk_valid, 1),
         benchmark::Counter::kAvgThreads);
     state.counters["avg_orientation_error"] = benchmark::Counter(
-        total_orientation_error / std::max(successes, 1),
+        total_orientation_error / std::max(fk_valid, 1),
         benchmark::Counter::kAvgThreads);
 }
 

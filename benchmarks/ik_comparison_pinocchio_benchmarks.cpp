@@ -3,7 +3,7 @@
 ///
 /// pinocchio-LM is a hand-rolled mirror of cartan::lm: body-frame error
 /// V_b = log(T_curr^{-1} * T_target), body Jacobian, Nielsen damping update,
-/// LDLT solve of (J^T J + lambda I) dq = J^T V_b. Same 10000 target/seed pairs
+/// LDLT solve of (J^T J + lambda I) dq = J^T V_b. Same 2000 target/seed pairs
 /// (seed 42), same convergence criteria (1e-5 / 1e-5), same iteration cap (100).
 ///
 /// Both solvers see the same problem set; the wall-time and accuracy gap is
@@ -59,6 +59,7 @@
 #include <vector>
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <stdexcept>
 #include <string>
 
@@ -128,7 +129,7 @@ constexpr int per_family_per_attempt = 100;
 namespace
 {
 
-constexpr int num_targets = 10000;
+constexpr int num_targets = 2000;
 
 // ============================================================================
 // Target set generation — identical seed/protocol to ik_comparison_benchmarks
@@ -245,12 +246,38 @@ struct pin_ik_result
     double ori_err{0.0};
 };
 
+// Reusable per-solve Eigen scratch, sized once for an N-DOF chain. Hoisting the
+// Jacobian, normal-equation, and step buffers out of the solve/iteration loop
+// keeps the pinocchio-LM wall time free of per-iteration heap traffic.
+struct pin_lm_workspace
+{
+    Eigen::MatrixXd J_b;
+    Eigen::MatrixXd H;
+    Eigen::MatrixXd A;
+    Eigen::VectorXd g;
+    Eigen::VectorXd dq;
+    Eigen::VectorXd q_trial;
+    Eigen::LDLT<Eigen::MatrixXd> ldlt;
+
+    explicit pin_lm_workspace(int n)
+        : J_b(Eigen::MatrixXd::Zero(6, n)),
+          H(n, n),
+          A(n, n),
+          g(n),
+          dq(n),
+          q_trial(n),
+          ldlt(n)
+    {
+    }
+};
+
 inline pin_ik_result pinocchio_lm_solve(
     const pinocchio::Model& model,
     pinocchio::Data& data,
     pinocchio::FrameIndex ee_frame_id,
     const pinocchio::SE3& target,
     Eigen::VectorXd q,
+    pin_lm_workspace& ws,
     int max_iter = 100,
     double tol = 1e-5)
 {
@@ -263,12 +290,11 @@ inline pin_ik_result pinocchio_lm_solve(
     Eigen::Matrix<double, 6, 1> V_b = pinocchio::log6(T_curr.actInv(target)).toVector();
     double err_old_sq = V_b.squaredNorm();
 
-    Eigen::MatrixXd J_b = Eigen::MatrixXd::Zero(6, n);
     pinocchio::computeFrameJacobian(model, data, q, ee_frame_id,
-                                    pinocchio::LOCAL, J_b);
-    Eigen::MatrixXd H = J_b.transpose() * J_b;
+                                    pinocchio::LOCAL, ws.J_b);
+    ws.H.noalias() = ws.J_b.transpose() * ws.J_b;
     double max_diag = 0.0;
-    for (int i = 0; i < n; ++i) max_diag = std::max(max_diag, H(i, i));
+    for (int i = 0; i < n; ++i) max_diag = std::max(max_diag, ws.H(i, i));
     double lambda = 1e-3 * max_diag;
     if (lambda < std::numeric_limits<double>::epsilon()) lambda = 1e-4;
     double nu = 2.0;
@@ -290,30 +316,31 @@ inline pin_ik_result pinocchio_lm_solve(
 
         // Recompute J + H + g at current q (cartan does this each step)
         pinocchio::computeFrameJacobian(model, data, q, ee_frame_id,
-                                        pinocchio::LOCAL, J_b);
-        H.noalias() = J_b.transpose() * J_b;
-        Eigen::VectorXd g = J_b.transpose() * V_b;
+                                        pinocchio::LOCAL, ws.J_b);
+        ws.H.noalias() = ws.J_b.transpose() * ws.J_b;
+        ws.g.noalias() = ws.J_b.transpose() * V_b;
 
-        Eigen::MatrixXd A = H;
-        for (int i = 0; i < n; ++i) A(i, i) += lambda;
+        ws.A = ws.H;
+        for (int i = 0; i < n; ++i) ws.A(i, i) += lambda;
 
-        Eigen::VectorXd dq = A.ldlt().solve(g);
-        Eigen::VectorXd q_trial = q + dq;
+        ws.ldlt.compute(ws.A);
+        ws.dq = ws.ldlt.solve(ws.g);
+        ws.q_trial = q + ws.dq;
 
-        pinocchio::framesForwardKinematics(model, data, q_trial);
+        pinocchio::framesForwardKinematics(model, data, ws.q_trial);
         pinocchio::SE3 T_trial = data.oMf[ee_frame_id];
         Eigen::Matrix<double, 6, 1> V_b_trial =
             pinocchio::log6(T_trial.actInv(target)).toVector();
         double err_new_sq = V_b_trial.squaredNorm();
 
-        double pred_red = dq.transpose() * (lambda * dq + g);
+        double pred_red = ws.dq.transpose() * (lambda * ws.dq + ws.g);
         double rho = 0.0;
         if (std::abs(pred_red) > std::numeric_limits<double>::epsilon())
             rho = (err_old_sq - err_new_sq) / pred_red;
 
         if (rho > 0.0)
         {
-            q = q_trial;
+            q = ws.q_trial;
             V_b = V_b_trial;
             err_old_sq = err_new_sq;
             double factor = 1.0 - std::pow(2.0 * rho - 1.0, 3.0);
@@ -573,12 +600,15 @@ void bm_cartan_argmin_slsqp_kreest(
 template <int N>
 void bm_pinocchio_lm(
     benchmark::State& state,
+    const cartan::kinematic_chain<double, N>& chain,
     const pinocchio::Model& model_template,
     pinocchio::FrameIndex ee_frame_id,
     const target_set<double, N>& ts)
 {
     pinocchio::Model model = model_template;
     pinocchio::Data data(model);
+    pin_lm_workspace ws(N);
+    state.SetLabel("LM on Pinocchio primitives (ours)");
 
     // Pre-convert targets and seeds to pinocchio types
     auto count = static_cast<std::size_t>(num_targets);
@@ -598,18 +628,24 @@ void bm_pinocchio_lm(
         pin_seeds.push_back(q);
     }
 
+    using position_type = typename cartan::joint_state<double, N>::position_type;
+    constexpr double tol = 1e-5;
+
     std::size_t idx = 0;
     int successes = 0;
+    int verified_ok = 0;
     int total_iter = 0;
     double total_pos = 0.0, total_ori = 0.0;
+    double v_pos = 0.0, v_ori = 0.0;
 
     for (auto _ : state)
     {
-        const auto& target = pin_targets[idx % count];
-        const auto& q_seed = pin_seeds[idx % count];
+        std::size_t cur = idx % count;
+        const auto& target = pin_targets[cur];
+        const auto& q_seed = pin_seeds[cur];
         ++idx;
 
-        auto r = pinocchio_lm_solve(model, data, ee_frame_id, target, q_seed);
+        auto r = pinocchio_lm_solve(model, data, ee_frame_id, target, q_seed, ws);
         if (r.converged)
         {
             ++successes;
@@ -617,18 +653,38 @@ void bm_pinocchio_lm(
             total_pos += r.pos_err;
             total_ori += r.ori_err;
         }
+
+        // Canonical cross-check: recompute cartan FK on pinocchio's returned q
+        // and gate on the same 2-norm body-twist error at tol the cartan and
+        // TRAC-IK cells use, rather than trusting pinocchio's self-reported flag.
+        position_type q_cartan;
+        for (int j = 0; j < N; ++j) q_cartan(j) = r.q(j);
+        auto [pos_err, ori_err] = cartan::fixtures::compute_pose_errors(
+            chain, q_cartan, ts.targets[cur]);
+        if (pos_err < tol && ori_err < tol)
+        {
+            ++verified_ok;
+            v_pos += pos_err;
+            v_ori += ori_err;
+        }
         benchmark::DoNotOptimize(r);
     }
 
     auto total = static_cast<int>(idx);
     state.counters["Success_pct"] = benchmark::Counter(
         100.0 * static_cast<double>(successes) / std::max(total, 1));
+    state.counters["verified_pct"] = benchmark::Counter(
+        100.0 * static_cast<double>(verified_ok) / std::max(total, 1));
     state.counters["avg_iter"] = benchmark::Counter(
         static_cast<double>(total_iter) / std::max(successes, 1));
     state.counters["pos_err"] = benchmark::Counter(
         total_pos / std::max(successes, 1));
     state.counters["ori_err"] = benchmark::Counter(
         total_ori / std::max(successes, 1));
+    state.counters["verified_pos_err"] = benchmark::Counter(
+        v_pos / std::max(verified_ok, 1));
+    state.counters["verified_ori_err"] = benchmark::Counter(
+        v_ori / std::max(verified_ok, 1));
 }
 
 #ifdef CARTAN_HAS_TRAC_IK
@@ -658,9 +714,16 @@ void bm_trac_ik_verified(
         kdl_seeds.push_back(seed);
     }
 
+    // TRAC-IK converges via KDL::Equal, a component-wise infinity-norm at eps,
+    // while verification uses a 2-norm body-twist error. A component-wise gate
+    // at eps admits a 2-norm up to sqrt(3)*eps, so eps = tol/sqrt(3) keeps
+    // TRAC-IK's component gate no looser than the 2-norm tol we verify against.
     constexpr double tol = 1e-5;
+    const double trac_eps = tol / std::sqrt(3.0);
+    // TRAC-IK's Speed mode seeds internal random restarts from rand().
+    std::srand(42);
     TRAC_IK::TRAC_IK solver(kdl_chain, q_min, q_max,
-                             /*maxtime=*/10.0, /*eps=*/tol, TRAC_IK::Speed);
+                             /*maxtime=*/10.0, /*eps=*/trac_eps, TRAC_IK::Speed);
 
     std::size_t idx = 0;
     int rc_ok = 0;
@@ -724,7 +787,7 @@ static void bm_ik_##ROBOT##_trac_ik(benchmark::State& state)                    
     cartan::fixtures::KDL_LIMITS_FACTORY(q_min, q_max);                               \
     bm_trac_ik_verified<N_DOF>(state, chain, kdl_chain, q_min, q_max, ts);              \
 }                                                                                       \
-BENCHMARK(bm_ik_##ROBOT##_trac_ik)->Iterations(2000)->Unit(benchmark::kMicrosecond)
+BENCHMARK(bm_ik_##ROBOT##_trac_ik)->Iterations(num_targets)->Unit(benchmark::kMicrosecond)
 #else
 #define IK_BENCH_ROBOT_TRAC_IK(ROBOT, FACTORY, KDL_FACTORY, KDL_LIMITS_FACTORY, N_DOF) /* trac_ik disabled */
 #endif
@@ -736,22 +799,22 @@ static void bm_ik_##ROBOT##_cartan_lm(benchmark::State& state)                  
     static target_set<double, N_DOF> ts(chain, num_targets);                            \
     bm_cartan_lm<N_DOF>(state, chain, ts);                                              \
 }                                                                                       \
-BENCHMARK(bm_ik_##ROBOT##_cartan_lm)->Iterations(2000)->Unit(benchmark::kMicrosecond);  \
+BENCHMARK(bm_ik_##ROBOT##_cartan_lm)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);  \
 static void bm_ik_##ROBOT##_cartan_restart_lm(benchmark::State& state)                  \
 {                                                                                       \
     static auto chain = cartan::fixtures::FACTORY<double>();                          \
     static target_set<double, N_DOF> ts(chain, num_targets);                            \
     bm_cartan_restart_lm<N_DOF>(state, chain, ts);                                      \
 }                                                                                       \
-BENCHMARK(bm_ik_##ROBOT##_cartan_restart_lm)->Iterations(2000)->Unit(benchmark::kMicrosecond); \
+BENCHMARK(bm_ik_##ROBOT##_cartan_restart_lm)->Iterations(num_targets)->Unit(benchmark::kMicrosecond); \
 static void bm_ik_##ROBOT##_pinocchio_lm(benchmark::State& state)                       \
 {                                                                                       \
     static auto chain = cartan::fixtures::FACTORY<double>();                          \
     static target_set<double, N_DOF> ts(chain, num_targets);                            \
     static auto pc = build_pinocchio_chain(chain, #ROBOT);                              \
-    bm_pinocchio_lm<N_DOF>(state, pc.model, pc.ee_frame_id, ts);                        \
+    bm_pinocchio_lm<N_DOF>(state, chain, pc.model, pc.ee_frame_id, ts);                 \
 }                                                                                       \
-BENCHMARK(bm_ik_##ROBOT##_pinocchio_lm)->Iterations(2000)->Unit(benchmark::kMicrosecond); \
+BENCHMARK(bm_ik_##ROBOT##_pinocchio_lm)->Iterations(num_targets)->Unit(benchmark::kMicrosecond); \
 IK_BENCH_ROBOT_TRAC_IK(ROBOT, FACTORY, KDL_FACTORY, KDL_LIMITS_FACTORY, N_DOF)
 
 // Per-solver macro: emits three cells per (ROBOT, SOLVER) pair —
@@ -778,7 +841,7 @@ static void bm_ik_##ROBOT##_##SOLVER_NAME(benchmark::State& state)              
         cartan::bench::per_family_per_attempt,                                       \
         (FAMILY_TOTAL_UNITS));                                                           \
 }                                                                                        \
-BENCHMARK(bm_ik_##ROBOT##_##SOLVER_NAME)->Iterations(2000)->Unit(benchmark::kMicrosecond); \
+BENCHMARK(bm_ik_##ROBOT##_##SOLVER_NAME)->Iterations(num_targets)->Unit(benchmark::kMicrosecond); \
 static void bm_ik_##ROBOT##_##SOLVER_NAME##_no_limits(benchmark::State& state)           \
 {                                                                                        \
     using chain_t = cartan::kinematic_chain<double, N_DOF>;                              \
@@ -789,7 +852,7 @@ static void bm_ik_##ROBOT##_##SOLVER_NAME##_no_limits(benchmark::State& state)  
         cartan::bench::per_family_per_attempt,                                       \
         (FAMILY_TOTAL_UNITS));                                                           \
 }                                                                                        \
-BENCHMARK(bm_ik_##ROBOT##_##SOLVER_NAME##_no_limits)->Iterations(2000)->Unit(benchmark::kMicrosecond); \
+BENCHMARK(bm_ik_##ROBOT##_##SOLVER_NAME##_no_limits)->Iterations(num_targets)->Unit(benchmark::kMicrosecond); \
 static void bm_ik_##ROBOT##_##SOLVER_NAME##_restart(benchmark::State& state)             \
 {                                                                                        \
     using chain_t = cartan::kinematic_chain<double, N_DOF>;                              \
@@ -801,7 +864,7 @@ static void bm_ik_##ROBOT##_##SOLVER_NAME##_restart(benchmark::State& state)    
         cartan::bench::per_family_per_attempt,                                       \
         (FAMILY_TOTAL_UNITS));                                                           \
 }                                                                                        \
-BENCHMARK(bm_ik_##ROBOT##_##SOLVER_NAME##_restart)->Iterations(2000)->Unit(benchmark::kMicrosecond)
+BENCHMARK(bm_ik_##ROBOT##_##SOLVER_NAME##_restart)->Iterations(num_targets)->Unit(benchmark::kMicrosecond)
 
 // argmin_slsqp k-sweep macro: emits three cells per (ROBOT, K_VALUE) pair —
 //   bm_ik_<robot>_argmin_slsqp_fast_kreest_k<K_VALUE>           (default LimitsPolicy)
@@ -828,7 +891,7 @@ static void bm_ik_##ROBOT##_##SOLVER_NAME##_kreest_k##K_VALUE(benchmark::State& 
         (FAMILY_TOTAL_UNITS),                                                                       \
         static_cast<std::size_t>(K_VALUE));                                                         \
 }                                                                                                   \
-BENCHMARK(bm_ik_##ROBOT##_##SOLVER_NAME##_kreest_k##K_VALUE)->Iterations(2000)->Unit(benchmark::kMicrosecond); \
+BENCHMARK(bm_ik_##ROBOT##_##SOLVER_NAME##_kreest_k##K_VALUE)->Iterations(num_targets)->Unit(benchmark::kMicrosecond); \
 static void bm_ik_##ROBOT##_##SOLVER_NAME##_kreest_k##K_VALUE##_no_limits(benchmark::State& state)  \
 {                                                                                                   \
     using chain_t = cartan::kinematic_chain<double, N_DOF>;                                         \
@@ -840,7 +903,7 @@ static void bm_ik_##ROBOT##_##SOLVER_NAME##_kreest_k##K_VALUE##_no_limits(benchm
         (FAMILY_TOTAL_UNITS),                                                                       \
         static_cast<std::size_t>(K_VALUE));                                                         \
 }                                                                                                   \
-BENCHMARK(bm_ik_##ROBOT##_##SOLVER_NAME##_kreest_k##K_VALUE##_no_limits)->Iterations(2000)->Unit(benchmark::kMicrosecond); \
+BENCHMARK(bm_ik_##ROBOT##_##SOLVER_NAME##_kreest_k##K_VALUE##_no_limits)->Iterations(num_targets)->Unit(benchmark::kMicrosecond); \
 static void bm_ik_##ROBOT##_##SOLVER_NAME##_kreest_k##K_VALUE##_restart(benchmark::State& state)    \
 {                                                                                                   \
     using chain_t = cartan::kinematic_chain<double, N_DOF>;                                         \
@@ -887,7 +950,7 @@ static void bm_ik_##ROBOT##_##SOLVER_NAME##_kreest_k##K_VALUE##_restart(benchmar
     state.counters["ori_err"] = benchmark::Counter(total_ori / std::max(successes, 1));             \
     state.counters["k_reest"] = benchmark::Counter(static_cast<double>(K_VALUE));                   \
 }                                                                                                   \
-BENCHMARK(bm_ik_##ROBOT##_##SOLVER_NAME##_kreest_k##K_VALUE##_restart)->Iterations(2000)->Unit(benchmark::kMicrosecond)
+BENCHMARK(bm_ik_##ROBOT##_##SOLVER_NAME##_kreest_k##K_VALUE##_restart)->Iterations(num_targets)->Unit(benchmark::kMicrosecond)
 
 // Single-cell variant for solvers whose public template already encapsulates restart logic
 // (e.g. projected_lm self-restarts on stall via Halton re-seed). Adding _no_limits and
@@ -904,7 +967,7 @@ static void bm_ik_##ROBOT##_##SOLVER_NAME(benchmark::State& state)              
         cartan::bench::per_family_per_attempt,                                       \
         (FAMILY_TOTAL_UNITS));                                                           \
 }                                                                                        \
-BENCHMARK(bm_ik_##ROBOT##_##SOLVER_NAME)->Iterations(2000)->Unit(benchmark::kMicrosecond)
+BENCHMARK(bm_ik_##ROBOT##_##SOLVER_NAME)->Iterations(num_targets)->Unit(benchmark::kMicrosecond)
 
 IK_BENCH_ROBOT(ur3e,       make_ur3e_chain,       make_ur3e_kdl_chain,       make_ur3e_kdl_limits,       6);
 IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, dls,            cartan::dls,            cartan::bench::lm_family_total_units);

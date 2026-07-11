@@ -8,10 +8,19 @@
 
 #include <benchmark/benchmark.h>
 
+#include <array>
 #include <random>
+#include <cstddef>
 
 namespace
 {
+
+// Cartan-side cells draw q from a table of varied configs indexed by the
+// iteration counter and DoNotOptimize the chosen q before the call, so the
+// optimizer cannot hoist a loop-invariant FK out of the timed loop. KDL cells
+// keep their own loop-invariant q (equal end-effector work is the point).
+// Power-of-two size wraps the index with a mask.
+constexpr std::size_t kInputs = 1024;
 
 // ============================================================================
 // Static chain factories (mirrored from test infrastructure)
@@ -149,9 +158,13 @@ static void bm_fk_##ROBOT##_kinematic_chain(benchmark::State& state)     \
 {                                                                        \
     auto chain = cartan::fixtures::FACTORY<double>();                    \
     std::mt19937 rng(42);                                                \
-    auto q = cartan::fixtures::random_joint_config(chain, rng);         \
+    std::array<decltype(cartan::fixtures::random_joint_config(chain, rng)), kInputs> qs; \
+    for (auto& q : qs) q = cartan::fixtures::random_joint_config(chain, rng); \
+    std::size_t i = 0;                                                   \
     for (auto _ : state)                                                 \
     {                                                                    \
+        auto& q = qs[i++ & (kInputs - 1)];                              \
+        benchmark::DoNotOptimize(q);                                    \
         auto result = cartan::forward_kinematics(chain, q);               \
         benchmark::DoNotOptimize(result);                                \
     }                                                                    \
@@ -164,9 +177,13 @@ static void bm_fk_##ROBOT##_static_generic(benchmark::State& state)      \
     auto sc = STATIC_FACTORY<double>();                                   \
     cartan::detail::generic_chain_wrapper wrapped{sc};                     \
     std::mt19937 rng(42);                                                \
-    auto q = random_config_static(sc, rng);                              \
+    std::array<decltype(random_config_static(sc, rng)), kInputs> qs;      \
+    for (auto& q : qs) q = random_config_static(sc, rng);                 \
+    std::size_t i = 0;                                                   \
     for (auto _ : state)                                                 \
     {                                                                    \
+        auto& q = qs[i++ & (kInputs - 1)];                              \
+        benchmark::DoNotOptimize(q);                                    \
         auto result = cartan::forward_kinematics(wrapped, q);             \
         benchmark::DoNotOptimize(result);                                \
     }                                                                    \
@@ -178,9 +195,13 @@ static void bm_fk_##ROBOT##_static_specialized(benchmark::State& state)  \
 {                                                                        \
     auto sc = STATIC_FACTORY<double>();                                   \
     std::mt19937 rng(42);                                                \
-    auto q = random_config_static(sc, rng);                              \
+    std::array<decltype(random_config_static(sc, rng)), kInputs> qs;      \
+    for (auto& q : qs) q = random_config_static(sc, rng);                 \
+    std::size_t i = 0;                                                   \
     for (auto _ : state)                                                 \
     {                                                                    \
+        auto& q = qs[i++ & (kInputs - 1)];                              \
+        benchmark::DoNotOptimize(q);                                    \
         auto result = cartan::forward_kinematics(sc, q);                  \
         benchmark::DoNotOptimize(result);                                \
     }                                                                    \

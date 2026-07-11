@@ -19,18 +19,21 @@ static void bm_ik_nlopt_bobyqa_3r_planar(benchmark::State& state)
 {
     auto chain = cartan::fixtures::make_3r_planar_chain<double>();
     cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 100};
-    std::mt19937 rng(42);
+    cartan::fixtures::target_seed_pool<double, 3> pool(chain, 1024);
 
     int total_solves = 0;
     int successes = 0;
     int total_iterations = 0;
     double total_pos_error = 0.0;
     double total_ori_error = 0.0;
+    std::size_t idx = 0;
 
     for (auto _ : state)
     {
-        auto target = cartan::fixtures::random_reachable_target(chain, rng);
-        auto q_seed = cartan::fixtures::random_joint_config(chain, rng);
+        const auto i = idx % pool.targets.size();
+        ++idx;
+        const auto& target = pool.targets[i];
+        const auto& q_seed = pool.seeds[i];
 
         cartan::basic_ik_runner<cartan::nlopt_bobyqa<cartan::kinematic_chain<double, 3>>> solver;
         solver.setup(chain, target, q_seed, criteria);
@@ -68,18 +71,21 @@ static void bm_ik_nlopt_bobyqa_ur3e(benchmark::State& state)
 {
     auto chain = cartan::fixtures::make_ur3e_chain<double>();
     cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 100};
-    std::mt19937 rng(42);
+    cartan::fixtures::target_seed_pool<double, 6> pool(chain, 1024);
 
     int total_solves = 0;
     int successes = 0;
     int total_iterations = 0;
     double total_pos_error = 0.0;
     double total_ori_error = 0.0;
+    std::size_t idx = 0;
 
     for (auto _ : state)
     {
-        auto target = cartan::fixtures::random_reachable_target(chain, rng);
-        auto q_seed = cartan::fixtures::random_joint_config(chain, rng);
+        const auto i = idx % pool.targets.size();
+        ++idx;
+        const auto& target = pool.targets[i];
+        const auto& q_seed = pool.seeds[i];
 
         cartan::basic_ik_runner<cartan::nlopt_bobyqa<cartan::kinematic_chain<double, 6>>> solver;
         solver.setup(chain, target, q_seed, criteria);
@@ -117,18 +123,21 @@ static void bm_ik_nlopt_bobyqa_lbr_med14(benchmark::State& state)
 {
     auto chain = cartan::fixtures::make_lbr_med14_chain<double>();
     cartan::convergence_criteria<double> criteria{1e-5, 1e-5, 100};
-    std::mt19937 rng(42);
+    cartan::fixtures::target_seed_pool<double, 7> pool(chain, 1024);
 
     int total_solves = 0;
     int successes = 0;
     int total_iterations = 0;
     double total_pos_error = 0.0;
     double total_ori_error = 0.0;
+    std::size_t idx = 0;
 
     for (auto _ : state)
     {
-        auto target = cartan::fixtures::random_reachable_target(chain, rng);
-        auto q_seed = cartan::fixtures::random_joint_config(chain, rng);
+        const auto i = idx % pool.targets.size();
+        ++idx;
+        const auto& target = pool.targets[i];
+        const auto& q_seed = pool.seeds[i];
 
         cartan::basic_ik_runner<cartan::nlopt_bobyqa<cartan::kinematic_chain<double, 7>>> solver;
         solver.setup(chain, target, q_seed, criteria);

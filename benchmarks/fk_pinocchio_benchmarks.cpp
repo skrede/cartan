@@ -17,12 +17,21 @@
 
 #include <benchmark/benchmark.h>
 
+#include <array>
 #include <random>
 #include <string>
+#include <cstddef>
 #include <stdexcept>
 
 namespace
 {
+
+// Cartan-side cells draw their config from a table of varied inputs indexed by
+// the iteration counter and DoNotOptimize the chosen input before the op, so a
+// loop-invariant result cannot be hoisted out of the timed loop. The Pinocchio
+// cell keeps its own loop-invariant q (equal end-effector work is the point).
+// Power-of-two size wraps the index with a mask.
+constexpr std::size_t kInputs = 1024;
 
 template <typename Scalar>
 auto make_3r_planar_static()
@@ -484,6 +493,41 @@ void verify_fk_matrix_native(const Chain& chain, const std::string& robot)
             + " r=" + std::to_string(r_err) + " t=" + std::to_string(t_err));
 }
 
+// Sanity check: fk_matrix_accum must agree with cartan::forward_kinematics.
+template <typename Chain>
+void verify_fk_matrix_accum(const Chain& chain, const std::string& robot)
+{
+    std::mt19937 rng(123);
+    auto q = cartan::fixtures::random_joint_config(chain, rng);
+    auto cartan_fk = cartan::forward_kinematics(chain, q);
+    auto [R_m, t_m] = fk_matrix_accum(chain, q);
+    auto R_q = cartan_fk.end_effector.rotation().matrix();
+    auto t_q = cartan_fk.end_effector.translation();
+    double r_err = (R_m - R_q).norm();
+    double t_err = (t_m - t_q).norm();
+    if (r_err > 1e-12 || t_err > 1e-12)
+        throw std::runtime_error("fk_matrix_accum mismatch on " + robot
+            + " r=" + std::to_string(r_err) + " t=" + std::to_string(t_err));
+}
+
+// Sanity check: fk_matrix_native_full must agree with cartan::forward_kinematics.
+template <typename Chain>
+void verify_fk_matrix_native_full(const Chain& chain, const std::string& robot)
+{
+    std::mt19937 rng(123);
+    auto q = cartan::fixtures::random_joint_config(chain, rng);
+    auto cartan_fk = cartan::forward_kinematics(chain, q);
+    auto [R_m, t_m, intermediates] = fk_matrix_native_full(chain, q);
+    static_cast<void>(intermediates);
+    auto R_q = cartan_fk.end_effector.rotation().matrix();
+    auto t_q = cartan_fk.end_effector.translation();
+    double r_err = (R_m - R_q).norm();
+    double t_err = (t_m - t_q).norm();
+    if (r_err > 1e-12 || t_err > 1e-12)
+        throw std::runtime_error("fk_matrix_native_full mismatch on " + robot
+            + " r=" + std::to_string(r_err) + " t=" + std::to_string(t_err));
+}
+
 // Matrix-form space Jacobian. Takes intermediates as pair<Matrix3, Vector3>
 // (output of fk_matrix_native_full). Skips the quaternion->matrix conversion
 // that jacobian_column does today on every column.
@@ -559,10 +603,15 @@ void verify_jacobian_matrix(const Chain& chain, const std::string& robot)
 static void bm_fk_##ROBOT##_cartan_matrix(benchmark::State& state)                      \
 {                                                                                       \
     auto chain = cartan::fixtures::KC_FACTORY<double>();                              \
+    verify_fk_matrix_accum(chain, #ROBOT);                                              \
     std::mt19937 rng(42);                                                               \
-    auto q = cartan::fixtures::random_joint_config(chain, rng);                       \
+    std::array<decltype(cartan::fixtures::random_joint_config(chain, rng)), kInputs> qs; \
+    for (auto& q : qs) q = cartan::fixtures::random_joint_config(chain, rng);          \
+    std::size_t i = 0;                                                                  \
     for (auto _ : state)                                                                \
     {                                                                                   \
+        auto& q = qs[i++ & (kInputs - 1)];                                             \
+        benchmark::DoNotOptimize(q);                                                    \
         auto r = fk_matrix_accum(chain, q);                                             \
         benchmark::DoNotOptimize(r);                                                    \
     }                                                                                   \
@@ -573,9 +622,13 @@ static void bm_fk_##ROBOT##_cartan_matrix_native(benchmark::State& state)       
     auto chain = cartan::fixtures::KC_FACTORY<double>();                              \
     verify_fk_matrix_native(chain, #ROBOT);                                             \
     std::mt19937 rng(42);                                                               \
-    auto q = cartan::fixtures::random_joint_config(chain, rng);                       \
+    std::array<decltype(cartan::fixtures::random_joint_config(chain, rng)), kInputs> qs; \
+    for (auto& q : qs) q = cartan::fixtures::random_joint_config(chain, rng);          \
+    std::size_t i = 0;                                                                  \
     for (auto _ : state)                                                                \
     {                                                                                   \
+        auto& q = qs[i++ & (kInputs - 1)];                                             \
+        benchmark::DoNotOptimize(q);                                                    \
         auto r = fk_matrix_native(chain, q);                                            \
         benchmark::DoNotOptimize(r);                                                    \
     }                                                                                   \
@@ -584,10 +637,15 @@ BENCHMARK(bm_fk_##ROBOT##_cartan_matrix_native);                                
 static void bm_fk_##ROBOT##_cartan_matrix_native_full(benchmark::State& state)          \
 {                                                                                       \
     auto chain = cartan::fixtures::KC_FACTORY<double>();                              \
+    verify_fk_matrix_native_full(chain, #ROBOT);                                        \
     std::mt19937 rng(42);                                                               \
-    auto q = cartan::fixtures::random_joint_config(chain, rng);                       \
+    std::array<decltype(cartan::fixtures::random_joint_config(chain, rng)), kInputs> qs; \
+    for (auto& q : qs) q = cartan::fixtures::random_joint_config(chain, rng);          \
+    std::size_t i = 0;                                                                  \
     for (auto _ : state)                                                                \
     {                                                                                   \
+        auto& q = qs[i++ & (kInputs - 1)];                                             \
+        benchmark::DoNotOptimize(q);                                                    \
         auto r = fk_matrix_native_full(chain, q);                                       \
         benchmark::DoNotOptimize(r);                                                    \
     }                                                                                   \
@@ -616,9 +674,13 @@ static void bm_fk_##ROBOT##_cartan_static(benchmark::State& state)              
 {                                                                                       \
     auto sc = SC_FACTORY<double>();                                                     \
     std::mt19937 rng(42);                                                               \
-    auto q = random_config_static(sc, rng);                                             \
+    std::array<decltype(random_config_static(sc, rng)), kInputs> qs;                    \
+    for (auto& q : qs) q = random_config_static(sc, rng);                               \
+    std::size_t i = 0;                                                                  \
     for (auto _ : state)                                                                \
     {                                                                                   \
+        auto& q = qs[i++ & (kInputs - 1)];                                             \
+        benchmark::DoNotOptimize(q);                                                    \
         auto result = cartan::forward_kinematics(sc, q);                                \
         benchmark::DoNotOptimize(result);                                               \
     }                                                                                   \
@@ -630,9 +692,13 @@ static void bm_fk_##ROBOT##_cartan_kc(benchmark::State& state)                  
 {                                                                                       \
     auto chain = cartan::fixtures::KC_FACTORY<double>();                              \
     std::mt19937 rng(42);                                                               \
-    auto q = cartan::fixtures::random_joint_config(chain, rng);                       \
+    std::array<decltype(cartan::fixtures::random_joint_config(chain, rng)), kInputs> qs; \
+    for (auto& q : qs) q = cartan::fixtures::random_joint_config(chain, rng);          \
+    std::size_t i = 0;                                                                  \
     for (auto _ : state)                                                                \
     {                                                                                   \
+        auto& q = qs[i++ & (kInputs - 1)];                                             \
+        benchmark::DoNotOptimize(q);                                                    \
         auto result = cartan::forward_kinematics(chain, q);                             \
         benchmark::DoNotOptimize(result);                                               \
     }                                                                                   \
@@ -644,10 +710,13 @@ static void bm_jac_##ROBOT##_cartan(benchmark::State& state)                    
 {                                                                                       \
     auto chain = cartan::fixtures::KC_FACTORY<double>();                              \
     std::mt19937 rng(42);                                                               \
-    auto q = cartan::fixtures::random_joint_config(chain, rng);                       \
-    auto fk = cartan::forward_kinematics(chain, q);                                     \
+    std::array<decltype(cartan::forward_kinematics(chain, cartan::fixtures::random_joint_config(chain, rng))), kInputs> fks; \
+    for (auto& f : fks) f = cartan::forward_kinematics(chain, cartan::fixtures::random_joint_config(chain, rng)); \
+    std::size_t i = 0;                                                                  \
     for (auto _ : state)                                                                \
     {                                                                                   \
+        auto& fk = fks[i++ & (kInputs - 1)];                                           \
+        benchmark::DoNotOptimize(fk);                                                   \
         auto J = cartan::space_jacobian(chain, fk);                                     \
         benchmark::DoNotOptimize(J);                                                    \
     }                                                                                   \
@@ -657,10 +726,13 @@ static void bm_jac_##ROBOT##_matrix(benchmark::State& state)                    
 {                                                                                       \
     auto chain = cartan::fixtures::KC_FACTORY<double>();                              \
     std::mt19937 rng(42);                                                               \
-    auto q = cartan::fixtures::random_joint_config(chain, rng);                       \
-    auto fkm = cartan::forward_kinematics_matrix(chain, q);                             \
+    std::array<decltype(cartan::forward_kinematics_matrix(chain, cartan::fixtures::random_joint_config(chain, rng))), kInputs> fkms; \
+    for (auto& f : fkms) f = cartan::forward_kinematics_matrix(chain, cartan::fixtures::random_joint_config(chain, rng)); \
+    std::size_t i = 0;                                                                  \
     for (auto _ : state)                                                                \
     {                                                                                   \
+        auto& fkm = fkms[i++ & (kInputs - 1)];                                         \
+        benchmark::DoNotOptimize(fkm);                                                  \
         auto J = cartan::space_jacobian(chain, fkm);                                    \
         benchmark::DoNotOptimize(J);                                                    \
     }                                                                                   \
@@ -670,9 +742,13 @@ static void bm_fk_##ROBOT##_matrix_api(benchmark::State& state)                 
 {                                                                                       \
     auto chain = cartan::fixtures::KC_FACTORY<double>();                              \
     std::mt19937 rng(42);                                                               \
-    auto q = cartan::fixtures::random_joint_config(chain, rng);                       \
+    std::array<decltype(cartan::fixtures::random_joint_config(chain, rng)), kInputs> qs; \
+    for (auto& q : qs) q = cartan::fixtures::random_joint_config(chain, rng);          \
+    std::size_t i = 0;                                                                  \
     for (auto _ : state)                                                                \
     {                                                                                   \
+        auto& q = qs[i++ & (kInputs - 1)];                                             \
+        benchmark::DoNotOptimize(q);                                                    \
         auto fkm = cartan::forward_kinematics_matrix(chain, q);                         \
         benchmark::DoNotOptimize(fkm);                                                  \
     }                                                                                   \
@@ -682,9 +758,13 @@ static void bm_fkjac_##ROBOT##_cartan(benchmark::State& state)                  
 {                                                                                       \
     auto chain = cartan::fixtures::KC_FACTORY<double>();                              \
     std::mt19937 rng(42);                                                               \
-    auto q = cartan::fixtures::random_joint_config(chain, rng);                       \
+    std::array<decltype(cartan::fixtures::random_joint_config(chain, rng)), kInputs> qs; \
+    for (auto& q : qs) q = cartan::fixtures::random_joint_config(chain, rng);          \
+    std::size_t i = 0;                                                                  \
     for (auto _ : state)                                                                \
     {                                                                                   \
+        auto& q = qs[i++ & (kInputs - 1)];                                             \
+        benchmark::DoNotOptimize(q);                                                    \
         auto fk = cartan::forward_kinematics(chain, q);                                 \
         auto J = cartan::space_jacobian(chain, fk);                                     \
         benchmark::DoNotOptimize(J);                                                    \
@@ -696,9 +776,13 @@ static void bm_fkjac_##ROBOT##_matrix(benchmark::State& state)                  
 {                                                                                       \
     auto chain = cartan::fixtures::KC_FACTORY<double>();                              \
     std::mt19937 rng(42);                                                               \
-    auto q = cartan::fixtures::random_joint_config(chain, rng);                       \
+    std::array<decltype(cartan::fixtures::random_joint_config(chain, rng)), kInputs> qs; \
+    for (auto& q : qs) q = cartan::fixtures::random_joint_config(chain, rng);          \
+    std::size_t i = 0;                                                                  \
     for (auto _ : state)                                                                \
     {                                                                                   \
+        auto& q = qs[i++ & (kInputs - 1)];                                             \
+        benchmark::DoNotOptimize(q);                                                    \
         auto fkm = cartan::forward_kinematics_matrix(chain, q);                         \
         auto J = cartan::space_jacobian(chain, fkm);                                    \
         benchmark::DoNotOptimize(J);                                                    \
@@ -712,9 +796,13 @@ static void bm_fk_##ROBOT##_matrix_static(benchmark::State& state)              
 {                                                                                       \
     auto sc = SC_FACTORY<double>();                                                     \
     std::mt19937 rng(42);                                                               \
-    auto q = random_config_static(sc, rng);                                             \
+    std::array<decltype(random_config_static(sc, rng)), kInputs> qs;                    \
+    for (auto& q : qs) q = random_config_static(sc, rng);                               \
+    std::size_t i = 0;                                                                  \
     for (auto _ : state)                                                                \
     {                                                                                   \
+        auto& q = qs[i++ & (kInputs - 1)];                                             \
+        benchmark::DoNotOptimize(q);                                                    \
         auto fkm = cartan::forward_kinematics_matrix(sc, q);                            \
         benchmark::DoNotOptimize(fkm);                                                  \
     }                                                                                   \
@@ -724,9 +812,13 @@ static void bm_fkjac_##ROBOT##_matrix_static(benchmark::State& state)           
 {                                                                                       \
     auto sc = SC_FACTORY<double>();                                                     \
     std::mt19937 rng(42);                                                               \
-    auto q = random_config_static(sc, rng);                                             \
+    std::array<decltype(random_config_static(sc, rng)), kInputs> qs;                    \
+    for (auto& q : qs) q = random_config_static(sc, rng);                               \
+    std::size_t i = 0;                                                                  \
     for (auto _ : state)                                                                \
     {                                                                                   \
+        auto& q = qs[i++ & (kInputs - 1)];                                             \
+        benchmark::DoNotOptimize(q);                                                    \
         auto fkm = cartan::forward_kinematics_matrix(sc, q);                            \
         auto J = cartan::space_jacobian(sc, fkm);                                       \
         benchmark::DoNotOptimize(J);                                                    \
