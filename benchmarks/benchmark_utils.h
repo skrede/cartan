@@ -218,8 +218,11 @@ inline KDL::Chain make_abb_irb120_kdl_chain()
     KDL::Chain chain;
     chain.addSegment(KDL::Segment(KDL::Joint(KDL::Joint::RotZ), KDL::Frame(KDL::Vector(0, 0, 0.290))));
     chain.addSegment(KDL::Segment(KDL::Joint(KDL::Joint::RotY), KDL::Frame(KDL::Vector(0, 0, 0.270))));
-    chain.addSegment(KDL::Segment(KDL::Joint(KDL::Joint::RotY), KDL::Frame(KDL::Vector(0, 0, 0))));
-    chain.addSegment(KDL::Segment(KDL::Joint(KDL::Joint::RotX), KDL::Frame(KDL::Vector(0, 0, 0.302))));
+    // The 0.302 forearm offset precedes J4 (matching the PoE factory, which
+    // places J4 at z=0.862); putting it on J4's own segment shifts J4 to
+    // z=0.560 and desynchronizes this chain from make_abb_irb120_chain.
+    chain.addSegment(KDL::Segment(KDL::Joint(KDL::Joint::RotY), KDL::Frame(KDL::Vector(0, 0, 0.302))));
+    chain.addSegment(KDL::Segment(KDL::Joint(KDL::Joint::RotX), KDL::Frame(KDL::Vector(0, 0, 0))));
     chain.addSegment(KDL::Segment(KDL::Joint(KDL::Joint::RotY), KDL::Frame(KDL::Vector(0, 0, 0))));
     chain.addSegment(KDL::Segment(KDL::Joint(KDL::Joint::RotX), KDL::Frame(KDL::Vector(0, 0, 0.072))));
     return chain;

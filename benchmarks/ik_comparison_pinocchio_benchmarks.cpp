@@ -720,10 +720,13 @@ void bm_trac_ik_verified(
     // TRAC-IK's component gate no looser than the 2-norm tol we verify against.
     constexpr double tol = 1e-5;
     const double trac_eps = tol / std::sqrt(3.0);
+    // A 50 ms per-solve cap: generous for a single reachable-target solve yet
+    // bounded, so a rare non-convergence times out at 50 ms rather than
+    // dominating the run. A timed-out solve returns a failure code.
     // TRAC-IK's Speed mode seeds internal random restarts from rand().
     std::srand(42);
     TRAC_IK::TRAC_IK solver(kdl_chain, q_min, q_max,
-                             /*maxtime=*/10.0, /*eps=*/trac_eps, TRAC_IK::Speed);
+                             /*maxtime=*/0.05, /*eps=*/trac_eps, TRAC_IK::Speed);
 
     std::size_t idx = 0;
     int rc_ok = 0;
