@@ -4,10 +4,14 @@
 /// Both solvers use the same random seed (42) and the same 2,000 targets
 /// (FK-generated, guaranteed reachable), one solve per distinct target. Success
 /// is FK-verified for every solver: the returned q is passed back through cartan
-/// FK and gated on a 2-norm body-twist error below 1e-5 in both position and
-/// orientation. TRAC-IK's component-wise eps is set to 1e-5/sqrt(3) so its gate
-/// is no looser than that 2-norm; its raw CartToJnt rc rate is reported alongside.
-/// TRAC-IK uses maxtime=10.0 for convergence-based termination.
+/// FK and gated on a 2-norm body-twist error below the accuracy gate in both
+/// position and orientation. The gate is one shared value (`bench_tol()`,
+/// default 1e-5, overridable via the CARTAN_BENCH_TOL environment variable): it
+/// sets cartan's convergence_criteria, TRAC-IK's component-wise eps (as
+/// gate/sqrt(3), so TRAC-IK's infinity-norm gate is no looser than the 2-norm we
+/// verify against), and the verification threshold, so a sweep over the variable
+/// drives every solver at a matched stopping and verification tolerance. TRAC-IK's
+/// raw CartToJnt rc rate is reported alongside; its solve is capped at 50 ms.
 /// cartan uses LM stepper (closest algorithmic match to TRAC-IK's Newton methods)
 /// and restart+LM (random-restart wrapper, closer to TRAC-IK's actual strategy).
 ///
@@ -61,6 +65,27 @@ namespace
 
 constexpr int num_targets = 2000;
 
+/// Accuracy gate shared by every cell in this file: cartan's convergence
+/// criteria, TRAC-IK's eps (as gate/sqrt(3)), and the FK re-verification
+/// threshold all derive from this single value, so a sweep can drive matched-gate
+/// runs by setting CARTAN_BENCH_TOL. A missing, unparseable, non-finite, or
+/// non-positive value falls back to 1e-5.
+double bench_tol()
+{
+    static const double tol = []
+    {
+        const char* raw = std::getenv("CARTAN_BENCH_TOL");
+        if (raw == nullptr)
+            return 1e-5;
+        char* end = nullptr;
+        const double parsed = std::strtod(raw, &end);
+        if (end == raw || !std::isfinite(parsed) || parsed <= 0.0)
+            return 1e-5;
+        return parsed;
+    }();
+    return tol;
+}
+
 // ============================================================================
 // Template helpers to reduce boilerplate across 9 robots x 2 solvers
 // ============================================================================
@@ -95,8 +120,8 @@ void bm_cartan_comparison(
     const target_set<double, N>& ts)
 {
     cartan::convergence_criteria<double> criteria{
-        .position_tol               = 1e-5,
-        .orientation_tol            = 1e-5,
+        .position_tol               = bench_tol(),
+        .orientation_tol            = bench_tol(),
         .max_iterations_per_attempt = 100,
         .max_total_work_units       = 100
     };
@@ -156,8 +181,8 @@ void bm_cartan_restart_lm_comparison(
         chain_t, cartan::lm<chain_t, LimitsPolicy>>;
 
     cartan::convergence_criteria<double> criteria{
-        .position_tol               = 1e-5,
-        .orientation_tol            = 1e-5,
+        .position_tol               = bench_tol(),
+        .orientation_tol            = bench_tol(),
         .max_iterations_per_attempt = 200,
         .max_total_work_units       = 200
     };
@@ -215,8 +240,8 @@ void bm_cartan_speed_comparison(
     using chain_t = cartan::kinematic_chain<double, N>;
 
     cartan::convergence_criteria<double> criteria{
-        .position_tol               = 1e-5,
-        .orientation_tol            = 1e-5,
+        .position_tol               = bench_tol(),
+        .orientation_tol            = bench_tol(),
         .max_iterations_per_attempt = 200,
         .max_total_work_units       = 200
     };
@@ -274,8 +299,8 @@ void bm_cartan_racing_comparison(
     using chain_t = cartan::kinematic_chain<double, N>;
 
     cartan::convergence_criteria<double> criteria{
-        .position_tol               = 1e-5,
-        .orientation_tol            = 1e-5,
+        .position_tol               = bench_tol(),
+        .orientation_tol            = bench_tol(),
         .max_iterations_per_attempt = 500,
         .max_total_work_units       = 500
     };
@@ -327,8 +352,8 @@ void bm_cartan_racing_comparison(
 ///
 /// CartToJnt's rc>=0 is a self-report and can pass solutions outside tolerance,
 /// so success is FK-verified: recompute cartan FK on the returned q and gate on
-/// the same 2-norm body-twist error (position and orientation) at 1e-5 that the
-/// cartan and pinocchio cells use. The raw rc rate is reported separately.
+/// the same 2-norm body-twist error (position and orientation) at `bench_tol()`
+/// that the cartan and pinocchio cells use. The raw rc rate is reported separately.
 template <int N>
 void bm_trac_ik_comparison(
     benchmark::State& state,
@@ -363,7 +388,7 @@ void bm_trac_ik_comparison(
     // order of magnitude above the real-time budget) yet bounded, so a rare
     // non-convergence times out at 50 ms instead of dominating the run. A timed-
     // out solve returns a failure code and drops out of both success columns.
-    constexpr double tol = 1e-5;
+    const double tol = bench_tol();
     const double trac_eps = tol / std::sqrt(3.0);
     // TRAC-IK's Speed mode seeds internal random restarts from rand().
     std::srand(42);
@@ -1021,8 +1046,8 @@ using nlopt_bobyqa_solver = cartan::basic_ik_runner<
 inline cartan::convergence_criteria<double> argmin_comparison_criteria()
 {
     return {
-        .position_tol               = 1e-5,
-        .orientation_tol            = 1e-5,
+        .position_tol               = bench_tol(),
+        .orientation_tol            = bench_tol(),
         .max_iterations_per_attempt = 500,
         .max_total_work_units       = 500
     };

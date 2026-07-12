@@ -2,8 +2,9 @@
 
 Cartan is benchmarked head-to-head against TRAC-IK/KDL and Pinocchio on a nine-robot
 suite, covering forward kinematics, the Jacobian, and inverse kinematics (wall time,
-success rate, iterations, and pose accuracy). All numbers below come from a single
-measured sweep so they are internally comparable.
+success rate, iterations, and pose accuracy). The head-to-head tables come from a
+single measured sweep so they are internally comparable; the accuracy-gate section
+adds a second sweep that drives every solver at a matched, varying convergence gate.
 
 ## Setup
 
@@ -16,8 +17,9 @@ measured sweep so they are internally comparable.
 | Harness | Google Benchmark, `--benchmark_repetitions=3 --benchmark_min_time=0.5s`, `real_time` **median** |
 | Compared | cartan · TRAC-IK/KDL · Pinocchio |
 | Robots | UR3e, ABB IRB 120, KUKA KR 6 R900 SIXX, Franka Panda, Fetch, Kinova Jaco2, Rethink Baxter, KUKA LWR 4+, KUKA LBR Med 14 |
-| IK protocol | 2000 FK-walked (reachable) targets per robot, tolerance 1e-5 rad / 1e-5 m |
-| TRAC-IK | `Speed` mode, 50 ms per-solve cap, `eps = 1e-5/√3` (see gate note below) |
+| IK protocol | 2000 FK-walked (reachable) targets per robot; accuracy gate 1e-5 rad / 1e-5 m by default, swept 1e-4…1e-7 |
+| Accuracy gate | one shared value (`CARTAN_BENCH_TOL`) sets cartan's convergence, TRAC-IK's `eps`, and the verifier |
+| TRAC-IK | `Speed` mode, 50 ms per-solve cap, `eps = gate/√3` (see gate note below) |
 
 Each cell measures one thing and is FK-verified where a success rate is claimed. The harness
 was hardened so that dead-code elimination cannot fold away an op (every cell cycles varied
@@ -45,25 +47,33 @@ recomputed from forward kinematics rather than trusted from a solver's own retur
   CPU work is unchanged. Read the comparison as per-core efficiency, not idle-machine latency.
 - **Matched convergence gate (∞-norm vs 2-norm).** TRAC-IK terminates on `KDL::Equal`, a
   component-wise ∞-norm at its `eps`; the harness verifies on a 2-norm body-twist error. A
-  component-wise bound of `eps` admits a 2-norm up to `√3·eps`, so TRAC-IK is constructed with
-  `eps = 1e-5/√3` and verified at 2-norm 1e-5. Under this matched gate, TRAC-IK's own success
-  count and the independent FK re-verification agree to within rounding on every robot — its
-  return code is honest here, and it converges to a *tighter* pose error than cartan's 1e-5
-  stopping tolerance. Only its iteration count is blank (its API does not export it).
+  component-wise bound of `eps` admits a 2-norm up to `√3·eps`, so at a gate `g` TRAC-IK is
+  constructed with `eps = g/√3` and every solver — cartan's convergence criteria included — is
+  verified at 2-norm `g`. Both cartan's stopping tolerance and TRAC-IK's `eps` derive from the
+  same `g`, so lowering `g` tightens both at once; the accuracy-gate section sweeps `g` over
+  1e-4…1e-7. Under this matched gate, TRAC-IK's own success count and the independent FK
+  re-verification agree to within rounding (except where the 50 ms cap bites at the tightest
+  gate). Only its iteration count is blank (its API does not export it).
 
 ## Summary
 
 - **Speed (IK).** cartan solves in 17–27 µs (default LM) versus TRAC-IK's 214–1110 µs of
   per-core work on the same single core — roughly **11–42× less work per core**. Even
   crediting TRAC-IK ideal two-thread parallelism on a spare core, it stays several× slower.
+  This ratio holds at every accuracy gate and *widens* as the gate tightens (cartan's cost is
+  nearly gate-independent; TRAC-IK's grows) — see the accuracy-gate sweep.
 - **Success.** cartan's rates are FK-verified against the 1e-5 gate: `cartan_restart_lm`
   reaches 98–100% (≥99.4% on seven of nine robots; 98.4% UR3e, 98.2% Panda) and
   `cartan_racing` 96.8–100%.
   TRAC-IK, verified at the matched gate, is 99.7–100% — its return code and the FK
   re-verification agree, so on verified success the two are effectively tied while cartan is
   an order of magnitude cheaper per core.
-- **Accuracy.** cartan's LM family converges to ~2.0–2.8 µm mean position error, well inside
-  the 1e-5 gate; TRAC-IK, run at the tighter `eps/√3`, lands at ~0.3–1.1 µm.
+- **Accuracy is a dial, not a fixed property.** Both solvers deliver position error
+  proportional to the gate — one decade of gate buys one decade of accuracy for each. cartan's
+  LM family settles at ~0.2× the gate (2.0–2.8 µm at 1e-5), TRAC-IK a few× tighter still
+  (0.3–1.1 µm at 1e-5) because its ∞-norm stop over-converges. Neither is "more accurate":
+  cartan dialed one decade tighter (gate 1e-6, ~0.2 µm, ~20 µs) is both **more accurate and
+  ~11× faster** than TRAC-IK at 1e-5 (~0.3–1.1 µm, ~230 µs). See the accuracy-gate sweep.
 - **Jacobian.** The honest whole-solve comparison (random q → Jacobian, matching KDL's
   `JntToJac`) makes cartan's analytic Product-of-Exponentials Jacobian **~2.3–2.6× faster than
   KDL** (367–448 ns vs 865–1085 ns). With the pose already computed, the *marginal* Jacobian
@@ -132,7 +142,47 @@ rather than read from the solver's own residual.
 | TRAC-IK | 1.12 | 0.31 | 0.34 | 0.45 | 0.41 | 0.33 | 0.44 | 0.49 | 0.47 |
 
 TRAC-IK's tighter mean is a direct consequence of its `eps/√3` stopping gate; cartan stops at
-its 1e-5 tolerance and does not iterate further.
+its 1e-5 tolerance and does not iterate further. Both track the gate down together — the
+accuracy-gate sweep below shows how far.
+
+## Accuracy gate (QoS) sweep
+
+The gate is a single knob: one value (`CARTAN_BENCH_TOL`) sets cartan's convergence tolerance,
+TRAC-IK's `eps = gate/√3`, and the FK verification threshold, so both solvers are driven and
+scored at the same accuracy. Sweeping it from 1e-4 to 1e-7 answers *how much* time, iterations,
+and success move with precision. Ranges are min–max across the nine robots; `cartan_restart_lm`
+and TRAC-IK are the two solvers held to the matched gate.
+
+| gate | cartan_restart_lm time | TRAC-IK time | cartan pos err | TRAC-IK pos err | cartan success | TRAC-IK success |
+|---|---|---|---|---|---|---|
+| 1e-4 | 17–42 µs | 213–1013 µs | 21.3–33.3 µm | 3.3–14.6 µm | 98.2–100% | 99.9–100% |
+| 1e-5 | 18–43 µs | 218–1125 µs | 2.0–2.8 µm | 0.30–1.12 µm | 98.2–100% | 99.8–100% |
+| 1e-6 | 19–44 µs | 232–1705 µs | 0.18–0.24 µm | 0.03–0.11 µm | 98.2–100% | 98.9–100% |
+| 1e-7 | 20–46 µs | 231–2310 µs | 0.017–0.021 µm | 0.003–0.007 µm | 98.2–100% | 65.8–83.9% |
+
+- **Time.** cartan's cost is essentially gate-independent: `restart_lm` moves only ~2–4 µs
+  (≈10%) across the full four-decade range, because LM converges quadratically near the root, so
+  a tighter gate costs at most a step or two. TRAC-IK's per-core time rises with the gate —
+  modestly on the easy chains (IRB 120 226→311 µs, 1.4×) and steeply on the hardest (UR3e
+  1013→2310 µs, 2.3×).
+- **Iterations.** `cartan_restart_lm` adds only ~0.6 iterations per decade of gate (IRB 120
+  12.9→14.7 over three decades; UR3e 29.6→31.5) — tightening the gate is nearly free in
+  iteration count.
+- **Accuracy scales linearly with the gate.** Both solvers' mean position error drops ~10× per
+  decade, in lockstep (IRB 120: cartan 2.31→0.019 µm, TRAC-IK 0.30→0.003 µm from 1e-5 to 1e-7).
+  cartan
+  settles at ~0.2× the gate, TRAC-IK a fixed few× tighter because its component-wise Newton stop
+  overshoots the 2-norm gate. That offset is a stopping-rule artifact, not a quality gap —
+  cartan at any gate is one dial-turn from matching it, at a fraction of the cost.
+- **Success: cartan flat, TRAC-IK cliffs at high precision.** `cartan_restart_lm`'s verified
+  success barely moves (Δ < 0.5 pp across the sweep) because its failures are wrong-basin, not
+  precision. TRAC-IK holds 100% down to 1e-6, then **collapses to 66–84% at 1e-7**: against the
+  50 ms cap it cannot reach `eps = 1e-7/√3` on 15–35% of targets and times out. Lifting the cap
+  would recover success only by inflating its already-larger solve time.
+
+Absolute times here come from the gate sweep and agree with the fixed-gate tables above to
+within run-to-run noise; the cross-gate trends are the point. Reproduce with
+`tools/ik_accuracy_sweep.py` (see [Reproducing](#reproducing)).
 
 ## Forward kinematics
 
@@ -215,3 +265,12 @@ comparison requires the TRAC-IK and Pinocchio dependencies; each comparison is o
 warning when its dependency is unavailable. Success rates are FK-verified in the benchmark
 cells themselves, not read from a solver's own return code, and each cross-library cell is
 constructed so both sides do equal end-effector work.
+
+The accuracy gate is set with the `CARTAN_BENCH_TOL` environment variable (default 1e-5); it
+drives cartan's convergence criteria, TRAC-IK's `eps`, and the verifier together. To regenerate
+the accuracy-gate sweep across a series of gates:
+
+```
+python3 tools/ik_accuracy_sweep.py <build>/benchmarks/ik_comparison_benchmarks \
+    --tolerances 1e-4,1e-5,1e-6,1e-7 --taskset-core 4 --out-dir sweep_out
+```

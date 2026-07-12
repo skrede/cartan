@@ -113,8 +113,13 @@ This runs the full 10,000-iteration benchmark 10 times and reports mean, median,
 - **Random seed:** 42 (fixed for reproducibility)
 - **IK iterations:** 10,000 solves per configuration
 - **Targets:** FK-generated from random joint configurations (guaranteed reachable)
-- **Convergence:** position tolerance 1e-5, orientation tolerance 1e-5, max 100 iterations
-- **TRAC-IK timeout:** 10.0s (convergence-based, not time-limited)
+- **Convergence:** position and orientation tolerance default 1e-5, max 100 iterations. In
+  `ik_comparison_benchmarks` the gate is one shared value set by the `CARTAN_BENCH_TOL`
+  environment variable (default 1e-5), driving cartan's convergence, TRAC-IK's `eps = gate/√3`,
+  and the FK verifier together; `tools/ik_accuracy_sweep.py` sweeps it to produce the
+  speed-vs-accuracy curve.
+- **TRAC-IK cap:** 50 ms per solve (bounds a rare non-converging target; a timed-out solve
+  counts as a failure)
 - **Reported metrics:** solve time, success rate, avg iterations, avg position error, avg orientation error
 - **Compiler optimization:** Benchmarks build with release flags; `DoNotOptimize` prevents dead code elimination
 
