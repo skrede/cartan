@@ -60,8 +60,7 @@ recomputed from forward kinematics rather than trusted from a solver's own retur
 - **Speed (IK).** cartan solves in 17–27 µs (default LM) versus TRAC-IK's 214–1110 µs of
   per-core work on the same single core — about 11–42× less CPU work per core. Even
   crediting TRAC-IK ideal two-thread parallelism on a spare core, it stays several× slower.
-  This ratio holds at every accuracy gate and *widens* as the gate tightens (cartan's cost is
-  nearly gate-independent; TRAC-IK's grows) — see the accuracy-gate sweep.
+  This ratio holds at every accuracy gate (see the accuracy-gate sweep, and the widening below).
 - **Success.** cartan's rates are FK-verified against the 1e-5 gate: `cartan_restart_lm`
   reaches 98–100% (≥99.4% on seven of nine robots; 98.4% UR3e, 98.2% Panda) and
   `cartan_racing` 96.8–100%.
@@ -74,6 +73,11 @@ recomputed from forward kinematics rather than trusted from a solver's own retur
   (0.3–1.1 µm at 1e-5) because its ∞-norm stop over-converges. Neither is "more accurate":
   cartan dialed one decade tighter (gate 1e-6, ~0.2 µm, ~20 µs) is tighter than TRAC-IK at 1e-5
   (~0.3–1.1 µm) and reaches it in a fraction of the time (~230 µs). See the accuracy-gate sweep.
+- **The advantage widens with precision.** cartan is essentially gate-independent in both cost
+  and success: `cartan_restart_lm` holds 98–100% and moves only ~2–4 µs across four decades of
+  gate (1e-4→1e-7). TRAC-IK moves the other way — its per-core time grows 1.4–2.3× and, against
+  the 50 ms cap, its verified success falls from 100% to 66–84% at 1e-7. The tighter the accuracy
+  you ask for, the larger cartan's lead in both cost and robustness. See the accuracy-gate sweep.
 - **Jacobian.** The whole-solve comparison (random q → Jacobian, matching KDL's
   `JntToJac`) makes cartan's analytic Product-of-Exponentials Jacobian **~2.3–2.6× faster than
   KDL** (367–448 ns vs 865–1085 ns). With the pose already computed, the *marginal* Jacobian
@@ -92,10 +96,10 @@ racing) is measured in `basic_ik_full_benchmarks`.
 
 | method | UR3e | IRB 120 | KR 6 | Panda | Fetch | Jaco2 | Baxter | LWR 4+ | LBR Med 14 |
 |---|---|---|---|---|---|---|---|---|---|
-| cartan (LM) | 27 | 19 | 19 | 22 | 18 | 24 | 21 | 17 | 17 |
 | cartan_restart_lm | 42 | 19 | 19 | 29 | 19 | 28 | 25 | 17 | 17 |
-| cartan_speed | 118 | 77 | 76 | 84 | 53 | 99 | 66 | 53 | 52 |
 | cartan_racing | 382 | 187 | 197 | 200 | 125 | 276 | 149 | 111 | 107 |
+| cartan (LM) | 27 | 19 | 19 | 22 | 18 | 24 | 21 | 17 | 17 |
+| cartan_speed | 118 | 77 | 76 | 84 | 53 | 99 | 66 | 53 | 52 |
 | cartan_restart_lm_clamped | 162 | 127 | 130 | 167 | 137 | 151 | 158 | 125 | 126 |
 | TRAC-IK (per-core) | 1110 | 220 | 214 | 283 | 238 | 543 | 289 | 222 | 231 |
 
@@ -107,18 +111,21 @@ All rows are FK-verified against the 1e-5 gate. TRAC-IK is verified at the match
 
 | method | UR3e | IRB 120 | KR 6 | Panda | Fetch | Jaco2 | Baxter | LWR 4+ | LBR Med 14 |
 |---|---|---|---|---|---|---|---|---|---|
-| cartan (LM) | 75.2 | 99.8 | 99.7 | 92.3 | 99.9 | 94.9 | 93.1 | 100 | 100 |
 | cartan_restart_lm | 98.4 | 100 | 100 | 98.2 | 100 | 99.4 | 99.9 | 100 | 100 |
-| cartan_speed | 84.8 | 97.4 | 97.6 | 94.9 | 99.6 | 93.4 | 98.7 | 99.1 | 99.1 |
 | cartan_racing | 96.8 | 99.9 | 100 | 99.9 | 100 | 99.5 | 100 | 100 | 100 |
+| cartan (LM) | 75.2 | 99.8 | 99.7 | 92.3 | 99.9 | 94.9 | 93.1 | 100 | 100 |
+| cartan_speed | 84.8 | 97.4 | 97.6 | 94.9 | 99.6 | 93.4 | 98.7 | 99.1 | 99.1 |
 | cartan_restart_lm_clamped | 47.8 | 66.8 | 65.3 | 48.3 | 69.3 | 57.0 | 58.9 | 70.4 | 68.8 |
 | TRAC-IK (verified = rc) | 99.7 | 100 | 100 | 100 | 100 | 100 | 100 | 100 | 100 |
 
-A single LM stepper (`cartan (LM)`) trails on the hardest chains (UR3e in particular); the
-multi-start `cartan_restart_lm` closes that gap while staying an order of magnitude cheaper
-than TRAC-IK, and its success is FK-verified. `cartan_racing` is cartan's own multi-strategy
-analog of TRAC-IK's dual-solver approach. `cartan_restart_lm_clamped` trades success for
-strict joint-limit clamping and is included to show that cost.
+`cartan_restart_lm` is the like-for-like comparator to TRAC-IK: like TRAC-IK's `Speed` mode it
+is a multi-start strategy, and it matches TRAC-IK's success (98–100% vs 99.7–100%) while staying
+an order of magnitude cheaper per core, all FK-verified. `cartan_racing` is cartan's own
+multi-strategy analog of TRAC-IK's dual-solver approach. The single LM stepper (`cartan (LM)`)
+is the bare inner loop — a component, not the recommended solver — and trails on the hardest
+chains (UR3e in particular); it is shown to expose what the multi-start wrapper buys.
+`cartan_restart_lm_clamped` trades success for strict joint-limit clamping and is included to
+show that cost.
 
 ### Average iterations to converge
 
@@ -126,8 +133,8 @@ TRAC-IK does not expose iteration counts.
 
 | method | UR3e | IRB 120 | KR 6 | Panda | Fetch | Jaco2 | Baxter | LWR 4+ | LBR Med 14 |
 |---|---|---|---|---|---|---|---|---|---|
-| cartan (LM) | 14 | 14 | 14 | 11 | 11 | 16 | 11 | 11 | 11 |
 | cartan_restart_lm | 31 | 14 | 14 | 16 | 11 | 20 | 16 | 11 | 11 |
+| cartan (LM) | 14 | 14 | 14 | 11 | 11 | 16 | 11 | 11 | 11 |
 | cartan_speed | 69 | 53 | 53 | 49 | 33 | 64 | 40 | 34 | 34 |
 
 ### Mean position error (µm)
@@ -137,8 +144,8 @@ rather than read from the solver's own residual.
 
 | method | UR3e | IRB 120 | KR 6 | Panda | Fetch | Jaco2 | Baxter | LWR 4+ | LBR Med 14 |
 |---|---|---|---|---|---|---|---|---|---|
-| cartan (LM) | 2.46 | 2.30 | 2.19 | 1.98 | 2.05 | 2.76 | 2.01 | 1.99 | 2.02 |
 | cartan_restart_lm | 2.46 | 2.31 | 2.19 | 2.01 | 2.06 | 2.78 | 2.04 | 1.99 | 2.02 |
+| cartan (LM) | 2.46 | 2.30 | 2.19 | 1.98 | 2.05 | 2.76 | 2.01 | 1.99 | 2.02 |
 | TRAC-IK | 1.12 | 0.31 | 0.34 | 0.45 | 0.41 | 0.33 | 0.44 | 0.49 | 0.47 |
 
 TRAC-IK's tighter mean is a direct consequence of its `eps/√3` stopping gate; cartan stops at

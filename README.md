@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/cartan-banner-dark.svg">
-    <img alt="Cartan" src="docs/cartan-banner.svg" width="640">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/skrede/cartan/master/docs/cartan-banner-dark.svg">
+    <img alt="Cartan" src="https://raw.githubusercontent.com/skrede/cartan/master/docs/cartan-banner.svg" width="640">
   </picture>
 </p>
 
@@ -20,7 +20,7 @@ A C++20 rigid-motion and serial kinematics library.
 **Public preview.** The C++ API and Python bindings are under development; 
 expect breaking changes onwards to a stable `v1.0.0` release. 
 The library builds and tests on Linux, macOS, and Windows and can be installed 
-using `FetchContent` (see below). Python bindings will be available as `pip install cartan-bindings` (WIP).
+using `FetchContent` (see below). Python bindings are available on PyPI: `pip install cartan-bindings`.
 
 ## Features
 
@@ -112,19 +112,19 @@ live under `tests/embedded/esp32-smoke/` (see that directory's README for the
 
 ## Documentation
 
-- [Getting Started](docs/getting-started.md) &mdash; zero to compiling in 5 minutes.
-- [Documentation Index](docs/README.md) &mdash; API reference, background theory, guides.
-- [Examples](examples/) &mdash; runnable programs for every feature area.
-- [Tutorials](examples/tutorials/) &mdash; step-by-step walkthroughs for FK, Jacobians, IK, and URDF loading.
-- [Python](python/) &mdash; tutorials and setup guide for Cartan's Python API.
+- [Getting Started](https://github.com/skrede/cartan/blob/master/docs/getting-started.md) &mdash; zero to compiling in 5 minutes.
+- [Documentation Index](https://github.com/skrede/cartan/blob/master/docs/README.md) &mdash; API reference, background theory, guides.
+- [Examples](https://github.com/skrede/cartan/tree/master/examples) &mdash; runnable programs for every feature area.
+- [Tutorials](https://github.com/skrede/cartan/tree/master/examples/tutorials) &mdash; step-by-step walkthroughs for FK, Jacobians, IK, and URDF loading.
+- [Python](https://github.com/skrede/cartan/tree/master/python) &mdash; tutorials and setup guide for Cartan's Python API.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution workflow, coding conventions, and commit message format.
+See [CONTRIBUTING.md](https://github.com/skrede/cartan/blob/master/CONTRIBUTING.md) for the contribution workflow, coding conventions, and commit message format.
 
 ## License
 
-Apache License 2.0 &mdash; see [LICENSE](LICENSE) for the full text.
+Apache License 2.0 &mdash; see [LICENSE](https://github.com/skrede/cartan/blob/master/LICENSE) for the full text.
 
 Copyright 2026 Aleksander Skrede.
 
