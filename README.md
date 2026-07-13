@@ -24,12 +24,14 @@ using `FetchContent` (see below). Python bindings will be available as `pip inst
 
 ## Features
 
-- **Lie groups:** SO(2), SE(2), SO(3), SE(3) with exp/log, adjoint, coadjoint, left/right Jacobians
-- **Product of Exponentials kinematics:** screw-theory-based FK with compile-time unrolled PoE for 1-7 DOF chains
-- **Space and body Jacobians:** reusing cached FK intermediate products for zero redundant computation
-- **Compile-time frame safety:** `transform<From, To>` and `rotation<From, To>` wrappers with structural type checking
-- **Policy-based IK solvers:** DLS, Levenberg-Marquardt, and SQP steppers composable with racing and fallback schedulers
-- **Header-only:** no compiled library artifacts, Eigen as the sole required dependency
+- **Lie groups:** SO(2), SE(2), SO(3), SE(3) with exp/log, adjoint, coadjoint, left/right Jacobians.
+- **Header-only:** depends on no compiled library artifacts, Eigen as the sole required dependency. Use the system-install or have CMake fetch it automatically.
+- **Compile-time frame safety:** Transforms and rotations are templated on frames, `transform<From_frame, To_frame>` and `rotation<From_frame, To_frame>`.
+- **Product of Exponentials kinematics:** Screw-theory-based FK through Product of Exponentials (PoE), either runtime-specified or compile-time (templated) for 1-7 DOF chains.
+- **Policy-based IK solvers:** Damped Least Squares (DLS), Levenberg-Marquardt (LM), and Sequential Quadratic Programming (SQP) &mdash; or roll your own.
+- **Policy-based solver runners:** Run one or multiple Cartan IK solvers until a solution is found; tunable convergence criteria.
+- **Analytic IK solvers:** Solve kinematics analytically for 2R, 3R or 6R Pieper manipulators, or robots with Ortho-Parallel Wrists (OPW).
+- **Real-time friendly:** User controls the execution: solver runners can step until converged, follow a budget (perform N steps), or step once.
 
 ## Scope
 
@@ -69,7 +71,7 @@ include(FetchContent)
 FetchContent_Declare(
     cartan
     GIT_REPOSITORY https://github.com/skrede/cartan.git
-    GIT_TAG        master
+    GIT_TAG        v0.4.2
 )
 FetchContent_MakeAvailable(cartan)
 
@@ -128,3 +130,4 @@ Copyright 2026 Aleksander Skrede.
 
 ## Declaration of AI use
 This library has been &mdash; and will be &mdash; developed with extensive use of Claude code (Sonnet, Opus and Fable).
+Development through Claude has been spec-driven using [GSD](https://github.com/open-gsd/gsd-core).

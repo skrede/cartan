@@ -58,7 +58,7 @@ recomputed from forward kinematics rather than trusted from a solver's own retur
 ## Summary
 
 - **Speed (IK).** cartan solves in 17–27 µs (default LM) versus TRAC-IK's 214–1110 µs of
-  per-core work on the same single core — roughly **11–42× less work per core**. Even
+  per-core work on the same single core — about 11–42× less CPU work per core. Even
   crediting TRAC-IK ideal two-thread parallelism on a spare core, it stays several× slower.
   This ratio holds at every accuracy gate and *widens* as the gate tightens (cartan's cost is
   nearly gate-independent; TRAC-IK's grows) — see the accuracy-gate sweep.
@@ -72,9 +72,9 @@ recomputed from forward kinematics rather than trusted from a solver's own retur
   proportional to the gate — one decade of gate buys one decade of accuracy for each. cartan's
   LM family settles at ~0.2× the gate (2.0–2.8 µm at 1e-5), TRAC-IK a few× tighter still
   (0.3–1.1 µm at 1e-5) because its ∞-norm stop over-converges. Neither is "more accurate":
-  cartan dialed one decade tighter (gate 1e-6, ~0.2 µm, ~20 µs) is both **more accurate and
-  ~11× faster** than TRAC-IK at 1e-5 (~0.3–1.1 µm, ~230 µs). See the accuracy-gate sweep.
-- **Jacobian.** The honest whole-solve comparison (random q → Jacobian, matching KDL's
+  cartan dialed one decade tighter (gate 1e-6, ~0.2 µm, ~20 µs) is tighter than TRAC-IK at 1e-5
+  (~0.3–1.1 µm) and reaches it in a fraction of the time (~230 µs). See the accuracy-gate sweep.
+- **Jacobian.** The whole-solve comparison (random q → Jacobian, matching KDL's
   `JntToJac`) makes cartan's analytic Product-of-Exponentials Jacobian **~2.3–2.6× faster than
   KDL** (367–448 ns vs 865–1085 ns). With the pose already computed, the *marginal* Jacobian
   is 44–61 ns (~15–20× the KDL whole-solve figure) — a real number, but only for callers that
@@ -174,11 +174,11 @@ and TRAC-IK are the two solvers held to the matched gate.
   settles at ~0.2× the gate, TRAC-IK a fixed few× tighter because its component-wise Newton stop
   overshoots the 2-norm gate. That offset is a stopping-rule artifact, not a quality gap —
   cartan at any gate is one dial-turn from matching it, at a fraction of the cost.
-- **Success: cartan flat, TRAC-IK cliffs at high precision.** `cartan_restart_lm`'s verified
+- **Success: cartan flat, TRAC-IK falls off at high precision.** `cartan_restart_lm`'s verified
   success barely moves (Δ < 0.5 pp across the sweep) because its failures are wrong-basin, not
-  precision. TRAC-IK holds 100% down to 1e-6, then **collapses to 66–84% at 1e-7**: against the
-  50 ms cap it cannot reach `eps = 1e-7/√3` on 15–35% of targets and times out. Lifting the cap
-  would recover success only by inflating its already-larger solve time.
+  precision. TRAC-IK holds 100% down to 1e-6, then falls to 66–84% at 1e-7: it times out against
+  the 50 ms cap before reaching `eps = 1e-7/√3` on 15–35% of targets. A longer cap trades that
+  back for more solve time.
 
 Absolute times here come from the gate sweep and agree with the fixed-gate tables above to
 within run-to-run noise; the cross-gate trends are the point. Reproduce with
@@ -206,7 +206,7 @@ comparison is conservative toward cartan.
 
 ## Jacobian
 
-Wall time in nanoseconds (median). The honest comparison is **random q → Jacobian**: cartan's
+Wall time in nanoseconds (median). The like-for-like comparison is **random q → Jacobian**: cartan's
 `space_jacobian` runs `forward_kinematics` inside the timed loop, matching KDL's `JntToJac`,
 which recomputes FK internally. On that basis cartan is ~2.3–2.6× faster than KDL. The
 *marginal* Jacobian (FK already computed, second column) is 44–61 ns — an ~15–20× headline
@@ -242,8 +242,8 @@ this page compared on speed alone because it did not). FK-verified against the s
 the two LM implementations reach **identical** success on every robot — 75% on UR3e, ≥99.7%
 on IRB 120 / KR 6 / Fetch / LWR 4+ / LBR Med 14, and 92–95% on Panda / Jaco2 / Baxter — at
 ~2.0–2.8 µm mean position error, because they are the same algorithm. The Pinocchio LM's own
-success count and the FK re-verification agree exactly, confirming honest convergence. The
-difference between the two is implementation overhead only, and it is within run-to-run noise.
+success count and the FK re-verification agree exactly, confirming the return code is accurate
+here. The difference between the two is implementation overhead only, within run-to-run noise.
 
 ## Lie group operations
 
