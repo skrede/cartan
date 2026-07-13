@@ -56,7 +56,7 @@ cartan owns kinematics and stays out of everything else.
 
 ## Requirements
 
-- C++20 compiler: GCC 10+, Clang 13+, MSVC 17.x+
+- C++20 compiler &mdash; CI builds and tests GCC 14, Clang 18, and MSVC 2022 (VS 17.x); older C++20 toolchains are untested
 - CMake 3.28+
 - Eigen 3.4+ (auto-fetched via FetchContent)
 - For embedded targets: an exceptions-off C++20 GCC backend &mdash; ESP-IDF 5.1+ / 6.x
@@ -114,7 +114,7 @@ live under `tests/embedded/esp32-smoke/` (see that directory's README for the
 
 - [Getting Started](https://github.com/skrede/cartan/blob/master/docs/getting-started.md) &mdash; zero to compiling in 5 minutes.
 - [Documentation Index](https://github.com/skrede/cartan/blob/master/docs/README.md) &mdash; API reference, background theory, guides.
-- [Examples](https://github.com/skrede/cartan/tree/master/examples) &mdash; runnable programs for every feature area.
+- [Examples](https://github.com/skrede/cartan/tree/master/examples) &mdash; runnable programs for the core feature areas (Lie basics, frame safety, FK/Jacobians, basic and composed IK).
 - [Tutorials](https://github.com/skrede/cartan/tree/master/examples/tutorials) &mdash; step-by-step walkthroughs for FK, Jacobians, IK, and URDF loading.
 - [Python](https://github.com/skrede/cartan/tree/master/python) &mdash; tutorials and setup guide for Cartan's Python API.
 

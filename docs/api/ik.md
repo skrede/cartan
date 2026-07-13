@@ -1,8 +1,8 @@
 # ik
 
 Headers under `cartan/serial/ik/` (sublib `cartan-serial-chain`). Iterative IK
-solvers live in the `cartan::ik::` namespace; runners, status / result types,
-and convergence criteria live in `cartan::`. Link with `cartan::serial-chain`
+solvers, runners, status / result types, and convergence criteria all live in
+the `cartan::` namespace. Link with `cartan::serial-chain`
 (or the convenience target `cartan::cartan`). The umbrella header
 `<cartan/serial/ik.h>` includes the runner, every solver, the wrappers, the
 limits / weight policies, and the type aliases / builders.
@@ -26,17 +26,17 @@ See [IK Methods](../background/ik-methods.md) | [IK Composition Guide](../guides
 | `cartan::basic_ik_runner` | `#include <cartan/serial/ik/basic_ik_runner.h>` |
 | `cartan::convergence_criteria`, `cartan::ik_status`, `cartan::ik_termination_reason`, `cartan::ik_failure`, `cartan::ik_objective`, `cartan::step_metrics`, `cartan::step_result`, `cartan::solver_options` | `#include <cartan/serial/ik/ik_status.h>` |
 | `cartan::ik_result`, `cartan::ik_error` | `#include <cartan/serial/ik/ik_result.h>` |
-| `cartan::ik::solve_policy` concept, `cartan::ik::step_one` | `#include <cartan/serial/ik/concepts/solve_concept.h>` |
+| `cartan::solve_policy` concept, `cartan::step_one` | `#include <cartan/serial/ik/concepts/solve_concept.h>` |
 | `cartan::no_limits`, `cartan::clamp_limits`, `cartan::null_space_limits` | `#include <cartan/serial/ik/policy/limits_policy.h>` |
 | `cartan::error_weight` | `#include <cartan/serial/ik/policy/error_weight.h>` |
-| `cartan::ik::lm` (alias for `builtin_lm`) | `#include <cartan/serial/ik/solver/lm.h>` |
-| `cartan::ik::lbfgsb` (alias for `builtin_lbfgsb`) | `#include <cartan/serial/ik/solver/lbfgsb.h>` |
-| `cartan::ik::projected_lm`, `cartan::ik::dls`, `cartan::ik::newton_raphson` | `#include <cartan/serial/ik/solver/{projected_lm,dls,newton_raphson}.h>` |
-| argmin-backed: `cartan::ik::argmin_lm`, `argmin_lbfgsb`, `argmin_slsqp`, `argmin_bobyqa`, `argmin_projected_gn`, `argmin_projected_gradient_gn` | `#include <cartan/serial/ik/solver/argmin_*.h>` |
-| NLopt-backed: `cartan::ik::nlopt_slsqp`, `cartan::ik::nlopt_bobyqa` | `#include <cartan/serial/ik/solver/nlopt_*.h>` (requires `CARTAN_HAS_NLOPT`) |
-| SQP family: `cartan::ik::nw_sqp`, `filter_nw_sqp`, `filter_slsqp` | `#include <cartan/serial/ik/solver/{nw_sqp,filter_nw_sqp,filter_slsqp}.h>` |
-| MMA / GCMMA / CMA-ES / aug. Lagrangian: `cartan::ik::mma`, `gcmma`, `cmaes`, `augmented_lagrangian` | `#include <cartan/serial/ik/solver/{mma,gcmma,cmaes,augmented_lagrangian}.h>` |
-| `cartan::ik::restart_wrapper` | `#include <cartan/serial/ik/wrapper/restart_wrapper.h>` |
+| `cartan::lm` (alias for `builtin_lm`) | `#include <cartan/serial/ik/solver/lm.h>` |
+| `cartan::lbfgsb` (alias for `builtin_lbfgsb`) | `#include <cartan/serial/ik/solver/lbfgsb.h>` |
+| `cartan::projected_lm`, `cartan::dls`, `cartan::newton_raphson` | `#include <cartan/serial/ik/solver/{projected_lm,dls,newton_raphson}.h>` |
+| argmin-backed: `cartan::argmin_lm`, `argmin_lbfgsb`, `argmin_slsqp`, `argmin_bobyqa`, `argmin_projected_gn`, `argmin_projected_gradient_gn` | `#include <cartan/serial/ik/solver/argmin_*.h>` |
+| NLopt-backed: `cartan::nlopt_slsqp`, `cartan::nlopt_bobyqa` | `#include <cartan/serial/ik/solver/nlopt_*.h>` (requires `CARTAN_HAS_NLOPT`) |
+| SQP family: `cartan::nw_sqp`, `filter_nw_sqp`, `filter_slsqp` | `#include <cartan/serial/ik/solver/{nw_sqp,filter_nw_sqp,filter_slsqp}.h>` |
+| MMA / GCMMA / CMA-ES / aug. Lagrangian: `cartan::mma`, `gcmma`, `cmaes`, `augmented_lagrangian` | `#include <cartan/serial/ik/solver/{mma,gcmma,cmaes,augmented_lagrangian}.h>` |
+| `cartan::restart_wrapper` | `#include <cartan/serial/ik/wrapper/restart_wrapper.h>` |
 | `cartan::exhaustive_ik_runner`, `cartan::exhaustive_options`, `cartan::exhaustive_result`, `cartan::ranking_strategy` | `#include <cartan/serial/ik/solver/exhaustive_ik_runner.h>` |
 | `cartan::verify_solution`, `cartan::filter_valid_solutions` | `#include <cartan/serial/ik/ik_validation.h>` |
 | Type aliases + builders: `speed_ik_runner`, `robust_ik_runner`, `dual_ik_runner`, `make_solver`, `make_speed_ik_runner`, `make_robust_ik_runner`, `make_dual_ik_runner` | `#include <cartan/serial/ik/solvers.h>` |
@@ -63,7 +63,7 @@ auto target = cartan::forward_kinematics(chain, q_known).end_effector;
 Eigen::Vector3d q0{0.0, 0.0, 0.0};
 cartan::convergence_criteria<double> criteria{1e-6, 1e-6, 100, 200};
 
-cartan::basic_ik_runner<cartan::ik::lm<cartan::kinematic_chain<double, 3>>> solver;
+cartan::basic_ik_runner<cartan::lm<cartan::kinematic_chain<double, 3>>> solver;
 solver.setup(chain, target, q0, criteria);
 auto result = solver.solve();
 
@@ -85,7 +85,7 @@ payload).
 ```cpp
 template <typename... Policies>
     requires (sizeof...(Policies) >= 1)
-          && (cartan::ik::solve_policy<Policies> && ...)
+          && (cartan::solve_policy<Policies> && ...)
 class basic_ik_runner;
 ```
 
@@ -169,12 +169,12 @@ Defined in `<cartan/serial/ik/solvers.h>`:
 
 ```cpp
 template <chain Chain>
-using speed_ik_runner = cartan::ik::restart_wrapper<Chain,
-    cartan::ik::projected_lm<Chain, no_limits>, no_limits>;
+using speed_ik_runner = cartan::restart_wrapper<Chain,
+    cartan::projected_lm<Chain, no_limits>, no_limits>;
 
 template <chain Chain>
-using robust_ik_runner = cartan::ik::restart_wrapper<Chain,
-    cartan::ik::builtin_lbfgsb<Chain, no_limits>, no_limits>;
+using robust_ik_runner = cartan::restart_wrapper<Chain,
+    cartan::builtin_lbfgsb<Chain, no_limits>, no_limits>;
 
 template <chain Chain>
 using dual_ik_runner = basic_ik_runner<
@@ -202,15 +202,15 @@ policies:
 
 ```cpp
 auto solver = cartan::make_solver<MyChain>()
-    .policy(cartan::ik::lm<MyChain>{})
-    .policy(cartan::ik::dls<MyChain>{})
+    .policy(cartan::lm<MyChain>{})
+    .policy(cartan::dls<MyChain>{})
     .build();
 ```
 
 ## solve_policy concept
 
 ```cpp
-namespace cartan::ik {
+namespace cartan {
 
 template <typename S>
 concept solve_policy = requires
@@ -249,7 +249,7 @@ accumulates `units_consumed` against `convergence_criteria::max_total_work_units
 
 ```cpp
 template <typename S>
-    requires cartan::ik::solve_policy<S>
+    requires cartan::solve_policy<S>
 auto step_one(S& s, const typename S::chain_type& chain);
 ```
 
@@ -461,7 +461,7 @@ struct no_limits;
 
 No-op: applies no enforcement. Use when the policy handles constraints
 internally (e.g., `projected_lm`, NLopt/argmin policies with box
-constraints). Default for `cartan::ik::lm` and `cartan::ik::projected_lm`
+constraints). Default for `cartan::lm` and `cartan::projected_lm`
 — the LM trust-region family for which post-step clamping would
 invalidate the trust-region step.
 **Critical**: post-step `clamp_limits` invalidates LM trust-region
@@ -514,7 +514,7 @@ all components.
 
 ## Solvers
 
-### cartan::ik::lm
+### cartan::lm
 
 ```cpp
 template <chain Chain, typename LimitsPolicy = no_limits>
@@ -530,7 +530,7 @@ evaluate gain ratio, accept/reject step, update lambda.
 Reference: Lynch & Park, Modern Robotics, Ch. 6.2, p. 227-233.
            Nielsen, "Damping Parameter in Marquardt's Method", 1999.
 
-### cartan::ik::lbfgsb
+### cartan::lbfgsb
 
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
@@ -545,7 +545,7 @@ minimization on free variables and a backtracking Armijo line search.
 Reference: Byrd, Lu, Nocedal, Zhu, "A Limited Memory Algorithm for Bound
            Constrained Optimization", SIAM J. Sci. Comput., 1995.
 
-### cartan::ik::projected_lm
+### cartan::projected_lm
 
 ```cpp
 template <chain Chain, typename LimitsPolicy = no_limits>
@@ -559,7 +559,7 @@ self-restart on stall via Halton re-seed, so wrapping `projected_lm` in
 an outer `restart_wrapper` is no longer the recommended composition —
 the bare `projected_lm` already delivers the multi-start behavior.
 
-### cartan::ik::dls
+### cartan::dls
 
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
@@ -570,7 +570,7 @@ Damped Least Squares with SVD-based adaptive damping (Nakamura).
 Body-frame Newton-Raphson iteration where the damping factor increases
 as the smallest singular value drops below a threshold.
 
-### cartan::ik::newton_raphson
+### cartan::newton_raphson
 
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
@@ -584,7 +584,7 @@ convergence tolerances.
 Reference: Nocedal & Wright, *Numerical Optimization*, Ch. 3 (line
            search), Ch. 10 (nonlinear least squares, Gauss-Newton).
 
-### cartan::ik::argmin_lm
+### cartan::argmin_lm
 
 ```cpp
 template <chain Chain, typename LimitsPolicy = no_limits>
@@ -596,7 +596,7 @@ exposing the 6-element body-frame error as residuals and the body
 Jacobian. Joint limits are enforced via clamping after each step since
 LM is unconstrained.
 
-### cartan::ik::argmin_lbfgsb
+### cartan::argmin_lbfgsb
 
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
@@ -608,13 +608,12 @@ gradient via the SE(3) log Jacobian.
 
 Reference: Byrd, Lu, Nocedal, Zhu (1995).
 
-### cartan::ik::argmin_slsqp
+### cartan::argmin_slsqp
 
 ```cpp
 template <chain Chain,
           typename LimitsPolicy = clamp_limits,
-          typename Convergence = argmin::default_convergence,
-          argmin::sqp_mode Mode = argmin::sqp_mode::accurate>
+          typename Convergence = argmin::default_convergence>
 class argmin_slsqp;
 ```
 
@@ -625,7 +624,7 @@ template parameter lets consumers opt out of argmin's default
 four-criterion convergence policy in favor of alternatives like
 `argmin::slsqp_compatible_convergence` (NLopt-style ftol+xtol+stall).
 
-### cartan::ik::argmin_bobyqa
+### cartan::argmin_bobyqa
 
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
@@ -639,7 +638,7 @@ trust-region steps.
 Reference: Powell, M.J.D., "The BOBYQA Algorithm for Bound Constrained
            Optimization Without Derivatives", 2009.
 
-### cartan::ik::argmin_projected_gn
+### cartan::argmin_projected_gn
 
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
@@ -648,7 +647,7 @@ class argmin_projected_gn;
 
 argmin-backed projected Gauss-Newton with active-set bounds.
 
-### cartan::ik::argmin_projected_gradient_gn
+### cartan::argmin_projected_gradient_gn
 
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
@@ -657,7 +656,7 @@ class argmin_projected_gradient_gn;
 
 argmin-backed projected-gradient Gauss-Newton with Armijo backtracking.
 
-### cartan::ik::nlopt_slsqp
+### cartan::nlopt_slsqp
 
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
@@ -667,7 +666,7 @@ class nlopt_slsqp;
 NLopt SLSQP solver. Same algorithm as `argmin_slsqp` but backed by
 NLopt. Guarded by `CARTAN_HAS_NLOPT`.
 
-### cartan::ik::nlopt_bobyqa
+### cartan::nlopt_bobyqa
 
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
@@ -677,7 +676,7 @@ class nlopt_bobyqa;
 NLopt BOBYQA solver. Same algorithm as `argmin_bobyqa` but backed by
 NLopt. Guarded by `CARTAN_HAS_NLOPT`.
 
-### cartan::ik::nw_sqp
+### cartan::nw_sqp
 
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
@@ -688,7 +687,7 @@ argmin-backed Nocedal-Wright SQP with inequality constraints.
 
 Reference: Nocedal & Wright, *Numerical Optimization*, Ch. 18 (SQP).
 
-### cartan::ik::filter_nw_sqp
+### cartan::filter_nw_sqp
 
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
@@ -697,7 +696,7 @@ class filter_nw_sqp;
 
 argmin-backed filter Nocedal-Wright SQP.
 
-### cartan::ik::filter_slsqp
+### cartan::filter_slsqp
 
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
@@ -706,7 +705,7 @@ class filter_slsqp;
 
 argmin-backed filter SLSQP with box constraints.
 
-### cartan::ik::mma
+### cartan::mma
 
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
@@ -715,7 +714,7 @@ class mma;
 
 argmin-backed Method of Moving Asymptotes.
 
-### cartan::ik::gcmma
+### cartan::gcmma
 
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
@@ -727,7 +726,7 @@ conservativity coefficients that grow on non-conservative inner-loop
 trials and decay between outer iterations, yielding the global
 convergence guarantee.
 
-### cartan::ik::cmaes
+### cartan::cmaes
 
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
@@ -738,7 +737,7 @@ argmin-backed Covariance Matrix Adaptation Evolution Strategy.
 Derivative-free, population-based; useful when the analytical gradient
 is unavailable or unreliable.
 
-### cartan::ik::augmented_lagrangian
+### cartan::augmented_lagrangian
 
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
@@ -750,7 +749,7 @@ argmin-backed augmented Lagrangian solver for constrained IK.
 ## restart_wrapper
 
 ```cpp
-namespace cartan::ik {
+namespace cartan {
 
 template <chain Chain,
           typename InnerPolicy = projected_lm<Chain>,
@@ -783,7 +782,7 @@ Reference: Beeson & Ames, "TRAC-IK", 2015 (multi-start strategy).
 
 ```cpp
 template <chain Chain, typename Policy>
-    requires cartan::ik::solve_policy<Policy>
+    requires cartan::solve_policy<Policy>
 class exhaustive_ik_runner;
 ```
 
@@ -883,4 +882,6 @@ candidates without an inline FK back-check.
   IK runners consume.
 - [Background: IK Methods](../background/ik-methods.md) — theory survey.
 - [Guide: IK Composition](../guides/ik-composition.md) — task-oriented
-  walkthrough of stepper, scheduler, and solver composition.
+  walkthrough of policy, runner, and restart-wrapper composition, including
+  variadic-policy racing via `basic_ik_runner` and multi-start via
+  `restart_wrapper`.

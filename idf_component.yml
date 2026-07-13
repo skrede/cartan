@@ -6,12 +6,12 @@
 # public headers from main/ or other components.
 #
 # Hardware deployment, Eigen alignment audit, memory + flash sweep, and a real
-# robot-arm demo are explicitly out of scope for the v0.4.1 manifest — those
+# robot-arm demo are explicitly out of scope for the 0.4.2 manifest — those
 # land in a follow-on Embedded Targeting milestone. The smoke test under
 # tests/embedded/esp32-smoke/ verifies headers compile under xtensa-esp32-elf
 # at the language level only.
 
-version: "0.4.1"
+version: "0.4.2"
 description: "C++20 Lie group / kinematics / inverse kinematics library for embedded robotics (header-only, Eigen-based)."
 url: "https://github.com/skrede/cartan"
 repository: "https://github.com/skrede/cartan.git"

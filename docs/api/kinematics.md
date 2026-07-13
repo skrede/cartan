@@ -17,13 +17,17 @@ See [PoE Kinematics](../background/poe-kinematics.md) | [Jacobians](../backgroun
 
 | Form | Header |
 |------|--------|
-| All kinematics | `#include <cartan/serial_chain.h>` |
+| Core kinematics (chains, PoE FK, Jacobian, velocity, IK) | `#include <cartan/serial_chain.h>` |
 | `cartan::forward_kinematics` | `#include <cartan/serial/fk/forward_kinematics.h>` |
 | `cartan::forward_kinematics_matrix`, `cartan::fk_matrix_result`, `cartan::pose_matrix` | `#include <cartan/serial/fk/forward_kinematics_matrix.h>` |
 | `cartan::space_jacobian`, `cartan::body_jacobian` | `#include <cartan/serial/fk/jacobian.h>` |
 | `cartan::jacobian_matrix` | `#include <cartan/serial/fk/jacobian_matrix.h>` |
 | `cartan::end_effector_velocity` | `#include <cartan/serial/fk/velocity.h>` |
 | `cartan::fk_result` | `#include <cartan/serial/fk/fk_result.h>` |
+
+The umbrella `<cartan/serial_chain.h>` does **not** pull in the matrix-form headers
+`forward_kinematics_matrix.h` / `jacobian_matrix.h`; include those directly when you
+need `forward_kinematics_matrix` / `jacobian_matrix`.
 
 ## fk_result
 

@@ -25,7 +25,8 @@ See [PoE Kinematics](../background/poe-kinematics.md)
 | `cartan::joint_kind`, `cartan::detect_joint_kind` | `#include <cartan/serial/chain/joint_kind.h>` |
 | `cartan::revolute_x/y/z`, `cartan::prismatic_x/y/z` joint tags | `#include <cartan/serial/chain/joint_tags.h>` |
 | `cartan::chain` concept, `cartan::joint_tag` concept | `#include <cartan/serial/chain/chain_concept.h>` |
-| `cartan::dynamic`, `cartan::detail::storage_t` | `#include <cartan/serial/chain/storage_trait.h>` |
+| `cartan::dynamic` | `#include <cartan/types.h>` |
+| `cartan::detail::storage_t` | `#include <cartan/serial/chain/storage_trait.h>` |
 
 ## screw_axis
 
@@ -265,7 +266,8 @@ kinematic_chain(
 - `limits` — Joint position/velocity limits. Same storage pattern as
   `axes`.
 
-Asserts `axes.size() == limits.size()`. Caches `joint_kind` per joint so
+Throws `std::invalid_argument` if `axes.size() != limits.size()`. Caches
+`joint_kind` per joint so
 FK / Jacobian can dispatch into compile-time specializations.
 
 ### Accessors
@@ -380,9 +382,9 @@ two in-tree implementations.
 Compile-time selector between `std::array` (fixed `N`) and `std::vector`
 (dynamic) storage.
 
-```cpp
-inline constexpr int dynamic = -1;
+The `dynamic` sentinel (`= -1`) it keys on is declared in `<cartan/types.h>`.
 
+```cpp
 namespace detail {
 
 template <int N, typename T>

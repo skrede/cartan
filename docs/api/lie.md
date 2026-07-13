@@ -709,7 +709,8 @@ screw_params<Scalar> to_screw_params(const vector3<Scalar>& omega, const vector3
 
 Extract screw parameters from twist components `(omega, v)`. For any
 non-zero `omega`, let `omega_hat = omega / ||omega||` (the unit rotation
-axis). Then `s_hat = omega_hat`, `q = omega_hat x v`, `h = omega_hat . v`.
+axis). Then `s_hat = omega_hat`, `q = (omega_hat x v) / ||omega||`,
+`h = (omega_hat . v) / ||omega||`.
 For pure translation (`||omega|| ~ 0`): `s_hat = v / ||v||`, `q = 0`,
 `h = infinity`.
 

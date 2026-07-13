@@ -105,7 +105,7 @@ and robustness near singularities:
 
 ### SVD-Based Adaptive Damping (Nakamura)
 
-Cartan's `dls_stepper` uses Nakamura's adaptive damping scheme. The body
+Cartan's `dls` policy uses Nakamura's adaptive damping scheme. The body
 Jacobian is decomposed via SVD: $J_b = U \Sigma V^\top$. The damping factor
 adapts based on the smallest singular value $\sigma_{\min}$:
 
@@ -129,11 +129,11 @@ discontinuities in joint velocities.
 ### Cartan Implementation
 
 ```
-dls_stepper<N, Scalar>
+dls<Chain, LimitsPolicy>
 ```
 
 - **Setup:** `setup(chain, target, q0, criteria)` -- initializes with chain, target pose, seed, and convergence criteria
-- **Step:** `step(chain)` -- one Newton-Raphson iteration with adaptive DLS damping
+- **Step:** `step(chain, n)` -- advances up to `n` work units of Newton-Raphson iteration with adaptive DLS damping, returning a `step_result`
 - **Diagnostics:** `condition_number()`, `manipulability()` -- monitor proximity to singularities
 
 ## Levenberg-Marquardt (LM)
@@ -185,11 +185,11 @@ $\lambda$ (more aggressive), poor steps increase $\lambda$ (more conservative).
 ### Cartan Implementation
 
 ```
-lm_stepper<N, Scalar>
+builtin_lm<Chain, LimitsPolicy>   // also available as the alias lm<Chain, LimitsPolicy>
 ```
 
 - **Setup:** `setup(chain, target, q0, criteria)` -- initializes lambda from $\lambda_0 \cdot \max(\text{diag}(J_b^\top J_b))$ (Nielsen initialization)
-- **Step:** `step(chain)` -- one LM iteration with gain ratio evaluation and lambda update
+- **Step:** `step(chain, n)` -- advances up to `n` LM iterations with gain ratio evaluation and lambda update, returning a `step_result`
 - **Diagnostic:** `lambda()` -- current damping parameter
 
 ## Sequential Quadratic Programming (SQP)
@@ -215,13 +215,15 @@ $g = -J_b^\top \xi_b$ (negative gradient).
 ### Cartan Implementation
 
 ```
-sqp_stepper<N, Scalar>   // requires CARTAN_HAS_NLOPT
+nlopt_slsqp<Chain, LimitsPolicy>   // requires CARTAN_HAS_NLOPT
 ```
 
 Cartan wraps NLopt's SLSQP algorithm. Joint limits from the `kinematic_chain`
-are passed as box constraints. The stepper runs a configurable budget of NLopt
-evaluations per `step()` call, enabling cooperative scheduling with other
-solvers.
+are passed as box constraints. The policy runs a configurable budget of NLopt
+evaluations per `step(chain, n)` call, enabling cooperative scheduling with
+other policies in a `basic_ik_runner`. For a dependency-free option that also
+respects joint limits, the native `projected_lm<Chain, LimitsPolicy>` policy
+solves the same box-constrained problem without NLopt.
 
 - **When to use:** When joint limits are critical (surgical robots, constrained workspaces)
 - **Trade-off:** More expensive per iteration than DLS/LM, but respects hard constraints throughout
@@ -241,20 +243,21 @@ Cartan uses the `convergence_criteria<Scalar>` struct:
 |-----------|---------|---------|
 | `position_tol` | Linear error tolerance $\epsilon_v$ | $10^{-6}$ |
 | `orientation_tol` | Angular error tolerance $\epsilon_\omega$ | $10^{-6}$ |
-| `max_iterations` | Maximum iterations before `iteration_limit` | 100 |
+| `max_iterations_per_attempt` | Per-attempt iteration cap before `iteration_limit` | 100 |
+| `max_total_work_units` | Runner-level total work-unit budget | 200 |
 
 Separating angular and linear tolerances is essential because they have
 different physical units (radians vs meters) and different magnitudes in
 practice. A combined norm $\lVert \xi_b \rVert < \epsilon$ conflates the two,
 making it difficult to set appropriate tolerances.
 
-Cartan's `epsilon_v<Scalar>` trait provides scalar-appropriate default
-tolerances: `double` uses $10^{-6}$, `float` uses $10^{-4}$, reflecting
+Cartan's `default_position_tol_v<Scalar>` constant provides scalar-appropriate
+default tolerances: `double` uses $10^{-6}$, `float` uses $10^{-4}$, reflecting
 the difference in machine precision.
 
 ### Termination Conditions
 
-All three steppers report status via `ik_status`:
+Every solve policy reports status via `ik_status`:
 
 | Status | Meaning |
 |--------|---------|
@@ -262,22 +265,23 @@ All three steppers report status via `ik_status`:
 | `iteration_limit` | Maximum iterations reached |
 | `stalled` | Error not improving (within stall window) |
 | `diverged` | Error exceeds divergence factor times initial error |
-| `joint_limit_hit` | Joint limit violated (SQP box constraint) |
+| `joint_limit_hit` | Limits policy rejected the step |
 
 ## Cartan's Tick-Based Architecture
 
 Cartan's IK architecture is designed around **cooperative scheduling**. Each
-stepper is a passive object with a `step()` method that performs exactly one
-iteration. The scheduler (not the stepper) controls iteration allocation.
+solve policy is a passive object whose `step(chain, n)` method advances the
+solve by up to `n` work units. The runner (not the policy) controls how work
+units are allocated.
 
-### The `ik_stepper` Concept
+### The `solve_policy` Concept
 
-All steppers satisfy the `ik_stepper` concept:
+Every solver satisfies the `solve_policy` concept:
 
 ```cpp
-concept ik_stepper = requires(S& s, ...) {
+concept solve_policy = requires(S& s, ...) {
     { s.setup(chain, target, q0, criteria) };
-    { s.step(chain) } -> std::same_as<ik_status>;
+    { s.step(chain, int{}) } -> std::same_as<step_result<typename S::scalar_type>>;
     { s.converged() } -> std::convertible_to<bool>;
     { s.solution() };
     { s.error_norm() };
@@ -286,24 +290,29 @@ concept ik_stepper = requires(S& s, ...) {
 };
 ```
 
+The concept also requires the member types `chain_type`, `scalar_type`,
+`limits_type`, and the `joints` count so the runner can specialize on the chain.
+
 ### Cooperative Scheduling
 
-The `racing_scheduler` runs multiple steppers cooperatively:
+`basic_ik_runner<Policies...>` drives one or more policies. A single policy
+gives a direct solve; several policies race cooperatively:
 
-1. Each tick, the scheduler calls `step()` on each active stepper
-2. The first stepper to converge wins -- its solution is returned
-3. Steppers that stall or diverge are deactivated
-4. The scheduler controls iteration budget via **tick policies**:
-   - `round_robin_tick`: 1 step per solver per tick
-   - `budget_tick`: batch steps based on total budget
-   - `time_boxed_tick`: step until time budget exhausted
+1. Each `step()` performs one round-robin across the active policies
+2. The first policy to converge wins -- its solution is returned (for the speed objective)
+3. Policies that stall or diverge are parked
+4. The runner accumulates each policy's `step_result` work units against `max_total_work_units`
+
+For multi-start, `restart_wrapper` wraps any inner policy: when the inner
+policy stalls, diverges, or hits `max_iterations_per_attempt`, the wrapper
+re-seeds from a Halton sequence and retries.
 
 This architecture replaces TRAC-IK's thread-per-solver model. Instead of
-spawning $O(N)$ threads, Cartan schedules $N$ steppers cooperatively on a
-single thread. Multiple IK queries can run concurrently on separate threads
-without internal thread proliferation.
+spawning $O(N)$ threads, Cartan schedules $N$ policies cooperatively on a
+single thread. Multiple IK queries can still run concurrently on separate
+threads without internal thread proliferation.
 
-See [API Reference](../api/ik.md) for solver and scheduler interfaces.
+See [API Reference](../api/ik.md) for solver and runner interfaces.
 See [Jacobians](jacobians.md) for the body Jacobian used in all IK methods.
 
 ## Bibliography

@@ -176,7 +176,7 @@ int main()
     Eigen::Vector2d q0{0.0, 0.0};
     cartan::convergence_criteria<double> criteria{1e-6, 1e-6, 100, 200};
 
-    cartan::basic_ik_runner<cartan::ik::lm<cartan::kinematic_chain<double, 2>>> solver;
+    cartan::basic_ik_runner<cartan::lm<cartan::kinematic_chain<double, 2>>> solver;
     solver.setup(chain, target, q0, criteria);
     auto result = solver.solve();
 

@@ -352,7 +352,7 @@ The `Chain` type must satisfy the `chain` concept and model a six-joint
 mechanism. The wrist
 center decomposition assumes joints 4, 5, 6 share a common intersection
 point (Pieper geometry). Industrial 6R arms commonly satisfy this
-constraint (KR6 R900, UR5, ABB IRB120 with appropriate geometry, etc.).
+constraint (KR6 R900, PUMA 560, ABB IRB120 with appropriate geometry, etc.).
 
 ```cpp
 using chain_type = Chain;

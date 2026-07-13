@@ -362,7 +362,7 @@ map derived above.
 
 This formula is the basis for Cartan's `forward_kinematics()`, `space_jacobian()`,
 and `body_jacobian()` implementations. See the
-[Kinematics background page](../background/) and
+[PoE Kinematics background page](poe-kinematics.md) and
 [API Reference](../api/kinematics.md) for details.
 
 ## Cartan Mapping

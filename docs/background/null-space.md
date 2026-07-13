@@ -129,8 +129,8 @@ policies are provided, selectable at compile time:
 
 ### `no_limits`
 
-No enforcement. Use when the stepper itself handles constraints (e.g.,
-`sqp_stepper` with box bounds from NLopt).
+No enforcement. Use when the solve policy itself handles constraints (e.g.,
+an SQP policy with its own box bounds).
 
 ### `clamp_limits`
 
@@ -156,21 +156,28 @@ the `enforce_extended` interface (detected at compile time via the
 
 ### Policy Concept
 
-All limits policies satisfy a common interface:
+The limits policies are stateless structs consumed by the solve policies that
+`basic_ik_runner` drives. All of them satisfy a common interface, templated on
+the chain type:
 
 ```cpp
-template <int N, typename Scalar>
-static void enforce(position_type& q, const limits_storage& limits);
+template <chain Chain>
+static void enforce(
+    typename joint_state<typename Chain::scalar_type, Chain::joints>::position_type& q,
+    const auto& limits);
 ```
 
-The `null_space_limits` policy additionally provides:
+The `null_space_limits` policy additionally provides an extended overload,
+detected at compile time via the `has_extended_enforce` concept:
 
 ```cpp
-template <int N, typename Scalar>
+template <chain Chain>
 static void enforce_extended(
-    position_type& q, const limits_storage& limits,
-    const jacobian_matrix<N, Scalar>& J_b,
-    const JacobiSVD<...>& svd, Scalar gain = 0.5);
+    typename joint_state<typename Chain::scalar_type, Chain::joints>::position_type& q,
+    const auto& limits,
+    const jacobian_matrix<typename Chain::scalar_type, Chain::joints>& J_b,
+    const Eigen::JacobiSVD<jacobian_matrix<typename Chain::scalar_type, Chain::joints>>& svd,
+    typename Chain::scalar_type gain = typename Chain::scalar_type(0.5));
 ```
 
 See [API Reference](../api/ik.md) for the complete limits policy interface.

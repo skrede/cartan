@@ -196,7 +196,7 @@ used. Both paths produce identical results.
 | Space Jacobian $J_s(\theta)$ | `space_jacobian(chain, fk)` |
 | Body Jacobian $J_b(\theta)$ | `body_jacobian(chain, fk)` |
 | Spatial twist $\mathcal{V}_s = J_s \dot{\theta}$ | `end_effector_velocity(chain, q, dq)` |
-| Jacobian matrix type | `jacobian_matrix<N, Scalar>` |
+| Jacobian matrix type | `jacobian_matrix<Scalar, N>` |
 | Cached intermediates for Jacobian | `fk_result::intermediates` |
 
 The `end_effector_velocity` function is a convenience that computes FK and the
