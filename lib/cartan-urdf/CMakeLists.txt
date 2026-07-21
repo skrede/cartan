@@ -1,19 +1,23 @@
-if (CARTAN_CMAKE_FETCH_DEPS)
-    FetchContent_Declare(
-        pugixml
-        GIT_REPOSITORY https://github.com/zeux/pugixml.git
-        GIT_TAG v1.15
-        GIT_SHALLOW TRUE
-        EXCLUDE_FROM_ALL
-        SYSTEM
-    )
-    set(PUGIXML_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-    set(PUGIXML_INSTALL OFF CACHE BOOL "" FORCE)
-    FetchContent_MakeAvailable(pugixml)
-else ()
-    find_package(pugixml CONFIG REQUIRED)
-    if (pugixml_VERSION VERSION_LESS "1.14")
-        message(FATAL_ERROR "cartan-urdf requires pugixml >= 1.14, found ${pugixml_VERSION}")
+# A parent project may already provide pugixml; honor it and skip our own
+# acquisition so dependency sourcing stays the integrator's decision.
+if (NOT TARGET pugixml::pugixml)
+    if (CARTAN_CMAKE_FETCH_DEPS)
+        FetchContent_Declare(
+            pugixml
+            GIT_REPOSITORY https://github.com/zeux/pugixml.git
+            GIT_TAG v1.15
+            GIT_SHALLOW TRUE
+            EXCLUDE_FROM_ALL
+            SYSTEM
+        )
+        set(PUGIXML_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+        set(PUGIXML_INSTALL OFF CACHE BOOL "" FORCE)
+        FetchContent_MakeAvailable(pugixml)
+    else ()
+        find_package(pugixml CONFIG REQUIRED)
+        if (pugixml_VERSION VERSION_LESS "1.14")
+            message(FATAL_ERROR "cartan-urdf requires pugixml >= 1.14, found ${pugixml_VERSION}")
+        endif ()
     endif ()
 endif ()
 
