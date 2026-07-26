@@ -26,8 +26,8 @@
 
 #include <argmin/solver/options.h>
 #include <argmin/solver/convergence.h>
-#include <argmin/solver/basic_solver.h>
 #include <argmin/solver/kraft_slsqp_policy.h>
+#include <argmin/solver/step_budget_solver.h>
 
 #include <Eigen/Core>
 
@@ -354,7 +354,7 @@ public:
     /// fired. Requires argmin HEAD >= 21a0acf.
     ///
     /// Note: reads from the member `m_nab_opts.convergence.last_check_results_`
-    /// rather than from `m_solver->convergence()` because basic_solver's
+    /// rather than from `m_solver->convergence()` because step_budget_solver's
     /// explicit-opts `step_n(budget, opts)` overload (which argmin_slsqp
     /// uses to forward a typed convergence policy per call) writes the
     /// per-iteration telemetry into the caller's opts, not into the solver's
@@ -374,7 +374,7 @@ public:
     }
 
 private:
-    using argmin_solver = argmin::basic_solver<
+    using argmin_solver = argmin::step_budget_solver<
         argmin::kraft_slsqp_policy<joints>, joints, cartan::detail::argmin_ik_problem<Chain>>;
     using argmin_opts_type = argmin::solver_options<Convergence>;
 

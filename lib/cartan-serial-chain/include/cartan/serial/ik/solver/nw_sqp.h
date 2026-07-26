@@ -23,8 +23,8 @@
 #include "cartan/serial/fk/forward_kinematics.h"
 
 #include <argmin/solver/options.h>
-#include <argmin/solver/basic_solver.h>
 #include <argmin/solver/nw_sqp_policy.h>
+#include <argmin/solver/step_budget_solver.h>
 
 #include <Eigen/Core>
 
@@ -177,7 +177,7 @@ public:
     void abort() { m_status = ik_status::stalled; }
 
 private:
-    using argmin_solver = argmin::basic_solver<
+    using argmin_solver = argmin::step_budget_solver<
         argmin::nw_sqp_policy<joints>, joints, cartan::detail::argmin_constrained_ik_problem<Chain>>;
 
     void sync_solution_from_solver()

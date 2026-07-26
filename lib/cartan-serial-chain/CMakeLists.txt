@@ -4,13 +4,15 @@ if (CARTAN_BUILD_ARGMIN)
             argmin
             SOURCE_DIR "${CARTAN_ARGMIN_SOURCE_DIR}"
             EXCLUDE_FROM_ALL
+            SYSTEM
         )
     else ()
         FetchContent_Declare(
             argmin
             GIT_REPOSITORY https://github.com/skrede/argmin.git
-            GIT_TAG master
+            GIT_TAG 864d558c10d43337399d24f7c27cdfa0e5275475
             EXCLUDE_FROM_ALL
+            SYSTEM
         )
     endif ()
     set(ARGMIN_BUILD_TESTS OFF CACHE BOOL "" FORCE)

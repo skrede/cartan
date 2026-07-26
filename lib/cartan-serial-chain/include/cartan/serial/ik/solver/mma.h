@@ -29,8 +29,8 @@
 #include "cartan/serial/fk/forward_kinematics.h"
 
 #include <argmin/solver/options.h>
-#include <argmin/solver/basic_solver.h>
 #include <argmin/solver/mma_policy.h>
+#include <argmin/solver/step_budget_solver.h>
 
 #include <Eigen/Core>
 
@@ -74,7 +74,7 @@ public:
         // Pass-through of argmin mma_policy options. Leaving fields
         // unset keeps argmin's defaults (K_asymptote = K_saturation = 5,
         // kkt_jump_threshold_factor = 1000, stall_tolerance_threshold
-        // resolved to 1e-6 by basic_solver::forward_policy_hints).
+        // resolved to 1e-6 by step_budget_solver::forward_policy_hints).
         typename argmin::mma_policy<joints>::options_type policy_options{};
 
         double gradient_threshold{1e-14};
@@ -207,7 +207,7 @@ public:
     void abort() { m_status = ik_status::stalled; }
 
 private:
-    using argmin_solver = argmin::basic_solver<
+    using argmin_solver = argmin::step_budget_solver<
         argmin::mma_policy<joints>, joints,
         cartan::detail::argmin_bounded_ik_problem<Chain>>;
 

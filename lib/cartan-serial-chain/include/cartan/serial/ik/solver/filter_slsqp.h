@@ -24,7 +24,7 @@
 
 #include <argmin/solver/options.h>
 #include <argmin/solver/convergence.h>
-#include <argmin/solver/basic_solver.h>
+#include <argmin/solver/step_budget_solver.h>
 #include <argmin/solver/filter_slsqp_policy.h>
 
 #include <Eigen/Core>
@@ -251,7 +251,7 @@ public:
     }
 
 private:
-    using argmin_solver = argmin::basic_solver<
+    using argmin_solver = argmin::step_budget_solver<
         argmin::filter_slsqp_policy<joints>, joints, cartan::detail::argmin_ik_problem<Chain>>;
     using argmin_opts_type = argmin::solver_options<Convergence>;
 
