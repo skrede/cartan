@@ -8,8 +8,11 @@
 
 namespace spp = cartan;
 
+using spp::fixtures::fixed_joint_vector;
 using spp::fixtures::joint_vector;
 using spp::fixtures::make_six_joint_dynamic_chain;
+using spp::fixtures::make_six_joint_fixed_chain;
+using spp::fixtures::six_joints;
 
 /// Both poses come out of the same instruction sequence, so the difference is
 /// zero; the tolerance keeps the comparison from reading as an exact-equality
@@ -98,4 +101,32 @@ TEMPLATE_TEST_CASE("the unchecked path answers a nonfinite joint vector",
                               .end_effector.R.allFinite());
         }
     }
+}
+
+/// The unchecked sibling still spells its joint vector as the chain's
+/// fixed-size position_type, so an over-long dynamically-sized argument is
+/// converted in the caller's frame, silently truncated to the joint count, and
+/// answered with a credible pose. That is what the checked entry point looked
+/// like at every fixed-size chain before the conversion moved inside it.
+TEMPLATE_TEST_CASE("the unchecked fixed-size path truncates a dynamically-sized joint vector",
+    "[fk][boundary]", double, float)
+{
+    using Scalar = TestType;
+    auto chain = make_six_joint_fixed_chain<Scalar>();
+
+    const auto reference =
+        spp::forward_kinematics_unchecked(chain, fixed_joint_vector(Scalar(0.1)));
+    const auto from_other_values =
+        spp::forward_kinematics_unchecked(chain, joint_vector(six_joints + 1, Scalar(0.6)));
+    const auto with_dropped_tail =
+        spp::forward_kinematics_unchecked(chain, joint_vector(six_joints + 1, Scalar(0.1)));
+
+    REQUIRE((from_other_values.end_effector.matrix() - reference.end_effector.matrix()).norm()
+            > Scalar(1e-3));
+    REQUIRE(same_pose(with_dropped_tail.end_effector.matrix(),
+        reference.end_effector.matrix()));
+
+    auto refused = spp::forward_kinematics(chain, joint_vector(six_joints + 1, Scalar(0.6)));
+    REQUIRE_FALSE(refused.has_value());
+    REQUIRE(refused.error() == spp::chain_failure::dimension_mismatch);
 }

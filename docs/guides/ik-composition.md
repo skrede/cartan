@@ -141,7 +141,7 @@ int main()
 
     // Target: forward kinematics of a known configuration -- guaranteed reachable.
     Eigen::Vector<double, 6> q_truth{0.2, -0.4, 0.3, -0.5, 0.6, -0.2};
-    auto target = cartan::forward_kinematics(chain, q_truth).end_effector;
+    auto target = cartan::forward_kinematics(chain, q_truth).value().end_effector;
 
     // Race the speed and robust presets cooperatively in the calling thread.
     cartan::dual_ik_runner<Chain> solver;

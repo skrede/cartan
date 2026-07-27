@@ -126,10 +126,6 @@ jacobian_matrix<Scalar, N> space_jacobian_unrolled(
 /// end of the cache, and one with more yields a matrix for a different chain.
 /// Neither is checked here, and violating either is undefined behavior.
 ///
-/// The suffix marks a structural precondition between arguments, and is a
-/// different claim from the `trusted` vocabulary, which marks a mathematical
-/// invariant carried by one value.
-///
 /// J_si(q) = Ad_{T_{i-1}}(S_i). For fixed-size chains with N=1-7 joints,
 /// dispatches to a compile-time unrolled fold expression. For dynamic or larger
 /// chains, uses a runtime loop.
@@ -159,12 +155,8 @@ cartan::expected<jacobian_matrix<Scalar, N>, chain_failure> space_jacobian(
     const kinematic_chain<Scalar, N>& chain,
     const fk_result<Scalar, N>& fk)
 {
-    auto shape = detail::check_fk_shape(chain, fk);
-    if (!shape)
-    {
-        return cartan::unexpected(shape.error());
-    }
-    return space_jacobian_unchecked(chain, fk);
+    return detail::guarded(detail::check_fk_shape(chain, fk),
+        [&] { return space_jacobian_unchecked(chain, fk); });
 }
 
 /// Body Jacobian under the same unchecked precondition on fk as the space
@@ -189,12 +181,8 @@ cartan::expected<jacobian_matrix<Scalar, N>, chain_failure> body_jacobian(
     const kinematic_chain<Scalar, N>& chain,
     const fk_result<Scalar, N>& fk)
 {
-    auto shape = detail::check_fk_shape(chain, fk);
-    if (!shape)
-    {
-        return cartan::unexpected(shape.error());
-    }
-    return body_jacobian_unchecked(chain, fk);
+    return detail::guarded(detail::check_fk_shape(chain, fk),
+        [&] { return body_jacobian_unchecked(chain, fk); });
 }
 
 /// Specialized space Jacobian for static_chain exploiting compile-time
@@ -243,12 +231,8 @@ space_jacobian(
     const static_chain<Scalar, Joints...>& chain,
     const fk_result<Scalar, static_cast<int>(sizeof...(Joints))>& fk)
 {
-    auto shape = detail::check_fk_shape(chain, fk);
-    if (!shape)
-    {
-        return cartan::unexpected(shape.error());
-    }
-    return space_jacobian_unchecked(chain, fk);
+    return detail::guarded(detail::check_fk_shape(chain, fk),
+        [&] { return space_jacobian_unchecked(chain, fk); });
 }
 
 /// Specialized body Jacobian for static_chain, under the same unchecked
@@ -272,12 +256,8 @@ body_jacobian(
     const static_chain<Scalar, Joints...>& chain,
     const fk_result<Scalar, static_cast<int>(sizeof...(Joints))>& fk)
 {
-    auto shape = detail::check_fk_shape(chain, fk);
-    if (!shape)
-    {
-        return cartan::unexpected(shape.error());
-    }
-    return body_jacobian_unchecked(chain, fk);
+    return detail::guarded(detail::check_fk_shape(chain, fk),
+        [&] { return body_jacobian_unchecked(chain, fk); });
 }
 
 namespace detail
@@ -343,12 +323,8 @@ space_jacobian(
     const Chain& chain,
     const fk_result<typename Chain::scalar_type, Chain::joints>& fk)
 {
-    auto shape = detail::check_fk_shape(chain, fk);
-    if (!shape)
-    {
-        return cartan::unexpected(shape.error());
-    }
-    return space_jacobian_unchecked(chain, fk);
+    return detail::guarded(detail::check_fk_shape(chain, fk),
+        [&] { return space_jacobian_unchecked(chain, fk); });
 }
 
 /// Generic body Jacobian for any chain type satisfying the chain concept,
@@ -377,12 +353,8 @@ body_jacobian(
     const Chain& chain,
     const fk_result<typename Chain::scalar_type, Chain::joints>& fk)
 {
-    auto shape = detail::check_fk_shape(chain, fk);
-    if (!shape)
-    {
-        return cartan::unexpected(shape.error());
-    }
-    return body_jacobian_unchecked(chain, fk);
+    return detail::guarded(detail::check_fk_shape(chain, fk),
+        [&] { return body_jacobian_unchecked(chain, fk); });
 }
 
 }

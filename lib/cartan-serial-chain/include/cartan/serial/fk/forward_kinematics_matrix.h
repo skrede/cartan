@@ -36,25 +36,6 @@ struct pose_matrix
     vector3<Scalar> p{vector3<Scalar>::Zero()};
 };
 
-namespace detail
-{
-
-template <typename Scalar, int N>
-auto make_matrix_intermediate_storage()
-{
-    if constexpr (N == dynamic)
-    {
-        return std::vector<pose_matrix<Scalar>>{};
-    }
-    else
-    {
-        std::array<pose_matrix<Scalar>, static_cast<std::size_t>(N)> arr{};
-        return arr;
-    }
-}
-
-}
-
 /// Result of matrix-form forward kinematics. Mirrors `fk_result` but with
 /// matrix-form rotation in the per-joint intermediates and end-effector pose.
 template <typename Scalar = double, int N = dynamic>
@@ -69,7 +50,7 @@ struct fk_matrix_result
         std::array<pose_matrix<Scalar>, static_cast<std::size_t>((N == dynamic) ? 0 : N)>>;
 
     pose_matrix<Scalar> end_effector{};
-    intermediate_storage intermediates{detail::make_matrix_intermediate_storage<Scalar, N>()};
+    intermediate_storage intermediates{};
 
     int num_joints() const
     {
@@ -120,17 +101,17 @@ fk_matrix_result<Scalar, N> forward_kinematics_matrix_unchecked(
 }
 
 /// Matrix-form forward kinematics for a kinematic chain.
-template <typename Scalar, int N>
+///
+/// q is taken at the caller's own type for the reason spelled out over
+/// `forward_kinematics`: a position_type parameter converts an ill-sized vector
+/// in the caller's frame, where no predicate here can see the over-read.
+template <typename Scalar, int N, typename Derived>
 cartan::expected<fk_matrix_result<Scalar, N>, chain_failure> forward_kinematics_matrix(
     const kinematic_chain<Scalar, N>& chain,
-    const typename joint_state<Scalar, N>::position_type& q)
+    const Eigen::MatrixBase<Derived>& q)
 {
-    auto positions = detail::check_joint_positions(chain, q);
-    if (!positions)
-    {
-        return cartan::unexpected(positions.error());
-    }
-    return forward_kinematics_matrix_unchecked(chain, q);
+    return detail::guarded(detail::check_joint_positions(chain, q),
+        [&] { return forward_kinematics_matrix_unchecked(chain, q.derived()); });
 }
 
 /// Matrix-form forward kinematics for a static_chain under the same unchecked
@@ -180,18 +161,14 @@ forward_kinematics_matrix_unchecked(
 }
 
 /// Matrix-form forward kinematics for a static_chain.
-template <typename Scalar, joint_tag... Joints>
+template <typename Scalar, joint_tag... Joints, typename Derived>
 cartan::expected<fk_matrix_result<Scalar, static_cast<int>(sizeof...(Joints))>, chain_failure>
 forward_kinematics_matrix(
     const static_chain<Scalar, Joints...>& chain,
-    const typename joint_state<Scalar, static_cast<int>(sizeof...(Joints))>::position_type& q)
+    const Eigen::MatrixBase<Derived>& q)
 {
-    auto positions = detail::check_joint_positions(chain, q);
-    if (!positions)
-    {
-        return cartan::unexpected(positions.error());
-    }
-    return forward_kinematics_matrix_unchecked(chain, q);
+    return detail::guarded(detail::check_joint_positions(chain, q),
+        [&] { return forward_kinematics_matrix_unchecked(chain, q.derived()); });
 }
 
 }

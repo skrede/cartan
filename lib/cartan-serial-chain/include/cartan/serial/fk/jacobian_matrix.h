@@ -184,12 +184,8 @@ cartan::expected<jacobian_matrix<Scalar, N>, chain_failure> space_jacobian(
     const kinematic_chain<Scalar, N>& chain,
     const fk_matrix_result<Scalar, N>& fk)
 {
-    auto shape = detail::check_fk_shape(chain, fk);
-    if (!shape)
-    {
-        return cartan::unexpected(shape.error());
-    }
-    return space_jacobian_unchecked(chain, fk);
+    return detail::guarded(detail::check_fk_shape(chain, fk),
+        [&] { return space_jacobian_unchecked(chain, fk); });
 }
 
 /// Space Jacobian from matrix-form FK result for a static_chain, under the
@@ -238,12 +234,8 @@ space_jacobian(
     const static_chain<Scalar, Joints...>& chain,
     const fk_matrix_result<Scalar, static_cast<int>(sizeof...(Joints))>& fk)
 {
-    auto shape = detail::check_fk_shape(chain, fk);
-    if (!shape)
-    {
-        return cartan::unexpected(shape.error());
-    }
-    return space_jacobian_unchecked(chain, fk);
+    return detail::guarded(detail::check_fk_shape(chain, fk),
+        [&] { return space_jacobian_unchecked(chain, fk); });
 }
 
 }

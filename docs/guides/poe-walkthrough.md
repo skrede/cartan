@@ -102,7 +102,7 @@ configuration using the PoE formula:
 
 ```cpp
 Eigen::Vector3d q{0.5, -0.3, 0.8};   // joint angles in radians
-auto fk = cartan::forward_kinematics(chain, q);
+auto fk = cartan::forward_kinematics(chain, q).value();
 
 // End-effector SE(3) pose.
 cartan::se3<double> T_ee = fk.end_effector;
@@ -122,11 +122,11 @@ chain and the cached `fk_result`:
 
 ```cpp
 // Space Jacobian: V_s = J_s(q) * dq
-auto Js = cartan::space_jacobian(chain, fk);
+auto Js = cartan::space_jacobian(chain, fk).value();
 std::cout << "Space Jacobian (6x3):\n" << Js << "\n";
 
 // Body Jacobian: V_b = J_b(q) * dq
-auto Jb = cartan::body_jacobian(chain, fk);
+auto Jb = cartan::body_jacobian(chain, fk).value();
 std::cout << "Body Jacobian (6x3):\n" << Jb << "\n";
 ```
 
@@ -164,16 +164,17 @@ int main()
     cartan::kinematic_chain<double, 3> chain(
         home, {s1, s2, s3}, {lim, lim, lim});
 
-    // Compute FK at q = (0.5, -0.3, 0.8).
+    // Compute FK at q = (0.5, -0.3, 0.8). Every entry point returns an
+    // expected; .value() is fine here because the sizes are known to match.
     Eigen::Vector3d q{0.5, -0.3, 0.8};
-    auto fk = cartan::forward_kinematics(chain, q);
+    auto fk = cartan::forward_kinematics(chain, q).value();
 
     std::cout << "End-effector position: "
               << fk.end_effector.translation().transpose() << "\n";
 
     // Compute Jacobians from the cached FK result.
-    auto Js = cartan::space_jacobian(chain, fk);
-    auto Jb = cartan::body_jacobian(chain, fk);
+    auto Js = cartan::space_jacobian(chain, fk).value();
+    auto Jb = cartan::body_jacobian(chain, fk).value();
     std::cout << "Space Jacobian:\n" << Js << "\n";
     std::cout << "Body Jacobian:\n" << Jb << "\n";
 

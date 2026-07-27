@@ -110,9 +110,7 @@ TEMPLATE_TEST_CASE("the fixed-size Jacobians accept the only result they can be 
 }
 
 /// A result of the chain's own length taken from a different chain of that
-/// length passes the predicate: this guard is shape, not provenance. Kept as a
-/// live case so the residual hole stays visible rather than resting on a
-/// comment in the predicate.
+/// length passes the predicate: this guard is shape, not provenance.
 TEMPLATE_TEST_CASE("a same-length result from another configuration is still admitted",
     "[jacobian][boundary]", double, float)
 {

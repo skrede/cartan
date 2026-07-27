@@ -172,11 +172,12 @@ Cartan computes the space Jacobian column-by-column using the cached
 intermediate products from `fk_result`. This avoids redundant matrix
 exponential computations:
 
-1. The forward kinematics `forward_kinematics(chain, q)` stores all
+1. The forward kinematics `forward_kinematics(chain, q)` returns an `expected`
+   whose value stores all
    intermediate products $T_i = e^{[\mathcal{S}_1]\theta_1} \cdots e^{[\mathcal{S}_i]\theta_i}$
    in `fk_result::intermediates`.
 
-2. `space_jacobian(chain, fk)` computes each column as:
+2. `space_jacobian(chain, fk)`, taking that value, computes each column as:
    - Column 0: $\mathcal{S}_1$ (no adjoint needed)
    - Column $i > 0$: $\text{Ad}_{T_{i-1}} \mathcal{S}_i$ using the cached
      `fk.intermediates[i-1]`
@@ -200,9 +201,13 @@ used. Both paths produce identical results.
 | Cached intermediates for Jacobian | `fk_result::intermediates` |
 
 Both Jacobian entry points reject an `fk_result` whose joint count does not
-match the chain's; `space_jacobian_unchecked` and `body_jacobian_unchecked` are
-the same computations without that check, for a caller that has already
-established the pairing.
+match the chain's, and `space_jacobian_unchecked` / `body_jacobian_unchecked`
+are the same computations without that check. The rejection only ever fires for
+a chain whose joint count is *not* in its type: an `fk_result` for a fixed-size
+chain carries that count in its own type, so a mismatched one is ill-formed
+rather than rejected, and the predicate folds away at those overloads. Note also
+that matching joint counts are not provenance — a result of the right length
+computed from a different chain is accepted.
 
 The `end_effector_velocity` function is a convenience that computes FK and the
 space Jacobian internally, returning the 6-vector spatial twist wrapped in

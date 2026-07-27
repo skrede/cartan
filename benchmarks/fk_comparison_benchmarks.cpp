@@ -20,6 +20,11 @@ namespace
 // optimizer cannot hoist a loop-invariant FK out of the timed loop. KDL cells
 // keep their own loop-invariant q (equal end-effector work is the point).
 // Power-of-two size wraps the index with a mask.
+//
+// The timed loop calls the unchecked entry point. The checked one validates
+// joint-vector length and finiteness on every call, which inside a timed region
+// measures the guard rather than the kinematics and would shift a published
+// comparison number under an unchanged benchmark name.
 constexpr std::size_t kInputs = 1024;
 
 // ============================================================================
@@ -165,7 +170,7 @@ static void bm_fk_##ROBOT##_kinematic_chain(benchmark::State& state)     \
     {                                                                    \
         auto& q = qs[i++ & (kInputs - 1)];                              \
         benchmark::DoNotOptimize(q);                                    \
-        auto result = cartan::forward_kinematics(chain, q);               \
+        auto result = cartan::forward_kinematics_unchecked(chain, q);               \
         benchmark::DoNotOptimize(result);                                \
     }                                                                    \
 }                                                                        \
@@ -184,7 +189,7 @@ static void bm_fk_##ROBOT##_static_generic(benchmark::State& state)      \
     {                                                                    \
         auto& q = qs[i++ & (kInputs - 1)];                              \
         benchmark::DoNotOptimize(q);                                    \
-        auto result = cartan::forward_kinematics(wrapped, q);             \
+        auto result = cartan::forward_kinematics_unchecked(wrapped, q);             \
         benchmark::DoNotOptimize(result);                                \
     }                                                                    \
 }                                                                        \
@@ -202,7 +207,7 @@ static void bm_fk_##ROBOT##_static_specialized(benchmark::State& state)  \
     {                                                                    \
         auto& q = qs[i++ & (kInputs - 1)];                              \
         benchmark::DoNotOptimize(q);                                    \
-        auto result = cartan::forward_kinematics(sc, q);                  \
+        auto result = cartan::forward_kinematics_unchecked(sc, q);                  \
         benchmark::DoNotOptimize(result);                                \
     }                                                                    \
 }                                                                        \

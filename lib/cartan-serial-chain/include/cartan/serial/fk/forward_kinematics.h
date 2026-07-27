@@ -124,10 +124,6 @@ fk_result<Scalar, N> fk_unrolled(
 /// to the joint count and yields a plausible pose for a configuration the
 /// caller never asked about.
 ///
-/// The suffix marks a structural precondition between arguments, and is a
-/// different claim from the `trusted` vocabulary, which marks a mathematical
-/// invariant carried by one value.
-///
 /// For fixed-size chains with N=1-7 joints, dispatches to a compile-time
 /// unrolled fold expression. For dynamic or larger chains, uses a runtime loop.
 ///
@@ -152,17 +148,20 @@ fk_result<Scalar, N> forward_kinematics_unchecked(
 ///
 /// Returns the end-effector SE(3) pose and all intermediate products
 /// for Jacobian computation reuse.
-template <typename Scalar, int N>
+///
+/// q is taken at the caller's own type and validated before anything converts
+/// it. Spelling the parameter as the chain's position_type would not do: that
+/// is a non-deduced context, so an ill-sized vector is converted in the
+/// caller's frame, reading past its end before this function is entered, and
+/// Eigen's converting constructor checks the size only through eigen_assert,
+/// which NDEBUG removes.
+template <typename Scalar, int N, typename Derived>
 cartan::expected<fk_result<Scalar, N>, chain_failure> forward_kinematics(
     const kinematic_chain<Scalar, N>& chain,
-    const typename joint_state<Scalar, N>::position_type& q)
+    const Eigen::MatrixBase<Derived>& q)
 {
-    auto positions = detail::check_joint_positions(chain, q);
-    if (!positions)
-    {
-        return cartan::unexpected(positions.error());
-    }
-    return forward_kinematics_unchecked(chain, q);
+    return detail::guarded(detail::check_joint_positions(chain, q),
+        [&] { return forward_kinematics_unchecked(chain, q.derived()); });
 }
 
 /// Specialized forward kinematics for static_chain exploiting compile-time
@@ -205,22 +204,17 @@ forward_kinematics_unchecked(
 /// Forward kinematics for a static_chain, exploiting the compile-time joint
 /// tags of the unchecked overload above.
 ///
-/// A fixed joint count makes a size mismatch reachable only through a
-/// dynamically-sized joint vector; the predicate call stays unconditional
-/// because the comparison folds away for a fixed-size vector while its
-/// finiteness half remains load-bearing at runtime.
-template <typename Scalar, joint_tag... Joints>
+/// The joint count being in the chain's type does not make an ill-sized q
+/// unreachable: the caller may still hand over a dynamically-sized vector, and
+/// it is rejected here rather than converted at the call site.
+template <typename Scalar, joint_tag... Joints, typename Derived>
 cartan::expected<fk_result<Scalar, static_cast<int>(sizeof...(Joints))>, chain_failure>
 forward_kinematics(
     const static_chain<Scalar, Joints...>& chain,
-    const typename joint_state<Scalar, static_cast<int>(sizeof...(Joints))>::position_type& q)
+    const Eigen::MatrixBase<Derived>& q)
 {
-    auto positions = detail::check_joint_positions(chain, q);
-    if (!positions)
-    {
-        return cartan::unexpected(positions.error());
-    }
-    return forward_kinematics_unchecked(chain, q);
+    return detail::guarded(detail::check_joint_positions(chain, q),
+        [&] { return forward_kinematics_unchecked(chain, q.derived()); });
 }
 
 /// Generic forward kinematics for any chain type satisfying the chain concept,
@@ -265,18 +259,14 @@ forward_kinematics_unchecked(
 }
 
 /// Generic forward kinematics for any chain type satisfying the chain concept.
-template <chain Chain>
+template <chain Chain, typename Derived>
 cartan::expected<fk_result<typename Chain::scalar_type, Chain::joints>, chain_failure>
 forward_kinematics(
     const Chain& chain,
-    const typename joint_state<typename Chain::scalar_type, Chain::joints>::position_type& q)
+    const Eigen::MatrixBase<Derived>& q)
 {
-    auto positions = detail::check_joint_positions(chain, q);
-    if (!positions)
-    {
-        return cartan::unexpected(positions.error());
-    }
-    return forward_kinematics_unchecked(chain, q);
+    return detail::guarded(detail::check_joint_positions(chain, q),
+        [&] { return forward_kinematics_unchecked(chain, q.derived()); });
 }
 
 }

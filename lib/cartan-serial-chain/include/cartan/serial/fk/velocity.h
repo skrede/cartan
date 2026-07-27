@@ -24,10 +24,6 @@ namespace cartan
 /// truncated to the joint count; an over-long dq is truncated in double but
 /// reads past the last Jacobian column in float, because the product's
 /// vectorized evaluator traverses the operand rather than the matrix.
-///
-/// The suffix marks a structural precondition between arguments, and is a
-/// different claim from the `trusted` vocabulary, which marks a mathematical
-/// invariant carried by one value.
 template <typename Scalar, int N>
 vector6<Scalar> end_effector_velocity_unchecked(
     const kinematic_chain<Scalar, N>& chain,
@@ -43,23 +39,24 @@ vector6<Scalar> end_effector_velocity_unchecked(
 ///
 /// Computes forward kinematics internally to obtain the space Jacobian,
 /// then multiplies by joint velocities.
-template <typename Scalar, int N>
+///
+/// Both vectors are taken at the caller's own type and validated before
+/// anything converts them, for the reason spelled out over
+/// `forward_kinematics`. Joint positions are established before joint
+/// velocities, so a call violating both contracts reports the position
+/// failure.
+template <typename Scalar, int N, typename QDerived, typename DqDerived>
 cartan::expected<vector6<Scalar>, chain_failure> end_effector_velocity(
     const kinematic_chain<Scalar, N>& chain,
-    const typename joint_state<Scalar, N>::position_type& q,
-    const typename joint_state<Scalar, N>::velocity_type& dq)
+    const Eigen::MatrixBase<QDerived>& q,
+    const Eigen::MatrixBase<DqDerived>& dq)
 {
-    auto positions = detail::check_joint_positions(chain, q);
-    if (!positions)
+    if (auto positions = detail::check_joint_positions(chain, q); !positions)
     {
         return cartan::unexpected(positions.error());
     }
-    auto velocities = detail::check_joint_velocities(chain, dq);
-    if (!velocities)
-    {
-        return cartan::unexpected(velocities.error());
-    }
-    return end_effector_velocity_unchecked(chain, q, dq);
+    return detail::guarded(detail::check_joint_velocities(chain, dq),
+        [&] { return end_effector_velocity_unchecked(chain, q.derived(), dq.derived()); });
 }
 
 }

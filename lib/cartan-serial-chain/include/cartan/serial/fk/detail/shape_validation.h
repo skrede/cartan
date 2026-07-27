@@ -8,8 +8,23 @@
 
 #include "cartan/serial/chain/chain_failure.h"
 
+#include <type_traits>
+
 namespace cartan::detail
 {
+
+/// Sequences a predicate and the kernel it guards. It exists so the checked
+/// entry points do not carry a dozen copies of the same three statements.
+template <typename Kernel>
+cartan::expected<std::invoke_result_t<Kernel>, chain_failure>
+guarded(const cartan::expected<void, chain_failure>& held, Kernel&& kernel)
+{
+    if (!held)
+    {
+        return cartan::unexpected(held.error());
+    }
+    return kernel();
+}
 
 /// Length first, then finiteness on the raw input, before any arithmetic can
 /// touch it: an infinity multiplied by a zero becomes a NaN, so a guard placed

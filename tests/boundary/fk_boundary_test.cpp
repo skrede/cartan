@@ -89,6 +89,53 @@ TEMPLATE_TEST_CASE("forward_kinematics rejects a nonfinite joint value",
     expect_nonfinite_rejected<Scalar>(tagged, fixed_finite, matrix_fk);
 }
 
+/// The joint count being in the chain's type does not put an ill-sized joint
+/// vector out of reach. The entry points take the vector at the caller's own
+/// type, so a dynamically-sized one is rejected here rather than converted at
+/// the call site — where, before the conversion moved inside the boundary, it
+/// read past its own end and the boundary then answered a plausible pose for a
+/// configuration nobody asked about.
+TEMPLATE_TEST_CASE("the fixed-size entry points reject a dynamically-sized joint vector",
+    "[fk][boundary]", double, float)
+{
+    using Scalar = TestType;
+    auto fixed = make_six_joint_fixed_chain<Scalar>();
+    auto tagged = make_six_joint_static_chain<Scalar>();
+    const auto dq = fixed_joint_vector(Scalar(0.2));
+
+    for (int size : {0, spp::fixtures::six_joints - 1, spp::fixtures::six_joints + 1})
+    {
+        const auto q = joint_vector(size, Scalar(0.1));
+
+        auto fixed_pose = spp::forward_kinematics(fixed, q);
+        REQUIRE_FALSE(fixed_pose.has_value());
+        REQUIRE(fixed_pose.error() == spp::chain_failure::dimension_mismatch);
+
+        auto tagged_pose = spp::forward_kinematics(tagged, q);
+        REQUIRE_FALSE(tagged_pose.has_value());
+        REQUIRE(tagged_pose.error() == spp::chain_failure::dimension_mismatch);
+
+        auto fixed_matrix = spp::forward_kinematics_matrix(fixed, q);
+        REQUIRE_FALSE(fixed_matrix.has_value());
+        REQUIRE(fixed_matrix.error() == spp::chain_failure::dimension_mismatch);
+
+        auto tagged_matrix = spp::forward_kinematics_matrix(tagged, q);
+        REQUIRE_FALSE(tagged_matrix.has_value());
+        REQUIRE(tagged_matrix.error() == spp::chain_failure::dimension_mismatch);
+
+        auto twist = spp::end_effector_velocity(fixed, q, dq);
+        REQUIRE_FALSE(twist.has_value());
+        REQUIRE(twist.error() == spp::chain_failure::dimension_mismatch);
+
+        auto velocities = spp::end_effector_velocity(fixed, fixed_joint_vector(Scalar(0.1)), q);
+        REQUIRE_FALSE(velocities.has_value());
+        REQUIRE(velocities.error() == spp::chain_failure::dimension_mismatch);
+    }
+
+    REQUIRE(spp::forward_kinematics(fixed, joint_vector(6, Scalar(0.1))).has_value());
+    REQUIRE(spp::forward_kinematics(tagged, joint_vector(6, Scalar(0.1))).has_value());
+}
+
 /// Length is established before finiteness, so a call violating both contracts
 /// reports the length failure and the caller has to come back a second time.
 TEMPLATE_TEST_CASE("forward_kinematics reports the length failure first",

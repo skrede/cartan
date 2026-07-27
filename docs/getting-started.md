@@ -138,7 +138,7 @@ int main()
     cartan::kinematic_chain<double, 2> chain(home, {s1, s2}, {lim, lim});
 
     Eigen::Vector2d q(0.5, -0.3);
-    auto fk = cartan::forward_kinematics(chain, q);
+    auto fk = cartan::forward_kinematics(chain, q).value();
 
     std::cout << "End-effector:\n" << fk.end_effector.matrix() << "\n";
 }
@@ -171,7 +171,7 @@ int main()
     cartan::kinematic_chain<double, 2> chain(home, {s1, s2}, {lim, lim});
 
     Eigen::Vector2d q_known{0.3, -0.5};
-    auto target = cartan::forward_kinematics(chain, q_known).end_effector;
+    auto target = cartan::forward_kinematics(chain, q_known).value().end_effector;
 
     Eigen::Vector2d q0{0.0, 0.0};
     cartan::convergence_criteria<double> criteria{1e-6, 1e-6, 100, 200};

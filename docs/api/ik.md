@@ -58,7 +58,7 @@ auto lim = *cartan::joint_limits<double>::make(-std::numbers::pi, std::numbers::
 cartan::kinematic_chain<double, 3> chain(home, {s1, s2, s3}, {lim, lim, lim});
 
 Eigen::Vector3d q_known{0.3, -0.5, 0.2};
-auto target = cartan::forward_kinematics(chain, q_known).end_effector;
+auto target = cartan::forward_kinematics(chain, q_known).value().end_effector;
 
 Eigen::Vector3d q0{0.0, 0.0, 0.0};
 cartan::convergence_criteria<double> criteria{1e-6, 1e-6, 100, 200};

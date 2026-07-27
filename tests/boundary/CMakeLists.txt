@@ -1,16 +1,27 @@
+# Each header's declared entry-point count is asserted, not printed: a family
+# that quietly shrinks is the same defect as one that quietly grows.
 set(cartan_kinematics_headers "")
-foreach (header IN ITEMS forward_kinematics forward_kinematics_matrix jacobian
-        jacobian_matrix velocity)
+set(cartan_kinematics_entry_points "")
+foreach (header IN ITEMS forward_kinematics:3 forward_kinematics_matrix:2
+        jacobian:6 jacobian_matrix:2 velocity:1)
+    string(REPLACE ":" ";" header_pair "${header}")
+    list(GET header_pair 0 header_stem)
+    list(GET header_pair 1 header_count)
     list(APPEND cartan_kinematics_headers
-        "${CMAKE_SOURCE_DIR}/lib/cartan-serial-chain/include/cartan/serial/fk/${header}.h")
+        "${CMAKE_SOURCE_DIR}/lib/cartan-serial-chain/include/cartan/serial/fk/${header_stem}.h")
+    list(APPEND cartan_kinematics_entry_points "${header_count}")
 endforeach ()
 
+set(cartan_entry_point_roots "${CMAKE_SOURCE_DIR}/lib")
+file(GLOB_RECURSE cartan_entry_point_watched "${cartan_entry_point_roots}/*.h")
 set_property(DIRECTORY APPEND PROPERTY
-    CMAKE_CONFIGURE_DEPENDS ${cartan_kinematics_headers})
+    CMAKE_CONFIGURE_DEPENDS ${cartan_entry_point_watched})
 
 execute_process(
     COMMAND "${CMAKE_COMMAND}"
             "-DHEADERS=${cartan_kinematics_headers}"
+            "-DEXPECTED=${cartan_kinematics_entry_points}"
+            "-DSEARCH_ROOTS=${cartan_entry_point_roots}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/entry_point_gate.cmake"
     OUTPUT_VARIABLE cartan_entry_point_gate_stdout
     ERROR_VARIABLE cartan_entry_point_gate_stderr
@@ -23,6 +34,16 @@ endif ()
 string(REGEX REPLACE "^-- |[ \t\r\n]+$" ""
     cartan_entry_point_gate_summary "${cartan_entry_point_gate_stdout}")
 message(STATUS "${cartan_entry_point_gate_summary}")
+
+# The gate's own rejection is a test rather than a run recorded when it was
+# written, so a scan that stops matching cannot report every header clean.
+add_test(NAME entry_point_gate_rejects_an_unguarded_overload
+    COMMAND "${CMAKE_COMMAND}"
+        "-DGATE_SCRIPT=${CMAKE_CURRENT_SOURCE_DIR}/entry_point_gate.cmake"
+        "-DSOURCE_HEADER=${CMAKE_SOURCE_DIR}/lib/cartan-serial-chain/include/cartan/serial/fk/jacobian.h"
+        "-DSCRATCH_DIR=${CMAKE_CURRENT_BINARY_DIR}/entry_point_gate_scratch"
+        -DEXPECTED=6
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/expect_gate_rejects.cmake")
 
 function(cartan_add_boundary_test TEST_NAME TEST_SOURCE)
     add_executable(${TEST_NAME} ${TEST_SOURCE})
@@ -87,15 +108,13 @@ unset(CMAKE_REQUIRED_FLAGS)
 # cartan asserts on a nonfinite quaternion, and either aborts the process before
 # the behavior under demonstration can be observed.
 if (CARTAN_BOUNDARY_ASSERTIONS_OFF)
-    cartan_add_boundary_test(velocity_unchecked_differential_test
-        velocity_unchecked_differential_test.cpp)
-    cartan_add_boundary_test(fk_unchecked_differential_test
-        fk_unchecked_differential_test.cpp)
-    cartan_add_boundary_test(jacobian_unchecked_differential_test
-        jacobian_unchecked_differential_test.cpp)
+    foreach (differential IN ITEMS velocity_unchecked_differential_test
+            fk_unchecked_differential_test jacobian_unchecked_differential_test)
+        cartan_add_boundary_test(${differential} ${differential}.cpp)
+        set_property(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" APPEND
+            PROPERTY cartan_boundary_differential "${differential}")
+    endforeach ()
 endif ()
-
-set(cartan_boundary_evidence_tests 0)
 
 if (CARTAN_BOUNDARY_ADDRESS_SANITIZER)
     # A probe carries no test framework and exists solely to reproduce what the
@@ -131,8 +150,12 @@ if (CARTAN_BOUNDARY_ADDRESS_SANITIZER)
         fk_unchecked_short_probe.cpp)
     cartan_add_sanitizer_probe(jacobian_unchecked_short_fk_probe
         jacobian_unchecked_short_fk_probe.cpp)
+    cartan_add_sanitizer_probe(fk_unchecked_fixed_short_probe
+        fk_unchecked_fixed_short_probe.cpp)
 
     function(cartan_add_sanitizer_tripwire TEST_NAME PROBE_NAME WANT_ERROR WANT_FILE)
+        set_property(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" APPEND
+            PROPERTY cartan_boundary_evidence "${TEST_NAME}")
         add_test(NAME ${TEST_NAME}
             COMMAND "${CMAKE_COMMAND}"
                 "-DPROBE=$<TARGET_FILE:${PROBE_NAME}>"
@@ -211,10 +234,24 @@ if (CARTAN_BOUNDARY_ADDRESS_SANITIZER)
         jacobian_unchecked_short_fk_probe
         "heap-buffer-overflow" "jacobian.h" 3 float)
 
+    # The unchecked siblings still spell their joint vector as the chain's
+    # fixed-size position_type, so an ill-sized argument is converted in the
+    # caller's frame and over-reads before the callee is entered. The report
+    # therefore names the calling file, not a cartan header — which is exactly
+    # why the checked entry points take the vector at the caller's own type.
+    cartan_add_sanitizer_tripwire(fk_unchecked_fixed_short_q_trips_sanitizer_in_double
+        fk_unchecked_fixed_short_probe
+        "heap-buffer-overflow" "fk_unchecked_fixed_short_probe.cpp" 5 double)
+    cartan_add_sanitizer_tripwire(fk_unchecked_fixed_short_q_trips_sanitizer_in_float
+        fk_unchecked_fixed_short_probe
+        "heap-buffer-overflow" "fk_unchecked_fixed_short_probe.cpp" 5 float)
+
     # An in-bounds invocation of the same binary must be clean and exit zero, and
     # the assertion above must reject that same run. The first is what makes a
     # tripwire attributable to the violated precondition; the second is what keeps
     # the assertion from being satisfiable by anything at all.
+    set_property(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" APPEND
+        PROPERTY cartan_boundary_evidence "velocity_unchecked_in_bounds_is_clean")
     add_test(NAME velocity_unchecked_in_bounds_is_clean
         COMMAND "${CMAKE_COMMAND}"
             "-DPROBE=$<TARGET_FILE:velocity_unchecked_short_probe>"
@@ -222,6 +259,8 @@ if (CARTAN_BOUNDARY_ADDRESS_SANITIZER)
             -DEXPECT=clean
             -P "${CMAKE_CURRENT_SOURCE_DIR}/expect_sanitizer.cmake")
 
+    set_property(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" APPEND
+        PROPERTY cartan_boundary_evidence "fk_unchecked_in_bounds_is_clean")
     add_test(NAME fk_unchecked_in_bounds_is_clean
         COMMAND "${CMAKE_COMMAND}"
             "-DPROBE=$<TARGET_FILE:fk_unchecked_short_probe>"
@@ -229,6 +268,8 @@ if (CARTAN_BOUNDARY_ADDRESS_SANITIZER)
             -DEXPECT=clean
             -P "${CMAKE_CURRENT_SOURCE_DIR}/expect_sanitizer.cmake")
 
+    set_property(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" APPEND
+        PROPERTY cartan_boundary_evidence "jacobian_unchecked_matching_result_is_clean")
     add_test(NAME jacobian_unchecked_matching_result_is_clean
         COMMAND "${CMAKE_COMMAND}"
             "-DPROBE=$<TARGET_FILE:jacobian_unchecked_short_fk_probe>"
@@ -236,6 +277,8 @@ if (CARTAN_BOUNDARY_ADDRESS_SANITIZER)
             -DEXPECT=clean
             -P "${CMAKE_CURRENT_SOURCE_DIR}/expect_sanitizer.cmake")
 
+    set_property(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" APPEND
+        PROPERTY cartan_boundary_evidence "velocity_unchecked_assertion_rejects_a_clean_run")
     add_test(NAME velocity_unchecked_assertion_rejects_a_clean_run
         COMMAND "${CMAKE_COMMAND}"
             "-DEXPECT_SCRIPT=${CMAKE_CURRENT_SOURCE_DIR}/expect_sanitizer.cmake"
@@ -245,15 +288,25 @@ if (CARTAN_BOUNDARY_ADDRESS_SANITIZER)
             "-DWANT_FILE=forward_kinematics.h"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/expect_sanitizer_rejects.cmake")
 
-    set(cartan_boundary_evidence_tests 19)
 endif ()
 
-# Registering nothing must not be able to pass. The guard is compiled in this
-# configuration and reads NDEBUG and the sanitizer for itself, so a configuration
-# that ought to carry the evidence but registered none of it fails here.
+get_property(cartan_boundary_evidence_names
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" PROPERTY cartan_boundary_evidence)
+list(LENGTH cartan_boundary_evidence_names cartan_boundary_evidence_tests)
+get_property(cartan_boundary_differential_names
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" PROPERTY cartan_boundary_differential)
+list(LENGTH cartan_boundary_differential_names cartan_boundary_differential_tests)
+
+# Registering nothing must not be able to pass, and neither must registering
+# some. Both counts are derived from the registrations themselves and compared
+# against a declared expectation, so deleting one case is caught as well as
+# deleting the group. The guard is compiled in this configuration and reads
+# NDEBUG and the sanitizer for itself.
 add_executable(boundary_evidence_guard boundary_evidence_guard.cpp)
 target_compile_options(boundary_evidence_guard PRIVATE ${CARTAN_WARNING_FLAGS})
 target_compile_definitions(boundary_evidence_guard PRIVATE
     CARTAN_REGISTERED_EVIDENCE_TESTS=${cartan_boundary_evidence_tests}
-    CARTAN_EXPECTED_EVIDENCE_TESTS=19)
+    CARTAN_EXPECTED_EVIDENCE_TESTS=21
+    CARTAN_REGISTERED_DIFFERENTIAL_TESTS=${cartan_boundary_differential_tests}
+    CARTAN_EXPECTED_DIFFERENTIAL_TESTS=3)
 add_test(NAME boundary_evidence_registration COMMAND boundary_evidence_guard)

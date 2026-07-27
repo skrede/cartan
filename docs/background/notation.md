@@ -67,8 +67,8 @@ textbooks and to their Cartan C++ implementations.
 |---------|-----------------|---------------------|-------------|-----------|
 | Forward kinematics | $T(\theta) = e^{[\mathcal{S}_1]\theta_1} \cdots e^{[\mathcal{S}_n]\theta_n} M$ | $T(q)$ | $\mathbf{T}(q)$ | `forward_kinematics(chain, q)` |
 | Home configuration | $M$ | -- | -- | `chain<...>::home()` |
-| Space Jacobian | $J_s(\theta)$ | $J$ (geometric) | $\mathbf{J}$ | `space_jacobian(chain, q)` |
-| Body Jacobian | $J_b(\theta)$ | -- | -- | `body_jacobian(chain, q)` |
+| Space Jacobian | $J_s(\theta)$ | $J$ (geometric) | $\mathbf{J}$ | `space_jacobian(chain, fk)` |
+| Body Jacobian | $J_b(\theta)$ | -- | -- | `body_jacobian(chain, fk)` |
 | Adjoint (SE3) | $[\text{Ad}_T]$ (6x6) | -- | $\mathcal{T}$ or $\text{Ad}(\mathbf{T})$ | `se3<Scalar>::adjoint()` |
 | Adjoint (SO3) | $R$ (3x3, acts on $\omega$) | -- | $\mathbf{C}$ | `so3<Scalar>::adjoint()` |
 | Left Jacobian (SO3) | -- | -- | $\mathbf{J}$ | `so3<Scalar>::left_jacobian(phi)` |
