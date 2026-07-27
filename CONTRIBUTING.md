@@ -66,7 +66,11 @@ cmake --build build/dev -j$(nproc)
 ctest --test-dir build/dev --output-on-failure
 ```
 
-The `dev-full` preset also builds examples, fuzz, and property tests.
+The `dev-full` preset adds examples, property tests, the URDF module and
+the fuzz targets. The fuzz targets are built with libFuzzer, so that
+preset needs a Clang toolchain; GCC rejects `-fsanitize=fuzzer` and the
+configure fails there.
+
 The benchmark suite is gated behind `CARTAN_BUILD_BENCHMARKS`; each
 third-party comparison dependency (orocos-kdl, TRAC-IK, pinocchio) is
 auto-detected, and any benchmark whose dependency is missing is omitted with
@@ -99,9 +103,10 @@ public contributions.
 - **Return types:** prefer the traditional form (`T func()`) over
   trailing return types (`auto func() -> T`) unless the trailing form
   is required by templates or concepts.
-- **File / class size guidance:** classes around 100 NLOC (200 max
-  ideal); functions 5-15 lines with delegation; files match class
-  length. Readability overrides these when splitting hurts comprehension.
+- **File and function size:** see the size section of
+  [CONVENTIONS.md](CONVENTIONS.md), which states the budget once, and
+  `EXCEPTIONS.md`, which registers the files sanctioned to exceed it.
+  Do not work from a second formulation of the rule.
 
 ### Headers
 

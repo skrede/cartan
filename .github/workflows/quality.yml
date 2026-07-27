@@ -25,3 +25,84 @@ jobs:
 
       - name: File sizes against the exception register
         run: python3 tools/check_file_size.py
+
+  # The linter needs a compile database and therefore a compiler, so it is its own
+  # job: the checks above stay build-free and finish while this one is still
+  # configuring.
+  linter:
+    runs-on: ubuntu-24.04
+    name: clang-tidy over the compile database
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      # A linter's verdict is a property of its version: a check's diagnostics move
+      # between major releases, so an unpinned tool is an unpinned verdict. The
+      # compiler that writes the compile database is pinned to the same release, so
+      # the flags in it are flags this clang-tidy understands.
+      - name: Install the pinned toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang-18 clang-tidy-18 clang-tools-18 ninja-build
+          clang-tidy-18 --version
+
+      # Ninja scans C++20 sources for module dependencies by default and writes an
+      # @<target>.modmap into every compile command. Those files are produced by the
+      # build, so clang-tidy run against an unbuilt tree fails to open them and every
+      # translation unit reports clang-diagnostic-error instead of being linted.
+      - name: Configure
+        env:
+          CC: clang-18
+          CXX: clang++-18
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DCMAKE_CXX_SCAN_FOR_MODULES=OFF \
+            -DCARTAN_BUILD_TESTS=ON \
+            -DCARTAN_BUILD_URDF=ON \
+            -DCARTAN_CMAKE_FETCH_DEPS=ON
+
+      # An empty or module-map-carrying database lints nothing and exits zero, which
+      # is the shape of a gate that reports clean having read no code.
+      - name: Assert the compile database is usable
+        run: |
+          python3 - <<'PY'
+          import json, sys
+          db = json.load(open('build/compile_commands.json'))
+          print(f'translation units: {len(db)}')
+          if len(db) < 60:
+              sys.exit(f'compile database holds {len(db)} entries; expected the full test set')
+          bad = [e['file'] for e in db if 'modmap' in e['command']]
+          if bad:
+              sys.exit(f'{len(bad)} entries reference a module map that only a build produces')
+          PY
+
+      # clang-tidy falls back to a built-in check set when it does not find the
+      # repository's configuration, and a fallback run is quiet: the checks this gate
+      # is made of are simply absent and it exits clean having enforced nothing. So
+      # assert the effective set is ours before trusting a green run.
+      - name: Assert the repository configuration is in effect
+        run: |
+          clang-tidy-18 --list-checks > enabled.txt
+          if ! grep -qx '    modernize-use-transparent-functors' enabled.txt; then
+            echo 'the effective check set is not this repository configuration'
+            exit 1
+          fi
+          if grep -qx '    readability-function-size' enabled.txt; then
+            echo 'a check the configuration disables is enabled, so it was not read'
+            exit 1
+          fi
+          echo "enabled checks: $(grep -c '^    ' enabled.txt)"
+
+      # The gated set is the check list in .clang-tidy and nothing else; no check
+      # names appear here. Promoting every remaining finding to an error is what makes
+      # this a gate rather than a report.
+      - name: Lint
+        run: |
+          run-clang-tidy-18 \
+            -clang-tidy-binary clang-tidy-18 \
+            -p build \
+            -header-filter='.*/lib/cartan-.*' \
+            -warnings-as-errors='*' \
+            -j2
