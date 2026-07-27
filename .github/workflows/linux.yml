@@ -96,10 +96,20 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: asan-ubsan
+          - name: asan-ubsan-debug
+            build_type: Debug
             cc: clang-18
             cxx: clang++-18
             flags: "-fsanitize=address,undefined -fno-omit-frame-pointer"
+          # Optimized, assertions compiled out, and the undefined-behavior
+          # sanitizer made non-recovering: without -fno-sanitize-recover a
+          # violation prints a diagnostic and the process still exits zero, so
+          # the lane above cannot go red on one.
+          - name: asan-ubsan-release
+            build_type: Release
+            cc: clang-18
+            cxx: clang++-18
+            flags: "-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=undefined -g"
 
     runs-on: ubuntu-24.04
     name: sanitize (${{ matrix.name }})
@@ -112,9 +122,9 @@ jobs:
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
         run: |
-          cmake . -B build -DCMAKE_BUILD_TYPE=Debug \
+          cmake . -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
             -DCMAKE_CXX_FLAGS="${{ matrix.flags }}" \
-            -DCMAKE_EXE_LINKER_FLAGS="${{ matrix.flags }}" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined" \
             -DCARTAN_BUILD_TESTS=ON \
             -DCARTAN_CMAKE_FETCH_DEPS=ON
 

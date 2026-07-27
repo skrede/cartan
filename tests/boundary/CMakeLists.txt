@@ -68,6 +68,11 @@ cartan_add_boundary_test(jacobian_boundary_test jacobian_boundary_test.cpp)
 cartan_add_boundary_test(solver_setup_boundary_test solver_setup_boundary_test.cpp)
 cartan_add_boundary_test(fixture_smoke_test fixture_smoke_test.cpp)
 
+# The completeness sweep over the surveyed fail-open sites. Every cell it covers
+# is owned by an earlier target; what this one adds is that a boundary silently
+# losing its guard is caught even if that target is deleted or narrowed.
+cartan_add_boundary_test(nonfinite_matrix_test nonfinite_matrix_test.cpp)
+
 # The tag/axis and classification cells are wrong-value cells with no sanitizer
 # signature, and their demonstrations construct no group element from nonfinite
 # data, so nothing here depends on NDEBUG either.

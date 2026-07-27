@@ -82,6 +82,20 @@
             }
         },
         {
+            "name": "release-sanitize",
+            "displayName": "Sanitizers, optimized (ASan + UBSan, halting on a violation)",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/release-sanitize",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=undefined -g",
+                "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined",
+                "CARTAN_BUILD_TESTS": "ON",
+                "CARTAN_BUILD_ARGMIN": "ON",
+                "CARTAN_CMAKE_FETCH_DEPS": "ON"
+            }
+        },
+        {
             "name": "bench",
             "displayName": "Benchmarks",
             "generator": "Ninja",
@@ -150,6 +164,10 @@
             "configurePreset": "sanitize"
         },
         {
+            "name": "release-sanitize",
+            "configurePreset": "release-sanitize"
+        },
+        {
             "name": "bench",
             "configurePreset": "bench"
         },
@@ -187,6 +205,13 @@
         {
             "name": "sanitize",
             "configurePreset": "sanitize",
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
+            "name": "release-sanitize",
+            "configurePreset": "release-sanitize",
             "output": {
                 "outputOnFailure": true
             }
