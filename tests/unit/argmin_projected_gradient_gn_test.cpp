@@ -1,5 +1,7 @@
 #ifdef CARTAN_BUILD_ARGMIN
 
+#include "../support/joint_limits_helpers.h"
+
 #include <cartan/serial/ik/solver/argmin_projected_gradient_gn.h>
 #include <cartan/serial/ik/concepts/solve_concept.h>
 
@@ -31,8 +33,17 @@ static chain_t make_ur5_like_chain()
     home_trans << 0.817, 0.191, -0.006;
     auto home = cartan::se3<double>(cartan::so3<double>::identity(), home_trans);
 
-    cartan::joint_limits<double> lim{-2 * std::numbers::pi, 2 * std::numbers::pi};
+    auto lim = cartan::testing::limits(-2 * std::numbers::pi, 2 * std::numbers::pi);
     return chain_t(home, {s1, s2, s3, s4, s5, s6}, {lim, lim, lim, lim, lim, lim});
+}
+
+/// The checked entry point unwrapped for a test whose subject is the solver
+/// rather than the boundary: a refusal here is a bug in the test setup.
+static cartan::se3<double> target_at(const chain_t& chain, const Eigen::Vector<double, 6>& q)
+{
+    auto held = cartan::forward_kinematics(chain, q);
+    REQUIRE(held.has_value());
+    return held->end_effector;
 }
 
 static_assert(cartan::solve_policy<cartan::argmin_projected_gradient_gn<chain_t>>,
@@ -45,7 +56,7 @@ TEST_CASE("argmin_projected_gradient_gn converges on reachable target",
 
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.5, 0.8, -0.3, 0.6, -0.2;
-    auto target = cartan::forward_kinematics(chain, q_known).end_effector;
+    auto target = target_at(chain, q_known);
 
     cartan::argmin_projected_gradient_gn<chain_t> solver{};
     Eigen::Vector<double, 6> q_seed = Eigen::Vector<double, 6>::Zero();
@@ -111,7 +122,7 @@ TEST_CASE("argmin_projected_gradient_gn zero restarts on easy target",
 
     Eigen::Vector<double, 6> q_known;
     q_known << 0.1, -0.2, 0.3, -0.1, 0.2, -0.05;
-    auto target = cartan::forward_kinematics(chain, q_known).end_effector;
+    auto target = target_at(chain, q_known);
 
     cartan::argmin_projected_gradient_gn<chain_t> solver{};
     Eigen::Vector<double, 6> q_seed;
@@ -165,7 +176,7 @@ TEST_CASE("argmin_projected_gradient_gn abort from running state transitions to 
 
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.5, 0.8, -0.3, 0.6, -0.2;
-    auto target = cartan::forward_kinematics(chain, q_known).end_effector;
+    auto target = target_at(chain, q_known);
 
     cartan::argmin_projected_gradient_gn<chain_t> solver{};
     Eigen::Vector<double, 6> q_seed = Eigen::Vector<double, 6>::Zero();

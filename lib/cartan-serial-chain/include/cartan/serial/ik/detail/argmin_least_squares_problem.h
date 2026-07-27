@@ -55,7 +55,7 @@ public:
     double value(const Eigen::MatrixBase<Derived>& x) const
     {
         auto q = to_position(x);
-        auto fk = forward_kinematics(*m_chain, q);
+        auto fk = forward_kinematics_unchecked(*m_chain, q);
         auto V_b = (m_target.inverse() * fk.end_effector).log();
         return 0.5 * static_cast<double>(V_b.squaredNorm());
     }
@@ -64,7 +64,7 @@ public:
     void residuals(const Eigen::MatrixBase<DerivedIn>& x, Eigen::MatrixBase<DerivedOut>& r) const
     {
         auto q = to_position(x);
-        auto fk = forward_kinematics(*m_chain, q);
+        auto fk = forward_kinematics_unchecked(*m_chain, q);
         auto V_b = (m_target.inverse() * fk.end_effector).log();
         for (int i = 0; i < 6; ++i)
         {
@@ -76,8 +76,8 @@ public:
     void jacobian(const Eigen::MatrixBase<DerivedIn>& x, Eigen::MatrixBase<DerivedOut>& J) const
     {
         auto q = to_position(x);
-        auto fk = forward_kinematics(*m_chain, q);
-        auto J_b = body_jacobian(*m_chain, fk);
+        auto fk = forward_kinematics_unchecked(*m_chain, q);
+        auto J_b = body_jacobian_unchecked(*m_chain, fk);
         int n = m_chain->num_joints();
         for (int i = 0; i < 6; ++i)
         {
@@ -98,7 +98,7 @@ public:
         }
         for (int i = 0; i < n; ++i)
         {
-            lb[i] = static_cast<double>(m_chain->limits()[static_cast<std::size_t>(i)].position_min);
+            lb[i] = static_cast<double>(m_chain->limits()[static_cast<std::size_t>(i)].position_min());
         }
         return lb;
     }
@@ -113,7 +113,7 @@ public:
         }
         for (int i = 0; i < n; ++i)
         {
-            ub[i] = static_cast<double>(m_chain->limits()[static_cast<std::size_t>(i)].position_max);
+            ub[i] = static_cast<double>(m_chain->limits()[static_cast<std::size_t>(i)].position_max());
         }
         return ub;
     }

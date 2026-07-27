@@ -1,3 +1,5 @@
+#include "../support/joint_limits_helpers.h"
+
 #include <cartan/serial/ik/ik.h>
 #include <cartan/serial/ik/ik_validation.h>
 #include <cartan/serial/ik/basic_ik_runner.h>
@@ -42,15 +44,17 @@ static chain_t make_ur5_like_chain()
     home_trans << 0.817, 0.191, -0.006;
     auto home = cartan::se3<double>(cartan::so3<double>::identity(), home_trans);
 
-    cartan::joint_limits<double> lim{-2 * std::numbers::pi, 2 * std::numbers::pi};
+    auto lim = cartan::testing::limits(-2 * std::numbers::pi, 2 * std::numbers::pi);
     return chain_t(home, {s1, s2, s3, s4, s5, s6}, {lim, lim, lim, lim, lim, lim});
 }
 
-static auto make_test_target(const chain_t& chain)
+static cartan::se3<double> make_test_target(const chain_t& chain)
 {
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.5, 0.8, -0.3, 0.6, -0.2;
-    return cartan::forward_kinematics(chain, q_known).end_effector;
+    auto held = cartan::forward_kinematics(chain, q_known);
+    REQUIRE(held.has_value());
+    return held->end_effector;
 }
 
 TEST_CASE("argmin_lbfgsb_solve_policy converges on UR5-like chain", "[ik][argmin][lbfgsb]")

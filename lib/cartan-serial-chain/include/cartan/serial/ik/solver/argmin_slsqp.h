@@ -17,6 +17,7 @@
 #include "cartan/serial/ik/detail/convergence.h"
 #include "cartan/serial/ik/detail/argmin_problem.h"
 #include "cartan/serial/ik/detail/stall_detection.h"
+#include "cartan/serial/ik/detail/setup_validation.h"
 #include "cartan/serial/ik/detail/limit_enforcement.h"
 
 #include "cartan/lie/se3.h"
@@ -155,6 +156,14 @@ public:
         const position_type& q0,
         const convergence_criteria<scalar_type>& criteria)
     {
+        if (auto held = cartan::detail::validate_solve_inputs(chain, target, q0); !held)
+        {
+            m_status = held.error();
+            return;
+        }
+
+        m_setup_joints = chain.num_joints();
+
         m_chain = &chain;
         m_target = target;
         m_criteria = criteria;
@@ -171,7 +180,7 @@ public:
         if (m_options.rng_seed)
             m_rng.seed(*m_options.rng_seed);
 
-        auto fk = forward_kinematics(chain, q0);
+        auto fk = forward_kinematics_unchecked(chain, q0);
         auto V_b = (target.inverse() * fk.end_effector).log();
         m_initial_error = V_b.norm();
 
@@ -195,6 +204,8 @@ public:
 
     step_result<scalar_type> step(const Chain& chain, int N)
     {
+        m_status = cartan::detail::chain_bound_status(m_status, m_setup_joints, chain);
+
         int units = 0;
         m_chain = &chain;
         while (units < N && m_status == ik_status::running)
@@ -217,7 +228,7 @@ public:
 
             sync_solution_from_solver();
 
-            auto fk = forward_kinematics(chain, m_q);
+            auto fk = forward_kinematics_unchecked(chain, m_q);
             auto V_b = (m_target.inverse() * fk.end_effector).log();
             m_error_norm = V_b.norm();
             update_best(chain);
@@ -257,7 +268,7 @@ public:
                     auto q_perturbed = perturb_solution(m_q, *m_chain);
 
                     m_error_history.clear();
-                    auto fk_new = forward_kinematics(*m_chain, q_perturbed);
+                    auto fk_new = forward_kinematics_unchecked(*m_chain, q_perturbed);
                     auto V_b_new = (m_target.inverse() * fk_new.end_effector).log();
                     m_initial_error = V_b_new.norm();
 
@@ -391,14 +402,14 @@ private:
         for (int i = 0; i < n; ++i)
         {
             auto idx = static_cast<std::size_t>(i);
-            const auto raw_range = limits[idx].position_max - limits[idx].position_min;
+            const auto raw_range = limits[idx].position_max() - limits[idx].position_min();
             const auto range = cartan::detail::finite_range_or(raw_range,
                 cartan::detail::k_unbounded_angular_range_v<scalar_type>);
             auto perturbation = static_cast<scalar_type>(dist(m_rng)) * m_options.restart_scale * range;
             q_new[i] = std::clamp(
                 q[i] + perturbation,
-                limits[idx].position_min,
-                limits[idx].position_max);
+                limits[idx].position_min(),
+                limits[idx].position_max());
         }
         return q_new;
     }
@@ -510,6 +521,7 @@ private:
     scalar_type m_initial_error{};
     scalar_type m_error_norm{std::numeric_limits<scalar_type>::max()};
     int m_iterations{};
+    int m_setup_joints{-1};
     int m_attempt_iterations{};
     ik_status m_status{ik_status::not_initialized};
     ik_termination_reason m_termination_reason{ik_termination_reason::unknown};

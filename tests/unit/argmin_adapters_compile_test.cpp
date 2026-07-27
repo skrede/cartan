@@ -1,3 +1,5 @@
+#include "../support/joint_limits_helpers.h"
+
 #include "cartan/serial/ik/detail/argmin_problem.h"
 #include "cartan/serial/ik/detail/argmin_unconstrained_problem.h"
 #include "cartan/serial/ik/detail/argmin_constrained_problem.h"
@@ -33,7 +35,7 @@ static spp::kinematic_chain<double, 6> make_chain()
     home_trans << 0.817, 0.191, -0.006;
     auto home = spp::se3<double>(spp::so3<double>::identity(), home_trans);
 
-    spp::joint_limits<double> lim{-2 * std::numbers::pi, 2 * std::numbers::pi};
+    auto lim = cartan::testing::limits(-2 * std::numbers::pi, 2 * std::numbers::pi);
     return spp::kinematic_chain<double, 6>(home, {s1, s2, s3, s4, s5, s6},
                                            {lim, lim, lim, lim, lim, lim});
 }

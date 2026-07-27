@@ -79,7 +79,7 @@ public:
         }
         for (int i = 0; i < n; ++i)
         {
-            lb[i] = static_cast<double>(m_chain->limits()[static_cast<std::size_t>(i)].position_min);
+            lb[i] = static_cast<double>(m_chain->limits()[static_cast<std::size_t>(i)].position_min());
         }
         return lb;
     }
@@ -94,7 +94,7 @@ public:
         }
         for (int i = 0; i < n; ++i)
         {
-            ub[i] = static_cast<double>(m_chain->limits()[static_cast<std::size_t>(i)].position_max);
+            ub[i] = static_cast<double>(m_chain->limits()[static_cast<std::size_t>(i)].position_max());
         }
         return ub;
     }

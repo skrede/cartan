@@ -328,16 +328,15 @@ vector, and every policy's work loop refuses to run from a latched terminal
 status.
 
 `setup()` returns `void`, so it reports a rejected seed or target by latching
-`dimension_mismatch` or `non_finite_input`. `basic_ik_runner`, `restart_wrapper`,
-`exhaustive_ik_runner` and the seven policies that ship without an optional
-backend -- `lm`, `dls`, `lbfgsb`, `newton_raphson`, `projected_lm`,
-`nlopt_bobyqa` and `nlopt_slsqp` -- validate their arguments this way. The
-thirteen backend-gated policies do not yet; a solve driven straight through one
-of them, rather than through a runner or the wrapper, is unchecked. Because the
-chain is a parameter of `step()` and not only of `setup()`, each validating
-policy also records the setup-time joint count and refuses a `step()` whose
-chain does not match it. `basic_ik_runner` maps a latched status onto the
-same-named `ik_failure` reason.
+`dimension_mismatch` or `non_finite_input`. Every solve policy validates its
+arguments this way, as do `basic_ik_runner`, `restart_wrapper` and
+`exhaustive_ik_runner`; the policies that require the optional numeric backend
+are no exception, so a solve driven straight through one of them, rather than
+through a runner or the wrapper, is checked exactly as the others are. Because
+the chain is a parameter of `step()` and not only of `setup()`, each policy also
+records the setup-time joint count and refuses a `step()` whose chain does not
+match it. `basic_ik_runner` maps a latched status onto the same-named
+`ik_failure` reason.
 
 `message()` returns a static diagnostic string; it allocates nothing.
 

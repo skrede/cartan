@@ -106,7 +106,7 @@ public:
         for (int i = 0; i < n; ++i)
         {
             lo[i] = static_cast<double>(
-                m_chain->limits()[static_cast<std::size_t>(i)].position_min);
+                m_chain->limits()[static_cast<std::size_t>(i)].position_min());
         }
         return lo;
     }
@@ -122,7 +122,7 @@ public:
         for (int i = 0; i < n; ++i)
         {
             hi[i] = static_cast<double>(
-                m_chain->limits()[static_cast<std::size_t>(i)].position_max);
+                m_chain->limits()[static_cast<std::size_t>(i)].position_max());
         }
         return hi;
     }

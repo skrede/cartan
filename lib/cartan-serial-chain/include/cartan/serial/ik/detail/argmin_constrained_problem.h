@@ -94,8 +94,8 @@ public:
         for (int i = 0; i < n; ++i)
         {
             const auto& lim = m_chain->limits()[static_cast<std::size_t>(i)];
-            const Scalar lo = cartan::detail::finite_lower_or(lim.position_min, half_fallback);
-            const Scalar hi = cartan::detail::finite_upper_or(lim.position_max, half_fallback);
+            const Scalar lo = cartan::detail::finite_lower_or(lim.position_min(), half_fallback);
+            const Scalar hi = cartan::detail::finite_upper_or(lim.position_max(), half_fallback);
             c[i] = x[i] - static_cast<double>(lo);
             c[n + i] = static_cast<double>(hi) - x[i];
         }

@@ -1,3 +1,5 @@
+#include "../support/joint_limits_helpers.h"
+
 #include <cartan/serial/ik/solver/argmin_slsqp.h>
 
 #include <cartan/lie/se3.h>
@@ -28,8 +30,17 @@ static chain_t make_ur5_like_chain()
     home_trans << 0.817, 0.191, -0.006;
     auto home = cartan::se3<double>(cartan::so3<double>::identity(), home_trans);
 
-    cartan::joint_limits<double> lim{-2 * std::numbers::pi, 2 * std::numbers::pi};
+    auto lim = cartan::testing::limits(-2 * std::numbers::pi, 2 * std::numbers::pi);
     return chain_t(home, {s1, s2, s3, s4, s5, s6}, {lim, lim, lim, lim, lim, lim});
+}
+
+/// The checked entry point unwrapped for a test whose subject is the solver
+/// rather than the boundary: a refusal here is a bug in the test setup.
+static cartan::se3<double> target_at(const chain_t& chain, const Eigen::Vector<double, 6>& q)
+{
+    auto held = cartan::forward_kinematics(chain, q);
+    REQUIRE(held.has_value());
+    return held->end_effector;
 }
 
 TEST_CASE("argmin_slsqp restart_count reaches max_restarts on hard target", "[ik][argmin][slsqp][restart]")
@@ -61,7 +72,7 @@ TEST_CASE("argmin_slsqp zero restarts on easy target", "[ik][argmin][slsqp][rest
 
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.5, 0.8, -0.3, 0.6, -0.2;
-    auto target = cartan::forward_kinematics(chain, q_known).end_effector;
+    auto target = target_at(chain, q_known);
 
     cartan::argmin_slsqp<chain_t> solver{};
     Eigen::Vector<double, 6> q_seed = Eigen::Vector<double, 6>::Zero();

@@ -20,6 +20,7 @@
 #include "cartan/serial/ik/concepts/solve_concept.h"
 #include "cartan/serial/ik/detail/convergence.h"
 #include "cartan/serial/ik/detail/stall_detection.h"
+#include "cartan/serial/ik/detail/setup_validation.h"
 #include "cartan/serial/ik/detail/limit_enforcement.h"
 #include "cartan/serial/ik/detail/argmin_bounded_ik_problem.h"
 
@@ -94,6 +95,14 @@ public:
         const position_type& q0,
         const convergence_criteria<scalar_type>& criteria)
     {
+        if (auto held = cartan::detail::validate_solve_inputs(chain, target, q0); !held)
+        {
+            m_status = held.error();
+            return;
+        }
+
+        m_setup_joints = chain.num_joints();
+
         m_chain = &chain;
         m_target = target;
         m_criteria = criteria;
@@ -102,7 +111,7 @@ public:
         m_status = ik_status::running;
         m_error_history.clear();
 
-        auto fk = forward_kinematics(chain, q0);
+        auto fk = forward_kinematics_unchecked(chain, q0);
         auto V_b = (target.inverse() * fk.end_effector).log();
         m_initial_error = V_b.norm();
 
@@ -133,6 +142,8 @@ public:
 
     step_result<scalar_type> step(const Chain& chain, int N)
     {
+        m_status = cartan::detail::chain_bound_status(m_status, m_setup_joints, chain);
+
         int units = 0;
         m_chain = &chain;
         while (units < N && m_status == ik_status::running)
@@ -156,7 +167,7 @@ public:
             // argmin actually endorses.
             sync_solution_from_result(result.x);
 
-            auto fk = forward_kinematics(chain, m_q);
+            auto fk = forward_kinematics_unchecked(chain, m_q);
             auto V_b = (m_target.inverse() * fk.end_effector).log();
             m_error_norm = V_b.norm();
 
@@ -235,6 +246,7 @@ private:
     scalar_type m_initial_error{};
     scalar_type m_error_norm{std::numeric_limits<scalar_type>::max()};
     int m_iterations{};
+    int m_setup_joints{-1};
     ik_status m_status{ik_status::not_initialized};
     std::optional<cartan::detail::argmin_bounded_ik_problem<Chain>> m_problem;
     std::optional<argmin_solver> m_solver;

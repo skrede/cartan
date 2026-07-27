@@ -144,13 +144,15 @@ void run_per_pose(
         {
             iters = result->iterations;
             const auto& q = result->solution.position;
-            auto fk = cartan::forward_kinematics(chain, q);
-            auto Vb = (target.inverse() * fk.end_effector).log();
-            ori_err = static_cast<double>(Vb.template head<3>().norm());
-            pos_err = static_cast<double>(Vb.template tail<3>().norm());
-            final_obj = 0.5 * static_cast<double>(Vb.squaredNorm());
-            pose_hit = pos_err <= criteria.position_tol
-                    && ori_err <= criteria.orientation_tol;
+            if (auto fk = cartan::forward_kinematics(chain, q))
+            {
+                auto Vb = (target.inverse() * fk->end_effector).log();
+                ori_err = static_cast<double>(Vb.template head<3>().norm());
+                pos_err = static_cast<double>(Vb.template tail<3>().norm());
+                final_obj = 0.5 * static_cast<double>(Vb.squaredNorm());
+                pose_hit = pos_err <= criteria.position_tol
+                        && ori_err <= criteria.orientation_tol;
+            }
             status_str = pose_hit ? "runner_success_pose_hit" : "runner_success_pose_miss";
             termination_str = "converged";
         }
@@ -159,11 +161,9 @@ void run_per_pose(
             const auto& e = result.error();
             status_str = to_string(e.reason);
             termination_str = to_string(e.termination_reason);
-            const auto& q = e.last_q;
-            if (q.size() == chain.num_joints())
+            if (auto fk = cartan::forward_kinematics(chain, e.last_q))
             {
-                auto fk = cartan::forward_kinematics(chain, q);
-                auto Vb = (target.inverse() * fk.end_effector).log();
+                auto Vb = (target.inverse() * fk->end_effector).log();
                 ori_err = static_cast<double>(Vb.template head<3>().norm());
                 pos_err = static_cast<double>(Vb.template tail<3>().norm());
                 final_obj = 0.5 * static_cast<double>(Vb.squaredNorm());
