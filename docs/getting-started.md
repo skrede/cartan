@@ -134,7 +134,7 @@ int main()
     auto s2 = cartan::screw_axis<double>::revolute(vec3(0, 0, 1), vec3(1, 0, 0));
     auto home = SE3(SO3::identity(), vec3(2, 0, 0));
 
-    auto lim = *cartan::joint_limits<double>::make(-std::numbers::pi, std::numbers::pi);
+    auto lim = cartan::joint_limits<double>::make(-std::numbers::pi, std::numbers::pi).value();
     cartan::kinematic_chain<double, 2> chain(home, {s1, s2}, {lim, lim});
 
     Eigen::Vector2d q(0.5, -0.3);
@@ -167,7 +167,7 @@ int main()
     auto s1 = cartan::screw_axis<double>::revolute(vec3(0, 0, 1), vec3(0, 0, 0));
     auto s2 = cartan::screw_axis<double>::revolute(vec3(0, 0, 1), vec3(1, 0, 0));
     auto home = cartan::se3<double>(cartan::so3<double>::identity(), vec3(2, 0, 0));
-    auto lim = *cartan::joint_limits<double>::make(-std::numbers::pi, std::numbers::pi);
+    auto lim = cartan::joint_limits<double>::make(-std::numbers::pi, std::numbers::pi).value();
     cartan::kinematic_chain<double, 2> chain(home, {s1, s2}, {lim, lim});
 
     Eigen::Vector2d q_known{0.3, -0.5};

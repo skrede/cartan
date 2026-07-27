@@ -54,7 +54,7 @@ auto s1 = cartan::screw_axis<double>::revolute(z, {0, 0, 0});
 auto s2 = cartan::screw_axis<double>::revolute(z, {1, 0, 0});
 auto s3 = cartan::screw_axis<double>::revolute(z, {2, 0, 0});
 auto home = cartan::se3<double>(cartan::so3<double>::identity(), {3, 0, 0});
-auto lim = *cartan::joint_limits<double>::make(-std::numbers::pi, std::numbers::pi);
+auto lim = cartan::joint_limits<double>::make(-std::numbers::pi, std::numbers::pi).value();
 cartan::kinematic_chain<double, 3> chain(home, {s1, s2, s3}, {lim, lim, lim});
 
 Eigen::Vector3d q_known{0.3, -0.5, 0.2};

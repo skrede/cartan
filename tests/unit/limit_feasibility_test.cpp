@@ -3,6 +3,8 @@
 #include <cartan/serial/chain/joint_limits.h>
 #include <cartan/serial/chain/kinematic_chain.h>
 
+#include "../support/joint_limits_helpers.h"
+
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_template_test_macros.hpp>
 
@@ -18,8 +20,7 @@ cartan::kinematic_chain<Scalar, cartan::dynamic> one_joint_chain(Scalar lo, Scal
 {
     std::vector<cartan::screw_axis<Scalar>> axes = {
         cartan::screw_axis<Scalar>::revolute({0, 0, 1}, {0, 0, 0})};
-    std::vector<cartan::joint_limits<Scalar>> limits = {
-        *cartan::joint_limits<Scalar>::make(lo, hi)};
+    std::vector<cartan::joint_limits<Scalar>> limits = {cartan::testing::limits(lo, hi)};
     return cartan::kinematic_chain<Scalar, cartan::dynamic>(
         cartan::se3<Scalar>::identity(), std::move(axes), std::move(limits));
 }
@@ -39,8 +40,8 @@ bool feasible(Scalar q, Scalar lo, Scalar hi)
 /// q. Every comparison against a NaN is false, so it answered "feasible" for
 /// one -- and for an unbounded joint neither comparison ran at all.
 ///
-/// A replica is only evidence while it still describes the shipped predicate,
-/// which is what the agreement case below is for.
+/// The replica only says something about the library while it still describes
+/// the shipped predicate, which is what the agreement case below pins down.
 template <typename Scalar>
 bool unguarded_feasibility_admits(Scalar q, Scalar lo, Scalar hi, Scalar tol)
 {

@@ -7,6 +7,8 @@
 #include <string>
 #include <filesystem>
 
+#include <pugixml.hpp>
+
 using Catch::Approx;
 
 namespace
@@ -186,16 +188,74 @@ TEST_CASE("parser: a bound that overflows the scalar type is rejected at that "
     CHECK(as_float.error().detail.find("overflow_joint") != std::string::npos);
 }
 
-/// The pre-cast gate that shipped before this rejection existed, and the value
-/// the builder would have received once it passed. Neither half is cartan code,
-/// which is the point: the loader looked only at the double.
-TEST_CASE("parser: the pre-cast finiteness test admits a value the cast overflows",
+/// The gate that shipped before this rejection existed, run on the same
+/// attribute the loader reads, followed by the cast the loader then performed.
+/// as_finite_double is unchanged library code, so this is a live demonstration
+/// of the admission rather than an assertion about IEEE-754.
+TEST_CASE("parser: the pre-cast attribute gate admits a value the cast overflows",
     "[urdf_parser][urdf_strict]")
 {
-    const double bound = 1e300;
-    CHECK(std::isfinite(bound));
-    CHECK(std::isinf(static_cast<float>(bound)));
-    CHECK(std::isinf(static_cast<float>(-bound)));
+    pugi::xml_document doc;
+    REQUIRE(doc.load_string(R"(<limit lower="-1e300" upper="1e300" tiny="1e-320"/>)"));
+    const auto limit = doc.child("limit");
+
+    for (const char* name : {"lower", "upper"})
+    {
+        const auto attr = limit.attribute(name);
+        const auto admitted = cartan::detail::as_finite_double(attr);
+        REQUIRE(admitted.has_value());
+        CHECK(std::isinf(static_cast<float>(*admitted)));
+        CHECK_FALSE(cartan::detail::as_finite_scalar<float>(attr).has_value());
+        CHECK(cartan::detail::as_finite_scalar<double>(attr).has_value());
+    }
+
+    // The mirrored direction: a nonzero bound that narrows to exactly zero is
+    // as unrecoverable as one that narrows to an infinity.
+    const auto tiny = limit.attribute("tiny");
+    REQUIRE(cartan::detail::as_finite_double(tiny).has_value());
+    CHECK(static_cast<float>(*cartan::detail::as_finite_double(tiny)) == 0.0f);
+    CHECK_FALSE(cartan::detail::as_finite_scalar<float>(tiny).has_value());
+    CHECK(cartan::detail::as_finite_scalar<double>(tiny).has_value());
+}
+
+/// An <axis> magnitude whose square overflows normalizes to the zero vector,
+/// not to a NaN, so both the pre-normalization zero-axis guard and every
+/// finiteness test downstream pass while the joint contributes identity to the
+/// kinematics forever. The squaring is what overflows, so this is not a
+/// single-precision problem: 1e200 does it in double.
+TEST_CASE("parser: an <axis> whose squared magnitude overflows is rejected",
+    "[urdf_parser][urdf_strict]")
+{
+    const auto path = fixture_path("axis_overflow.urdf");
+
+    auto as_double = cartan::load_urdf<double>(path);
+    REQUIRE(as_double.has_value());
+    CHECK(as_double->chain.axes()[0].is_revolute());
+
+    auto as_float = cartan::load_urdf<float>(path);
+    REQUIRE_FALSE(as_float.has_value());
+    CHECK(as_float.error().kind == cartan::urdf_failure::non_finite_value);
+    CHECK(as_float.error().detail.find("overflow_axis_joint") != std::string::npos);
+}
+
+/// The residual, asserted so it is not misread as closed. The construction
+/// spelling stays deliberately unvalidated, so a chain assembled in code rather
+/// than loaded from a description can still hold an axis that is finite,
+/// zero, and no longer a joint. Neither input is a NaN: a zero vector and an
+/// overflowing one both take a branch of normalized() that never divides badly.
+TEST_CASE("parser: the unvalidated construction spelling still yields a dead axis",
+    "[urdf_parser][urdf_strict]")
+{
+    cartan::vector3<float> huge;
+    huge << 1e30f, 0, 0;
+    const auto overflowed = cartan::screw_axis<float>::revolute(huge, {0, 0, 0});
+    CHECK(overflowed.to_vector().allFinite());
+    CHECK_FALSE(overflowed.is_revolute());
+    CHECK(overflowed.omega().norm() == 0.0f);
+
+    cartan::vector3<double> huge_d;
+    huge_d << 1e200, 0, 0;
+    CHECK_FALSE(cartan::screw_axis<double>::revolute(huge_d, {0, 0, 0}).is_revolute());
 }
 
 TEST_CASE("parser: a reversed <limit> is rejected by the limits factory",

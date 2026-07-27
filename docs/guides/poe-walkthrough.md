@@ -73,7 +73,7 @@ first, then the joint count:
 
 ```cpp
 // Joint limits: [-pi, pi] for each joint.
-auto lim = *cartan::joint_limits<double>::make(-std::numbers::pi, std::numbers::pi);
+auto lim = cartan::joint_limits<double>::make(-std::numbers::pi, std::numbers::pi).value();
 
 // Fixed-size 3-DOF chain (N known at compile time).
 cartan::kinematic_chain<double, 3> chain(
@@ -160,7 +160,7 @@ int main()
     // Home: end-effector at (3, 0, 0) when all joints are zero.
     auto home = cartan::se3<double>(cartan::so3<double>::identity(), vec3(3, 0, 0));
 
-    auto lim = *cartan::joint_limits<double>::make(-std::numbers::pi, std::numbers::pi);
+    auto lim = cartan::joint_limits<double>::make(-std::numbers::pi, std::numbers::pi).value();
     cartan::kinematic_chain<double, 3> chain(
         home, {s1, s2, s3}, {lim, lim, lim});
 

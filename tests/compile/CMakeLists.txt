@@ -26,7 +26,41 @@ add_test(NAME exceptions_factory_parity_test COMMAND exceptions_factory_parity_t
 # Compile-fail test infrastructure
 # Each test should FAIL to compile. If it compiles, that's a test failure.
 # Uses try_compile at configure time to verify type-safety errors.
+#
+# Every cartan include root is mapped, not just the Lie one, so a compile-fail
+# test may name any public header. Eigen comes from the imported target rather
+# than from eigen3_SOURCE_DIR, which is populated only on the FetchContent
+# branch: with a system Eigen it was empty, every one of these tests failed with
+# "Eigen/Dense: No such file or directory", and each reported success while
+# never reaching the code it exists to reject. Deleting the type safety outright
+# would not have failed any of them.
+set(CARTAN_COMPILE_FAIL_INCLUDES
+    "${PROJECT_SOURCE_DIR}/lib/cartan-lie/include"
+    "${PROJECT_SOURCE_DIR}/lib/cartan-serial-chain/include"
+    "${PROJECT_SOURCE_DIR}/lib/cartan-analytical/include")
+
+# find_package's imported targets are scoped to the directory that called it,
+# and that call lives in lib/cartan-lie, so Eigen3::Eigen is not visible here.
+# Re-resolve it locally; the find is cached and costs nothing.
+if (NOT TARGET Eigen3::Eigen)
+    find_package(Eigen3 CONFIG QUIET)
+endif ()
+if (TARGET Eigen3::Eigen)
+    get_target_property(CARTAN_COMPILE_FAIL_EIGEN Eigen3::Eigen
+        INTERFACE_INCLUDE_DIRECTORIES)
+endif ()
+if (NOT CARTAN_COMPILE_FAIL_EIGEN)
+    set(CARTAN_COMPILE_FAIL_EIGEN "${eigen3_SOURCE_DIR}")
+endif ()
+if (NOT CARTAN_COMPILE_FAIL_EIGEN)
+    message(FATAL_ERROR
+        "No Eigen include directory for the compile-fail subproject; every test in it would "
+        "fail on a missing header and report success.")
+endif ()
+
 function(cartan_add_compile_fail_test TEST_NAME TEST_SOURCE)
+    string(REPLACE ";" "|" fail_includes "${CARTAN_COMPILE_FAIL_INCLUDES}")
+    string(REPLACE ";" "|" eigen_includes "${CARTAN_COMPILE_FAIL_EIGEN}")
     try_compile(${TEST_NAME}_COMPILES
         PROJECT compile_fail_${TEST_NAME}
         SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/fail"
@@ -34,20 +68,56 @@ function(cartan_add_compile_fail_test TEST_NAME TEST_SOURCE)
         TARGET compile_fail_target
         CMAKE_FLAGS
             "-DCMAKE_CXX_STANDARD=23"
-            "-DCARTAN_INCLUDE_DIR=${PROJECT_SOURCE_DIR}/lib/cartan-lie/include"
-            "-DEIGEN_INCLUDE_DIR=${eigen3_SOURCE_DIR}"
+            "-DCARTAN_INCLUDE_DIR=${fail_includes}"
+            "-DEIGEN_INCLUDE_DIR=${eigen_includes}"
             "-DTEST_SOURCE=${TEST_SOURCE}"
+        OUTPUT_VARIABLE compile_fail_output
     )
 
     if(${TEST_NAME}_COMPILES)
         message(FATAL_ERROR "Compile-fail test '${TEST_NAME}' unexpectedly compiled!")
     endif()
 
+    # A missing header fails the compile just as an ill-formed program does, and
+    # is the way this gate stops testing anything without saying so.
+    if(compile_fail_output MATCHES "No such file or directory|file not found")
+        message(FATAL_ERROR
+            "Compile-fail test '${TEST_NAME}' failed on a missing header rather than on the "
+            "construct it exists to reject; its include plumbing is broken:\n${compile_fail_output}")
+    endif()
+
     add_test(NAME compile_fail_${TEST_NAME}
         COMMAND ${CMAKE_COMMAND} -E echo "PASS: ${TEST_NAME} correctly fails to compile")
 endfunction()
+
+# The control: the same subproject, the same include plumbing, a well-formed
+# program. It must compile, or every rejection below is meaningless.
+string(REPLACE ";" "|" cartan_control_includes "${CARTAN_COMPILE_FAIL_INCLUDES}")
+string(REPLACE ";" "|" cartan_control_eigen "${CARTAN_COMPILE_FAIL_EIGEN}")
+try_compile(CARTAN_COMPILE_FAIL_CONTROL_COMPILES
+    PROJECT compile_fail_control
+    SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/fail"
+    BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/compile_fail_control"
+    TARGET compile_fail_target
+    CMAKE_FLAGS
+        "-DCMAKE_CXX_STANDARD=23"
+        "-DCARTAN_INCLUDE_DIR=${cartan_control_includes}"
+        "-DEIGEN_INCLUDE_DIR=${cartan_control_eigen}"
+        "-DTEST_SOURCE=joint_limits_control.cpp"
+    OUTPUT_VARIABLE cartan_compile_fail_control_output
+)
+if(NOT CARTAN_COMPILE_FAIL_CONTROL_COMPILES)
+    message(FATAL_ERROR
+        "The compile-fail control did not compile, so the rejections below prove nothing:\n"
+        "${cartan_compile_fail_control_output}")
+endif()
+add_test(NAME compile_fail_control
+    COMMAND ${CMAKE_COMMAND} -E echo "PASS: the compile-fail harness compiles a valid program")
 
 cartan_add_compile_fail_test(frame_mismatch_compose frame_mismatch_compose.cpp)
 cartan_add_compile_fail_test(frame_mismatch_inverse_compose frame_mismatch_inverse_compose.cpp)
 cartan_add_compile_fail_test(frame_mismatch_adjoint_twist frame_mismatch_adjoint_twist.cpp)
 cartan_add_compile_fail_test(frame_mismatch_coadjoint_wrench frame_mismatch_coadjoint_wrench.cpp)
+cartan_add_compile_fail_test(joint_limits_aggregate joint_limits_aggregate.cpp)
+cartan_add_compile_fail_test(joint_limits_field_assign joint_limits_field_assign.cpp)
+cartan_add_compile_fail_test(joint_limits_member_assign joint_limits_member_assign.cpp)

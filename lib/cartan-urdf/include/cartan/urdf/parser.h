@@ -98,18 +98,25 @@ inline std::optional<double> as_finite_double(const pugi::xml_attribute& attr)
 }
 
 /// Narrow a value that parsed as a finite double to the chain's scalar type,
-/// returning an empty optional when the conversion overflows to an infinity.
+/// returning an empty optional when the conversion does not preserve it --
+/// overflow to an infinity, or underflow of a nonzero value to zero.
 ///
 /// This second gate is not redundant with the finiteness test above, and it has
 /// to live here rather than at the limits factory: +/-infinity is the library's
 /// deliberate encoding for an unbounded continuous joint, so once the cast has
 /// happened a bound that overflowed is indistinguishable from one that was
-/// meant to be unbounded. Here the original double is still in hand.
+/// meant to be unbounded. Here the original double is still in hand. Underflow
+/// is the same defect mirrored: a nonzero bound that becomes exactly zero is
+/// indistinguishable from one the description pinned to zero.
 template <typename Scalar>
 std::optional<Scalar> narrow_finite(double value)
 {
     const Scalar narrowed = static_cast<Scalar>(value);
     if (!std::isfinite(narrowed))
+    {
+        return std::nullopt;
+    }
+    if (narrowed == Scalar(0) && value != 0.0)
     {
         return std::nullopt;
     }
@@ -153,11 +160,12 @@ inline std::string_view next_field(std::string_view& s)
 /// pugixml attribute reader the rest of this parser relies on (both require a
 /// "C" numeric locale, as ROS does). std::from_chars would be locale-free but
 /// its floating-point overload is unavailable below a very recent macOS SDK.
-/// Returns false on any field that fails to parse, is non-finite as a double or
-/// after narrowing to Scalar, or leaves trailing characters, and on a count
-/// other than three; out is written only on full success.
+/// Returns the failure kind, or nullopt on success; out is written only on full
+/// success. A field that is well-formed and parses correctly but is not
+/// representable in Scalar is reported as non_finite_value rather than
+/// malformed_xml, because the document is not what is wrong with it.
 template <typename Scalar>
-bool parse_triple(std::string_view s, vector3<Scalar>& out)
+std::optional<urdf_failure> parse_triple(std::string_view s, vector3<Scalar>& out)
 {
     Scalar values[3];
     for (std::size_t i = 0; i < 3; ++i)
@@ -165,28 +173,28 @@ bool parse_triple(std::string_view s, vector3<Scalar>& out)
         const std::string_view field = next_field(s);
         if (field.empty())
         {
-            return false;
+            return urdf_failure::malformed_xml;
         }
         const std::string token(field);
         char* end = nullptr;
         const double parsed = std::strtod(token.c_str(), &end);
-        if (end != token.c_str() + token.size() || !std::isfinite(parsed))
+        if (end != token.c_str() + token.size())
         {
-            return false;
+            return urdf_failure::malformed_xml;
         }
-        auto narrowed = narrow_finite<Scalar>(parsed);
+        auto narrowed = std::isfinite(parsed) ? narrow_finite<Scalar>(parsed) : std::nullopt;
         if (!narrowed.has_value())
         {
-            return false;
+            return urdf_failure::non_finite_value;
         }
         values[i] = *narrowed;
     }
     if (!next_field(s).empty())
     {
-        return false;
+        return urdf_failure::malformed_xml;
     }
     out << values[0], values[1], values[2];
-    return true;
+    return std::nullopt;
 }
 
 /// Build an SO(3) rotation from URDF roll-pitch-yaw angles. URDF convention:
@@ -206,22 +214,22 @@ so3<Scalar> rotation_from_rpy(Scalar roll, Scalar pitch, Scalar yaw)
 /// on malformed numeric content; absence of the <origin> element entirely is
 /// the caller's concern.
 template <typename Scalar>
-std::optional<se3<Scalar>> parse_origin(const pugi::xml_node& origin)
+cartan::expected<se3<Scalar>, urdf_failure> parse_origin(const pugi::xml_node& origin)
 {
     vector3<Scalar> xyz = vector3<Scalar>::Zero();
     vector3<Scalar> rpy = vector3<Scalar>::Zero();
     if (auto attr = origin.attribute("xyz"); attr)
     {
-        if (!parse_triple<Scalar>(attr.value(), xyz))
+        if (auto failure = parse_triple<Scalar>(attr.value(), xyz))
         {
-            return std::nullopt;
+            return cartan::unexpected(*failure);
         }
     }
     if (auto attr = origin.attribute("rpy"); attr)
     {
-        if (!parse_triple<Scalar>(attr.value(), rpy))
+        if (auto failure = parse_triple<Scalar>(attr.value(), rpy))
         {
-            return std::nullopt;
+            return cartan::unexpected(*failure);
         }
     }
     return se3<Scalar>(rotation_from_rpy<Scalar>(rpy(0), rpy(1), rpy(2)), xyz);
@@ -283,11 +291,12 @@ parse_inertial(const pugi::xml_node& inertial_node,
     {
         if (auto attr = origin.attribute("xyz"); attr)
         {
-            if (!parse_triple<Scalar>(attr.value(), out.com))
+            if (auto failure = parse_triple<Scalar>(attr.value(), out.com))
             {
                 return cartan::unexpected(urdf_error{
-                    .kind = urdf_failure::inertial_singular,
-                    .detail = "link '" + link_name + "': malformed inertial origin xyz",
+                    .kind = *failure,
+                    .detail = "link '" + link_name
+                        + "': inertial origin xyz is malformed or not representable",
                     .location = urdf_source_location{file_path, 0, "inertial"}});
             }
         }
@@ -507,8 +516,9 @@ parse_urdf_file(const std::filesystem::path& path)
             if (!pose.has_value())
             {
                 return cartan::unexpected(urdf_error{
-                    .kind = urdf_failure::malformed_xml,
-                    .detail = "joint '" + joint.name + "' has malformed <origin>",
+                    .kind = pose.error(),
+                    .detail = "joint '" + joint.name
+                        + "' has an <origin> that is malformed or not representable",
                     .location = urdf_source_location{path_str, 0, "origin"}});
             }
             joint.origin = std::move(pose.value());
@@ -519,11 +529,12 @@ parse_urdf_file(const std::filesystem::path& path)
             vector3<Scalar> axis;
             if (auto attr = axis_node.attribute("xyz"); attr)
             {
-                if (!detail::parse_triple<Scalar>(attr.value(), axis))
+                if (auto failure = detail::parse_triple<Scalar>(attr.value(), axis))
                 {
                     return cartan::unexpected(urdf_error{
-                        .kind = urdf_failure::malformed_xml,
-                        .detail = "joint '" + joint.name + "' has malformed <axis>",
+                        .kind = *failure,
+                        .detail = "joint '" + joint.name
+                            + "' has an <axis> that is malformed or not representable",
                         .location = urdf_source_location{path_str, 0, "axis"}});
                 }
                 joint.axis = axis;

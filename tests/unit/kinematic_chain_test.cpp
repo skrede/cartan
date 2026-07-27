@@ -156,8 +156,7 @@ TEST_CASE("kinematic_chain with prismatic", "[kinematic_chain]")
 }
 
 // ============================================================================
-// Construction rejections. All three fail in Release as well as Debug; none of
-// them had a test before.
+// Construction rejections, all effective in Release as well as Debug
 // ============================================================================
 
 namespace

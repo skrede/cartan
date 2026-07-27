@@ -24,6 +24,7 @@
 
 #include "cartan/types.h"
 
+#include <cmath>
 #include <string>
 #include <vector>
 #include <limits>
@@ -313,13 +314,30 @@ build_chain(const parsed_model<Scalar>& model, const load_options& opts = {})
         // R(T_acc * j.origin).act(axis). The point on the axis (origin of the
         // joint frame in world coords) is (T_acc * j.origin).translation().
         se3<Scalar> T_acc_after_joint = T_acc * j.origin;
-        // A zero-magnitude axis normalizes to NaN and would silently poison the
-        // kinematics; reject it before normalization.
-        if (!(j.axis.norm() > Scalar(0)))
+        // Eigen's normalized() is `squaredNorm() > 0 ? v / sqrt(squaredNorm())
+        // : v`, so it has two ways of returning something that is not a unit
+        // axis, and both leave a joint contributing identity to the kinematics
+        // forever. A zero axis takes the else branch and comes back unchanged.
+        // A magnitude whose *square* overflows the scalar type takes the
+        // division branch against an infinite norm and comes back as the zero
+        // vector -- and the squaring is what overflows, so a magnitude well
+        // inside the type's range (1e30 in float, 1e200 in double) is enough.
+        // Neither is caught downstream: the result is finite either way. Both
+        // are refused here, before normalization.
+        const Scalar axis_sq = j.axis.squaredNorm();
+        if (!(axis_sq > Scalar(0)))
         {
             return cartan::unexpected(urdf_error{
                 .kind = urdf_failure::zero_axis,
                 .detail = "joint '" + j.name + "' has a zero-magnitude <axis>",
+                .location = std::nullopt});
+        }
+        if (!std::isfinite(axis_sq))
+        {
+            return cartan::unexpected(urdf_error{
+                .kind = urdf_failure::non_finite_value,
+                .detail = "joint '" + j.name
+                    + "' has an <axis> whose squared magnitude overflows the chain's scalar type",
                 .location = std::nullopt});
         }
         const vector3<Scalar> axis_world =

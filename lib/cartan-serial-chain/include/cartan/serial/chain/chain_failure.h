@@ -12,7 +12,7 @@ enum class chain_failure
 {
     dimension_mismatch,           ///< Joint-vector or fk_result length differs from the chain's joint count.
     tag_axis_contradiction,       ///< A stored screw axis is not the +/-e_k named by its compile-time joint tag.
-    reversed_position_bounds,     ///< Lower position bound exceeds the upper bound.
+    reversed_position_bounds,     ///< Position bounds are not an interval: reversed, or both the same infinity.
     negative_velocity_limit,      ///< A joint velocity bound is negative.
     negative_effort_limit,        ///< A joint effort bound is negative.
     negative_acceleration_limit,  ///< A joint acceleration bound is negative.
@@ -30,7 +30,7 @@ constexpr const char* message(chain_failure failure)
     case chain_failure::tag_axis_contradiction:
         return "Screw axis contradicts its compile-time joint tag";
     case chain_failure::reversed_position_bounds:
-        return "Position bounds are reversed: lower bound exceeds upper bound";
+        return "Position bounds are not an interval: reversed, or both the same infinity";
     case chain_failure::negative_velocity_limit:
         return "Joint velocity bound is negative";
     case chain_failure::negative_effort_limit:

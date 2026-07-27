@@ -5,8 +5,11 @@
 ///
 /// Required position bounds plus optional velocity, effort and acceleration
 /// limits. The five values are private and read-only, so the checked make()
-/// factory is the only way a joint_limits comes into existence and there is no
-/// way to assign one back into a state the factory would have refused.
+/// factory is the only supported way a joint_limits comes into existence and
+/// no ordinary expression assigns one back into a state the factory refused.
+/// The type stays trivially copyable, so std::bit_cast and std::memcpy remain
+/// well-defined routes around that; the guarantee is against mistakes, not
+/// against a caller who reaches for one of those on purpose.
 
 #include "cartan/serial/chain/chain_failure.h"
 #include "cartan/serial/chain/detail/limits_validation.h"
@@ -34,7 +37,14 @@ public:
     /// consume them. The asymmetry with the dynamic bounds is therefore
     /// deliberate: a NaN is refused everywhere, while an infinite velocity,
     /// effort or acceleration bound is refused because no part of the library
-    /// treats one as meaningful.
+    /// treats one as meaningful. An infinite bound is only meaningful signed
+    /// outward, so (-inf, +inf) is the unbounded joint while (+inf, +inf) and
+    /// (-inf, -inf) are refused as reversed -- they describe no interval, and
+    /// an ordering test alone would admit them because inf is not less than
+    /// itself.
+    ///
+    /// Not constexpr: std::isnan and std::isfinite are not constant
+    /// expressions before C++23, and the supported compiler floor is C++20.
     static cartan::expected<joint_limits, chain_failure> make(
         Scalar position_min,
         Scalar position_max,
@@ -56,9 +66,9 @@ public:
 
     Scalar position_max() const { return m_position_max; }
 
-    std::optional<Scalar> effort_max() const { return m_effort_max; }
-
     std::optional<Scalar> velocity_max() const { return m_velocity_max; }
+
+    std::optional<Scalar> effort_max() const { return m_effort_max; }
 
     std::optional<Scalar> acceleration_max() const { return m_acceleration_max; }
 
@@ -76,6 +86,17 @@ public:
             return std::nullopt;
         }
         return position >= m_position_min && position <= m_position_max;
+    }
+
+    /// contains(position) with the unanswerable case decided by the caller.
+    ///
+    /// This is the spelling to reach for. Writing `if (lim.contains(q))` on the
+    /// optional compiles and asks whether the question was answerable, not
+    /// whether the joint value is in range -- it is true for a finite value
+    /// well outside the bounds.
+    bool contains_or(Scalar position, bool when_nonfinite) const
+    {
+        return contains(position).value_or(when_nonfinite);
     }
 
 private:

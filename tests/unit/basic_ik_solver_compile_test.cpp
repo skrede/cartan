@@ -8,6 +8,8 @@
 #include <cartan/serial/chain/joint_limits.h>
 #include <cartan/serial/chain/kinematic_chain.h>
 
+#include "../support/joint_limits_helpers.h"
+
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
@@ -17,7 +19,7 @@ namespace spp = cartan;
 
 TEST_CASE("clamp_limits clamps each q(i) to bounds", "[ik][limits]")
 {
-    auto lim = *spp::joint_limits<double>::make(-1.0, 1.0);
+    auto lim = spp::testing::limits(-1.0, 1.0);
     using chain_type = spp::kinematic_chain<double, 3>;
     typename chain_type::limits_storage limits = {lim, lim, lim};
 
@@ -33,7 +35,7 @@ TEST_CASE("clamp_limits clamps each q(i) to bounds", "[ik][limits]")
 
 TEST_CASE("no_limits returns q unchanged", "[ik][limits]")
 {
-    auto lim = *spp::joint_limits<double>::make(-1.0, 1.0);
+    auto lim = spp::testing::limits(-1.0, 1.0);
     using chain_type = spp::kinematic_chain<double, 3>;
     typename chain_type::limits_storage limits = {lim, lim, lim};
 

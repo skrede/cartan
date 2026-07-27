@@ -1,6 +1,8 @@
 #ifndef HPP_GUARD_CARTAN_TESTS_BOUNDARY_BOUNDARY_FIXTURES_H
 #define HPP_GUARD_CARTAN_TESTS_BOUNDARY_BOUNDARY_FIXTURES_H
 
+#include "../support/joint_limits_helpers.h"
+
 #include "cartan/serial_chain.h"
 
 #include <array>
@@ -31,7 +33,7 @@ screw_axis<Scalar> spaced_revolute_axis(int i)
 template <typename Scalar>
 joint_limits<Scalar> full_turn_limits()
 {
-    return *joint_limits<Scalar>::make(
+    return cartan::testing::limits(
         -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>);
 }
 

@@ -94,9 +94,10 @@ otherwise.
 ## joint_limits
 
 Joint limits with required position bounds and optional dynamic limits. The five
-values are private and read-only, and `make` is the only way to obtain one, so an
-invalid set of limits cannot be constructed and a valid one cannot be assigned
-back into an invalid state.
+values are private and read-only, and `make` is the only supported way to obtain
+one, so no ordinary expression constructs an invalid set of limits or assigns a
+valid one back into an invalid state. The type is still trivially copyable, so
+`std::bit_cast` and `std::memcpy` remain well-defined routes around that.
 
 ```cpp
 template <typename Scalar = double>
@@ -112,44 +113,48 @@ public:
 
     Scalar position_min() const;
     Scalar position_max() const;
-    std::optional<Scalar> effort_max() const;
     std::optional<Scalar> velocity_max() const;
+    std::optional<Scalar> effort_max() const;
     std::optional<Scalar> acceleration_max() const;
 
     std::optional<bool> contains(Scalar position) const;
+    bool contains_or(Scalar position, bool when_nonfinite) const;
 };
 ```
 
 Construction examples:
 
 ```cpp
-auto lim = cartan::joint_limits<double>::make(-3.14, 3.14);              // Position only
-auto all = cartan::joint_limits<double>::make(-3.14, 3.14, 2.0, 50.0, 10.0);
+auto lim = cartan::joint_limits<double>::make(-3.14, 3.14).value();              // Position only
+auto all = cartan::joint_limits<double>::make(-3.14, 3.14, 2.0, 50.0, 10.0).value();
 ```
 
-`make` rejects a NaN in any bound, a `position_max` below `position_min`, a
-negative velocity, effort or acceleration bound, and an infinite dynamic bound:
+`make` rejects a NaN in any bound, position bounds that do not describe a
+non-empty interval, a negative velocity, effort or acceleration bound, and an
+infinite dynamic bound. It is not `constexpr`: `std::isnan` and `std::isfinite`
+are not constant expressions before C++23 and the compiler floor is C++20.
 
 | Rejection | `chain_failure` |
 | --- | --- |
 | NaN in any bound; infinite velocity, effort or acceleration | `non_finite_input` |
-| `position_max < position_min` | `reversed_position_bounds` |
+| bounds that are not an interval -- `position_max < position_min`, and also `(+inf, +inf)` or `(-inf, -inf)`, which an ordering test alone admits because an infinity is not less than itself | `reversed_position_bounds` |
 | negative velocity bound | `negative_velocity_limit` |
 | negative effort bound | `negative_effort_limit` |
 | negative acceleration bound | `negative_acceleration_limit` |
 
-Positive and negative infinity are **legal position bounds**: they are the
-library's encoding for an unbounded continuous joint, written by the URDF loader
-and consumed by the unbounded-joint helpers below. The asymmetry with the
-dynamic bounds is deliberate -- no part of the library treats an infinite
-velocity, effort or acceleration limit as meaningful.
+Positive and negative infinity are **legal position bounds**, signed outward:
+`(-inf, +inf)` is the unbounded continuous joint the URDF loader writes and the
+unbounded-joint helpers below consume, and one bound may be infinite while the
+other is finite. `(+inf, +inf)` and `(-inf, -inf)` are refused -- they describe
+no interval. The asymmetry with the dynamic bounds is deliberate: no part of the
+library treats an infinite velocity, effort or acceleration limit as meaningful.
 
 `contains` returns an empty optional for a non-finite position rather than
 `false`. Both bound comparisons are false for a NaN, which would read as
 "outside the limits" when the truth is that the question has no answer;
-non-finite joint values are rejected upstream at the checked entry points.
-
-Check whether a position value lies within `[position_min, position_max]`.
+non-finite joint values are rejected upstream at the checked entry points. Note
+that `if (lim.contains(q))` tests whether the question was *answerable*, not
+whether `q` is in range; `contains_or(q, false)` is the spelling to reach for.
 
 ## joint_state
 
