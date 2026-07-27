@@ -8,27 +8,59 @@ on:
       - 'docs/**'
       - '.planning/**'
   pull_request:
-    branches: [master,develop]
+    branches: [master, develop, 'milestone/**']
     paths-ignore:
       - '**.md'
       - 'docs/**'
       - '.planning/**'
+  # Exploration on a cadence rather than only when someone pushes. Scheduled
+  # runs use the default branch and take the larger budget selected below.
+  # Monday 03:17 UTC, following the weekly-cron pattern already in this
+  # repository.
+  schedule:
+    - cron: "17 3 * * 1"
   workflow_dispatch:
 
 jobs:
   fuzz:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+
+    # Read access and nothing else. A job that pushed a grown corpus to a
+    # durable store would need write access to that store, and keeping this
+    # block minimal is what makes granting it a visible, reviewable edit
+    # rather than an inherited default nobody chose.
+    permissions:
+      contents: read
+
     env:
-      CC: clang
-      CXX: clang++
+      CC: clang-18
+      CXX: clang++-18
+      # The targets are compiled with -fno-sanitize-recover=undefined, so a
+      # finding aborts regardless of the environment. This is set as well
+      # because both have been observed to be, on their own, the only thing
+      # between a real undefined-behavior finding and a green tick.
+      UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+      CARTAN_FUZZ_TARGETS: >-
+        fuzz_urdf_parse
+        fuzz_urdf_build
+        fuzz_screw_axis
+        fuzz_joint_limits
+        fuzz_analytical_target
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
-      - name: Install Clang and LLVM
+      # Pinned, because this gate's verdict is a sanitizer's verdict: which
+      # reporter fires first, what exit code it uses and how libFuzzer treats a
+      # corpus directory are properties of one toolchain generation. libFuzzer's
+      # archive ships in the compiler runtime package, which clang alone does
+      # not pull in.
+      - name: Install the pinned Clang
         run: |
+          set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y clang llvm
+          sudo apt-get install -y clang-18 llvm-18 libclang-rt-18-dev
+          clang++-18 --version
 
       # The fuzz block hard-errors without the URDF module: its two document
       # targets cover the only boundary where the library parses a byte stream
@@ -37,8 +69,8 @@ jobs:
       - name: Configure
         run: >
           cmake -B build
-          -DCMAKE_C_COMPILER=clang
-          -DCMAKE_CXX_COMPILER=clang++
+          -DCMAKE_C_COMPILER=clang-18
+          -DCMAKE_CXX_COMPILER=clang++-18
           -DCARTAN_BUILD_FUZZ_TESTS=ON
           -DCARTAN_BUILD_URDF=ON
           -DCARTAN_CMAKE_FETCH_DEPS=ON
@@ -46,9 +78,119 @@ jobs:
       - name: Build fuzz targets
         run: cmake --build build -j$(nproc)
 
-      # Replays the committed corpus through every target, once per input and
-      # with no mutation. This proves the targets execute; it is a regression
-      # check and cannot stand in for a budgeted fuzzing run. --no-tests=error
-      # so a filter that matches nothing fails instead of reporting success.
-      - name: Replay the corpus through every target
+      # A build step reports success when its target list resolves empty, and
+      # this job's did exactly that for as long as the fuzz block was a comment.
+      # The count is asserted in both directions so that a target added to the
+      # build and not to the list above is a failure rather than a binary
+      # nobody fuzzes.
+      - name: Assert every target was built
+        run: |
+          set -euo pipefail
+          for target in $CARTAN_FUZZ_TARGETS; do
+            if [ ! -x build/fuzz/"$target" ]; then
+              echo "::error::build/fuzz/$target is missing: the build produced no such target" >&2
+              exit 1
+            fi
+          done
+          built=$(find build/fuzz -maxdepth 1 -type f -executable | wc -l)
+          listed=$(echo $CARTAN_FUZZ_TARGETS | wc -w)
+          if [ "$built" -ne "$listed" ]; then
+            echo "::error::built $built targets but this job runs $listed of them" >&2
+            exit 1
+          fi
+          echo "built and listed: $built targets"
+
+      # Seeded at configure time from the committed fixtures. A run over an
+      # empty directory is the exact shape of a check that passes because it
+      # tested nothing, so an empty or missing corpus fails here rather than
+      # producing a fast green campaign.
+      - name: Assert every corpus is populated
+        run: |
+          set -euo pipefail
+          for target in $CARTAN_FUZZ_TARGETS; do
+            dir=build/fuzz/corpus/"$target"
+            if [ ! -d "$dir" ]; then
+              echo "::error::$dir does not exist: nothing seeded the corpus" >&2
+              exit 1
+            fi
+            inputs=$(find "$dir" -type f | wc -l)
+            if [ "$inputs" -lt 1 ]; then
+              echo "::error::$dir holds no inputs" >&2
+              exit 1
+            fi
+            echo "$target: $inputs seed inputs"
+          done
+
+      # Every stored input executed once, no mutation. This proves the targets
+      # execute and that the fixtures still parse; --no-tests=error so a filter
+      # that matches nothing fails instead of reporting success.
+      - name: Regression replay over the committed corpus
         run: ctest --test-dir build --output-on-failure --no-tests=error
+
+      # The gate proper. Everything above this point either builds the targets
+      # or replays inputs that already exist, and neither can discover a defect
+      # that needs a mutation to reach: measured against a seeded off-by-one,
+      # replay missed it and a budgeted run found it in one to three seconds.
+      # The replay above is a separate regression check and may never replace
+      # this budgeted run — if this step ever has to get cheaper, cut the
+      # budget, do not convert it into a replay.
+      #
+      # Any non-zero exit fails the step. libFuzzer's own error exit and a
+      # sanitizer's differ, both are findings, and matching one would let the
+      # other pass.
+      - name: Fuzz every target
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.ref }}" = "refs/heads/master" ]; then
+            budget=300
+            seed=
+          else
+            budget=60
+            seed=-seed=1
+          fi
+          mkdir -p fuzz-artifacts
+          for target in $CARTAN_FUZZ_TARGETS; do
+            log=fuzz-artifacts/"$target".log
+            build/fuzz/"$target" \
+              -max_total_time="$budget" \
+              -timeout=25 \
+              -rss_limit_mb=2048 \
+              -print_final_stats=1 \
+              -artifact_prefix=fuzz-artifacts/"$target"- \
+              $seed \
+              build/fuzz/corpus/"$target" 2>&1 | tee "$log"
+            executed=$(awk '/stat::number_of_executed_units/ { print $2 }' "$log")
+            if [ "${executed:-0}" -lt 1 ]; then
+              echo "::error::$target exited zero having executed ${executed:-no} inputs" >&2
+              exit 1
+            fi
+            echo "$target executed $executed inputs in ${budget}s"
+          done
+
+      # The input a durable corpus store would consume the day one exists.
+      # Producing it now costs one step and makes accumulation a matter of
+      # keeping an artifact rather than of building a mechanism.
+      - name: Minimize the corpus
+        run: |
+          set -euo pipefail
+          for target in $CARTAN_FUZZ_TARGETS; do
+            mkdir -p minimized-corpus/"$target"
+            build/fuzz/"$target" -merge=1 -timeout=25 -rss_limit_mb=2048 \
+              minimized-corpus/"$target" build/fuzz/corpus/"$target"
+          done
+
+      - name: Upload the minimized corpus
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: minimized-corpus
+          path: minimized-corpus/
+
+      # A crash input nobody kept is a crash nobody can reproduce, which is most
+      # of what a finding is worth. The per-target log travels with it because
+      # it carries the seed the run used.
+      - name: Upload crash inputs and run logs
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: fuzz-findings
+          path: fuzz-artifacts/
