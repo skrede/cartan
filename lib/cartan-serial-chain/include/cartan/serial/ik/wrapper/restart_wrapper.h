@@ -81,21 +81,27 @@ public:
         int max_restarts{20};
     };
 
-    restart_wrapper() = default;
+    restart_wrapper()
+        : m_best_q(joint_state<scalar_type, joints>::zero_position())
+    {
+    }
 
     explicit restart_wrapper(InnerPolicy inner)
         : m_inner(std::move(inner))
+        , m_best_q(joint_state<scalar_type, joints>::zero_position())
     {
     }
 
     explicit restart_wrapper(const options& opts)
         : m_options(opts)
+        , m_best_q(joint_state<scalar_type, joints>::zero_position())
     {
     }
 
     restart_wrapper(const options& opts, InnerPolicy inner)
         : m_inner(std::move(inner))
         , m_options(opts)
+        , m_best_q(joint_state<scalar_type, joints>::zero_position())
     {
     }
 
@@ -378,7 +384,7 @@ private:
     int m_total_iterations{};
     scalar_type m_best_lambda{};
     scalar_type m_best_error{std::numeric_limits<scalar_type>::max()};
-    position_type m_best_q{};
+    position_type m_best_q;
     scalar_type m_best_q_error{std::numeric_limits<scalar_type>::max()};
     bool m_best_feasible{false};
     bool m_best_valid{false};

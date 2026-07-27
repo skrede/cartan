@@ -70,10 +70,14 @@ public:
         std::optional<std::uint64_t> seed{};
     };
 
-    cmaes() = default;
+    cmaes()
+        : cmaes(options{})
+    {
+    }
 
     explicit cmaes(const options& opts)
         : m_options{opts}
+        , m_q(joint_state<scalar_type, joints>::zero_position())
     {}
 
     void setup(
@@ -222,7 +226,7 @@ private:
     convergence_criteria<scalar_type> m_criteria{};
     error_weight<scalar_type> m_weight{};
     options m_options{};
-    position_type m_q{};
+    position_type m_q;
     cartan::detail::error_ring<scalar_type> m_error_history;
     scalar_type m_initial_error{};
     scalar_type m_error_norm{std::numeric_limits<scalar_type>::max()};

@@ -110,10 +110,14 @@ public:
         double step_threshold{1e-14};
     };
 
-    argmin_projected_gradient_gn() = default;
+    argmin_projected_gradient_gn()
+        : argmin_projected_gradient_gn(options{})
+    {
+    }
 
     explicit argmin_projected_gradient_gn(const options& opts)
         : m_options{opts}
+        , m_q(joint_state<scalar_type, joints>::zero_position())
     {}
 
     void setup(
@@ -387,7 +391,7 @@ private:
     se3<scalar_type> m_target{se3<scalar_type>::identity()};
     convergence_criteria<scalar_type> m_criteria{};
     options m_options{};
-    position_type m_q{};
+    position_type m_q;
     cartan::detail::error_ring<scalar_type> m_error_history;
     scalar_type m_initial_error{};
     scalar_type m_error_norm{std::numeric_limits<scalar_type>::max()};

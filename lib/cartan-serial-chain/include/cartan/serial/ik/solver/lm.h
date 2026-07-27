@@ -65,10 +65,14 @@ public:
         int stall_window{5};
     };
 
-    builtin_lm() = default;
+    builtin_lm()
+        : builtin_lm(options{})
+    {
+    }
 
     explicit builtin_lm(const options& opts)
-        : m_options(opts)
+        : m_q(joint_state<scalar_type, joints>::zero_position())
+        , m_options(opts)
     {
     }
 
@@ -260,7 +264,7 @@ private:
     }
 
     se3<scalar_type> m_target{se3<scalar_type>::identity()};
-    position_type m_q{};
+    position_type m_q;
     vector6<scalar_type> m_V_b{vector6<scalar_type>::Zero()};
     convergence_criteria<scalar_type> m_criteria{};
     options m_options{};

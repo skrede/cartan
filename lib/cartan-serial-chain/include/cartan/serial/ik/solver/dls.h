@@ -173,13 +173,27 @@ public:
             constexpr unsigned int svd_options = (joints == dynamic)
                 ? (Eigen::ComputeThinU | Eigen::ComputeThinV)
                 : (Eigen::ComputeFullU | Eigen::ComputeFullV);
+            // Eigen sizes the singular-value vector from a run-time diagonal size
+            // even when both matrix dimensions are compile-time constants. Once the
+            // decomposition's write loop and the reads below are inlined into one
+            // function, GCC cannot prove that size equals min(rows, cols), so the
+            // last element reads as possibly unwritten; for a fixed-size Jacobian it
+            // is that minimum unconditionally. Only -O3 raises this -- -O0, -O1 and
+            // -O2 are clean, as is clang on the same source.
+#if defined(__GNUC__) && !defined(__clang__) && __GNUC__ >= 15
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
             Eigen::JacobiSVD<jacobian_matrix<scalar_type, joints>> svd(J_b, svd_options);
 
-            auto sigma = svd.singularValues();
+            const auto& sigma = svd.singularValues();
             int rank = static_cast<int>(sigma.size());
 
             scalar_type sigma_min = sigma(rank - 1);
             scalar_type sigma_max = sigma(0);
+#if defined(__GNUC__) && !defined(__clang__) && __GNUC__ >= 15
+#pragma GCC diagnostic pop
+#endif
             scalar_type lambda_sq{0};
 
             if (sigma_min < m_options.singularity_threshold)

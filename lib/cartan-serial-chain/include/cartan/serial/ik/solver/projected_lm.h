@@ -134,10 +134,17 @@ public:
         scalar_type trust_region_radius{scalar_type(1.0)};
     };
 
-    projected_lm() = default;
+    projected_lm()
+        : projected_lm(options{})
+    {
+    }
 
     explicit projected_lm(const options& opts)
-        : m_options(opts)
+        : m_q(joint_state<scalar_type, joints>::zero_position())
+        , m_best_q(joint_state<scalar_type, joints>::zero_position())
+        , m_q_min(joint_state<scalar_type, joints>::zero_position())
+        , m_q_max(joint_state<scalar_type, joints>::zero_position())
+        , m_options(opts)
     {
     }
 
@@ -437,7 +444,7 @@ private:
         }
         else
         {
-            dq = position_type::Zero();
+            dq = joint_state<scalar_type, joints>::zero_position();
         }
 
         if (n_free == 0)
@@ -610,9 +617,23 @@ private:
         free_vec b = delta_gn;
         free_vec d = b - a;
 
+        // Eigen picks its vectorized reduction traversal from the dynamic-size
+        // branch and handles the sub-packet remainder at run time. These vectors
+        // carry a compile-time maximum of three, so the packet loop body executes
+        // zero times, but GCC cannot prove that and models a speculative full-width
+        // load past the end of the object. Clang is clean on the same source and the
+        // reported access width follows the vector register width, which is what
+        // marks this as a modelling artifact rather than a live over-read.
+#if defined(__GNUC__) && !defined(__clang__) && __GNUC__ >= 15
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds"
+#endif
         scalar_type a_sq = a.squaredNorm();
         scalar_type d_sq = d.squaredNorm();
         scalar_type a_dot_d = a.dot(d);
+#if defined(__GNUC__) && !defined(__clang__) && __GNUC__ >= 15
+#pragma GCC diagnostic pop
+#endif
         scalar_type delta_sq = m_delta * m_delta;
 
         scalar_type discriminant = a_dot_d * a_dot_d - d_sq * (a_sq - delta_sq);
@@ -623,10 +644,10 @@ private:
     }
 
     se3<scalar_type> m_target{se3<scalar_type>::identity()};
-    position_type m_q{};
-    position_type m_best_q{};
-    position_type m_q_min{};
-    position_type m_q_max{};
+    position_type m_q;
+    position_type m_best_q;
+    position_type m_q_min;
+    position_type m_q_max;
     vector6<scalar_type> m_V_b{vector6<scalar_type>::Zero()};
     convergence_criteria<scalar_type> m_criteria{};
     error_weight<scalar_type> m_weight{};

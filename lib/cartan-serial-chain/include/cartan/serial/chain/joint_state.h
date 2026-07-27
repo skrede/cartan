@@ -35,6 +35,22 @@ struct joint_state
     position_type position;                   ///< Joint positions
     std::optional<velocity_type> velocity{};  ///< Joint velocities (optional)
 
+    /// The zero of position_type. A fixed-size Eigen vector's default constructor
+    /// leaves its coefficients indeterminate, so it must be zeroed explicitly; a
+    /// dynamic one starts empty and has no coefficients to zero, and the no-argument
+    /// Zero() is a fixed-size-only method there.
+    static position_type zero_position()
+    {
+        if constexpr (N == dynamic)
+        {
+            return position_type{};
+        }
+        else
+        {
+            return position_type::Zero();
+        }
+    }
+
     /// Create a joint state from position only (no velocity).
     static joint_state from_position(const position_type& q)
     {

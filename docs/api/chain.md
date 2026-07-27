@@ -204,6 +204,15 @@ it is `Eigen::VectorX<Scalar>`.
 ### Methods
 
 ```cpp
+static position_type zero_position();
+```
+
+The zero of `position_type`. For fixed `N` this is an explicitly zeroed vector:
+an Eigen fixed-size vector's default constructor leaves its coefficients
+indeterminate. For dynamic `N` it is the empty vector, which has no
+coefficients to zero.
+
+```cpp
 static joint_state from_position(const position_type& q);
 ```
 

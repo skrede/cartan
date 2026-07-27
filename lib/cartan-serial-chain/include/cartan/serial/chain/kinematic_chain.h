@@ -56,6 +56,7 @@ public:
         : m_home(home)
         , m_axes(std::move(axes))
         , m_limits(std::move(limits))
+        , m_kinds{}
     {
         validate();
         if constexpr (N == dynamic)
@@ -125,7 +126,7 @@ private:
     se3<Scalar> m_home;         ///< End-effector home pose (M matrix)
     screw_storage m_axes;       ///< Space-frame screw axes S1..Sn
     limits_storage m_limits;    ///< Joint limits
-    kind_storage m_kinds{};     ///< Cached axis classification per joint
+    kind_storage m_kinds;       ///< Cached axis classification per joint
 
     /// Real runtime invariants, not debug-only assertions. A debug-only assert
     /// would be compiled out under -DNDEBUG (Release), letting a malformed

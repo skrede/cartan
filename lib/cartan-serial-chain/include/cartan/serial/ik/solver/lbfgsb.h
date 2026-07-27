@@ -74,10 +74,17 @@ public:
         int stall_window{15};
     };
 
-    builtin_lbfgsb() = default;
+    builtin_lbfgsb()
+        : builtin_lbfgsb(options{})
+    {
+    }
 
     explicit builtin_lbfgsb(const options& opts)
-        : m_options(opts)
+        : m_q(joint_state<scalar_type, joints>::zero_position())
+        , m_gradient(joint_state<scalar_type, joints>::zero_position())
+        , m_lower(joint_state<scalar_type, joints>::zero_position())
+        , m_upper(joint_state<scalar_type, joints>::zero_position())
+        , m_options(opts)
     {
     }
 
@@ -383,10 +390,10 @@ private:
     }
 
     se3<scalar_type> m_target{se3<scalar_type>::identity()};
-    position_type m_q{};
-    position_type m_gradient{};
-    position_type m_lower{};
-    position_type m_upper{};
+    position_type m_q;
+    position_type m_gradient;
+    position_type m_lower;
+    position_type m_upper;
     vector6<scalar_type> m_body_error{vector6<scalar_type>::Zero()};
     vector6<scalar_type> m_weighted_error{vector6<scalar_type>::Zero()};
     convergence_criteria<scalar_type> m_criteria{};

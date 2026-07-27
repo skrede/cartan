@@ -144,10 +144,15 @@ public:
             argmin::kraft_slsqp_policy<joints>::default_multiplier_reest_every_k};
     };
 
-    argmin_slsqp() = default;
+    argmin_slsqp()
+        : argmin_slsqp(options{})
+    {
+    }
 
     explicit argmin_slsqp(const options& opts)
         : m_options{opts}
+        , m_q(joint_state<scalar_type, joints>::zero_position())
+        , m_best_q(joint_state<scalar_type, joints>::zero_position())
     {}
 
     void setup(
@@ -513,8 +518,8 @@ private:
     convergence_criteria<scalar_type> m_criteria{};
     error_weight<scalar_type> m_weight{};
     options m_options{};
-    position_type m_q{};
-    position_type m_best_q{};
+    position_type m_q;
+    position_type m_best_q;
     scalar_type m_best_q_error{std::numeric_limits<scalar_type>::max()};
     bool m_best_feasible{false};
     bool m_best_valid{false};

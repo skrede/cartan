@@ -98,10 +98,14 @@ public:
 
     using position_type = typename joint_state<scalar_type, joints>::position_type;
 
-    basic_ik_runner() = default;
+    basic_ik_runner()
+        : m_best_q(joint_state<scalar_type, joints>::zero_position())
+    {
+    }
 
     explicit basic_ik_runner(Policies... policies)
         : m_policies(std::move(policies)...)
+        , m_best_q(joint_state<scalar_type, joints>::zero_position())
     {
     }
 
@@ -713,7 +717,7 @@ private:
     std::optional<std::reference_wrapper<const chain_type>> m_chain{};
     se3<scalar_type> m_target{se3<scalar_type>::identity()};
     convergence_criteria<scalar_type> m_criteria{};
-    position_type m_best_q{};
+    position_type m_best_q;
     scalar_type m_best_manipulability{};
     scalar_type m_best_isotropy{};
     scalar_type m_best_error{};

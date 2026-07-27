@@ -60,10 +60,16 @@ public:
         int stall_window{10};
     };
 
-    newton_raphson() = default;
+    newton_raphson()
+        : newton_raphson(options{})
+    {
+    }
 
     explicit newton_raphson(const options& opts)
-        : m_options(opts)
+        : m_q(joint_state<scalar_type, joints>::zero_position())
+        , m_lower(joint_state<scalar_type, joints>::zero_position())
+        , m_upper(joint_state<scalar_type, joints>::zero_position())
+        , m_options(opts)
     {
     }
 
@@ -221,9 +227,9 @@ public:
 
 private:
     se3<scalar_type> m_target{se3<scalar_type>::identity()};
-    position_type m_q{};
-    position_type m_lower{};
-    position_type m_upper{};
+    position_type m_q;
+    position_type m_lower;
+    position_type m_upper;
     convergence_criteria<scalar_type> m_criteria{};
     error_weight<scalar_type> m_weight{};
     options m_options{};
