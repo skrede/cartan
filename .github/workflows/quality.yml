@@ -1,0 +1,27 @@
+name: Quality
+
+# The static checks that need no compiler live here so they do not queue behind a
+# build. Unlike the build workflows this one carries no path filter: the register
+# the size gate reads is a markdown file, so ignoring '**.md' would skip exactly
+# the edit that can turn the gate red.
+on:
+  push:
+    branches: [master, develop, 'milestone/**']
+  pull_request:
+    branches: [master, develop]
+  workflow_dispatch:
+
+jobs:
+  static-checks:
+    runs-on: ubuntu-24.04
+    name: build-free static checks
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+
+      - name: File sizes against the exception register
+        run: python3 tools/check_file_size.py

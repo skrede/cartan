@@ -39,6 +39,9 @@ it sits on screen:
 | Function | 5–15 lines | 25 lines     |
 | File     | ~100 lines | 200 lines    |
 
+The file ceiling is enforced for new and for growing files; the files already over it are
+registered in `EXCEPTIONS.md`.
+
 Readability is the goal, not SOLID or DRY orthodoxy. Group code that is read together. Split
 where it genuinely separates responsibilities — never to chase a number.
 
@@ -57,9 +60,17 @@ Keep public headers lean by moving internal helpers into a `detail/` directory a
 `detail::` namespace. Make `detail/` files and `detail::` types as needed — but a `detail/`
 file is still a real file and obeys these same rules.
 
-Enforcement: `.clang-tidy` runs size and cognitive-complexity checks and **fails the build**
-over the ceiling. A change is not done until it is within budget or its overage is a
-registered exception.
+Enforcement, file size: `tools/check_file_size.py` measures every tracked C++ file and checks it
+against `EXCEPTIONS.md`. It fails on an overage that is not registered, on a registered row whose
+file has dropped back under the ceiling, and on a registered file that has grown past the allowance
+its row records. Run it from the repository root; it needs no build and no configure.
+
+Enforcement, function size: `.clang-tidy` carries `readability-function-size` at this ceiling, so a
+linter run with that check enabled reports every function over it — but **nothing fails over it
+today**. The measured finding count and what would change that are recorded in `EXCEPTIONS.md`. The
+function ceiling is a rule to follow, not one a machine currently catches you breaking.
+
+A change is not done until it is within budget or its overage is a registered exception.
 
 ### Exceptions
 
