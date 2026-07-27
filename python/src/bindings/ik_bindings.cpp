@@ -174,7 +174,10 @@ void register_ik(nb::module_& m)
         .value("stalled",               cartan::ik_failure::stalled)
         .value("iteration_limit",       cartan::ik_failure::iteration_limit)
         .value("joint_limit_violation", cartan::ik_failure::joint_limit_violation)
-        .value("aborted",               cartan::ik_failure::aborted);
+        .value("aborted",               cartan::ik_failure::aborted)
+        .value("not_initialized",       cartan::ik_failure::not_initialized)
+        .value("dimension_mismatch",    cartan::ik_failure::dimension_mismatch)
+        .value("non_finite_input",      cartan::ik_failure::non_finite_input);
 
     // ------------------------------------------------------------------
     // IkConfig (kw-only ctor; def_rw on each field)

@@ -65,7 +65,7 @@ lim: cartan.JointLimits = cartan.JointLimits(
 )
 lim_min: float = lim.position_min
 lim_max: float = lim.position_max
-in_range: bool = lim.contains(0.0)
+in_range: bool | None = lim.contains(0.0)
 
 chain: cartan.KinematicChain = cartan.KinematicChain(T2, [s], [lim])
 home_pose: cartan.SE3 = chain.home()

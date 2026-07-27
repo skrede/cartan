@@ -217,7 +217,7 @@ def test_kinematic_chain_mismatched_sizes_raises() -> None:
     s1 = cartan.ScrewAxis.revolute(z, np.array([0.0, 0.0, 0.0]))
     s2 = cartan.ScrewAxis.revolute(z, np.array([1.0, 0.0, 0.0]))
     home = cartan.SE3.exp(np.array([0.0, 0.0, 0.0, 2.0, 0.0, 0.0]))
-    with pytest.raises((ValueError, RuntimeError)):
+    with pytest.raises(ValueError):
         cartan.KinematicChain(home, [s1, s2], [cartan.JointLimits(-1.0, 1.0)])
 
 

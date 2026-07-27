@@ -8,8 +8,8 @@
 ///
 /// py_analytical_status mirrors cartan::analytical_failure plus a Python
 /// success sentinel "ok". The C++ analytical_failure variants are
-/// unreachable, degenerate_geometry, singular_configuration, and
-/// verification_failed. The to_py_status helper translates a C++
+/// unreachable, degenerate_geometry, singular_configuration,
+/// verification_failed and non_finite_input. The to_py_status helper translates a C++
 /// failure value to the Python enum; the success branch is handled at
 /// the caller, which constructs an AnalyticalResult with status=ok.
 ///
@@ -39,7 +39,8 @@ enum class py_analytical_status : int
     unreachable,
     degenerate_geometry,
     singular_configuration,
-    verification_failed
+    verification_failed,
+    non_finite_input
 };
 
 inline py_analytical_status to_py_status(cartan::analytical_failure f)
@@ -54,6 +55,8 @@ inline py_analytical_status to_py_status(cartan::analytical_failure f)
             return py_analytical_status::singular_configuration;
         case cartan::analytical_failure::verification_failed:
             return py_analytical_status::verification_failed;
+        case cartan::analytical_failure::non_finite_input:
+            return py_analytical_status::non_finite_input;
     }
     return py_analytical_status::degenerate_geometry;
 }

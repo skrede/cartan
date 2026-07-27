@@ -184,7 +184,7 @@ inline VectorXd unwrap_solution(const KC &chain, const VectorXd &q, const Vector
             continue;
         }
         const auto idx = static_cast<std::size_t>(i);
-        out(i)         = cartan::detail::unwrap_to_range_nearest(q(i), limits[idx].position_min, limits[idx].position_max, reference(i), tol);
+        out(i)         = cartan::detail::unwrap_to_range_nearest(q(i), limits[idx].position_min(), limits[idx].position_max(), reference(i), tol);
     }
     return out;
 }
@@ -253,19 +253,20 @@ void register_analytical(nb::module_ &m)
     nb::module_ analytical = m.def_submodule("analytical", "Closed-form analytical IK solvers and Paden-Kahan subproblems.");
 
     // ------------------------------------------------------------------
-    // AnalyticalStatus enum (5 variants mirroring C++ analytical_failure
+    // AnalyticalStatus enum (6 variants mirroring C++ analytical_failure
     // plus a Python success sentinel "ok"). The set is fixed to mirror
     // cartan::analytical_failure; the Python surface intentionally does
     // not expose any legacy "singular" / "near_singular" names.
     // ------------------------------------------------------------------
     nb::enum_<py_analytical_status>(analytical, "AnalyticalStatus",
-                                    "Outcome of an analytical IK solve. ok signals success; the four "
+                                    "Outcome of an analytical IK solve. ok signals success; the five "
                                     "failure variants mirror cartan::analytical_failure.")
             .value("ok", py_analytical_status::ok)
             .value("unreachable", py_analytical_status::unreachable)
             .value("degenerate_geometry", py_analytical_status::degenerate_geometry)
             .value("singular_configuration", py_analytical_status::singular_configuration)
-            .value("verification_failed", py_analytical_status::verification_failed);
+            .value("verification_failed", py_analytical_status::verification_failed)
+            .value("non_finite_input", py_analytical_status::non_finite_input);
 
     // ------------------------------------------------------------------
     // AnalyticalResult value class (def_ro on the three fields). The

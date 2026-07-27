@@ -58,6 +58,9 @@ inline std::string ik_failure_to_string(cartan::ik_failure r)
         case cartan::ik_failure::iteration_limit:       return "iteration_limit";
         case cartan::ik_failure::joint_limit_violation: return "joint_limit_violation";
         case cartan::ik_failure::aborted:               return "aborted";
+        case cartan::ik_failure::not_initialized:       return "not_initialized";
+        case cartan::ik_failure::dimension_mismatch:    return "dimension_mismatch";
+        case cartan::ik_failure::non_finite_input:      return "non_finite_input";
     }
     return "unknown";
 }
