@@ -1,3 +1,5 @@
+#include "../support/joint_limits_helpers.h"
+
 #include <cartan/serial/chain/static_chain.h>
 #include <cartan/serial/chain/joint_tags.h>
 #include <cartan/serial/chain/screw_axis.h>
@@ -25,14 +27,6 @@ using Catch::Approx;
 
 namespace
 {
-
-template <typename Scalar>
-cartan::joint_limits<Scalar> unwrap_limits(Scalar lo, Scalar hi)
-{
-    auto made = cartan::joint_limits<Scalar>::make(lo, hi);
-    REQUIRE(made.has_value());
-    return *made;
-}
 
 template <typename Scalar>
 cartan::se3<Scalar> nonfinite_home()
@@ -63,7 +57,7 @@ cartan::se3<double> make_3r_home()
 
 std::array<cartan::joint_limits<double>, 3> make_3r_limits()
 {
-    auto lim = unwrap_limits<double>(-std::numbers::pi, std::numbers::pi);
+    auto lim = cartan::testing::limits<double>(-std::numbers::pi, std::numbers::pi);
     return std::array<cartan::joint_limits<double>, 3>{lim, lim, lim};
 }
 
@@ -95,7 +89,7 @@ TEST_CASE("static_chain single revolute joint", "[static_chain]")
     using namespace cartan;
 
     auto s0 = screw_axis<double>::revolute({0, 0, 1}, {0, 0, 0});
-    auto lim = unwrap_limits<double>(-std::numbers::pi, std::numbers::pi);
+    auto lim = cartan::testing::limits<double>(-std::numbers::pi, std::numbers::pi);
 
     auto made = static_chain<double, revolute_z>::make(
         se3<double>::identity(), {s0}, {lim});
@@ -146,7 +140,7 @@ TEST_CASE("static_chain home() returns construction pose", "[static_chain]")
 
     vector3<double> t{1.0, 2.0, 3.0};
     auto s0 = screw_axis<double>::revolute({0, 0, 1}, {0, 0, 0});
-    auto lim = unwrap_limits<double>(-std::numbers::pi, std::numbers::pi);
+    auto lim = cartan::testing::limits<double>(-std::numbers::pi, std::numbers::pi);
 
     auto made = static_chain<double, revolute_z>::make(
         se3<double>(so3<double>::identity(), t), {s0}, {lim});
@@ -165,8 +159,8 @@ TEST_CASE("static_chain limits() returns construction limits", "[static_chain]")
 
     auto s0 = screw_axis<double>::revolute({0, 0, 1}, {0, 0, 0});
     auto s1 = screw_axis<double>::revolute({0, 1, 0}, {0, 0, 0.5});
-    auto lim0 = unwrap_limits<double>(-1.0, 1.0);
-    auto lim1 = unwrap_limits<double>(-2.0, 2.0);
+    auto lim0 = cartan::testing::limits<double>(-1.0, 1.0);
+    auto lim1 = cartan::testing::limits<double>(-2.0, 2.0);
 
     auto made = static_chain<double, revolute_z, revolute_y>::make(
         se3<double>::identity(), {s0, s1}, {lim0, lim1});
@@ -200,7 +194,7 @@ TEST_CASE("static_chain with prismatic joint tag", "[static_chain]")
 
     auto s0 = screw_axis<double>::revolute({0, 0, 1}, {0, 0, 0});
     auto s1 = screw_axis<double>::prismatic({0, 0, 1});
-    auto lim = unwrap_limits<double>(-10.0, 10.0);
+    auto lim = cartan::testing::limits<double>(-10.0, 10.0);
 
     auto made = static_chain<double, revolute_z, prismatic_z>::make(
         se3<double>::identity(), {s0, s1}, {lim, lim});
@@ -221,7 +215,7 @@ TEMPLATE_TEST_CASE("static_chain::make accepts either sign of a tag's axis",
     using namespace cartan;
     using Scalar = TestType;
 
-    auto lim = unwrap_limits<Scalar>(Scalar(-1), Scalar(1));
+    auto lim = cartan::testing::limits<Scalar>(Scalar(-1), Scalar(1));
 
     auto positive = screw_axis<Scalar>::revolute({0, 0, 1}, vector3<Scalar>::Zero());
     auto negative = screw_axis<Scalar>::revolute({0, 0, -1}, vector3<Scalar>::Zero());
@@ -245,7 +239,7 @@ TEMPLATE_TEST_CASE("static_chain::make keeps a real negative-axis robot expressi
     using namespace cartan;
     using Scalar = TestType;
 
-    auto lim = unwrap_limits<Scalar>(Scalar(-3), Scalar(3));
+    auto lim = cartan::testing::limits<Scalar>(Scalar(-3), Scalar(3));
 
     auto a1 = screw_axis<Scalar>::revolute(
         {0, 0, -1}, vector3<Scalar>(Scalar(0), Scalar(0), Scalar(0)));
@@ -265,7 +259,7 @@ TEMPLATE_TEST_CASE("static_chain::make rejects an axis about another principal d
     using namespace cartan;
     using Scalar = TestType;
 
-    auto lim = unwrap_limits<Scalar>(Scalar(-1), Scalar(1));
+    auto lim = cartan::testing::limits<Scalar>(Scalar(-1), Scalar(1));
     auto about_y = screw_axis<Scalar>::revolute({0, 1, 0}, vector3<Scalar>::Zero());
 
     auto made = static_chain<Scalar, revolute_z>::make(
@@ -284,7 +278,7 @@ TEMPLATE_TEST_CASE("static_chain::make rejects a near-principal axis at one epsi
     using namespace cartan;
     using Scalar = TestType;
 
-    auto lim = unwrap_limits<Scalar>(Scalar(-1), Scalar(1));
+    auto lim = cartan::testing::limits<Scalar>(Scalar(-1), Scalar(1));
     Scalar eps = std::numeric_limits<Scalar>::epsilon();
     auto tilted = screw_axis<Scalar>::revolute(
         vector3<Scalar>(eps, Scalar(0), Scalar(1)), vector3<Scalar>::Zero());
@@ -304,7 +298,7 @@ TEMPLATE_TEST_CASE("static_chain::make rejects a prismatic direction under a rev
     using namespace cartan;
     using Scalar = TestType;
 
-    auto lim = unwrap_limits<Scalar>(Scalar(-1), Scalar(1));
+    auto lim = cartan::testing::limits<Scalar>(Scalar(-1), Scalar(1));
     auto slide = screw_axis<Scalar>::prismatic({0, 0, 1});
     auto turn = screw_axis<Scalar>::revolute({0, 0, 1}, vector3<Scalar>::Zero());
 
@@ -325,7 +319,7 @@ TEMPLATE_TEST_CASE("static_chain::make rejects a nonfinite axis or home pose",
     using namespace cartan;
     using Scalar = TestType;
 
-    auto lim = unwrap_limits<Scalar>(Scalar(-1), Scalar(1));
+    auto lim = cartan::testing::limits<Scalar>(Scalar(-1), Scalar(1));
     auto good = screw_axis<Scalar>::revolute({0, 0, 1}, vector3<Scalar>::Zero());
 
     for (Scalar poison : {std::numeric_limits<Scalar>::quiet_NaN(),
@@ -358,7 +352,7 @@ TEMPLATE_TEST_CASE("static_chain::make reports a contradiction as a value, not a
     using namespace cartan;
     using Scalar = TestType;
 
-    auto lim = unwrap_limits<Scalar>(Scalar(-1), Scalar(1));
+    auto lim = cartan::testing::limits<Scalar>(Scalar(-1), Scalar(1));
     auto about_y = screw_axis<Scalar>::revolute({0, 1, 0}, vector3<Scalar>::Zero());
 
     auto made = static_chain<Scalar, revolute_z>::make(

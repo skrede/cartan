@@ -1,3 +1,5 @@
+#include "../support/kinematics_helpers.h"
+
 #include "cartan/analytical.h"
 #include "cartan/serial_chain.h"
 
@@ -23,7 +25,7 @@ static double fk_error(const Chain& chain,
                        const Eigen::Vector<double, 6>& q,
                        const se3<double>& target)
 {
-    auto fk = forward_kinematics(chain, q);
+    auto fk = testing::fk_at(chain, q);
     const double pe =
         (fk.end_effector.translation() - target.translation()).norm();
     const double oe = (fk.end_effector.rotation().inverse()
@@ -61,7 +63,7 @@ TEST_CASE("IRB120: reconciled-geometry FK accuracy over a workspace-spanning "
         for (int k = 0; k < 6; ++k)
             q_known(k) = angle(rng);
 
-        auto target = forward_kinematics(chain, q_known).end_effector;
+        auto target = testing::fk_at(chain, q_known).end_effector;
         auto result = solver->solve(target);
 
         INFO("sample " << t << " q_known = " << q_known.transpose());
@@ -99,8 +101,8 @@ TEST_CASE("IRB120: reconciled chain and static factory agree on FK away from "
     constexpr double tol = 1e-12;
     for (const auto& q : configs)
     {
-        auto a = forward_kinematics(kc, q).end_effector;
-        auto b = forward_kinematics(sc, q).end_effector;
+        auto a = testing::fk_at(kc, q).end_effector;
+        auto b = testing::fk_at(sc, q).end_effector;
         const double pe = (a.translation() - b.translation()).norm();
         const double oe =
             (a.rotation().inverse() * b.rotation()).log().norm();

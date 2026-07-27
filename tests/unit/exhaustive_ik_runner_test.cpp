@@ -1,3 +1,6 @@
+#include "../support/kinematics_helpers.h"
+#include "../support/joint_limits_helpers.h"
+
 #include <cartan/serial/ik/ik_validation.h>
 #include <cartan/serial/ik/solver/exhaustive_ik_runner.h>
 
@@ -38,7 +41,7 @@ static ur5_chain make_ur5_like_chain()
     home_trans << 0.817, 0.191, -0.006;
     auto home = spp::se3<double>(spp::so3<double>::identity(), home_trans);
 
-    spp::joint_limits<double> lim{-2 * std::numbers::pi, 2 * std::numbers::pi};
+    auto lim = spp::testing::limits(-2 * std::numbers::pi, 2 * std::numbers::pi);
     return ur5_chain(home, {s1, s2, s3, s4, s5, s6},
                      {lim, lim, lim, lim, lim, lim});
 }
@@ -49,7 +52,7 @@ TEST_CASE("verify_solution validates FK-consistent configurations", "[ik][valida
     Eigen::Vector<double, 6> q;
     q << 0.5, -0.3, 0.8, -0.2, 0.4, 0.1;
 
-    auto fk = spp::forward_kinematics(chain, q);
+    auto fk = spp::testing::fk_at(chain, q);
     auto target = fk.end_effector;
 
     spp::convergence_criteria<double> criteria;
@@ -74,7 +77,7 @@ TEST_CASE("filter_valid_solutions removes invalid entries", "[ik][validation]")
     Eigen::Vector<double, 6> q_good;
     q_good << 0.5, -0.3, 0.8, -0.2, 0.4, 0.1;
 
-    auto fk = spp::forward_kinematics(chain, q_good);
+    auto fk = spp::testing::fk_at(chain, q_good);
     auto target = fk.end_effector;
 
     spp::convergence_criteria<double> criteria;
@@ -118,7 +121,7 @@ TEST_CASE("exhaustive_ik_runner finds multiple solutions", "[ik][exhaustive]")
     Eigen::Vector<double, 6> q_known;
     q_known << 0.5, -0.3, 0.8, -0.2, 0.4, 0.1;
 
-    auto fk = spp::forward_kinematics(chain, q_known);
+    auto fk = spp::testing::fk_at(chain, q_known);
     auto target = fk.end_effector;
 
     spp::convergence_criteria<double> criteria;
@@ -185,7 +188,7 @@ TEST_CASE("exhaustive_ik_runner dedup removes near-identical solutions", "[ik][e
     Eigen::Vector<double, 6> q_known;
     q_known << 0.5, -0.3, 0.8, -0.2, 0.4, 0.1;
 
-    auto fk = spp::forward_kinematics(chain, q_known);
+    auto fk = spp::testing::fk_at(chain, q_known);
     auto target = fk.end_effector;
 
     spp::convergence_criteria<double> criteria;
@@ -217,7 +220,7 @@ TEST_CASE("exhaustive_ik_runner ranking strategies", "[ik][exhaustive]")
     Eigen::Vector<double, 6> q_known;
     q_known << 0.5, -0.3, 0.8, -0.2, 0.4, 0.1;
 
-    auto fk = spp::forward_kinematics(chain, q_known);
+    auto fk = spp::testing::fk_at(chain, q_known);
     auto target = fk.end_effector;
 
     spp::convergence_criteria<double> criteria;
@@ -271,7 +274,7 @@ TEST_CASE("exhaustive_ik_runner ranking strategies", "[ik][exhaustive]")
             for (int j = 0; j < 6; ++j)
             {
                 auto lim = chain.limits()[static_cast<std::size_t>(j)];
-                mid[j] = (lim.position_min + lim.position_max) / 2.0;
+                mid[j] = (lim.position_min() + lim.position_max()) / 2.0;
             }
             double d0 = (result.solutions[0].solution.position - mid).norm();
             double d1 = (result.solutions[1].solution.position - mid).norm();
@@ -290,7 +293,7 @@ TEST_CASE("exhaustive_ik_runner<argmin_slsqp> concept satisfaction and solve", "
     Eigen::Vector<double, 6> q_known;
     q_known << 0.5, -0.3, 0.8, -0.2, 0.4, 0.1;
 
-    auto fk = spp::forward_kinematics(chain, q_known);
+    auto fk = spp::testing::fk_at(chain, q_known);
     auto target = fk.end_effector;
 
     spp::convergence_criteria<double> criteria;

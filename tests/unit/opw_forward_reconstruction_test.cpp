@@ -1,3 +1,5 @@
+#include "../support/kinematics_helpers.h"
+
 #include "cartan/analytical.h"
 #include "cartan/serial_chain.h"
 
@@ -62,7 +64,7 @@ TEST_CASE(
     // so a convention slip is diagnosed before the random sweep.
     {
         const Eigen::Vector<double, 6> q = Eigen::Vector<double, 6>::Zero();
-        const auto fk = forward_kinematics(chain, q).end_effector;
+        const auto fk = testing::fk_at(chain, q).end_effector;
         const auto err = reconstruction_at(params, q, fk);
         INFO("home configuration q = " << q.transpose());
         CHECK(err.position < tolerance);
@@ -84,7 +86,7 @@ TEST_CASE(
         for (int j = 0; j < 6; ++j)
             q(j) = joint(rng);
 
-        const auto fk = forward_kinematics(chain, q).end_effector;
+        const auto fk = testing::fk_at(chain, q).end_effector;
         const auto err = reconstruction_at(params, q, fk);
 
         worst_position = std::max(worst_position, err.position);

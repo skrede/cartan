@@ -151,7 +151,7 @@ TEST_CASE("rotation: from_matrix roundtrip", "[rotation]")
     auto r = cartan::rotation<world, base>{cartan::so3<double>::exp(phi)};
     auto result = cartan::rotation<world, base>::from_matrix(r.matrix());
     REQUIRE(result.has_value());
-    REQUIRE((result.value().matrix() - r.matrix()).norm() < 1e-12);
+    REQUIRE(((*result).matrix() - r.matrix()).norm() < 1e-12);
 }
 
 TEST_CASE("rotation: from_quaternion", "[rotation]")
@@ -160,7 +160,7 @@ TEST_CASE("rotation: from_quaternion", "[rotation]")
     auto result = cartan::rotation<world, base>::from_quaternion(q);
     REQUIRE(result.has_value());
     auto I = cartan::matrix3<double>::Identity();
-    REQUIRE((result.value().matrix() - I).norm() < 1e-14);
+    REQUIRE(((*result).matrix() - I).norm() < 1e-14);
 }
 
 // ============================================================================

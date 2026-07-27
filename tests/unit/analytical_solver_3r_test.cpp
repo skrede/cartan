@@ -1,3 +1,6 @@
+#include "../support/kinematics_helpers.h"
+#include "../support/joint_limits_helpers.h"
+
 #include "cartan/analytical.h"
 #include "cartan/serial_chain.h"
 
@@ -12,12 +15,14 @@ using Catch::Matchers::WithinAbs;
 
 static constexpr double tolerance = 1e-6;
 
+using zyz_3r_chain = static_chain<double, revolute_z, revolute_y, revolute_z>;
+
 /// Build a ZYZ 3R chain with axes 1 and 2 intersecting at the origin.
 /// Joint 0: revolute_z through origin.
 /// Joint 1: revolute_y through origin.
 /// Joint 2: revolute_z through (link_offset, 0, 0).
 /// Home EE at (link_offset + ee_offset, 0, 0).
-static auto make_3r_chain(double link_offset, double ee_offset)
+static zyz_3r_chain make_3r_chain(double link_offset, double ee_offset)
 {
     auto s0 = screw_axis<double>::revolute({0, 0, 1}, {0, 0, 0});
     auto s1 = screw_axis<double>::revolute({0, 1, 0}, {0, 0, 0});
@@ -25,9 +30,10 @@ static auto make_3r_chain(double link_offset, double ee_offset)
     auto home = se3<double>(
         so3<double>::identity(),
         Eigen::Vector3d(link_offset + ee_offset, 0, 0));
-    joint_limits<double> no_limits{-10.0, 10.0};
-    return static_chain<double, revolute_z, revolute_y, revolute_z>(
-        home, {s0, s1, s2}, {no_limits, no_limits, no_limits});
+    auto no_limits = testing::limits(-10.0, 10.0);
+    return testing::unwrap(
+        zyz_3r_chain::make(home, {s0, s1, s2}, {no_limits, no_limits, no_limits}),
+        "make_3r_chain");
 }
 
 TEST_CASE("3R solver: reachable target returns solutions")
@@ -36,7 +42,7 @@ TEST_CASE("3R solver: reachable target returns solutions")
     Eigen::Vector3d q_known;
     q_known << 0.3, 0.5, -0.2;
 
-    auto fk = forward_kinematics(chain, q_known);
+    auto fk = testing::fk_at(chain, q_known);
     auto result = spatial_3r_solver(chain).solve(fk.end_effector);
 
     REQUIRE(result.has_value());
@@ -44,7 +50,7 @@ TEST_CASE("3R solver: reachable target returns solutions")
 
     for (int i = 0; i < result->count; ++i)
     {
-        auto fk_check = forward_kinematics(chain, result->solutions[static_cast<std::size_t>(i)]);
+        auto fk_check = testing::fk_at(chain, result->solutions[static_cast<std::size_t>(i)]);
         double error = (fk_check.end_effector.translation()
             - fk.end_effector.translation()).norm();
         CHECK(error < tolerance);
@@ -57,7 +63,7 @@ TEST_CASE("3R solver: FK-computed target recovers original angles as one solutio
     Eigen::Vector3d q_known;
     q_known << 0.6, 0.8, -0.4;
 
-    auto fk = forward_kinematics(chain, q_known);
+    auto fk = testing::fk_at(chain, q_known);
     auto result = spatial_3r_solver(chain).solve(fk.end_effector);
 
     REQUIRE(result.has_value());
@@ -65,7 +71,7 @@ TEST_CASE("3R solver: FK-computed target recovers original angles as one solutio
     bool found_match = false;
     for (int i = 0; i < result->count; ++i)
     {
-        auto fk_check = forward_kinematics(chain, result->solutions[static_cast<std::size_t>(i)]);
+        auto fk_check = testing::fk_at(chain, result->solutions[static_cast<std::size_t>(i)]);
         double error = (fk_check.end_effector.translation()
             - fk.end_effector.translation()).norm();
         if (error < tolerance)
@@ -83,7 +89,7 @@ TEST_CASE("3R solver: multiple solutions are distinct")
     Eigen::Vector3d q_known;
     q_known << 0.3, 0.5, -0.2;
 
-    auto fk = forward_kinematics(chain, q_known);
+    auto fk = testing::fk_at(chain, q_known);
     auto result = spatial_3r_solver(chain).solve(fk.end_effector);
 
     REQUIRE(result.has_value());
@@ -121,7 +127,7 @@ TEST_CASE("3R solver: convenience function solve_3r works")
     Eigen::Vector3d q_known;
     q_known << 0.3, 0.5, -0.2;
 
-    auto fk = forward_kinematics(chain, q_known);
+    auto fk = testing::fk_at(chain, q_known);
 
     auto result_direct = spatial_3r_solver(chain).solve(fk.end_effector);
     auto result_convenience = solve_3r(chain, fk.end_effector);
@@ -145,14 +151,14 @@ TEST_CASE("3R solver: all solutions FK-verify")
     Eigen::Vector3d q_test;
     q_test << 1.0, 0.7, -0.5;
 
-    auto fk = forward_kinematics(chain, q_test);
+    auto fk = testing::fk_at(chain, q_test);
     auto result = spatial_3r_solver(chain).solve(fk.end_effector);
 
     REQUIRE(result.has_value());
 
     for (int i = 0; i < result->count; ++i)
     {
-        auto fk_check = forward_kinematics(chain, result->solutions[static_cast<std::size_t>(i)]);
+        auto fk_check = testing::fk_at(chain, result->solutions[static_cast<std::size_t>(i)]);
         double position_error = (fk_check.end_effector.translation()
             - fk.end_effector.translation()).norm();
         CHECK(position_error < tolerance);

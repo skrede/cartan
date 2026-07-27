@@ -41,14 +41,15 @@ void compare_fk(MakeChain make_chain, MakeKdlChain make_kdl_chain,
 
         for (int j = 0; j < n; ++j)
         {
-            double lo = chain.limits()[static_cast<std::size_t>(j)].position_min;
-            double hi = chain.limits()[static_cast<std::size_t>(j)].position_max;
+            double lo = chain.limits()[static_cast<std::size_t>(j)].position_min();
+            double hi = chain.limits()[static_cast<std::size_t>(j)].position_max();
             q(j) = lo + (hi - lo) * unit(rng);
         }
 
-        auto fk_result = cartan::forward_kinematics(chain, q);
-        auto pos_cartan = fk_result.end_effector.translation();
-        auto rot_cartan = fk_result.end_effector.rotation().matrix();
+        auto held = cartan::forward_kinematics(chain, q);
+        REQUIRE(held.has_value());
+        auto pos_cartan = held->end_effector.translation();
+        auto rot_cartan = held->end_effector.rotation().matrix();
 
         KDL::JntArray kdl_q(static_cast<unsigned>(n));
         for (int j = 0; j < n; ++j) { kdl_q(static_cast<unsigned>(j)) = q(j); }

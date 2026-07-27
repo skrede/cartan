@@ -150,7 +150,7 @@ TEST_CASE("so2: from_matrix with valid rotation", "[so2]")
 
     auto result = cartan::so2<double>::from_matrix(R);
     REQUIRE(result.has_value());
-    REQUIRE(result.value().log() == Approx(theta).margin(1e-14));
+    REQUIRE((*result).log() == Approx(theta).margin(1e-14));
 }
 
 TEST_CASE("so2: from_matrix rejects non-orthogonal matrix", "[so2]")

@@ -153,7 +153,7 @@ TEST_CASE("transform: from_matrix roundtrip", "[transform]")
     auto t = cartan::transform<world, base>{cartan::se3<double>::exp(v)};
     auto result = cartan::transform<world, base>::from_matrix(t.matrix());
     REQUIRE(result.has_value());
-    REQUIRE((result.value().matrix() - t.matrix()).norm() < 1e-10);
+    REQUIRE(((*result).matrix() - t.matrix()).norm() < 1e-10);
 }
 
 // ============================================================================

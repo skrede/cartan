@@ -1,3 +1,6 @@
+#include "../support/kinematics_helpers.h"
+#include "../support/joint_limits_helpers.h"
+
 #include <cartan/serial/ik/basic_ik_runner.h>
 #include <cartan/serial/ik/wrapper/restart_wrapper.h>
 #include <cartan/serial/ik/solver/lm.h>
@@ -41,7 +44,7 @@ static spp::kinematic_chain<double, 6> make_ur5_like_chain()
     home_trans << 0.817, 0.191, -0.006;
     auto home = spp::se3<double>(spp::so3<double>::identity(), home_trans);
 
-    spp::joint_limits<double> lim{-2 * std::numbers::pi, 2 * std::numbers::pi};
+    auto lim = spp::testing::limits(-2 * std::numbers::pi, 2 * std::numbers::pi);
     return spp::kinematic_chain<double, 6>(home, {s1, s2, s3, s4, s5, s6},
                                   {lim, lim, lim, lim, lim, lim});
 }
@@ -85,7 +88,7 @@ TEST_CASE("restart_wrapper trivial convergence", "[ik][restart]")
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
 
-    auto fk_target = spp::forward_kinematics(chain, q_known);
+    auto fk_target = spp::testing::fk_at(chain, q_known);
     auto target = fk_target.end_effector;
 
     spp::restart_wrapper<spp::kinematic_chain<double, 6>, spp::lm<spp::kinematic_chain<double, 6>>> stepper;
@@ -99,7 +102,7 @@ TEST_CASE("restart_wrapper trivial convergence", "[ik][restart]")
 
     REQUIRE(status == spp::ik_status::converged);
 
-    auto fk_sol = spp::forward_kinematics(chain, stepper.solution());
+    auto fk_sol = spp::testing::fk_at(chain, stepper.solution());
     auto err = (fk_sol.end_effector.inverse() * target).log();
     REQUIRE(err.head<3>().norm() < 1e-6);
     REQUIRE(err.tail<3>().norm() < 1e-6);
@@ -118,7 +121,7 @@ TEST_CASE("restart_wrapper re-seeds after stall", "[ik][restart]")
     Eigen::Vector<double, 6> q_known;
     q_known << 2.5, -1.8, 1.2, -2.0, 1.5, -1.0;
 
-    auto fk_target = spp::forward_kinematics(chain, q_known);
+    auto fk_target = spp::testing::fk_at(chain, q_known);
     auto target = fk_target.end_effector;
 
     // Use inner stepper options that make first attempt likely to stall
@@ -151,7 +154,7 @@ TEST_CASE("restart_wrapper re-seeds after stall", "[ik][restart]")
     // If it converged, great. If not, it at least tried multiple restarts.
     if (status == spp::ik_status::converged)
     {
-        auto fk_sol = spp::forward_kinematics(chain, stepper.solution());
+        auto fk_sol = spp::testing::fk_at(chain, stepper.solution());
         auto err = (fk_sol.end_effector.inverse() * target).log();
         REQUIRE(err.head<3>().norm() < 1e-5);
         REQUIRE(err.tail<3>().norm() < 1e-5);
@@ -169,7 +172,7 @@ TEST_CASE("restart_wrapper warm-start lambda", "[ik][restart]")
     Eigen::Vector<double, 6> q_known;
     q_known << 2.5, -1.8, 1.2, -2.0, 1.5, -1.0;
 
-    auto fk_target = spp::forward_kinematics(chain, q_known);
+    auto fk_target = spp::testing::fk_at(chain, q_known);
     auto target = fk_target.end_effector;
 
     // Run with warm-start (the default)
@@ -235,7 +238,7 @@ TEST_CASE("restart_wrapper iterations is cumulative", "[ik][restart]")
     Eigen::Vector<double, 6> q_known;
     q_known << 2.5, -1.8, 1.2, -2.0, 1.5, -1.0;
 
-    auto fk_target = spp::forward_kinematics(chain, q_known);
+    auto fk_target = spp::testing::fk_at(chain, q_known);
     auto target = fk_target.end_effector;
 
     spp::lm<spp::kinematic_chain<double, 6>>::options inner_opts;
@@ -274,7 +277,7 @@ TEST_CASE("restart_wrapper abort propagates", "[ik][restart]")
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
 
-    auto fk_target = spp::forward_kinematics(chain, q_known);
+    auto fk_target = spp::testing::fk_at(chain, q_known);
     auto target = fk_target.end_effector;
 
     spp::restart_wrapper<spp::kinematic_chain<double, 6>, spp::lm<spp::kinematic_chain<double, 6>>> stepper;
@@ -315,7 +318,7 @@ TEST_CASE("restart_wrapper step after abort short-circuits", "[ik][restart]")
 
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
-    auto target = spp::forward_kinematics(chain, q_known).end_effector;
+    auto target = spp::testing::fk_at(chain, q_known).end_effector;
 
     spp::restart_wrapper<spp::kinematic_chain<double, 6>> stepper;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
@@ -364,7 +367,7 @@ TEST_CASE("restart_wrapper retains best-so-far on terminal solve", "[ik][restart
     REQUIRE(reported < std::numeric_limits<double>::max());
 
     auto sol = stepper.solution();
-    auto fk_sol = spp::forward_kinematics(chain, sol);
+    auto fk_sol = spp::testing::fk_at(chain, sol);
     double actual = (fk_sol.end_effector.inverse() * target).log().norm();
     REQUIRE(std::abs(actual - reported) < 1e-6);
 }
@@ -383,7 +386,7 @@ TEST_CASE("restart_wrapper retained best is feasible in limits", "[ik][restart]"
 
     Eigen::Vector<double, 6> q_known;
     q_known << 2.6, -1.4, 1.1, -2.2, 1.3, 2.9;
-    auto target = spp::forward_kinematics(chain, q_known).end_effector;
+    auto target = spp::testing::fk_at(chain, q_known).end_effector;
 
     spp::restart_wrapper<spp::kinematic_chain<double, 6>>::options opts;
     opts.max_restarts = 6;
@@ -401,8 +404,8 @@ TEST_CASE("restart_wrapper retained best is feasible in limits", "[ik][restart]"
     const double slack = 1e-6;
     for (int i = 0; i < 6; ++i)
     {
-        double lo = chain.limits()[static_cast<std::size_t>(i)].position_min;
-        double hi = chain.limits()[static_cast<std::size_t>(i)].position_max;
+        double lo = chain.limits()[static_cast<std::size_t>(i)].position_min();
+        double hi = chain.limits()[static_cast<std::size_t>(i)].position_max();
         CHECK(sol(i) >= lo - slack);
         CHECK(sol(i) <= hi + slack);
     }
@@ -418,7 +421,7 @@ TEST_CASE("restart_wrapper weighted setup restarts and progresses", "[ik][restar
 
     Eigen::Vector<double, 6> q_known;
     q_known << 2.5, -1.8, 1.2, -2.0, 1.5, -1.0;
-    auto target = spp::forward_kinematics(chain, q_known).end_effector;
+    auto target = spp::testing::fk_at(chain, q_known).end_effector;
 
     // De-weight orientation (angular head), keep full position (linear tail).
     spp::error_weight<double> weight;

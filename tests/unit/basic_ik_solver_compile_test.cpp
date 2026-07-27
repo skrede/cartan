@@ -14,6 +14,8 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
+#include <utility>
+#include <type_traits>
 
 namespace spp = cartan;
 
@@ -55,4 +57,27 @@ TEST_CASE("basic_ik_solver with dls_solve_policy and clamp_limits compiles", "[i
     using solver_type = spp::basic_ik_runner<spp::dls<spp::kinematic_chain<double, 6>>>;
     solver_type solver;
     static_assert(std::is_default_constructible_v<solver_type>);
+}
+
+// A setup refused for shape or finiteness has to be expressible on both sides
+// of the runner: as a status a policy can latch and as a reason the error the
+// caller receives can carry. Naming one without the other would let a refusal
+// latch with nothing to report, or be reportable with nothing to latch it.
+TEST_CASE("a refused setup is expressible as a status and as a failure reason", "[ik][solver]")
+{
+    using runner_type = spp::basic_ik_runner<spp::dls<spp::kinematic_chain<double, 6>>>;
+    using error_type = typename decltype(std::declval<runner_type&>().solve())::error_type;
+
+    static_assert(std::is_same_v<decltype(error_type{}.reason), spp::ik_failure>);
+
+    STATIC_REQUIRE(spp::ik_status::dimension_mismatch != spp::ik_status::non_finite_input);
+    STATIC_REQUIRE(spp::ik_failure::dimension_mismatch != spp::ik_failure::non_finite_input);
+
+    error_type shape_error;
+    shape_error.reason = spp::ik_failure::dimension_mismatch;
+    REQUIRE(shape_error.reason == spp::ik_failure::dimension_mismatch);
+
+    error_type finite_error;
+    finite_error.reason = spp::ik_failure::non_finite_input;
+    REQUIRE(finite_error.reason == spp::ik_failure::non_finite_input);
 }

@@ -2,6 +2,8 @@
 /// @brief Verifies FK, Jacobian, and IK parity between kinematic_chain and
 ///        static_chain for all 9 benchmark robot geometries.
 
+#include "../support/kinematics_helpers.h"
+
 #include "../fixtures/chain_factories.h"
 
 #include <cartan/serial/ik/solvers.h>
@@ -26,91 +28,127 @@ namespace spp = cartan;
 // ============================================================================
 
 template <typename Scalar>
-auto make_3r_planar_static()
+using static_3r_planar_chain = spp::static_chain<Scalar, spp::revolute_z, spp::revolute_z, spp::revolute_z>;
+
+template <typename Scalar>
+static_3r_planar_chain<Scalar> make_3r_planar_static()
 {
     auto kc = spp::fixtures::make_3r_planar_chain<Scalar>();
-    return spp::static_chain<Scalar, spp::revolute_z, spp::revolute_z, spp::revolute_z>(
-        kc.home(), kc.axes(), kc.limits());
+    return spp::testing::unwrap(
+        static_3r_planar_chain<Scalar>::make(kc.home(), kc.axes(), kc.limits()),
+        "make_3r_planar_static");
 }
 
 template <typename Scalar>
-auto make_ur3e_static()
+using static_ur3e_chain = spp::static_chain<Scalar,
+    spp::revolute_z, spp::revolute_y, spp::revolute_y,
+    spp::revolute_y, spp::revolute_z, spp::revolute_y>;
+
+template <typename Scalar>
+static_ur3e_chain<Scalar> make_ur3e_static()
 {
     auto kc = spp::fixtures::make_ur3e_chain<Scalar>();
-    return spp::static_chain<Scalar,
-        spp::revolute_z, spp::revolute_y, spp::revolute_y,
-        spp::revolute_y, spp::revolute_z, spp::revolute_y>(
-        kc.home(), kc.axes(), kc.limits());
+    return spp::testing::unwrap(
+        static_ur3e_chain<Scalar>::make(kc.home(), kc.axes(), kc.limits()),
+        "make_ur3e_static");
 }
 
 template <typename Scalar>
-auto make_lbr_med14_static()
+using static_lbr_med14_chain = spp::static_chain<Scalar,
+    spp::revolute_z, spp::revolute_y, spp::revolute_z, spp::revolute_y,
+    spp::revolute_z, spp::revolute_y, spp::revolute_z>;
+
+template <typename Scalar>
+static_lbr_med14_chain<Scalar> make_lbr_med14_static()
 {
     auto kc = spp::fixtures::make_lbr_med14_chain<Scalar>();
-    return spp::static_chain<Scalar,
-        spp::revolute_z, spp::revolute_y, spp::revolute_z, spp::revolute_y,
-        spp::revolute_z, spp::revolute_y, spp::revolute_z>(
-        kc.home(), kc.axes(), kc.limits());
+    return spp::testing::unwrap(
+        static_lbr_med14_chain<Scalar>::make(kc.home(), kc.axes(), kc.limits()),
+        "make_lbr_med14_static");
 }
 
 template <typename Scalar>
-auto make_kr6_sixx_static()
+using static_kr6_sixx_chain = spp::static_chain<Scalar,
+    spp::revolute_z, spp::revolute_y, spp::revolute_y,
+    spp::revolute_x, spp::revolute_y, spp::revolute_x>;
+
+template <typename Scalar>
+static_kr6_sixx_chain<Scalar> make_kr6_sixx_static()
 {
     auto kc = spp::fixtures::make_kr6_sixx_chain<Scalar>();
-    return spp::static_chain<Scalar,
-        spp::revolute_z, spp::revolute_y, spp::revolute_y,
-        spp::revolute_x, spp::revolute_y, spp::revolute_x>(
-        kc.home(), kc.axes(), kc.limits());
+    return spp::testing::unwrap(
+        static_kr6_sixx_chain<Scalar>::make(kc.home(), kc.axes(), kc.limits()),
+        "make_kr6_sixx_static");
 }
 
 template <typename Scalar>
-auto make_panda_static()
+using static_panda_chain = spp::static_chain<Scalar,
+    spp::revolute_z, spp::revolute_y, spp::revolute_z, spp::revolute_y,
+    spp::revolute_z, spp::revolute_y, spp::revolute_z>;
+
+template <typename Scalar>
+static_panda_chain<Scalar> make_panda_static()
 {
     auto kc = spp::fixtures::make_panda_chain<Scalar>();
-    return spp::static_chain<Scalar,
-        spp::revolute_z, spp::revolute_y, spp::revolute_z, spp::revolute_y,
-        spp::revolute_z, spp::revolute_y, spp::revolute_z>(
-        kc.home(), kc.axes(), kc.limits());
+    return spp::testing::unwrap(
+        static_panda_chain<Scalar>::make(kc.home(), kc.axes(), kc.limits()),
+        "make_panda_static");
 }
 
 template <typename Scalar>
-auto make_abb_irb120_static()
+using static_abb_irb120_chain = spp::static_chain<Scalar,
+    spp::revolute_z, spp::revolute_y, spp::revolute_y,
+    spp::revolute_x, spp::revolute_y, spp::revolute_x>;
+
+template <typename Scalar>
+static_abb_irb120_chain<Scalar> make_abb_irb120_static()
 {
     auto kc = spp::fixtures::make_abb_irb120_chain<Scalar>();
-    return spp::static_chain<Scalar,
-        spp::revolute_z, spp::revolute_y, spp::revolute_y,
-        spp::revolute_x, spp::revolute_y, spp::revolute_x>(
-        kc.home(), kc.axes(), kc.limits());
+    return spp::testing::unwrap(
+        static_abb_irb120_chain<Scalar>::make(kc.home(), kc.axes(), kc.limits()),
+        "make_abb_irb120_static");
 }
 
 template <typename Scalar>
-auto make_jaco2_static()
+using static_jaco2_chain = spp::static_chain<Scalar,
+    spp::revolute_z, spp::revolute_y, spp::revolute_y,
+    spp::revolute_x, spp::revolute_y, spp::revolute_x>;
+
+template <typename Scalar>
+static_jaco2_chain<Scalar> make_jaco2_static()
 {
     auto kc = spp::fixtures::make_jaco2_chain<Scalar>();
-    return spp::static_chain<Scalar,
-        spp::revolute_z, spp::revolute_y, spp::revolute_y,
-        spp::revolute_x, spp::revolute_y, spp::revolute_x>(
-        kc.home(), kc.axes(), kc.limits());
+    return spp::testing::unwrap(
+        static_jaco2_chain<Scalar>::make(kc.home(), kc.axes(), kc.limits()),
+        "make_jaco2_static");
 }
 
 template <typename Scalar>
-auto make_fetch_static()
+using static_fetch_chain = spp::static_chain<Scalar,
+    spp::revolute_z, spp::revolute_y, spp::revolute_x, spp::revolute_y,
+    spp::revolute_x, spp::revolute_y, spp::revolute_x>;
+
+template <typename Scalar>
+static_fetch_chain<Scalar> make_fetch_static()
 {
     auto kc = spp::fixtures::make_fetch_chain<Scalar>();
-    return spp::static_chain<Scalar,
-        spp::revolute_z, spp::revolute_y, spp::revolute_x, spp::revolute_y,
-        spp::revolute_x, spp::revolute_y, spp::revolute_x>(
-        kc.home(), kc.axes(), kc.limits());
+    return spp::testing::unwrap(
+        static_fetch_chain<Scalar>::make(kc.home(), kc.axes(), kc.limits()),
+        "make_fetch_static");
 }
 
 template <typename Scalar>
-auto make_baxter_static()
+using static_baxter_chain = spp::static_chain<Scalar,
+    spp::revolute_z, spp::revolute_y, spp::revolute_x, spp::revolute_y,
+    spp::revolute_x, spp::revolute_y, spp::revolute_x>;
+
+template <typename Scalar>
+static_baxter_chain<Scalar> make_baxter_static()
 {
     auto kc = spp::fixtures::make_baxter_chain<Scalar>();
-    return spp::static_chain<Scalar,
-        spp::revolute_z, spp::revolute_y, spp::revolute_x, spp::revolute_y,
-        spp::revolute_x, spp::revolute_y, spp::revolute_x>(
-        kc.home(), kc.axes(), kc.limits());
+    return spp::testing::unwrap(
+        static_baxter_chain<Scalar>::make(kc.home(), kc.axes(), kc.limits()),
+        "make_baxter_static");
 }
 
 // ============================================================================
@@ -127,8 +165,8 @@ void verify_fk_parity(
 {
     for (const auto& q : configs)
     {
-        auto fk_kc = spp::forward_kinematics(kc, q);
-        auto fk_sc = spp::forward_kinematics(sc, q);
+        auto fk_kc = spp::testing::fk_at(kc, q);
+        auto fk_sc = spp::testing::fk_at(sc, q);
 
         auto diff = (fk_kc.end_effector.inverse() * fk_sc.end_effector).log();
         REQUIRE(diff.norm() < tol);
@@ -145,15 +183,15 @@ void verify_jacobian_parity(
 {
     for (const auto& q : configs)
     {
-        auto fk_kc = spp::forward_kinematics(kc, q);
-        auto fk_sc = spp::forward_kinematics(sc, q);
+        auto fk_kc = spp::testing::fk_at(kc, q);
+        auto fk_sc = spp::testing::fk_at(sc, q);
 
-        auto Js_kc = spp::space_jacobian(kc, fk_kc);
-        auto Js_sc = spp::space_jacobian(sc, fk_sc);
+        auto Js_kc = spp::testing::space_jacobian_at(kc, fk_kc);
+        auto Js_sc = spp::testing::space_jacobian_at(sc, fk_sc);
         REQUIRE((Js_kc - Js_sc).norm() < tol);
 
-        auto Jb_kc = spp::body_jacobian(kc, fk_kc);
-        auto Jb_sc = spp::body_jacobian(sc, fk_sc);
+        auto Jb_kc = spp::testing::body_jacobian_at(kc, fk_kc);
+        auto Jb_sc = spp::testing::body_jacobian_at(sc, fk_sc);
         REQUIRE((Jb_kc - Jb_sc).norm() < tol);
     }
 }
@@ -165,7 +203,7 @@ void verify_ik_parity(
     const SChain& sc,
     const Eigen::Vector<double, N>& q_known)
 {
-    auto target = spp::forward_kinematics(kc, q_known).end_effector;
+    auto target = spp::testing::fk_at(kc, q_known).end_effector;
     Eigen::Vector<double, N> q0 = Eigen::Vector<double, N>::Zero();
     spp::convergence_criteria<double> criteria{1e-6, 1e-6, 200};
 
@@ -180,8 +218,8 @@ void verify_ik_parity(
     REQUIRE(sc_result.has_value());
 
     // Verify both solutions reach the target
-    auto fk_kc = spp::forward_kinematics(kc, kc_result->solution.position);
-    auto fk_sc = spp::forward_kinematics(sc, sc_result->solution.position);
+    auto fk_kc = spp::testing::fk_at(kc, kc_result->solution.position);
+    auto fk_sc = spp::testing::fk_at(sc, sc_result->solution.position);
 
     auto err_kc = (fk_kc.end_effector.inverse() * target).log();
     auto err_sc = (fk_sc.end_effector.inverse() * target).log();

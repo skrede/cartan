@@ -3,6 +3,8 @@
 ///        and generic FK/Jacobian paths for all 9 benchmark robot geometries,
 ///        plus near-zero and zero-angle edge cases.
 
+#include "../support/kinematics_helpers.h"
+
 #include "../fixtures/chain_factories.h"
 #include "../fixtures/prismatic_chains.h"
 
@@ -25,91 +27,127 @@ namespace spp = cartan;
 // ============================================================================
 
 template <typename Scalar>
-auto make_3r_planar_static()
+using static_3r_planar_chain = spp::static_chain<Scalar, spp::revolute_z, spp::revolute_z, spp::revolute_z>;
+
+template <typename Scalar>
+static_3r_planar_chain<Scalar> make_3r_planar_static()
 {
     auto kc = spp::fixtures::make_3r_planar_chain<Scalar>();
-    return spp::static_chain<Scalar, spp::revolute_z, spp::revolute_z, spp::revolute_z>(
-        kc.home(), kc.axes(), kc.limits());
+    return spp::testing::unwrap(
+        static_3r_planar_chain<Scalar>::make(kc.home(), kc.axes(), kc.limits()),
+        "make_3r_planar_static");
 }
 
 template <typename Scalar>
-auto make_ur3e_static()
+using static_ur3e_chain = spp::static_chain<Scalar,
+    spp::revolute_z, spp::revolute_y, spp::revolute_y,
+    spp::revolute_y, spp::revolute_z, spp::revolute_y>;
+
+template <typename Scalar>
+static_ur3e_chain<Scalar> make_ur3e_static()
 {
     auto kc = spp::fixtures::make_ur3e_chain<Scalar>();
-    return spp::static_chain<Scalar,
-        spp::revolute_z, spp::revolute_y, spp::revolute_y,
-        spp::revolute_y, spp::revolute_z, spp::revolute_y>(
-        kc.home(), kc.axes(), kc.limits());
+    return spp::testing::unwrap(
+        static_ur3e_chain<Scalar>::make(kc.home(), kc.axes(), kc.limits()),
+        "make_ur3e_static");
 }
 
 template <typename Scalar>
-auto make_lbr_med14_static()
+using static_lbr_med14_chain = spp::static_chain<Scalar,
+    spp::revolute_z, spp::revolute_y, spp::revolute_z, spp::revolute_y,
+    spp::revolute_z, spp::revolute_y, spp::revolute_z>;
+
+template <typename Scalar>
+static_lbr_med14_chain<Scalar> make_lbr_med14_static()
 {
     auto kc = spp::fixtures::make_lbr_med14_chain<Scalar>();
-    return spp::static_chain<Scalar,
-        spp::revolute_z, spp::revolute_y, spp::revolute_z, spp::revolute_y,
-        spp::revolute_z, spp::revolute_y, spp::revolute_z>(
-        kc.home(), kc.axes(), kc.limits());
+    return spp::testing::unwrap(
+        static_lbr_med14_chain<Scalar>::make(kc.home(), kc.axes(), kc.limits()),
+        "make_lbr_med14_static");
 }
 
 template <typename Scalar>
-auto make_kr6_sixx_static()
+using static_kr6_sixx_chain = spp::static_chain<Scalar,
+    spp::revolute_z, spp::revolute_y, spp::revolute_y,
+    spp::revolute_x, spp::revolute_y, spp::revolute_x>;
+
+template <typename Scalar>
+static_kr6_sixx_chain<Scalar> make_kr6_sixx_static()
 {
     auto kc = spp::fixtures::make_kr6_sixx_chain<Scalar>();
-    return spp::static_chain<Scalar,
-        spp::revolute_z, spp::revolute_y, spp::revolute_y,
-        spp::revolute_x, spp::revolute_y, spp::revolute_x>(
-        kc.home(), kc.axes(), kc.limits());
+    return spp::testing::unwrap(
+        static_kr6_sixx_chain<Scalar>::make(kc.home(), kc.axes(), kc.limits()),
+        "make_kr6_sixx_static");
 }
 
 template <typename Scalar>
-auto make_panda_static()
+using static_panda_chain = spp::static_chain<Scalar,
+    spp::revolute_z, spp::revolute_y, spp::revolute_z, spp::revolute_y,
+    spp::revolute_z, spp::revolute_y, spp::revolute_z>;
+
+template <typename Scalar>
+static_panda_chain<Scalar> make_panda_static()
 {
     auto kc = spp::fixtures::make_panda_chain<Scalar>();
-    return spp::static_chain<Scalar,
-        spp::revolute_z, spp::revolute_y, spp::revolute_z, spp::revolute_y,
-        spp::revolute_z, spp::revolute_y, spp::revolute_z>(
-        kc.home(), kc.axes(), kc.limits());
+    return spp::testing::unwrap(
+        static_panda_chain<Scalar>::make(kc.home(), kc.axes(), kc.limits()),
+        "make_panda_static");
 }
 
 template <typename Scalar>
-auto make_abb_irb120_static()
+using static_abb_irb120_chain = spp::static_chain<Scalar,
+    spp::revolute_z, spp::revolute_y, spp::revolute_y,
+    spp::revolute_x, spp::revolute_y, spp::revolute_x>;
+
+template <typename Scalar>
+static_abb_irb120_chain<Scalar> make_abb_irb120_static()
 {
     auto kc = spp::fixtures::make_abb_irb120_chain<Scalar>();
-    return spp::static_chain<Scalar,
-        spp::revolute_z, spp::revolute_y, spp::revolute_y,
-        spp::revolute_x, spp::revolute_y, spp::revolute_x>(
-        kc.home(), kc.axes(), kc.limits());
+    return spp::testing::unwrap(
+        static_abb_irb120_chain<Scalar>::make(kc.home(), kc.axes(), kc.limits()),
+        "make_abb_irb120_static");
 }
 
 template <typename Scalar>
-auto make_jaco2_static()
+using static_jaco2_chain = spp::static_chain<Scalar,
+    spp::revolute_z, spp::revolute_y, spp::revolute_y,
+    spp::revolute_x, spp::revolute_y, spp::revolute_x>;
+
+template <typename Scalar>
+static_jaco2_chain<Scalar> make_jaco2_static()
 {
     auto kc = spp::fixtures::make_jaco2_chain<Scalar>();
-    return spp::static_chain<Scalar,
-        spp::revolute_z, spp::revolute_y, spp::revolute_y,
-        spp::revolute_x, spp::revolute_y, spp::revolute_x>(
-        kc.home(), kc.axes(), kc.limits());
+    return spp::testing::unwrap(
+        static_jaco2_chain<Scalar>::make(kc.home(), kc.axes(), kc.limits()),
+        "make_jaco2_static");
 }
 
 template <typename Scalar>
-auto make_fetch_static()
+using static_fetch_chain = spp::static_chain<Scalar,
+    spp::revolute_z, spp::revolute_y, spp::revolute_x, spp::revolute_y,
+    spp::revolute_x, spp::revolute_y, spp::revolute_x>;
+
+template <typename Scalar>
+static_fetch_chain<Scalar> make_fetch_static()
 {
     auto kc = spp::fixtures::make_fetch_chain<Scalar>();
-    return spp::static_chain<Scalar,
-        spp::revolute_z, spp::revolute_y, spp::revolute_x, spp::revolute_y,
-        spp::revolute_x, spp::revolute_y, spp::revolute_x>(
-        kc.home(), kc.axes(), kc.limits());
+    return spp::testing::unwrap(
+        static_fetch_chain<Scalar>::make(kc.home(), kc.axes(), kc.limits()),
+        "make_fetch_static");
 }
 
 template <typename Scalar>
-auto make_baxter_static()
+using static_baxter_chain = spp::static_chain<Scalar,
+    spp::revolute_z, spp::revolute_y, spp::revolute_x, spp::revolute_y,
+    spp::revolute_x, spp::revolute_y, spp::revolute_x>;
+
+template <typename Scalar>
+static_baxter_chain<Scalar> make_baxter_static()
 {
     auto kc = spp::fixtures::make_baxter_chain<Scalar>();
-    return spp::static_chain<Scalar,
-        spp::revolute_z, spp::revolute_y, spp::revolute_x, spp::revolute_y,
-        spp::revolute_x, spp::revolute_y, spp::revolute_x>(
-        kc.home(), kc.axes(), kc.limits());
+    return spp::testing::unwrap(
+        static_baxter_chain<Scalar>::make(kc.home(), kc.axes(), kc.limits()),
+        "make_baxter_static");
 }
 
 // ============================================================================
@@ -133,8 +171,8 @@ void verify_fk_parity_specialized(
         for (int j = 0; j < N; ++j)
             q(j) = dist(rng);
 
-        auto fk_spec = spp::forward_kinematics(sc, q);
-        auto fk_gen = spp::forward_kinematics(wrapped, q);
+        auto fk_spec = spp::testing::fk_at(sc, q);
+        auto fk_gen = spp::testing::fk_at(wrapped, q);
 
         // End-effector comparison
         double trans_diff = (fk_spec.end_effector.translation()
@@ -176,15 +214,15 @@ void verify_jacobian_parity_specialized(
         for (int j = 0; j < N; ++j)
             q(j) = dist(rng);
 
-        auto fk_spec = spp::forward_kinematics(sc, q);
-        auto fk_gen = spp::forward_kinematics(wrapped, q);
+        auto fk_spec = spp::testing::fk_at(sc, q);
+        auto fk_gen = spp::testing::fk_at(wrapped, q);
 
-        auto Js_spec = spp::space_jacobian(sc, fk_spec);
-        auto Js_gen = spp::space_jacobian(wrapped, fk_gen);
+        auto Js_spec = spp::testing::space_jacobian_at(sc, fk_spec);
+        auto Js_gen = spp::testing::space_jacobian_at(wrapped, fk_gen);
         REQUIRE((Js_spec - Js_gen).norm() < 1e-10);
 
-        auto Jb_spec = spp::body_jacobian(sc, fk_spec);
-        auto Jb_gen = spp::body_jacobian(wrapped, fk_gen);
+        auto Jb_spec = spp::testing::body_jacobian_at(sc, fk_spec);
+        auto Jb_gen = spp::testing::body_jacobian_at(wrapped, fk_gen);
         REQUIRE((Jb_spec - Jb_gen).norm() < 1e-10);
     }
 }
@@ -328,14 +366,14 @@ TEST_CASE("Specialized FK near-zero stability", "[specialized][edge]")
     Eigen::Vector<double, 6> q;
     q.setConstant(1e-15);
 
-    auto fk = spp::forward_kinematics(sc, q);
+    auto fk = spp::testing::fk_at(sc, q);
     REQUIRE_FALSE(fk.end_effector.translation().hasNaN());
     REQUIRE_FALSE(fk.end_effector.rotation().matrix().hasNaN());
 
-    auto Js = spp::space_jacobian(sc, fk);
+    auto Js = spp::testing::space_jacobian_at(sc, fk);
     REQUIRE_FALSE(Js.hasNaN());
 
-    auto Jb = spp::body_jacobian(sc, fk);
+    auto Jb = spp::testing::body_jacobian_at(sc, fk);
     REQUIRE_FALSE(Jb.hasNaN());
 
     // Near-zero angles should produce a pose close to home
@@ -355,7 +393,7 @@ TEST_CASE("Specialized FK at zero config", "[specialized][edge]")
         auto sc = make_ur3e_static<double>();
         Eigen::Vector<double, 6> q = Eigen::Vector<double, 6>::Zero();
 
-        auto fk = spp::forward_kinematics(sc, q);
+        auto fk = spp::testing::fk_at(sc, q);
 
         double trans_diff = (fk.end_effector.translation()
                              - sc.home().translation()).norm();
@@ -371,7 +409,7 @@ TEST_CASE("Specialized FK at zero config", "[specialized][edge]")
         auto sc = make_3r_planar_static<double>();
         Eigen::Vector<double, 3> q = Eigen::Vector<double, 3>::Zero();
 
-        auto fk = spp::forward_kinematics(sc, q);
+        auto fk = spp::testing::fk_at(sc, q);
 
         double trans_diff = (fk.end_effector.translation()
                              - sc.home().translation()).norm();
@@ -383,7 +421,7 @@ TEST_CASE("Specialized FK at zero config", "[specialized][edge]")
         auto sc = make_panda_static<double>();
         Eigen::Vector<double, 7> q = Eigen::Vector<double, 7>::Zero();
 
-        auto fk = spp::forward_kinematics(sc, q);
+        auto fk = spp::testing::fk_at(sc, q);
 
         double trans_diff = (fk.end_effector.translation()
                              - sc.home().translation()).norm();
@@ -422,8 +460,8 @@ TEST_CASE("Prismatic sign FK matches se3::exp oracle", "[specialized][prismatic]
         for (int j = 0; j < 4; ++j)
             q(j) = dist(rng);
 
-        auto fk_rt = spp::forward_kinematics(kc, q);
-        auto fk_or = spp::forward_kinematics(wrapped, q);
+        auto fk_rt = spp::testing::fk_at(kc, q);
+        auto fk_or = spp::testing::fk_at(wrapped, q);
         REQUIRE((fk_rt.end_effector.translation()
                  - fk_or.end_effector.translation()).norm() < 1e-12);
     }
@@ -450,7 +488,7 @@ TEST_CASE("Prismatic sign Jacobian matches adjoint-screw oracle",
         for (int j = 0; j < 4; ++j)
             q(j) = dist(rng);
 
-        auto fk_gen = spp::forward_kinematics(wrapped, q);
+        auto fk_gen = spp::testing::fk_at(wrapped, q);
 
         Eigen::Matrix<double, 6, 4> J_oracle;
         J_oracle.col(0) = sc.axis(0).to_vector();
@@ -461,22 +499,22 @@ TEST_CASE("Prismatic sign Jacobian matches adjoint-screw oracle",
                 * sc.axis(i).to_vector();
         }
 
-        auto fk_quat = spp::forward_kinematics(sc, q);
-        auto Js_quat = spp::space_jacobian(sc, fk_quat);
+        auto fk_quat = spp::testing::fk_at(sc, q);
+        auto Js_quat = spp::testing::space_jacobian_at(sc, fk_quat);
         REQUIRE((Js_quat - J_oracle).norm() < 1e-10);
 
-        auto fk_mat = spp::forward_kinematics_matrix(sc, q);
-        auto Js_mat = spp::space_jacobian(sc, fk_mat);
+        auto fk_mat = spp::testing::fk_matrix_at(sc, q);
+        auto Js_mat = spp::testing::space_jacobian_at(sc, fk_mat);
         REQUIRE((Js_mat - J_oracle).norm() < 1e-10);
 
         // Runtime (kinematic_chain) matrix and quaternion paths.
         auto kc = spp::fixtures::make_rppr_signed_chain<double>();
-        auto fk_kc = spp::forward_kinematics(kc, q);
-        auto Js_kc = spp::space_jacobian(kc, fk_kc);
+        auto fk_kc = spp::testing::fk_at(kc, q);
+        auto Js_kc = spp::testing::space_jacobian_at(kc, fk_kc);
         REQUIRE((Js_kc - J_oracle).norm() < 1e-10);
 
-        auto fk_kc_mat = spp::forward_kinematics_matrix(kc, q);
-        auto Js_kc_mat = spp::space_jacobian(kc, fk_kc_mat);
+        auto fk_kc_mat = spp::testing::fk_matrix_at(kc, q);
+        auto Js_kc_mat = spp::testing::space_jacobian_at(kc, fk_kc_mat);
         REQUIRE((Js_kc_mat - J_oracle).norm() < 1e-10);
     }
 }

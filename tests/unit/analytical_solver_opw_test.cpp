@@ -1,3 +1,6 @@
+#include "../support/kinematics_helpers.h"
+#include "../support/joint_limits_helpers.h"
+
 #include "cartan/analytical.h"
 #include "cartan/serial_chain.h"
 
@@ -19,13 +22,16 @@ using namespace cartan;
 // independent forward map at 1e-9 (never trusting the solver's own report).
 static constexpr double tolerance = 1e-9;
 
+using non_parallel_6r_chain = static_chain<double, revolute_z, revolute_y, revolute_x,
+    revolute_x, revolute_y, revolute_x>;
+
 // Worst of position and orientation reconstruction error of q against target.
 template <typename Chain>
 static double fk_error(const Chain& chain,
                        const Eigen::Vector<double, 6>& q,
                        const se3<double>& target)
 {
-    auto fk = forward_kinematics(chain, q);
+    auto fk = testing::fk_at(chain, q);
     const double pe =
         (fk.end_effector.translation() - target.translation()).norm();
     const double oe = (fk.end_effector.rotation().inverse()
@@ -37,7 +43,7 @@ static double fk_error(const Chain& chain,
 // (Z here would be parallel, so axis 2 is Z and axis 3 is X) -- the parallel
 // gate of make() must reject it. Built inline so the rejection premise is
 // self-evident from the joint tags rather than borrowed from a fixture.
-static auto make_non_ortho_parallel_chain()
+static non_parallel_6r_chain make_non_ortho_parallel_chain()
 {
     auto s0 = screw_axis<double>::revolute({0, 0, 1}, {0, 0, 0});
     auto s1 = screw_axis<double>::revolute({0, 1, 0}, {0, 0, 0.4});
@@ -47,14 +53,14 @@ static auto make_non_ortho_parallel_chain()
     auto s4 = screw_axis<double>::revolute({0, 1, 0}, {0.8, 0, 0.4});
     auto s5 = screw_axis<double>::revolute({1, 0, 0}, {0.8, 0, 0.4});
 
-    joint_limits<double> lim{-std::numbers::pi, std::numbers::pi};
+    auto lim = testing::limits(-std::numbers::pi, std::numbers::pi);
     std::array<joint_limits<double>, 6> limits{lim, lim, lim, lim, lim, lim};
 
-    return static_chain<double, revolute_z, revolute_y, revolute_x,
-                        revolute_x, revolute_y, revolute_x>(
-        se3<double>(so3<double>::identity(),
-                    Eigen::Vector3d(0.88, 0, 0.4)),
-        {s0, s1, s2, s3, s4, s5}, limits);
+    return testing::unwrap(
+        non_parallel_6r_chain::make(
+            se3<double>(so3<double>::identity(), Eigen::Vector3d(0.88, 0, 0.4)),
+            {s0, s1, s2, s3, s4, s5}, limits),
+        "make_non_parallel_chain");
 }
 
 TEST_CASE("OPW: FK round-trip reconstructs KR6 R900 targets at 1e-9 over a "
@@ -81,7 +87,7 @@ TEST_CASE("OPW: FK round-trip reconstructs KR6 R900 targets at 1e-9 over a "
         for (int k = 0; k < 6; ++k)
             q_known(k) = angle(rng);
 
-        auto target = forward_kinematics(chain, q_known).end_effector;
+        auto target = testing::fk_at(chain, q_known).end_effector;
         auto result = solver->solve(target);
 
         INFO("sample " << t << " q_known = " << q_known.transpose());
@@ -111,7 +117,7 @@ TEST_CASE("OPW: make() accepts the offset-shoulder KR6 R900 chain")
 
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.4, 0.5, 0.2, -0.3, 0.1;
-    auto target = forward_kinematics(chain, q_known).end_effector;
+    auto target = testing::fk_at(chain, q_known).end_effector;
     auto result = solver->solve(target);
 
     REQUIRE(result.has_value());
@@ -150,7 +156,7 @@ TEST_CASE("OPW: wrist singularity returns FK-verified folded solutions")
         {
             Eigen::Vector<double, 6> q;
             q << 0.3, -0.4, 0.5, q4, 0.0, q6;
-            auto target = forward_kinematics(chain, q).end_effector;
+            auto target = testing::fk_at(chain, q).end_effector;
 
             auto result = solver->solve(target);
 
@@ -236,7 +242,7 @@ TEST_CASE("OPW: the sin(theta5) fold threshold sits in the empirical "
         for (auto q : bases)
         {
             q(4) = delta;
-            auto target = forward_kinematics(chain, q).end_effector;
+            auto target = testing::fk_at(chain, q).end_effector;
 
             auto worst = [&](const auto& r) -> double
             {

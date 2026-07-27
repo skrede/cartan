@@ -155,7 +155,7 @@ TEST_CASE("se2: from_matrix with valid SE(2) matrix", "[se2]")
 
     auto result = cartan::se2<double>::from_matrix(T.matrix());
     REQUIRE(result.has_value());
-    REQUIRE((result.value().matrix() - T.matrix()).norm() == Approx(0.0).margin(1e-13));
+    REQUIRE(((*result).matrix() - T.matrix()).norm() == Approx(0.0).margin(1e-13));
 }
 
 TEST_CASE("se2: from_matrix rejects invalid matrix", "[se2]")

@@ -217,7 +217,7 @@ TEST_CASE("se3: from_matrix with valid SE(3)", "[se3]")
     auto T = cartan::se3<double>::exp(v);
     auto result = cartan::se3<double>::from_matrix(T.matrix());
     REQUIRE(result.has_value());
-    REQUIRE((result.value().matrix() - T.matrix()).norm() < 1e-10);
+    REQUIRE(((*result).matrix() - T.matrix()).norm() < 1e-10);
 }
 
 TEST_CASE("se3: from_matrix rejects invalid bottom row", "[se3]")

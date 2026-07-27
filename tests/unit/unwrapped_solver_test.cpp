@@ -1,3 +1,6 @@
+#include "../support/kinematics_helpers.h"
+#include "../support/joint_limits_helpers.h"
+
 #include "cartan/analytical.h"
 #include "cartan/serial_chain.h"
 
@@ -23,7 +26,7 @@ template <typename Chain>
 double fk_error(
     const Chain& chain, const Eigen::Vector<double, 6>& q, const se3<double>& target)
 {
-    auto fk = forward_kinematics(chain, q);
+    auto fk = testing::fk_at(chain, q);
     const double pe = (fk.end_effector.translation() - target.translation()).norm();
     const double oe =
         (fk.end_effector.rotation().inverse() * target.rotation()).log().norm();
@@ -33,25 +36,28 @@ double fk_error(
 double fk_position_error(
     const auto& chain, const Eigen::Vector<double, 3>& q, const se3<double>& target)
 {
-    auto fk = forward_kinematics(chain, q);
+    auto fk = testing::fk_at(chain, q);
     return (fk.end_effector.translation() - target.translation()).norm();
 }
 
 // ZYZ 3R chain (axes 1 and 2 intersect at the origin) with caller-chosen limits,
 // so a single geometry can realize each of the four unwrap spans.
-auto make_3r_zyz(const std::array<joint_limits<double>, 3>& limits)
+static_chain<double, revolute_z, revolute_y, revolute_z> make_3r_zyz(
+    const std::array<joint_limits<double>, 3>& limits)
 {
     auto s0 = screw_axis<double>::revolute({0, 0, 1}, {0, 0, 0});
     auto s1 = screw_axis<double>::revolute({0, 1, 0}, {0, 0, 0});
     auto s2 = screw_axis<double>::revolute({0, 0, 1}, {0.5, 0, 0});
     auto home = se3<double>(so3<double>::identity(), Eigen::Vector3d(0.8, 0, 0));
-    return static_chain<double, revolute_z, revolute_y, revolute_z>(
-        home, {s0, s1, s2}, limits);
+    return testing::unwrap(
+        static_chain<double, revolute_z, revolute_y, revolute_z>::make(
+            home, {s0, s1, s2}, limits),
+        "make_3r_zyz");
 }
 
 std::array<joint_limits<double>, 3> uniform_limits(double lo, double hi)
 {
-    joint_limits<double> lim{lo, hi};
+    auto lim = testing::limits(lo, hi);
     return {lim, lim, lim};
 }
 
@@ -65,7 +71,7 @@ TEST_CASE("unwrapped_solver: symmetric range yields the single in-range represen
 
     Eigen::Vector3d q_known;
     q_known << 0.3, 0.5, -0.2;
-    auto target = forward_kinematics(chain, q_known).end_effector;
+    auto target = testing::fk_at(chain, q_known).end_effector;
 
     auto result = wrapper.solve(target);
     REQUIRE(result.has_value());
@@ -93,7 +99,7 @@ TEST_CASE("unwrapped_solver: asymmetric range keeps in-range branches within lim
 
     Eigen::Vector3d q_known;
     q_known << 0.3, 0.5, 0.4;
-    auto target = forward_kinematics(chain, q_known).end_effector;
+    auto target = testing::fk_at(chain, q_known).end_effector;
 
     auto result = wrapper.solve(target);
     REQUIRE(result.has_value());
@@ -121,7 +127,7 @@ TEST_CASE("unwrapped_solver: multi-turn range honors the per-call reference")
 
     Eigen::Vector3d q_known;
     q_known << 0.3, 0.5, -0.2;
-    auto target = forward_kinematics(chain, q_known).end_effector;
+    auto target = testing::fk_at(chain, q_known).end_effector;
 
     auto toward_zero = wrapper.solve(target);
     Eigen::Vector3d seed;
@@ -156,7 +162,7 @@ TEST_CASE("unwrapped_solver: tight range tags out-of-arc branches, never drops t
 
     Eigen::Vector3d q_known;
     q_known << 0.3, 0.5, -0.2;
-    auto target = forward_kinematics(chain, q_known).end_effector;
+    auto target = testing::fk_at(chain, q_known).end_effector;
 
     auto raw = inner.solve(target);
     auto result = wrapper.solve(target);
@@ -197,7 +203,7 @@ TEST_CASE("unwrapped_solver: composes over the OPW solver with identical wrapper
 
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.4, 0.5, 0.2, -0.3, 0.1;
-    auto target = forward_kinematics(chain, q_known).end_effector;
+    auto target = testing::fk_at(chain, q_known).end_effector;
 
     auto result = wrapper.solve(target);
     REQUIRE(result.has_value());

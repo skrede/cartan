@@ -1,3 +1,5 @@
+#include "../support/kinematics_helpers.h"
+
 #include "../fixtures/chain_factories.h"
 
 #include <cartan/urdf.h>
@@ -32,8 +34,8 @@ auto random_within_limits(
     for (int i = 0; i < n; ++i)
     {
         const auto& lim = chain.limits()[static_cast<std::size_t>(i)];
-        Scalar lo = lim.position_min;
-        Scalar hi = lim.position_max;
+        Scalar lo = lim.position_min();
+        Scalar hi = lim.position_max();
         // Clamp infinities to a reasonable bound (continuous joints) so the
         // uniform sample is well-defined; the parity test does not depend on
         // sampling the whole real line.
@@ -73,8 +75,8 @@ void check_parity(
     for (int i = 0; i < 100; ++i)
     {
         auto q = random_within_limits(truth, rng);
-        auto fk_truth = cartan::forward_kinematics(truth, q);
-        auto fk_loaded = cartan::forward_kinematics(loaded_chain, q);
+        auto fk_truth = cartan::testing::fk_at(truth, q);
+        auto fk_loaded = cartan::testing::fk_at(loaded_chain, q);
 
         auto [pos_err, ori_err] = pose_error_norm(fk_loaded.end_effector, fk_truth.end_effector);
         REQUIRE(pos_err < Scalar(1e-12));

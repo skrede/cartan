@@ -3,6 +3,8 @@
 ///        chain reference, rejection of temporary chains at the call boundary,
 ///        and typed pre-setup errors instead of null dereferences.
 
+#include "../support/kinematics_helpers.h"
+
 #include "../fixtures/chain_factories.h"
 
 #include <cartan/serial/ik/solvers.h>
@@ -58,14 +60,17 @@ TEST_CASE("basic_ik_runner solve() before setup() reports not_initialized",
     REQUIRE(result.error().reason == spp::ik_failure::not_initialized);
 }
 
-TEST_CASE("basic_ik_runner step() before setup() returns a terminal status",
+// The status names the cause. Reporting an exhausted iteration budget for a
+// runner that never ran an iteration described the wrong failure, and a caller
+// reading it would retry with a larger budget instead of calling setup().
+TEST_CASE("basic_ik_runner step() before setup() reports not_initialized",
     "[basic_ik_runner][lifetime]")
 {
     runner3 runner;
 
     auto status = runner.step();
 
-    REQUIRE(status == spp::ik_status::iteration_limit);
+    REQUIRE(status == spp::ik_status::not_initialized);
 }
 
 // ===========================================================================
@@ -97,13 +102,14 @@ TEST_CASE("basic_ik_runner borrows a static_chain and solves it",
     "[basic_ik_runner][lifetime][static_chain]")
 {
     auto kc = spp::fixtures::make_3r_planar_chain<double>();
-    auto sc = spp::static_chain<double,
-        spp::revolute_z, spp::revolute_z, spp::revolute_z>(
-        kc.home(), kc.axes(), kc.limits());
+    auto sc = spp::testing::unwrap(
+        spp::static_chain<double, spp::revolute_z, spp::revolute_z, spp::revolute_z>::make(
+            kc.home(), kc.axes(), kc.limits()),
+        "3R planar static chain");
 
     Eigen::Vector<double, 3> q_known;
     q_known << 0.3, -0.5, 0.7;
-    auto target = spp::forward_kinematics(sc, q_known).end_effector;
+    auto target = spp::testing::fk_at(sc, q_known).end_effector;
 
     Eigen::Vector<double, 3> q0 = Eigen::Vector<double, 3>::Zero();
     spp::convergence_criteria<double> criteria{1e-6, 1e-6, 200};
@@ -114,7 +120,7 @@ TEST_CASE("basic_ik_runner borrows a static_chain and solves it",
 
     REQUIRE(result.has_value());
 
-    auto fk = spp::forward_kinematics(sc, result->solution.position);
+    auto fk = spp::testing::fk_at(sc, result->solution.position);
     auto err = (fk.end_effector.inverse() * target).log();
     REQUIRE(err.norm() < 1e-4);
 }

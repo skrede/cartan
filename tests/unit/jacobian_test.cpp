@@ -1,3 +1,6 @@
+#include "../support/kinematics_helpers.h"
+#include "../support/joint_limits_helpers.h"
+
 #include "cartan/serial_chain.h"
 
 #include <catch2/catch_approx.hpp>
@@ -24,7 +27,7 @@ static spp::kinematic_chain<double, 3> make_3r_chain()
     auto s2 = spp::screw_axis<double>::revolute({0, 0, 1}, {L, 0, 0});
     auto s3 = spp::screw_axis<double>::revolute({0, 0, 1}, {2 * L, 0, 0});
 
-    spp::joint_limits<double> lim{-std::numbers::pi, std::numbers::pi};
+    auto lim = spp::testing::limits(-std::numbers::pi, std::numbers::pi);
 
     return spp::kinematic_chain<double, 3>(
         home,
@@ -59,8 +62,8 @@ spp::jacobian_matrix<Scalar, N> finite_difference_space_jacobian(
         q_plus(i) += h;
         q_minus(i) -= h;
 
-        auto fk_plus = spp::forward_kinematics(chain, q_plus);
-        auto fk_minus = spp::forward_kinematics(chain, q_minus);
+        auto fk_plus = spp::testing::fk_at(chain, q_plus);
+        auto fk_minus = spp::testing::fk_at(chain, q_minus);
 
         // Space-frame finite difference: log(T_plus * T_minus^{-1}) / (2h)
         auto delta = (fk_plus.end_effector * fk_minus.end_effector.inverse()).log();
@@ -97,8 +100,8 @@ spp::jacobian_matrix<Scalar, N> finite_difference_body_jacobian(
         q_plus(i) += h;
         q_minus(i) -= h;
 
-        auto fk_plus = spp::forward_kinematics(chain, q_plus);
-        auto fk_minus = spp::forward_kinematics(chain, q_minus);
+        auto fk_plus = spp::testing::fk_at(chain, q_plus);
+        auto fk_minus = spp::testing::fk_at(chain, q_minus);
 
         // Body-frame finite difference: log(T_minus^{-1} * T_plus) / (2h)
         auto delta = (fk_minus.end_effector.inverse() * fk_plus.end_effector).log();
@@ -116,9 +119,9 @@ TEST_CASE("Space Jacobian at zero config: column 0 is S_1", "[jacobian]")
 {
     auto chain = make_3r_chain();
     Eigen::Vector3d q = Eigen::Vector3d::Zero();
-    auto fk = spp::forward_kinematics(chain, q);
+    auto fk = spp::testing::fk_at(chain, q);
 
-    auto J_s = spp::space_jacobian(chain, fk);
+    auto J_s = spp::testing::space_jacobian_at(chain, fk);
 
     auto s1 = chain.axes()[0].to_vector();
     for (int i = 0; i < 6; ++i)
@@ -135,9 +138,9 @@ TEST_CASE("Space Jacobian dimensions", "[jacobian]")
 {
     auto chain = make_3r_chain();
     Eigen::Vector3d q = Eigen::Vector3d::Zero();
-    auto fk = spp::forward_kinematics(chain, q);
+    auto fk = spp::testing::fk_at(chain, q);
 
-    auto J_s = spp::space_jacobian(chain, fk);
+    auto J_s = spp::testing::space_jacobian_at(chain, fk);
 
     REQUIRE(J_s.rows() == 6);
     REQUIRE(J_s.cols() == 3);
@@ -151,9 +154,9 @@ TEST_CASE("Space Jacobian vs finite-difference at q=0", "[jacobian]")
 {
     auto chain = make_3r_chain();
     Eigen::Vector3d q = Eigen::Vector3d::Zero();
-    auto fk = spp::forward_kinematics(chain, q);
+    auto fk = spp::testing::fk_at(chain, q);
 
-    auto J_s = spp::space_jacobian(chain, fk);
+    auto J_s = spp::testing::space_jacobian_at(chain, fk);
     auto J_fd = finite_difference_space_jacobian(chain, q);
 
     for (int r = 0; r < 6; ++r)
@@ -174,9 +177,9 @@ TEST_CASE("Space Jacobian vs finite-difference at non-zero q", "[jacobian]")
     auto chain = make_3r_chain();
     Eigen::Vector3d q;
     q << std::numbers::pi / 4.0, -std::numbers::pi / 6.0, std::numbers::pi / 3.0;
-    auto fk = spp::forward_kinematics(chain, q);
+    auto fk = spp::testing::fk_at(chain, q);
 
-    auto J_s = spp::space_jacobian(chain, fk);
+    auto J_s = spp::testing::space_jacobian_at(chain, fk);
     auto J_fd = finite_difference_space_jacobian(chain, q);
 
     for (int r = 0; r < 6; ++r)
@@ -197,10 +200,10 @@ TEST_CASE("Body Jacobian vs Ad_{T^{-1}} * J_s", "[jacobian]")
     auto chain = make_3r_chain();
     Eigen::Vector3d q;
     q << 0.3, -0.5, 0.7;
-    auto fk = spp::forward_kinematics(chain, q);
+    auto fk = spp::testing::fk_at(chain, q);
 
-    auto J_s = spp::space_jacobian(chain, fk);
-    auto J_b = spp::body_jacobian(chain, fk);
+    auto J_s = spp::testing::space_jacobian_at(chain, fk);
+    auto J_b = spp::testing::body_jacobian_at(chain, fk);
 
     // Manually compute J_b = Ad_{T^{-1}} * J_s
     auto Ad_inv = fk.end_effector.inverse().adjoint();
@@ -224,9 +227,9 @@ TEST_CASE("Body Jacobian vs finite-difference", "[jacobian]")
     auto chain = make_3r_chain();
     Eigen::Vector3d q;
     q << std::numbers::pi / 4.0, -std::numbers::pi / 6.0, std::numbers::pi / 3.0;
-    auto fk = spp::forward_kinematics(chain, q);
+    auto fk = spp::testing::fk_at(chain, q);
 
-    auto J_b = spp::body_jacobian(chain, fk);
+    auto J_b = spp::testing::body_jacobian_at(chain, fk);
     auto J_fd = finite_difference_body_jacobian(chain, q);
 
     for (int r = 0; r < 6; ++r)
@@ -253,11 +256,11 @@ TEST_CASE("Dynamic chain Jacobian matches fixed", "[jacobian]")
     Eigen::VectorXd q_dyn(3);
     q_dyn << 0.3, -0.5, 0.7;
 
-    auto fk_fixed = spp::forward_kinematics(fixed_chain, q_fixed);
-    auto fk_dyn = spp::forward_kinematics(dyn_chain, q_dyn);
+    auto fk_fixed = spp::testing::fk_at(fixed_chain, q_fixed);
+    auto fk_dyn = spp::testing::fk_at(dyn_chain, q_dyn);
 
-    auto J_s_fixed = spp::space_jacobian(fixed_chain, fk_fixed);
-    auto J_s_dyn = spp::space_jacobian(dyn_chain, fk_dyn);
+    auto J_s_fixed = spp::testing::space_jacobian_at(fixed_chain, fk_fixed);
+    auto J_s_dyn = spp::testing::space_jacobian_at(dyn_chain, fk_dyn);
 
     REQUIRE(J_s_dyn.rows() == 6);
     REQUIRE(J_s_dyn.cols() == 3);
@@ -286,17 +289,17 @@ TEST_CASE("Float Jacobian compiles and passes", "[jacobian]")
     auto s2 = spp::screw_axis<float>::revolute({0, 0, 1}, {L, 0, 0});
     auto s3 = spp::screw_axis<float>::revolute({0, 0, 1}, {2 * L, 0, 0});
 
-    spp::joint_limits<float> lim{
+    auto lim = spp::testing::limits(
         -static_cast<float>(std::numbers::pi),
-        static_cast<float>(std::numbers::pi)};
+        static_cast<float>(std::numbers::pi));
 
     spp::kinematic_chain<float, 3> chain(
         home, {s1, s2, s3}, {lim, lim, lim});
 
     Eigen::Vector3f q = Eigen::Vector3f::Zero();
-    auto fk = spp::forward_kinematics(chain, q);
+    auto fk = spp::testing::fk_at(chain, q);
 
-    auto J_s = spp::space_jacobian(chain, fk);
+    auto J_s = spp::testing::space_jacobian_at(chain, fk);
 
     REQUIRE(J_s.rows() == 6);
     REQUIRE(J_s.cols() == 3);
@@ -328,15 +331,15 @@ TEST_CASE("Generic dynamic-chain FK/Jacobian stays in bounds", "[jacobian][dynam
     Eigen::VectorXd q(3);
     q << 0.3, -0.5, 0.7;
 
-    auto fk_gen = spp::forward_kinematics(wrapped, q);
+    auto fk_gen = spp::testing::fk_at(wrapped, q);
     REQUIRE(fk_gen.num_joints() == 3);
 
-    auto J_gen = spp::space_jacobian(wrapped, fk_gen);
+    auto J_gen = spp::testing::space_jacobian_at(wrapped, fk_gen);
     REQUIRE(J_gen.rows() == 6);
     REQUIRE(J_gen.cols() == 3);
 
-    auto fk_ref = spp::forward_kinematics(dyn, q);
-    auto J_ref = spp::space_jacobian(dyn, fk_ref);
+    auto fk_ref = spp::testing::fk_at(dyn, q);
+    auto J_ref = spp::testing::space_jacobian_at(dyn, fk_ref);
     REQUIRE((J_gen - J_ref).norm() < 1e-12);
 
     auto diff = (fk_gen.end_effector.inverse() * fk_ref.end_effector).log();
@@ -358,7 +361,7 @@ TEST_CASE("Zero-joint dynamic chain space Jacobian is 6x0", "[jacobian][dynamic]
     REQUIRE(zero_chain.num_joints() == 0);
 
     spp::fk_result<double, spp::dynamic> fk;
-    auto J = spp::space_jacobian(zero_chain, fk);
+    auto J = spp::testing::space_jacobian_at(zero_chain, fk);
 
     REQUIRE(J.rows() == 6);
     REQUIRE(J.cols() == 0);

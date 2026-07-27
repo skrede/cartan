@@ -16,6 +16,9 @@
 /// and seed. Coverage extends to a pure-prismatic chain, a mixed
 /// revolute/prismatic chain, and a zero-DOF chain.
 
+#include "../support/kinematics_helpers.h"
+#include "../support/joint_limits_helpers.h"
+
 #include "../fixtures/chain_factories.h"
 #include "../fixtures/prismatic_chains.h"
 
@@ -99,7 +102,7 @@ sweep_stats ik_sweep_robot(MakeChain make_chain, const char* name)
             q0(j) = q_known(j) + perturb(rng);
         }
 
-        auto target = cartan::forward_kinematics(chain, q_known).end_effector;
+        auto target = cartan::testing::fk_at(chain, q_known).end_effector;
 
         cartan::basic_ik_runner<cartan::lm<Chain>> solver;
         solver.setup(chain, target, q0, criteria);
@@ -111,7 +114,7 @@ sweep_stats ik_sweep_robot(MakeChain make_chain, const char* name)
             // No lying: a reported convergence must survive independent FK
             // re-verification, never the solver's self-report alone.
             REQUIRE(cartan::verify_solution(
-                chain, target, result.value().solution.position, criteria));
+                chain, target, result->solution.position, criteria));
         }
     }
     return stats;
@@ -132,7 +135,7 @@ auto make_ppp_chain() -> cartan::kinematic_chain<Scalar, 3>
 
     auto home = cartan::se3<Scalar>(
         cartan::so3<Scalar>::identity(), vec3(Scalar(0), Scalar(0), Scalar(0)));
-    cartan::joint_limits<Scalar> lim{Scalar(-1), Scalar(1)};
+    auto lim = cartan::testing::limits(Scalar(-1), Scalar(1));
 
     return cartan::kinematic_chain<Scalar, 3>(
         home, {s1, s2, s3}, {lim, lim, lim});

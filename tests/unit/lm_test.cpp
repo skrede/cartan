@@ -1,3 +1,4 @@
+#include "../support/kinematics_helpers.h"
 #include "../support/joint_limits_helpers.h"
 
 #include <cartan/serial/ik/solver/lm.h>
@@ -20,19 +21,6 @@
 
 namespace spp = cartan;
 
-/// The checked entry point unwrapped for a test whose subject is the solver
-/// rather than the boundary. Unwrapping inside the helper keeps the return type
-/// a plain fk_result, so no call site below changes shape, and a refusal here is
-/// a bug in the test's own setup rather than a case under test.
-template <typename Chain>
-static spp::fk_result<typename Chain::scalar_type, Chain::joints> fk_at(
-    const Chain& chain,
-    const typename spp::joint_state<typename Chain::scalar_type, Chain::joints>::position_type& q)
-{
-    auto held = spp::forward_kinematics(chain, q);
-    REQUIRE(held.has_value());
-    return *held;
-}
 using Catch::Approx;
 
 // ============================================================================
@@ -104,7 +92,7 @@ TEST_CASE("LM converges on reachable 6R target", "[ik][lm]")
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
 
-    auto fk_target = fk_at(chain, q_known);
+    auto fk_target = spp::testing::fk_at(chain, q_known);
     auto target = fk_target.end_effector;
 
     spp::lm<spp::kinematic_chain<double, 6>> stepper;
@@ -119,7 +107,7 @@ TEST_CASE("LM converges on reachable 6R target", "[ik][lm]")
     REQUIRE(status == spp::ik_status::converged);
 
     // Verify FK roundtrip
-    auto fk_sol = fk_at(chain, stepper.solution());
+    auto fk_sol = spp::testing::fk_at(chain, stepper.solution());
     auto err = (fk_sol.end_effector.inverse() * target).log();
     REQUIRE(err.head<3>().norm() < 1e-6);
     REQUIRE(err.tail<3>().norm() < 1e-6);
@@ -136,7 +124,7 @@ TEST_CASE("LM converges on 3R planar target", "[ik][lm]")
     Eigen::Vector3d q_known;
     q_known << 0.5, -0.3, 0.7;
 
-    auto fk_target = fk_at(chain, q_known);
+    auto fk_target = spp::testing::fk_at(chain, q_known);
     auto target = fk_target.end_effector;
 
     spp::lm<spp::kinematic_chain<double, 3>> stepper;
@@ -150,7 +138,7 @@ TEST_CASE("LM converges on 3R planar target", "[ik][lm]")
 
     REQUIRE(status == spp::ik_status::converged);
 
-    auto fk_sol = fk_at(chain, stepper.solution());
+    auto fk_sol = spp::testing::fk_at(chain, stepper.solution());
     auto err = (fk_sol.end_effector.inverse() * target).log();
     REQUIRE(err.head<3>().norm() < 1e-6);
     REQUIRE(err.tail<3>().norm() < 1e-6);
@@ -190,7 +178,7 @@ TEST_CASE("LM lambda adapts during iteration", "[ik][lm]")
 
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
-    auto fk_target = fk_at(chain, q_known);
+    auto fk_target = spp::testing::fk_at(chain, q_known);
 
     spp::lm<spp::kinematic_chain<double, 6>> stepper;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
@@ -223,7 +211,7 @@ TEST_CASE("LM iterations count", "[ik][lm]")
 
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
-    auto fk_target = fk_at(chain, q_known);
+    auto fk_target = spp::testing::fk_at(chain, q_known);
 
     spp::lm<spp::kinematic_chain<double, 6>> stepper;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();

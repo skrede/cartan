@@ -1,3 +1,6 @@
+#include "../support/kinematics_helpers.h"
+#include "../support/joint_limits_helpers.h"
+
 #include "cartan/analytical.h"
 #include "cartan/serial_chain.h"
 
@@ -15,6 +18,11 @@ using Catch::Matchers::WithinAbs;
 
 static constexpr double tolerance = 1e-6;
 
+using zyy_zyz_6r_chain = static_chain<double, revolute_z, revolute_y, revolute_y,
+    revolute_z, revolute_y, revolute_z>;
+using zyy_zyx_6r_chain = static_chain<double, revolute_z, revolute_y, revolute_y,
+    revolute_z, revolute_y, revolute_x>;
+
 /// Build a PUMA-type 6R chain with Pieper geometry.
 ///
 /// Joints 1-3: shoulder-elbow (Z, Y, Y) for position.
@@ -22,7 +30,7 @@ static constexpr double tolerance = 1e-6;
 /// Axes 4, 5, 6 all intersect at the wrist center point.
 ///
 /// Dimensions: d1=0.5, a2=0.4, a3=0.3, d6=0.1
-static auto make_puma_chain()
+static zyy_zyz_6r_chain make_puma_chain()
 {
     double d1 = 0.5, a2 = 0.4, a3 = 0.3, d6 = 0.1;
     Eigen::Vector3d wrist_point(a2 + a3, 0, d1);
@@ -36,18 +44,18 @@ static auto make_puma_chain()
     auto s5 = screw_axis<double>::revolute({0, 0, 1}, wrist_point);
 
     auto home = se3<double>(so3<double>::identity(), ee_point);
-    joint_limits<double> no_limits{-10.0, 10.0};
+    auto no_limits = testing::limits(-10.0, 10.0);
     std::array<joint_limits<double>, 6> limits = {
         no_limits, no_limits, no_limits, no_limits, no_limits, no_limits};
 
-    return static_chain<double, revolute_z, revolute_y, revolute_y,
-                        revolute_z, revolute_y, revolute_z>(
-        home, {s0, s1, s2, s3, s4, s5}, limits);
+    return testing::unwrap(
+        zyy_zyz_6r_chain::make(home, {s0, s1, s2, s3, s4, s5}, limits),
+        "make_puma_chain");
 }
 
 /// Build a 6R chain where the last 3 axes do NOT intersect (non-Pieper).
 /// Axes 4, 5, 6 are offset from each other so they cannot intersect.
-static auto make_non_pieper_chain()
+static zyy_zyx_6r_chain make_non_pieper_chain()
 {
     auto s0 = screw_axis<double>::revolute({0, 0, 1}, {0, 0, 0});
     auto s1 = screw_axis<double>::revolute({0, 1, 0}, {0, 0, 0.5});
@@ -58,20 +66,20 @@ static auto make_non_pieper_chain()
     auto s5 = screw_axis<double>::revolute({1, 0, 0}, {0.7, 0, 3.0});    // large z offset, x-axis
 
     auto home = se3<double>(so3<double>::identity(), Eigen::Vector3d(0.8, 0, 0.5));
-    joint_limits<double> no_limits{-10.0, 10.0};
+    auto no_limits = testing::limits(-10.0, 10.0);
     std::array<joint_limits<double>, 6> limits = {
         no_limits, no_limits, no_limits, no_limits, no_limits, no_limits};
 
-    return static_chain<double, revolute_z, revolute_y, revolute_y,
-                        revolute_z, revolute_y, revolute_x>(
-        home, {s0, s1, s2, s3, s4, s5}, limits);
+    return testing::unwrap(
+        zyy_zyx_6r_chain::make(home, {s0, s1, s2, s3, s4, s5}, limits),
+        "make_non_pieper_chain");
 }
 
 /// Build a PUMA-type 6R chain whose wrist is an ASYMMETRIC (ZYX) triple:
 /// axes 4, 5, 6 point along z, y, x through the common wrist center. The
 /// canonical PUMA fixtures all use a symmetric ZYZ wrist, so this is the only
 /// chain that drives extract_asymmetric_euler.
-static auto make_asymmetric_wrist_puma()
+static zyy_zyx_6r_chain make_asymmetric_wrist_puma()
 {
     double d1 = 0.5, a2 = 0.4, a3 = 0.3, d6 = 0.1;
     Eigen::Vector3d wrist_point(a2 + a3, 0, d1);
@@ -85,18 +93,18 @@ static auto make_asymmetric_wrist_puma()
     auto s5 = screw_axis<double>::revolute({1, 0, 0}, wrist_point);
 
     auto home = se3<double>(so3<double>::identity(), ee_point);
-    joint_limits<double> no_limits{-10.0, 10.0};
+    auto no_limits = testing::limits(-10.0, 10.0);
     std::array<joint_limits<double>, 6> limits = {
         no_limits, no_limits, no_limits, no_limits, no_limits, no_limits};
 
-    return static_chain<double, revolute_z, revolute_y, revolute_y,
-                        revolute_z, revolute_y, revolute_x>(
-        home, {s0, s1, s2, s3, s4, s5}, limits);
+    return testing::unwrap(
+        zyy_zyx_6r_chain::make(home, {s0, s1, s2, s3, s4, s5}, limits),
+        "make_asymmetric_wrist_puma");
 }
 
 /// Build a 6-joint chain whose third axis is PRISMATIC. Geometry is otherwise
 /// PUMA-like; the point is that the joint-kind guard must reject it.
-static auto make_prismatic_third_joint_chain()
+static kinematic_chain<double, 6> make_prismatic_third_joint_chain()
 {
     double d1 = 0.5, a2 = 0.4, a3 = 0.3, d6 = 0.1;
     Eigen::Vector3d wrist_point(a2 + a3, 0, d1);
@@ -110,7 +118,7 @@ static auto make_prismatic_third_joint_chain()
     auto s5 = screw_axis<double>::revolute({0, 0, 1}, wrist_point);
 
     auto home = se3<double>(so3<double>::identity(), ee_point);
-    joint_limits<double> lim{-10.0, 10.0};
+    auto lim = testing::limits(-10.0, 10.0);
     std::array<joint_limits<double>, 6> limits = {lim, lim, lim, lim, lim, lim};
 
     return kinematic_chain<double, 6>(home, {s0, s1, s2, s3, s4, s5}, limits);
@@ -122,7 +130,7 @@ TEST_CASE("6R Pieper: reachable target from known FK returns solutions")
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.4, 0.5, 0.2, -0.3, 0.1;
 
-    auto fk = forward_kinematics(chain, q_known);
+    auto fk = testing::fk_at(chain, q_known);
     auto result = pieper_6r_solver(chain).solve(fk.end_effector);
 
     REQUIRE(result.has_value());
@@ -130,7 +138,7 @@ TEST_CASE("6R Pieper: reachable target from known FK returns solutions")
 
     for (int i = 0; i < result->count; ++i)
     {
-        auto fk_check = forward_kinematics(
+        auto fk_check = testing::fk_at(
             chain, result->solutions[static_cast<std::size_t>(i)]);
         double position_error = (fk_check.end_effector.translation()
             - fk.end_effector.translation()).norm();
@@ -147,7 +155,7 @@ TEST_CASE("6R Pieper: recovers original angles as one of the solutions")
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.4, 0.5, 0.2, -0.3, 0.1;
 
-    auto fk = forward_kinematics(chain, q_known);
+    auto fk = testing::fk_at(chain, q_known);
     auto result = pieper_6r_solver(chain).solve(fk.end_effector);
 
     REQUIRE(result.has_value());
@@ -155,7 +163,7 @@ TEST_CASE("6R Pieper: recovers original angles as one of the solutions")
     bool found_match = false;
     for (int i = 0; i < result->count; ++i)
     {
-        auto fk_check = forward_kinematics(
+        auto fk_check = testing::fk_at(
             chain, result->solutions[static_cast<std::size_t>(i)]);
         double position_error = (fk_check.end_effector.translation()
             - fk.end_effector.translation()).norm();
@@ -176,7 +184,7 @@ TEST_CASE("6R Pieper: multiple solutions are distinct")
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.4, 0.5, 0.2, -0.3, 0.1;
 
-    auto fk = forward_kinematics(chain, q_known);
+    auto fk = testing::fk_at(chain, q_known);
     auto result = pieper_6r_solver(chain).solve(fk.end_effector);
 
     REQUIRE(result.has_value());
@@ -214,7 +222,7 @@ TEST_CASE("6R Pieper: wrist singularity (theta5 near zero)")
     Eigen::Vector<double, 6> q_singular;
     q_singular << 0.3, -0.4, 0.5, 0.0, 0.0, 0.0;
 
-    auto fk = forward_kinematics(chain, q_singular);
+    auto fk = testing::fk_at(chain, q_singular);
     auto result = pieper_6r_solver(chain).solve(fk.end_effector);
 
     REQUIRE(result.has_value());
@@ -229,7 +237,7 @@ TEST_CASE("6R Pieper: wrist singularity (theta5 near zero)")
         {
             CHECK_FALSE(std::isnan(sol(k)));
         }
-        auto fk_check = forward_kinematics(chain, sol);
+        auto fk_check = testing::fk_at(chain, sol);
         double position_error = (fk_check.end_effector.translation()
             - fk.end_effector.translation()).norm();
         double orientation_error = (fk_check.end_effector.rotation().inverse()
@@ -268,7 +276,7 @@ TEST_CASE("6R Pieper: convenience function solve_6r works")
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.4, 0.5, 0.2, -0.3, 0.1;
 
-    auto fk = forward_kinematics(chain, q_known);
+    auto fk = testing::fk_at(chain, q_known);
 
     auto result_direct = pieper_6r_solver(chain).solve(fk.end_effector);
     auto result_convenience = solve_6r(chain, fk.end_effector);
@@ -304,7 +312,7 @@ TEST_CASE("6R Pieper: anti-parallel outer wrist solves reachable poses")
 
     for (const auto& q_known : configs)
     {
-        auto fk = forward_kinematics(chain, q_known);
+        auto fk = testing::fk_at(chain, q_known);
         auto result = pieper_6r_solver(chain).solve(fk.end_effector);
 
         REQUIRE(result.has_value());
@@ -317,7 +325,7 @@ TEST_CASE("6R Pieper: anti-parallel outer wrist solves reachable poses")
             for (int k = 0; k < 6; ++k)
                 REQUIRE_FALSE(std::isnan(sol(k)));
 
-            auto fk_check = forward_kinematics(chain, sol);
+            auto fk_check = testing::fk_at(chain, sol);
             double position_error = (fk_check.end_effector.translation()
                 - fk.end_effector.translation()).norm();
             double orientation_error = (fk_check.end_effector.rotation().inverse()
@@ -337,7 +345,7 @@ TEST_CASE("6R Pieper: solutions are wrapped to (-pi, pi] and deduplicated")
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.4, 0.5, 0.2, -0.3, 0.1;
 
-    auto fk = forward_kinematics(chain, q_known);
+    auto fk = testing::fk_at(chain, q_known);
     auto result = pieper_6r_solver(chain).solve(fk.end_effector);
 
     REQUIRE(result.has_value());
@@ -356,7 +364,7 @@ TEST_CASE("6R Pieper: solutions are wrapped to (-pi, pi] and deduplicated")
             CHECK(sol(k) > -pi - wrap_eps);
             CHECK(sol(k) <= pi + wrap_eps);
         }
-        auto fk_check = forward_kinematics(chain, sol);
+        auto fk_check = testing::fk_at(chain, sol);
         double position_error = (fk_check.end_effector.translation()
             - fk.end_effector.translation()).norm();
         double orientation_error = (fk_check.end_effector.rotation().inverse()
@@ -400,7 +408,7 @@ TEST_CASE("6R Pieper: non-Pieper chain fails gracefully")
     // Non-Pieper geometry should fail at solve() with degenerate_geometry
     Eigen::Vector<double, 6> q_test;
     q_test << 0.1, 0.2, 0.3, 0.4, 0.5, 0.6;
-    auto fk = forward_kinematics(chain, q_test);
+    auto fk = testing::fk_at(chain, q_test);
 
     auto result = solver.solve(fk.end_effector);
 
@@ -424,7 +432,7 @@ static bool fk_solvable(const Chain& chain, const se3<double>& target)
         for (int k = 0; k < 6; ++k)
             if (std::isnan(sol(k)))
                 return false;
-        auto fk = forward_kinematics(chain, sol);
+        auto fk = testing::fk_at(chain, sol);
         double pe = (fk.end_effector.translation() - target.translation()).norm();
         double oe = (fk.end_effector.rotation().inverse()
             * target.rotation()).log().norm();
@@ -443,7 +451,7 @@ TEST_CASE("6R Pieper: factory validates a canonical PUMA and solves")
 
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.4, 0.5, 0.2, -0.3, 0.1;
-    auto fk = forward_kinematics(chain, q_known);
+    auto fk = testing::fk_at(chain, q_known);
     auto result = solver->solve(fk.end_effector);
 
     REQUIRE(result.has_value());
@@ -471,7 +479,9 @@ TEST_CASE("6R Pieper: near-spherical wrist is rejected at construction")
     // tolerance, so the chain is not actually solvable. The factory (anchored
     // to the acceptance tolerance) must reject it, unlike the old 1e-3 default.
     const double wrist_offset = 5e-4;
-    auto chain = fixtures::make_near_spherical_wrist_puma<double>(wrist_offset);
+    auto chain = testing::unwrap(
+        fixtures::make_near_spherical_wrist_puma<double>(wrist_offset),
+        "make_near_spherical_wrist_puma");
     auto solver = pieper_6r_solver<decltype(chain)>::make(chain);
 
     REQUIRE_FALSE(solver.has_value());
@@ -481,7 +491,7 @@ TEST_CASE("6R Pieper: near-spherical wrist is rejected at construction")
     // rejecting it is correct (not an over-eager gate).
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.4, 0.5, 0.2, -0.3, 0.1;
-    auto fk = forward_kinematics(chain, q_known);
+    auto fk = testing::fk_at(chain, q_known);
     CHECK_FALSE(fk_solvable(chain, fk.end_effector));
 }
 
@@ -495,7 +505,7 @@ TEST_CASE("6R Pieper: shoulder singularity returns the error channel")
     Eigen::Vector<double, 6> q_singular;
     q_singular << 0.0, -std::numbers::pi / 2, 0.0, 0.0, 0.0, 0.0;
 
-    auto fk = forward_kinematics(chain, q_singular);
+    auto fk = testing::fk_at(chain, q_singular);
 
     // Precondition: the wrist center lies on the base (axis-1) z-line.
     Eigen::Vector3d wrist_center = fk.end_effector.translation()
@@ -535,8 +545,10 @@ TEST_CASE("6R Pieper: wrist-intersection tolerance sweep (construction gate)")
 
     for (const auto& s : samples)
     {
-        auto chain = fixtures::make_near_spherical_wrist_puma<double>(s.offset);
-        auto fk = forward_kinematics(chain, q_probe);
+        auto chain = testing::unwrap(
+            fixtures::make_near_spherical_wrist_puma<double>(s.offset),
+            "make_near_spherical_wrist_puma");
+        auto fk = testing::fk_at(chain, q_probe);
 
         INFO("wrist offset = " << s.offset);
         bool solvable = fk_solvable(chain, fk.end_effector);
@@ -558,7 +570,7 @@ TEST_CASE("6R Pieper: asymmetric ZYX wrist solves via Euler extraction")
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.4, 0.5, 0.2, -0.3, 0.1;
 
-    auto fk = forward_kinematics(chain, q_known);
+    auto fk = testing::fk_at(chain, q_known);
     auto result = pieper_6r_solver(chain).solve(fk.end_effector);
 
     REQUIRE(result.has_value());
@@ -571,7 +583,7 @@ TEST_CASE("6R Pieper: asymmetric ZYX wrist solves via Euler extraction")
         for (int k = 0; k < 6; ++k)
             REQUIRE_FALSE(std::isnan(sol(k)));
 
-        auto fk_check = forward_kinematics(chain, sol);
+        auto fk_check = testing::fk_at(chain, sol);
         double position_error = (fk_check.end_effector.translation()
             - fk.end_effector.translation()).norm();
         double orientation_error = (fk_check.end_effector.rotation().inverse()
@@ -593,7 +605,7 @@ TEST_CASE("6R Pieper: theta5 near pi drives the symmetric gimbal branch")
     Eigen::Vector<double, 6> q_gimbal;
     q_gimbal << 0.3, -0.4, 0.5, 0.0, std::numbers::pi, 0.0;
 
-    auto fk = forward_kinematics(chain, q_gimbal);
+    auto fk = testing::fk_at(chain, q_gimbal);
     auto result = pieper_6r_solver(chain).solve(fk.end_effector);
 
     REQUIRE(result.has_value());
@@ -606,7 +618,7 @@ TEST_CASE("6R Pieper: theta5 near pi drives the symmetric gimbal branch")
         for (int k = 0; k < 6; ++k)
             REQUIRE_FALSE(std::isnan(sol(k)));
 
-        auto fk_check = forward_kinematics(chain, sol);
+        auto fk_check = testing::fk_at(chain, sol);
         double position_error = (fk_check.end_effector.translation()
             - fk.end_effector.translation()).norm();
         double orientation_error = (fk_check.end_effector.rotation().inverse()

@@ -1,5 +1,8 @@
 #ifdef CARTAN_HAS_NLOPT
 
+#include "../support/kinematics_helpers.h"
+#include "../support/joint_limits_helpers.h"
+
 #include <cartan/serial/ik/solver/nlopt_bobyqa.h>
 
 #include <cartan/types.h>
@@ -37,7 +40,7 @@ static spp::kinematic_chain<double, 6> make_ur5_like_chain()
     home_trans << 0.817, 0.191, -0.006;
     auto home = spp::se3<double>(spp::so3<double>::identity(), home_trans);
 
-    spp::joint_limits<double> lim{-2 * std::numbers::pi, 2 * std::numbers::pi};
+    auto lim = spp::testing::limits(-2 * std::numbers::pi, 2 * std::numbers::pi);
     return spp::kinematic_chain<double, 6>(home, {s1, s2, s3, s4, s5, s6},
                                   {lim, lim, lim, lim, lim, lim});
 }
@@ -70,7 +73,7 @@ TEST_CASE("nlopt_bobyqa_solve_policy converges on UR5-like chain", "[ik][bobyqa]
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.5, 0.8, -0.3, 0.6, -0.2;
 
-    auto fk = spp::forward_kinematics(chain, q_known);
+    auto fk = spp::testing::fk_at(chain, q_known);
     auto target = fk.end_effector;
 
     // Solve from a different seed

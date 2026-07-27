@@ -1,3 +1,4 @@
+#include "../support/kinematics_helpers.h"
 #include "../support/joint_limits_helpers.h"
 
 #include <cartan/serial/ik/solver/lbfgsb.h>
@@ -22,20 +23,6 @@
 
 namespace spp = cartan;
 using Catch::Approx;
-
-/// The checked entry point unwrapped for a test whose subject is the solver
-/// rather than the boundary. Unwrapping inside the helper keeps the return type
-/// a plain fk_result, so no call site below changes shape, and a refusal here is
-/// a bug in the test's own setup rather than a case under test.
-template <typename Chain>
-static spp::fk_result<typename Chain::scalar_type, Chain::joints> fk_at(
-    const Chain& chain,
-    const typename spp::joint_state<typename Chain::scalar_type, Chain::joints>::position_type& q)
-{
-    auto held = spp::forward_kinematics(chain, q);
-    REQUIRE(held.has_value());
-    return *held;
-}
 
 // ============================================================================
 // Helper: UR5-like 6R chain
@@ -97,7 +84,7 @@ TEST_CASE("lbfgsb FK roundtrip", "[ik][lbfgsb]")
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
 
-    auto fk_target = fk_at(chain, q_known);
+    auto fk_target = spp::testing::fk_at(chain, q_known);
     auto target = fk_target.end_effector;
 
     spp::builtin_lbfgsb<spp::kinematic_chain<double, 6>> stepper;
@@ -112,7 +99,7 @@ TEST_CASE("lbfgsb FK roundtrip", "[ik][lbfgsb]")
     REQUIRE(status == spp::ik_status::converged);
 
     // Verify FK roundtrip
-    auto fk_sol = fk_at(chain, stepper.solution());
+    auto fk_sol = spp::testing::fk_at(chain, stepper.solution());
     auto err = (fk_sol.end_effector.inverse() * target).log();
     REQUIRE(err.head<3>().norm() < 1e-6);
     REQUIRE(err.tail<3>().norm() < 1e-6);
@@ -145,7 +132,7 @@ TEST_CASE("lbfgsb with tight limits", "[ik][lbfgsb]")
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.5, 0.4, 0.1, -0.4, 0.7;
 
-    auto fk_target = fk_at(chain, q_known);
+    auto fk_target = spp::testing::fk_at(chain, q_known);
     auto target = fk_target.end_effector;
 
     spp::builtin_lbfgsb<spp::kinematic_chain<double, 6>> stepper;
@@ -175,7 +162,7 @@ TEST_CASE("lbfgsb iterations count", "[ik][lbfgsb]")
 
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
-    auto fk_target = fk_at(chain, q_known);
+    auto fk_target = spp::testing::fk_at(chain, q_known);
 
     spp::builtin_lbfgsb<spp::kinematic_chain<double, 6>> stepper;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
@@ -216,7 +203,7 @@ TEST_CASE("lbfgsb with error weight", "[ik][lbfgsb]")
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
 
-    auto fk_target = fk_at(chain, q_known);
+    auto fk_target = spp::testing::fk_at(chain, q_known);
     auto target = fk_target.end_effector;
 
     spp::error_weight<double> weight;
@@ -260,7 +247,7 @@ TEST_CASE("lbfgsb stall detection", "[ik][lbfgsb]")
     Eigen::Vector<double, 6> q_far;
     q_far << 1.0, -1.0, 1.0, 0.5, -0.5, 0.5;
     auto fk_target_chain = make_ur5_like_chain();
-    auto fk_target = fk_at(fk_target_chain, q_far);
+    auto fk_target = spp::testing::fk_at(fk_target_chain, q_far);
     auto target = fk_target.end_effector;
 
     spp::builtin_lbfgsb<spp::kinematic_chain<double, 6>> stepper;

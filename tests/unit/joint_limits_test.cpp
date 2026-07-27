@@ -1,3 +1,5 @@
+#include "../support/joint_limits_helpers.h"
+
 #include <cartan/serial/chain/joint_limits.h>
 
 #include <catch2/catch_test_macros.hpp>
@@ -144,7 +146,7 @@ TEMPLATE_TEST_CASE("joint_limits::contains has no answer for a nonfinite positio
     "[joint_limits]", double, float)
 {
     using S = TestType;
-    auto lim = cartan::joint_limits<S>::make(S(-1), S(1)).value();
+    auto lim = cartan::testing::limits(S(-1), S(1));
     REQUIRE(lim.contains(S(0)) == true);
     REQUIRE(lim.contains(S(-1)) == true);
     REQUIRE(lim.contains(S(1)) == true);

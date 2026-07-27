@@ -1,3 +1,6 @@
+#include "../support/kinematics_helpers.h"
+#include "../support/joint_limits_helpers.h"
+
 #include "cartan/analytical.h"
 #include "cartan/serial_chain.h"
 
@@ -13,18 +16,20 @@ using Catch::Matchers::WithinAbs;
 
 static constexpr double tolerance = 1e-6;
 
+using planar_2r_chain = static_chain<double, revolute_y, revolute_y>;
+
 // 2R chain: two revolute_y joints in the XZ plane.
 // Joint 0 at origin, Joint 1 at (L1, 0, 0). Home EE at (L1+L2, 0, 0).
-auto make_2r_chain(double L1, double L2)
+planar_2r_chain make_2r_chain(double L1, double L2)
 {
     auto s0 = screw_axis<double>::revolute({0, 1, 0}, {0, 0, 0});
     auto s1 = screw_axis<double>::revolute({0, 1, 0}, {L1, 0, 0});
     auto home = se3<double>(
         so3<double>::identity(),
         Eigen::Vector3d(L1 + L2, 0, 0));
-    joint_limits<double> no_limits{-10.0, 10.0};
-    return static_chain<double, revolute_y, revolute_y>(
-        home, {s0, s1}, {no_limits, no_limits});
+    auto no_limits = testing::limits(-10.0, 10.0);
+    return testing::unwrap(
+        planar_2r_chain::make(home, {s0, s1}, {no_limits, no_limits}), "make_2r_chain");
 }
 
 static se3<double> target_at(double x, double y, double z)
@@ -42,7 +47,7 @@ TEST_CASE("2R solver: reachable interior target returns 2 solutions")
 
     for (std::size_t i = 0; i < static_cast<std::size_t>(result->count); ++i)
     {
-        auto fk = forward_kinematics(chain, result->solutions[i]);
+        auto fk = testing::fk_at(chain, result->solutions[i]);
         double error = (fk.end_effector.translation()
             - Eigen::Vector3d(1.0, 0, 0)).norm();
         CHECK(error < tolerance);
@@ -57,7 +62,7 @@ TEST_CASE("2R solver: fully extended boundary returns 1 solution")
     REQUIRE(result.has_value());
     CHECK(result->count == 1);
 
-    auto fk = forward_kinematics(chain, result->solutions[0]);
+    auto fk = testing::fk_at(chain, result->solutions[0]);
     double error = (fk.end_effector.translation()
         - Eigen::Vector3d(2.0, 0, 0)).norm();
     CHECK(error < tolerance);
@@ -133,7 +138,7 @@ TEST_CASE("2R solver: CTAD deduction guide works")
 // 2R chain with a BENT home: the second link leaves the first-link direction
 // at a known angle at the home configuration. The closed form carries this
 // constant home-bend angle into the joint-2 solutions.
-static auto make_bent_home_2r_chain(double L1, double L2)
+static planar_2r_chain make_bent_home_2r_chain(double L1, double L2)
 {
     auto s0 = screw_axis<double>::revolute({0, 1, 0}, {0, 0, 0});
     auto s1 = screw_axis<double>::revolute({0, 1, 0}, {L1, 0, 0});
@@ -141,9 +146,9 @@ static auto make_bent_home_2r_chain(double L1, double L2)
     auto home = se3<double>(
         so3<double>::identity(),
         Eigen::Vector3d(L1, 0, L2));
-    joint_limits<double> no_limits{-10.0, 10.0};
-    return static_chain<double, revolute_y, revolute_y>(
-        home, {s0, s1}, {no_limits, no_limits});
+    auto no_limits = testing::limits(-10.0, 10.0);
+    return testing::unwrap(
+        planar_2r_chain::make(home, {s0, s1}, {no_limits, no_limits}), "make_bent_home_2r_chain");
 }
 
 TEST_CASE("2R solver: factory validates a straight-home chain")
@@ -174,7 +179,7 @@ TEST_CASE("2R solver: bent home is solved and FK-reconstructs the target")
     REQUIRE(result->count > 0);
     for (std::size_t i = 0; i < static_cast<std::size_t>(result->count); ++i)
     {
-        auto fk = forward_kinematics(chain, result->solutions[i]);
+        auto fk = testing::fk_at(chain, result->solutions[i]);
         double error = (fk.end_effector.translation()
             - Eigen::Vector3d(0.8, 0, 0.9)).norm();
         CHECK(error < tolerance);
@@ -193,7 +198,7 @@ TEST_CASE("2R solver: bent home recovers the target at the home configuration")
     REQUIRE(result->count > 0);
     for (std::size_t i = 0; i < static_cast<std::size_t>(result->count); ++i)
     {
-        auto fk = forward_kinematics(chain, result->solutions[i]);
+        auto fk = testing::fk_at(chain, result->solutions[i]);
         double error = (fk.end_effector.translation()
             - Eigen::Vector3d(1.0, 0, 1.0)).norm();
         CHECK(error < tolerance);
@@ -208,7 +213,7 @@ TEST_CASE("2R solver: different link lengths")
     REQUIRE(result.has_value());
     for (std::size_t i = 0; i < static_cast<std::size_t>(result->count); ++i)
     {
-        auto fk = forward_kinematics(chain, result->solutions[i]);
+        auto fk = testing::fk_at(chain, result->solutions[i]);
         double error = (fk.end_effector.translation()
             - Eigen::Vector3d(1.0, 0, 0.5)).norm();
         CHECK(error < tolerance);

@@ -286,7 +286,7 @@ TEST_CASE("so3: from_matrix with valid SO(3)", "[so3]")
     auto r = cartan::so3<double>::exp(phi);
     auto result = cartan::so3<double>::from_matrix(r.matrix());
     REQUIRE(result.has_value());
-    REQUIRE((result.value().matrix() - r.matrix()).norm() < 1e-12);
+    REQUIRE(((*result).matrix() - r.matrix()).norm() < 1e-12);
 }
 
 TEST_CASE("so3: from_matrix rejects non-orthogonal matrix", "[so3]")
@@ -307,7 +307,7 @@ TEST_CASE("so3: from_quaternion with valid quaternion", "[so3]")
     auto result = cartan::so3<double>::from_quaternion(q);
     REQUIRE(result.has_value());
     auto I = cartan::matrix3<double>::Identity();
-    REQUIRE((result.value().matrix() - I).norm() < 1e-14);
+    REQUIRE(((*result).matrix() - I).norm() < 1e-14);
 }
 
 TEST_CASE("so3: from_quaternion rejects non-unit quaternion", "[so3]")
@@ -394,7 +394,7 @@ TEST_CASE("so3: matrix roundtrip with from_matrix", "[so3]")
     auto R = r.matrix();
     auto result = cartan::so3<double>::from_matrix(R);
     REQUIRE(result.has_value());
-    REQUIRE((result.value().matrix() - R).norm() < 1e-12);
+    REQUIRE(((*result).matrix() - R).norm() < 1e-12);
 }
 
 // ============================================================================

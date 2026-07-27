@@ -1,3 +1,6 @@
+#include "../support/kinematics_helpers.h"
+#include "../support/joint_limits_helpers.h"
+
 #include <cartan/serial/ik/solver/detail/analytical_gradient.h>
 
 #include <cartan/lie/se3.h>
@@ -33,7 +36,7 @@ static spp::kinematic_chain<double, 6> make_ur5_like_chain()
     home_trans << 0.817, 0.191, -0.006;
     auto home = spp::se3<double>(spp::so3<double>::identity(), home_trans);
 
-    spp::joint_limits<double> lim{-2 * std::numbers::pi, 2 * std::numbers::pi};
+    auto lim = spp::testing::limits(-2 * std::numbers::pi, 2 * std::numbers::pi);
     return spp::kinematic_chain<double, 6>(home, {s1, s2, s3, s4, s5, s6},
                                   {lim, lim, lim, lim, lim, lim});
 }
@@ -49,7 +52,7 @@ TEST_CASE("ik_se3_objective at target", "[ik][analytical_gradient]")
     Eigen::Vector<double, 6> q;
     q << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
 
-    auto fk = spp::forward_kinematics(chain, q);
+    auto fk = spp::testing::fk_at(chain, q);
     auto target = fk.end_effector;
 
     auto result = spp::ik_se3_objective<spp::kinematic_chain<double, 6>>::evaluate(chain, target, q);
@@ -73,7 +76,7 @@ TEST_CASE("ik_se3_objective gradient matches finite difference", "[ik][analytica
     // Target at a different configuration
     Eigen::Vector<double, 6> q_target;
     q_target << 0.4, -0.1, 0.3, 0.2, -0.2, 0.5;
-    auto fk_target = spp::forward_kinematics(chain, q_target);
+    auto fk_target = spp::testing::fk_at(chain, q_target);
     auto target = fk_target.end_effector;
 
     auto [info, grad] = spp::ik_se3_objective<spp::kinematic_chain<double, 6>>::evaluate_with_gradient(chain, target, q);
@@ -111,7 +114,7 @@ TEST_CASE("ik_se3_objective weighted gradient matches finite difference", "[ik][
 
     Eigen::Vector<double, 6> q_target;
     q_target << 0.4, -0.1, 0.3, 0.2, -0.2, 0.5;
-    auto fk_target = spp::forward_kinematics(chain, q_target);
+    auto fk_target = spp::testing::fk_at(chain, q_target);
     auto target = fk_target.end_effector;
 
     spp::error_weight<double> w;

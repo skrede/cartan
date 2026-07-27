@@ -19,6 +19,9 @@
 /// mirrors the KDL comparison sweep; the deterministic seed makes any failure
 /// reproducible.
 
+#include "../support/kinematics_helpers.h"
+#include "../support/joint_limits_helpers.h"
+
 #include "../fixtures/chain_factories.h"
 #include "../fixtures/prismatic_chains.h"
 
@@ -94,14 +97,14 @@ void fk_sweep_robot(MakeChain make_chain, const char* name)
         for (int j = 0; j < n; ++j)
         {
             const auto& lim = chain.limits()[static_cast<std::size_t>(j)];
-            q(j) = lim.position_min
-                 + (lim.position_max - lim.position_min) * unit(rng);
+            q(j) = lim.position_min()
+                 + (lim.position_max() - lim.position_min()) * unit(rng);
             q_dyn(j) = q(j);
         }
 
-        auto fk = cartan::forward_kinematics(chain, q).end_effector;
+        auto fk = cartan::testing::fk_at(chain, q).end_effector;
         auto oracle = poe_oracle(chain, q);
-        auto fk_dyn = cartan::forward_kinematics(dyn, q_dyn).end_effector;
+        auto fk_dyn = cartan::testing::fk_at(dyn, q_dyn).end_effector;
 
         REQUIRE(pose_error(fk, oracle) < Scalar(sweep_tol));
         REQUIRE(pose_error(fk, fk_dyn) < Scalar(sweep_tol));
@@ -124,7 +127,7 @@ auto make_ppp_chain() -> cartan::kinematic_chain<Scalar, 3>
 
     auto home = cartan::se3<Scalar>(
         cartan::so3<Scalar>::identity(), vec3(Scalar(0), Scalar(0), Scalar(0)));
-    cartan::joint_limits<Scalar> lim{Scalar(-1), Scalar(1)};
+    auto lim = cartan::testing::limits(Scalar(-1), Scalar(1));
 
     return cartan::kinematic_chain<Scalar, 3>(
         home, {s1, s2, s3}, {lim, lim, lim});
@@ -178,7 +181,7 @@ TEST_CASE("FK sweep: prismatic, mixed, and zero-DOF coverage",
         REQUIRE(chain.num_joints() == 0);
 
         Eigen::VectorX<double> q(0);
-        auto fk = cartan::forward_kinematics(chain, q).end_effector;
+        auto fk = cartan::testing::fk_at(chain, q).end_effector;
         REQUIRE(pose_error(fk, chain.home()) < sweep_tol);
     }
 }

@@ -1,3 +1,6 @@
+#include "../support/kinematics_helpers.h"
+#include "../support/joint_limits_helpers.h"
+
 #include "../fixtures/redundant_chains.h"
 
 #include <cartan/serial/ik/solver/projected_lm.h>
@@ -41,7 +44,7 @@ static spp::kinematic_chain<double, 6> make_ur5_like_chain()
     home_trans << 0.817, 0.191, -0.006;
     auto home = spp::se3<double>(spp::so3<double>::identity(), home_trans);
 
-    spp::joint_limits<double> lim{-2 * std::numbers::pi, 2 * std::numbers::pi};
+    auto lim = spp::testing::limits(-2 * std::numbers::pi, 2 * std::numbers::pi);
     return spp::kinematic_chain<double, 6>(home, {s1, s2, s3, s4, s5, s6},
                                   {lim, lim, lim, lim, lim, lim});
 }
@@ -63,8 +66,8 @@ static spp::kinematic_chain<double, 6> make_ur5_tight_limits_chain()
     home_trans << 0.817, 0.191, -0.006;
     auto home = spp::se3<double>(spp::so3<double>::identity(), home_trans);
 
-    spp::joint_limits<double> wide{-2 * std::numbers::pi, 2 * std::numbers::pi};
-    spp::joint_limits<double> tight{-0.5, 0.5};
+    auto wide = spp::testing::limits(-2 * std::numbers::pi, 2 * std::numbers::pi);
+    auto tight = spp::testing::limits(-0.5, 0.5);
     return spp::kinematic_chain<double, 6>(home, {s1, s2, s3, s4, s5, s6},
                                   {wide, wide, tight, wide, wide, wide});
 }
@@ -107,8 +110,8 @@ TEST_CASE("null-space limit step stays in the Jacobian kernel", "[ik][limits][nu
     Eigen::VectorXd q(n);
     q << 0.35, -0.55, 0.42, 0.90, -0.30, 0.65, -0.50;
 
-    auto fk = spp::forward_kinematics(chain, q);
-    auto J_b = spp::body_jacobian(chain, fk);
+    auto fk = spp::testing::fk_at(chain, q);
+    auto J_b = spp::testing::body_jacobian_at(chain, fk);
 
     Eigen::VectorXd q_before = q;
     spp::detail::enforce_limits<spp::null_space_limits>(q, chain);
@@ -144,7 +147,7 @@ TEST_CASE("projected_lm FK roundtrip", "[ik][projected_lm]")
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
 
-    auto fk_target = spp::forward_kinematics(chain, q_known);
+    auto fk_target = spp::testing::fk_at(chain, q_known);
     auto target = fk_target.end_effector;
 
     spp::projected_lm<spp::kinematic_chain<double, 6>> stepper;
@@ -159,7 +162,7 @@ TEST_CASE("projected_lm FK roundtrip", "[ik][projected_lm]")
     REQUIRE(status == spp::ik_status::converged);
 
     // Verify FK roundtrip
-    auto fk_sol = spp::forward_kinematics(chain, stepper.solution());
+    auto fk_sol = spp::testing::fk_at(chain, stepper.solution());
     auto err = (fk_sol.end_effector.inverse() * target).log();
     REQUIRE(err.head<3>().norm() < 1e-6);
     REQUIRE(err.tail<3>().norm() < 1e-6);
@@ -177,7 +180,7 @@ TEST_CASE("projected_lm respects tight limits", "[ik][projected_lm]")
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.5, 0.4, 0.1, -0.4, 0.7;
 
-    auto fk_target = spp::forward_kinematics(chain, q_known);
+    auto fk_target = spp::testing::fk_at(chain, q_known);
     auto target = fk_target.end_effector;
 
     spp::projected_lm<spp::kinematic_chain<double, 6>> stepper;
@@ -209,7 +212,7 @@ TEST_CASE("projected_lm active set holds joints at limits", "[ik][projected_lm]"
     Eigen::Vector<double, 6> q_known;
     q_known << 0.2, -0.3, 0.3, 0.1, -0.2, 0.5;
 
-    auto fk_target = spp::forward_kinematics(chain, q_known);
+    auto fk_target = spp::testing::fk_at(chain, q_known);
     auto target = fk_target.end_effector;
 
     spp::projected_lm<spp::kinematic_chain<double, 6>> stepper;
@@ -240,7 +243,7 @@ TEST_CASE("projected_lm dogleg converges", "[ik][projected_lm]")
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
 
-    auto fk_target = spp::forward_kinematics(chain, q_known);
+    auto fk_target = spp::testing::fk_at(chain, q_known);
     auto target = fk_target.end_effector;
 
     spp::projected_lm<spp::kinematic_chain<double, 6>>::options opts;
@@ -257,7 +260,7 @@ TEST_CASE("projected_lm dogleg converges", "[ik][projected_lm]")
 
     REQUIRE(status == spp::ik_status::converged);
 
-    auto fk_sol = spp::forward_kinematics(chain, stepper.solution());
+    auto fk_sol = spp::testing::fk_at(chain, stepper.solution());
     auto err = (fk_sol.end_effector.inverse() * target).log();
     REQUIRE(err.head<3>().norm() < 1e-6);
     REQUIRE(err.tail<3>().norm() < 1e-6);
@@ -274,7 +277,7 @@ TEST_CASE("projected_lm with error weight", "[ik][projected_lm]")
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
 
-    auto fk_target = spp::forward_kinematics(chain, q_known);
+    auto fk_target = spp::testing::fk_at(chain, q_known);
     auto target = fk_target.end_effector;
 
     // Weight emphasizing position (linear part) over orientation
@@ -292,7 +295,7 @@ TEST_CASE("projected_lm with error weight", "[ik][projected_lm]")
 
     REQUIRE(status == spp::ik_status::converged);
 
-    auto fk_sol = spp::forward_kinematics(chain, stepper.solution());
+    auto fk_sol = spp::testing::fk_at(chain, stepper.solution());
     auto err = (fk_sol.end_effector.inverse() * target).log();
     REQUIRE(err.head<3>().norm() < 1e-6);
     REQUIRE(err.tail<3>().norm() < 1e-6);

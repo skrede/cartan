@@ -1,3 +1,4 @@
+#include "../support/kinematics_helpers.h"
 #include "../support/joint_limits_helpers.h"
 
 #include <cartan/serial/ik/solver/dls.h>
@@ -20,19 +21,6 @@
 
 namespace spp = cartan;
 
-/// The checked entry point unwrapped for a test whose subject is the solver
-/// rather than the boundary. Unwrapping inside the helper keeps the return type
-/// a plain fk_result, so no call site below changes shape, and a refusal here is
-/// a bug in the test's own setup rather than a case under test.
-template <typename Chain>
-static spp::fk_result<typename Chain::scalar_type, Chain::joints> fk_at(
-    const Chain& chain,
-    const typename spp::joint_state<typename Chain::scalar_type, Chain::joints>::position_type& q)
-{
-    auto held = spp::forward_kinematics(chain, q);
-    REQUIRE(held.has_value());
-    return *held;
-}
 using Catch::Approx;
 
 // ============================================================================
@@ -105,7 +93,7 @@ TEST_CASE("DLS converges on reachable 6R target", "[ik][dls]")
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
 
-    auto fk_target = fk_at(chain, q_known);
+    auto fk_target = spp::testing::fk_at(chain, q_known);
     auto target = fk_target.end_effector;
 
     // Solve IK from zero seed
@@ -121,7 +109,7 @@ TEST_CASE("DLS converges on reachable 6R target", "[ik][dls]")
     REQUIRE(status == spp::ik_status::converged);
 
     // Verify FK roundtrip
-    auto fk_sol = fk_at(chain, stepper.solution());
+    auto fk_sol = spp::testing::fk_at(chain, stepper.solution());
     auto err = (fk_sol.end_effector.inverse() * target).log();
     REQUIRE(err.head<3>().norm() < 1e-6);
     REQUIRE(err.tail<3>().norm() < 1e-6);
@@ -138,7 +126,7 @@ TEST_CASE("DLS converges on 3R planar target", "[ik][dls]")
     Eigen::Vector3d q_known;
     q_known << 0.5, -0.3, 0.7;
 
-    auto fk_target = fk_at(chain, q_known);
+    auto fk_target = spp::testing::fk_at(chain, q_known);
     auto target = fk_target.end_effector;
 
     spp::dls<spp::kinematic_chain<double, 3>> stepper;
@@ -152,7 +140,7 @@ TEST_CASE("DLS converges on 3R planar target", "[ik][dls]")
 
     REQUIRE(status == spp::ik_status::converged);
 
-    auto fk_sol = fk_at(chain, stepper.solution());
+    auto fk_sol = spp::testing::fk_at(chain, stepper.solution());
     auto err = (fk_sol.end_effector.inverse() * target).log();
     REQUIRE(err.head<3>().norm() < 1e-6);
     REQUIRE(err.tail<3>().norm() < 1e-6);
@@ -195,7 +183,7 @@ TEST_CASE("DLS near-singular convergence", "[ik][dls]")
     Eigen::Vector<double, 6> q_known;
     q_known << 0.0, 0.01, 0.01, 0.0, 0.01, 0.0;
 
-    auto fk_target = fk_at(chain, q_known);
+    auto fk_target = spp::testing::fk_at(chain, q_known);
     auto target = fk_target.end_effector;
 
     spp::dls<spp::kinematic_chain<double, 6>> stepper;
@@ -206,7 +194,7 @@ TEST_CASE("DLS near-singular convergence", "[ik][dls]")
     criteria.max_total_work_units = 600;
 
     // Seed pose error, used below to show the damped iterate makes real progress.
-    auto seed_err = (fk_at(chain, q0).end_effector.inverse() * target).log();
+    auto seed_err = (spp::testing::fk_at(chain, q0).end_effector.inverse() * target).log();
 
     stepper.setup(chain, target, q0, criteria);
     auto status = run_stepper(stepper, chain, 300);
@@ -219,7 +207,7 @@ TEST_CASE("DLS near-singular convergence", "[ik][dls]")
     REQUIRE(status != spp::ik_status::diverged);
     REQUIRE(std::isfinite(stepper.condition_number()));
 
-    auto fk_sol = fk_at(chain, stepper.solution());
+    auto fk_sol = spp::testing::fk_at(chain, stepper.solution());
     auto err = (fk_sol.end_effector.inverse() * target).log();
     REQUIRE(std::isfinite(err.norm()));
     REQUIRE(err.norm() < 1e-2);                     // reaches within 1e-2 of the target
@@ -237,7 +225,7 @@ TEST_CASE("DLS separate angular/linear convergence", "[ik][dls]")
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
 
-    auto fk_target = fk_at(chain, q_known);
+    auto fk_target = spp::testing::fk_at(chain, q_known);
     auto target = fk_target.end_effector;
 
     // Loose position tolerance, tight orientation tolerance
@@ -265,7 +253,7 @@ TEST_CASE("DLS condition_number tracks proximity to singularity", "[ik][dls]")
 
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
-    auto target = fk_at(chain, q_known).end_effector;
+    auto target = spp::testing::fk_at(chain, q_known).end_effector;
 
     spp::convergence_criteria<double> criteria;
 
@@ -305,7 +293,7 @@ TEST_CASE("DLS iterations count", "[ik][dls]")
 
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
-    auto fk_target = fk_at(chain, q_known);
+    auto fk_target = spp::testing::fk_at(chain, q_known);
 
     spp::dls<spp::kinematic_chain<double, 6>> stepper;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();

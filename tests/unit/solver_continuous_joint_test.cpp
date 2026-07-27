@@ -1,3 +1,5 @@
+#include "../support/kinematics_helpers.h"
+
 #include <cartan/urdf.h>
 
 #include <cartan/serial/ik/ik_status.h>
@@ -55,7 +57,7 @@ void verify_continuous_wrist_roundtrip(unsigned seed_offset)
 
     Eigen::Vector<double, Eigen::Dynamic> q_known(chain.num_joints());
     q_known << 0.4, -0.6, 0.9;
-    auto fk_target = cartan::forward_kinematics(chain, q_known);
+    auto fk_target = cartan::testing::fk_at(chain, q_known);
     auto target = fk_target.end_effector;
 
     Solver solver{};
@@ -81,7 +83,7 @@ void verify_continuous_wrist_roundtrip(unsigned seed_offset)
 
     REQUIRE(solver.converged());
 
-    auto fk_sol = cartan::forward_kinematics(chain, solver.solution());
+    auto fk_sol = cartan::testing::fk_at(chain, solver.solution());
     const auto err = (fk_sol.end_effector.inverse() * target).log();
     REQUIRE(err.template head<3>().norm() < 1e-5);
     REQUIRE(err.template tail<3>().norm() < 1e-5);
