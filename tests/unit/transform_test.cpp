@@ -5,6 +5,7 @@
 #include <catch2/catch_template_test_macros.hpp>
 
 #include <cmath>
+#include <limits>
 #include <numbers>
 #include <type_traits>
 
@@ -185,4 +186,23 @@ TEST_CASE("transform: m_value is accessible as se3", "[transform]")
     auto M = t.m_value.matrix();
     auto I = cartan::matrix4<double>::Identity();
     REQUIRE((M - I).norm() < 1e-14);
+}
+
+// ============================================================================
+// Nonfinite rejection through delegation
+// ============================================================================
+
+/// from_matrix forwards to se3 and adds no test of its own. The translation
+/// block is the position nothing examined before that guard existed.
+TEMPLATE_TEST_CASE("transform: from_matrix rejects nonfinite input",
+    "[transform][nonfinite]", double, float)
+{
+    using S = TestType;
+
+    cartan::matrix4<S> T = cartan::matrix4<S>::Identity();
+    T(0, 3) = std::numeric_limits<S>::infinity();
+
+    auto result = cartan::transform<world, base, S>::from_matrix(T);
+    REQUIRE_FALSE(result.has_value());
+    REQUIRE(result.error() == cartan::lie_failure::non_finite_input);
 }

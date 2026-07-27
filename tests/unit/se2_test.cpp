@@ -445,3 +445,80 @@ TEST_CASE("se2: isApprox is rotation-wrap safe", "[se2]")
     cartan::se2<double> b(cartan::so2<double>::exp(pi + 1e-10), trans);
     REQUIRE(a.isApprox(b, 1e-6));
 }
+
+// ============================================================================
+// Nonfinite rejection
+// ============================================================================
+
+/// The affine-row and rotation-block tests as they read without a finiteness
+/// guard in front of them, with every comparison negated exactly as the factory
+/// spells it: `!(deviation > tol)` is true for a NaN where `deviation <= tol` is
+/// false. Nothing in this chain reads the translation block, which is why the
+/// translation cases below assert that it admits every value class.
+template <typename S>
+static bool unguarded_gate_admits(const Eigen::Matrix<S, 3, 3>& T)
+{
+    const S tol = cartan::detail::sqrt_epsilon_v<S>;
+    const bool affine_row_ok = !(std::abs(T(2, 0)) > tol) && !(std::abs(T(2, 1)) > tol)
+        && !(std::abs(T(2, 2) - S(1)) > tol);
+
+    const cartan::matrix2<S> R = T.template block<2, 2>(0, 0);
+    const cartan::matrix2<S> RtR = R.transpose() * R;
+    return affine_row_ok
+        && !((RtR - cartan::matrix2<S>::Identity()).norm() > tol)
+        && !(std::abs(R.determinant() - S(1)) > tol);
+}
+
+template <typename S>
+static void expect_affine_row_rejected(S poison, bool unguarded_admits)
+{
+    for (int j = 0; j < 3; ++j)
+    {
+        Eigen::Matrix<S, 3, 3> T = Eigen::Matrix<S, 3, 3>::Identity();
+        T(2, j) = poison;
+
+        auto result = cartan::se2<S>::from_matrix(T);
+        REQUIRE_FALSE(result.has_value());
+        REQUIRE(result.error() == cartan::lie_failure::non_finite_input);
+        REQUIRE(unguarded_gate_admits<S>(T) == unguarded_admits);
+    }
+}
+
+template <typename S>
+static void expect_translation_rejected(S poison, bool unguarded_admits)
+{
+    for (int i = 0; i < 2; ++i)
+    {
+        Eigen::Matrix<S, 3, 3> T = Eigen::Matrix<S, 3, 3>::Identity();
+        T(i, 2) = poison;
+
+        auto result = cartan::se2<S>::from_matrix(T);
+        REQUIRE_FALSE(result.has_value());
+        REQUIRE(result.error() == cartan::lie_failure::non_finite_input);
+        REQUIRE(unguarded_gate_admits<S>(T) == unguarded_admits);
+    }
+}
+
+TEMPLATE_TEST_CASE("se2: from_matrix rejects a nonfinite affine row",
+    "[se2][nonfinite]", double, float)
+{
+    using S = TestType;
+    using lim = std::numeric_limits<S>;
+
+    expect_affine_row_rejected<S>(lim::quiet_NaN(), true);
+    expect_affine_row_rejected<S>(-lim::quiet_NaN(), true);
+    expect_affine_row_rejected<S>(lim::infinity(), false);
+    expect_affine_row_rejected<S>(-lim::infinity(), false);
+}
+
+TEMPLATE_TEST_CASE("se2: from_matrix rejects a nonfinite translation block",
+    "[se2][nonfinite]", double, float)
+{
+    using S = TestType;
+    using lim = std::numeric_limits<S>;
+
+    expect_translation_rejected<S>(lim::quiet_NaN(), true);
+    expect_translation_rejected<S>(-lim::quiet_NaN(), true);
+    expect_translation_rejected<S>(lim::infinity(), true);
+    expect_translation_rejected<S>(-lim::infinity(), true);
+}

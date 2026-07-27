@@ -119,6 +119,11 @@ public:
     static cartan::expected<so2, lie_failure>
     from_matrix(const matrix2<Scalar>& R)
     {
+        if (!R.allFinite())
+        {
+            return cartan::unexpected(lie_failure::non_finite_input);
+        }
+
         Scalar tol = detail::sqrt_epsilon_v<Scalar>;
 
         // Check orthogonality: R^T * R ~= I

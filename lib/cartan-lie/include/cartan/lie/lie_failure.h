@@ -8,13 +8,21 @@ namespace cartan
 /// matchable; the sole error channel shared by so2/so3/se2/se3 from_matrix,
 /// so3 from_quaternion, the frame-tagged rotation/transform wrappers, and
 /// screw_axis::from_vector.
+///
+/// Every one of those factories tests finiteness on its raw input before it
+/// forms any product or norm, and the ordering is load-bearing rather than
+/// stylistic: an infinity multiplied by a zero is a NaN, so an infinity in
+/// R(0,1) reaches (R^T * R - I).norm() already laundered into a NaN, and every
+/// `deviation > tol` comparison is false for a NaN. A finiteness test placed
+/// after the arithmetic, or applied to its result, admits the value.
 enum class lie_failure
 {
     non_orthogonal,       ///< R^T * R deviates from identity (so2/so3 from_matrix).
     improper_rotation,    ///< det(R) != 1, a reflection rather than a rotation (so2/so3 from_matrix).
     non_unit_quaternion,  ///< ||q||^2 deviates from 1 (so3 from_quaternion).
     invalid_affine_row,   ///< Homogeneous bottom row is not [0..0 1] (se2/se3 from_matrix).
-    non_unit_screw_axis   ///< Revolute ||omega|| != 1 or prismatic ||v|| != 1 (screw_axis from_vector).
+    non_unit_screw_axis,  ///< Revolute ||omega|| != 1 or prismatic ||v|| != 1 (screw_axis from_vector).
+    non_finite_input      ///< An input component is NaN or infinite (every factory above).
 };
 
 /// Human-readable diagnostic for a lie_failure, for logging and binding
@@ -33,6 +41,8 @@ constexpr const char* message(lie_failure failure)
         return "Homogeneous bottom row is not [0..0 1]";
     case lie_failure::non_unit_screw_axis:
         return "Screw axis is not unit: revolute ||omega|| != 1 or prismatic ||v|| != 1";
+    case lie_failure::non_finite_input:
+        return "Input contains a NaN or infinite component";
     }
     return "Unknown lie_failure";
 }

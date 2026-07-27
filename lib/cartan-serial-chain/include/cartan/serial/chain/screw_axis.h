@@ -50,6 +50,11 @@ public:
     static cartan::expected<screw_axis, lie_failure> from_vector(
         const vector6<Scalar>& vec)
     {
+        if (!vec.allFinite())
+        {
+            return cartan::unexpected(lie_failure::non_finite_input);
+        }
+
         vector3<Scalar> omega = vec.template head<3>();
         vector3<Scalar> v = vec.template tail<3>();
 
