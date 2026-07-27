@@ -3,8 +3,15 @@
 
 /// Joint limits for kinematic chain joints.
 ///
-/// Stores required position bounds and optional velocity, effort,
-/// and acceleration limits. Aggregate-initializable.
+/// Required position bounds plus optional velocity, effort and acceleration
+/// limits. The five values are private and read-only, so the checked make()
+/// factory is the only way a joint_limits comes into existence and there is no
+/// way to assign one back into a state the factory would have refused.
+
+#include "cartan/serial/chain/chain_failure.h"
+#include "cartan/serial/chain/detail/limits_validation.h"
+
+#include "cartan/expected.h"
 
 #include <cmath>
 #include <numbers>
@@ -14,22 +21,83 @@ namespace cartan
 {
 
 /// Joint limits with required position bounds and optional dynamic limits.
-/// Aggregate-initializable: joint_limits<double>{-3.14, 3.14} or
-/// joint_limits<double>{-3.14, 3.14, 2.0, 50.0, 10.0}.
 template <typename Scalar = double>
-struct joint_limits
+class joint_limits
 {
-    Scalar position_min;                              ///< Minimum joint position (required)
-    Scalar position_max;                              ///< Maximum joint position (required)
-    std::optional<Scalar> velocity_max{};             ///< Maximum joint velocity (optional)
-    std::optional<Scalar> effort_max{};               ///< Maximum joint effort/torque (optional)
-    std::optional<Scalar> acceleration_max{};         ///< Maximum joint acceleration (optional)
-
-    /// Check whether a position value lies within [position_min, position_max].
-    bool contains(Scalar position) const
+public:
+    /// Validated construction, the only path to a joint_limits value.
+    ///
+    /// Positive and negative infinity are legal position bounds and must stay
+    /// legal: they are this library's encoding for an unbounded continuous
+    /// joint. The URDF builder writes them, and finite_range_or,
+    /// finite_lower_or, finite_upper_or and the fallback range below exist to
+    /// consume them. The asymmetry with the dynamic bounds is therefore
+    /// deliberate: a NaN is refused everywhere, while an infinite velocity,
+    /// effort or acceleration bound is refused because no part of the library
+    /// treats one as meaningful.
+    static cartan::expected<joint_limits, chain_failure> make(
+        Scalar position_min,
+        Scalar position_max,
+        std::optional<Scalar> velocity_max = std::nullopt,
+        std::optional<Scalar> effort_max = std::nullopt,
+        std::optional<Scalar> acceleration_max = std::nullopt)
     {
-        return position >= position_min && position <= position_max;
+        auto failure = detail::limits_failure(
+            position_min, position_max, velocity_max, effort_max, acceleration_max);
+        if (failure.has_value())
+        {
+            return cartan::unexpected(*failure);
+        }
+        return joint_limits(
+            position_min, position_max, velocity_max, effort_max, acceleration_max);
     }
+
+    Scalar position_min() const { return m_position_min; }
+
+    Scalar position_max() const { return m_position_max; }
+
+    std::optional<Scalar> effort_max() const { return m_effort_max; }
+
+    std::optional<Scalar> velocity_max() const { return m_velocity_max; }
+
+    std::optional<Scalar> acceleration_max() const { return m_acceleration_max; }
+
+    /// Whether position lies within [position_min, position_max], or nullopt
+    /// when the question has no answer.
+    ///
+    /// A nonfinite position makes both comparisons false, which reads as
+    /// "outside the limits" when the truth is that the question is malformed.
+    /// The checked entry points refuse a nonfinite joint value upstream rather
+    /// than having it classified here.
+    std::optional<bool> contains(Scalar position) const
+    {
+        if (!std::isfinite(position))
+        {
+            return std::nullopt;
+        }
+        return position >= m_position_min && position <= m_position_max;
+    }
+
+private:
+    joint_limits(
+        Scalar position_min,
+        Scalar position_max,
+        std::optional<Scalar> velocity_max,
+        std::optional<Scalar> effort_max,
+        std::optional<Scalar> acceleration_max)
+        : m_position_min(position_min)
+        , m_position_max(position_max)
+        , m_effort_max(effort_max)
+        , m_velocity_max(velocity_max)
+        , m_acceleration_max(acceleration_max)
+    {
+    }
+
+    Scalar m_position_min;
+    Scalar m_position_max;
+    std::optional<Scalar> m_effort_max;
+    std::optional<Scalar> m_velocity_max;
+    std::optional<Scalar> m_acceleration_max;
 };
 
 namespace detail

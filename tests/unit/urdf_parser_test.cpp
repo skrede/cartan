@@ -3,6 +3,7 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <cmath>
 #include <string>
 #include <filesystem>
 
@@ -156,4 +157,74 @@ TEST_CASE("parser: non-finite numeric attribute is rejected", "[urdf_parser][urd
     REQUIRE_FALSE(result.has_value());
     CHECK(result.error().kind == cartan::urdf_failure::non_finite_value);
     CHECK(result.error().detail.find("nan_limit_joint") != std::string::npos);
+}
+
+// --- Narrowing to the chain's scalar type ---
+//
+// A bound that is finite as a double and overflows to an infinity as a float has
+// to be caught at the conversion. Afterwards it is indistinguishable from the
+// +/-infinity the builder deliberately writes for a continuous joint, which is
+// why the same description must load at one precision and be refused at the
+// other. Both halves are asserted: a rejection at both precisions would mean the
+// bound was refused for some other reason entirely.
+
+TEST_CASE("parser: a bound that overflows the scalar type is rejected at that "
+          "scalar only", "[urdf_parser][urdf_strict]")
+{
+    const auto path = fixture_path("narrowing_overflow.urdf");
+
+    auto as_double = cartan::parse_urdf_file<double>(path);
+    REQUIRE(as_double.has_value());
+    REQUIRE(as_double->joints.size() == 1);
+    REQUIRE(as_double->joints[0].position_min.has_value());
+    CHECK(std::isfinite(*as_double->joints[0].position_min));
+    CHECK(std::isfinite(*as_double->joints[0].position_max));
+
+    auto as_float = cartan::parse_urdf_file<float>(path);
+    REQUIRE_FALSE(as_float.has_value());
+    CHECK(as_float.error().kind == cartan::urdf_failure::non_finite_value);
+    CHECK(as_float.error().detail.find("overflow_joint") != std::string::npos);
+}
+
+/// The pre-cast gate that shipped before this rejection existed, and the value
+/// the builder would have received once it passed. Neither half is cartan code,
+/// which is the point: the loader looked only at the double.
+TEST_CASE("parser: the pre-cast finiteness test admits a value the cast overflows",
+    "[urdf_parser][urdf_strict]")
+{
+    const double bound = 1e300;
+    CHECK(std::isfinite(bound));
+    CHECK(std::isinf(static_cast<float>(bound)));
+    CHECK(std::isinf(static_cast<float>(-bound)));
+}
+
+TEST_CASE("parser: a reversed <limit> is rejected by the limits factory",
+    "[urdf_parser][urdf_strict]")
+{
+    auto parsed = cartan::parse_urdf_file<double>(fixture_path("reversed_limit.urdf"));
+    REQUIRE(parsed.has_value());
+
+    auto built = cartan::build_chain<double>(*parsed);
+    REQUIRE_FALSE(built.has_value());
+    CHECK(built.error().kind == cartan::urdf_failure::invalid_joint_limit);
+    CHECK(built.error().detail.find("reversed_joint") != std::string::npos);
+}
+
+TEST_CASE("parser: a continuous joint still loads at both scalars",
+    "[urdf_parser][urdf_strict]")
+{
+    const auto path = fixture_path("extractor_continuous_wrist.urdf");
+
+    auto as_double = cartan::load_urdf<double>(path);
+    REQUIRE(as_double.has_value());
+    auto as_float = cartan::load_urdf<float>(path);
+    REQUIRE(as_float.has_value());
+
+    bool saw_unbounded = false;
+    for (const auto& lim : as_double->chain.limits())
+    {
+        saw_unbounded = saw_unbounded
+            || (std::isinf(lim.position_min()) && std::isinf(lim.position_max()));
+    }
+    CHECK(saw_unbounded);
 }

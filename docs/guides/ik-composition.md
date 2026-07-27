@@ -134,7 +134,7 @@ int main()
 
     auto home = cartan::se3<double>(
         cartan::so3<double>::identity(), vec3(0.935, 0, 0.400));
-    cartan::joint_limits<double> lim{-std::numbers::pi, std::numbers::pi};
+    auto lim = *cartan::joint_limits<double>::make(-std::numbers::pi, std::numbers::pi);
 
     Chain chain(home, {k1, k2, k3, k4, k5, k6},
                 {lim, lim, lim, lim, lim, lim});

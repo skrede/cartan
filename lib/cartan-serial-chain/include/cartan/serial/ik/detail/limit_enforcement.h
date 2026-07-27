@@ -43,11 +43,18 @@ inline Scalar default_feasibility_tol() noexcept
     return std::sqrt(std::numeric_limits<Scalar>::epsilon());
 }
 
-/// Feasibility predicate: true iff every finitely-bounded joint of q lies within
-/// [position_min - tol, position_max + tol]. Joints whose bound is non-finite
-/// (unbounded / continuous joints using +/-infinity) are skipped on that side,
-/// so a joint with one finite and one infinite bound is still checked against
-/// the finite side. This is a CHECK only -- it never mutates q. It is the gate a
+/// Feasibility predicate: true iff every joint value of q is finite and every
+/// finitely-bounded joint lies within [position_min - tol, position_max + tol].
+/// Joints whose bound is non-finite (unbounded / continuous joints using
+/// +/-infinity) are skipped on that side, so a joint with one finite and one
+/// infinite bound is still checked against the finite side.
+///
+/// The finiteness test is on the joint value and is separate from the tests on
+/// the bounds: both bound comparisons are false for a NaN joint value, so
+/// without it a NaN was reported feasible -- including against an unbounded
+/// joint, where neither comparison runs at all.
+///
+/// This is a CHECK only -- it never mutates q. It is the gate a
 /// no_limits trust-region solver consults before declaring convergence so that a
 /// pose-converged but out-of-range configuration is reported as a joint-limit
 /// failure rather than a trustworthy solution.
@@ -61,9 +68,13 @@ bool within_limits(
     int n = chain.num_joints();
     for (int i = 0; i < n; ++i)
     {
+        if (!std::isfinite(q(i)))
+        {
+            return false;
+        }
         auto idx = static_cast<std::size_t>(i);
-        auto lo = limits[idx].position_min;
-        auto hi = limits[idx].position_max;
+        auto lo = limits[idx].position_min();
+        auto hi = limits[idx].position_max();
         if (std::isfinite(lo) && q(i) < lo - tol)
         {
             return false;
@@ -184,7 +195,7 @@ void canonicalize_into_limits(
         }
         auto idx = static_cast<std::size_t>(i);
         q(i) = canonical_angle_in_limits(
-            q(i), limits[idx].position_min, limits[idx].position_max, tol);
+            q(i), limits[idx].position_min(), limits[idx].position_max(), tol);
     }
 }
 

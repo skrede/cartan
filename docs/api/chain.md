@@ -93,33 +93,61 @@ otherwise.
 
 ## joint_limits
 
-Joint limits with required position bounds and optional dynamic limits.
-Aggregate-initializable.
+Joint limits with required position bounds and optional dynamic limits. The five
+values are private and read-only, and `make` is the only way to obtain one, so an
+invalid set of limits cannot be constructed and a valid one cannot be assigned
+back into an invalid state.
 
 ```cpp
 template <typename Scalar = double>
-struct joint_limits
+class joint_limits
 {
-    Scalar position_min;                       // Required
-    Scalar position_max;                       // Required
-    std::optional<Scalar> velocity_max{};      // Optional
-    std::optional<Scalar> effort_max{};        // Optional
-    std::optional<Scalar> acceleration_max{};  // Optional
+public:
+    static cartan::expected<joint_limits, chain_failure> make(
+        Scalar position_min,
+        Scalar position_max,
+        std::optional<Scalar> velocity_max = std::nullopt,
+        std::optional<Scalar> effort_max = std::nullopt,
+        std::optional<Scalar> acceleration_max = std::nullopt);
+
+    Scalar position_min() const;
+    Scalar position_max() const;
+    std::optional<Scalar> effort_max() const;
+    std::optional<Scalar> velocity_max() const;
+    std::optional<Scalar> acceleration_max() const;
+
+    std::optional<bool> contains(Scalar position) const;
 };
 ```
 
 Construction examples:
 
 ```cpp
-joint_limits<double>{-3.14, 3.14}                    // Position only
-joint_limits<double>{-3.14, 3.14, 2.0, 50.0, 10.0}  // All limits
+auto lim = cartan::joint_limits<double>::make(-3.14, 3.14);              // Position only
+auto all = cartan::joint_limits<double>::make(-3.14, 3.14, 2.0, 50.0, 10.0);
 ```
 
-### Methods
+`make` rejects a NaN in any bound, a `position_max` below `position_min`, a
+negative velocity, effort or acceleration bound, and an infinite dynamic bound:
 
-```cpp
-bool contains(Scalar position) const;
-```
+| Rejection | `chain_failure` |
+| --- | --- |
+| NaN in any bound; infinite velocity, effort or acceleration | `non_finite_input` |
+| `position_max < position_min` | `reversed_position_bounds` |
+| negative velocity bound | `negative_velocity_limit` |
+| negative effort bound | `negative_effort_limit` |
+| negative acceleration bound | `negative_acceleration_limit` |
+
+Positive and negative infinity are **legal position bounds**: they are the
+library's encoding for an unbounded continuous joint, written by the URDF loader
+and consumed by the unbounded-joint helpers below. The asymmetry with the
+dynamic bounds is deliberate -- no part of the library treats an infinite
+velocity, effort or acceleration limit as meaningful.
+
+`contains` returns an empty optional for a non-finite position rather than
+`false`. Both bound comparisons are false for a NaN, which would read as
+"outside the limits" when the truth is that the question has no answer;
+non-finite joint values are rejected upstream at the checked entry points.
 
 Check whether a position value lies within `[position_min, position_max]`.
 

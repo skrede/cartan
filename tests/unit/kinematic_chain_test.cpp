@@ -2,12 +2,18 @@
 
 #include <cartan/serial/chain/joint_state.h>
 
+#include "../support/joint_limits_helpers.h"
+
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_template_test_macros.hpp>
 
 #include <cmath>
+#include <vector>
 #include <cstddef>
+#include <limits>
 #include <numbers>
+#include <stdexcept>
 
 using Catch::Approx;
 
@@ -31,7 +37,7 @@ TEST_CASE("kinematic_chain<double, 3> construction", "[kinematic_chain]")
     auto s2 = screw_axis<double>::revolute({0, 0, 1}, {L1, 0, 0});
     auto s3 = screw_axis<double>::revolute({0, 0, 1}, {L1 + L2, 0, 0});
 
-    joint_limits<double> lim{-std::numbers::pi, std::numbers::pi};
+    auto lim = testing::limits(-std::numbers::pi, std::numbers::pi);
 
     std::array<screw_axis<double>, 3> axes = {s1, s2, s3};
     std::array<joint_limits<double>, 3> limits = {lim, lim, lim};
@@ -63,7 +69,7 @@ TEST_CASE("kinematic_chain<double, 3> to_dynamic", "[kinematic_chain]")
     auto s2 = screw_axis<double>::revolute({0, 0, 1}, {L, 0, 0});
     auto s3 = screw_axis<double>::revolute({0, 0, 1}, {2 * L, 0, 0});
 
-    joint_limits<double> lim{-std::numbers::pi, std::numbers::pi};
+    auto lim = testing::limits(-std::numbers::pi, std::numbers::pi);
 
     kinematic_chain<double, 3> fixed_chain(
         home,
@@ -100,27 +106,12 @@ TEST_CASE("kinematic_chain<double, dynamic> construction", "[kinematic_chain]")
         screw_axis<double>::revolute({0, 0, 1}, {2 * L, 0, 0})
     };
 
-    joint_limits<double> lim{-std::numbers::pi, std::numbers::pi};
+    auto lim = testing::limits(-std::numbers::pi, std::numbers::pi);
     std::vector<joint_limits<double>> limits = {lim, lim, lim};
 
     kinematic_chain<double, dynamic> chain(home, std::move(axes), std::move(limits));
     REQUIRE(chain.num_joints() == 3);
     REQUIRE((chain.home().translation() - home_trans).norm() < 1e-12);
-}
-
-// ============================================================================
-// joint_limits contains
-// ============================================================================
-
-TEST_CASE("joint_limits contains", "[joint_limits]")
-{
-    cartan::joint_limits<double> lim{-std::numbers::pi, std::numbers::pi};
-
-    REQUIRE(lim.contains(0.0));
-    REQUIRE(lim.contains(-std::numbers::pi));
-    REQUIRE(lim.contains(std::numbers::pi));
-    REQUIRE_FALSE(lim.contains(4.0));
-    REQUIRE_FALSE(lim.contains(-4.0));
 }
 
 // ============================================================================
@@ -154,7 +145,7 @@ TEST_CASE("kinematic_chain with prismatic", "[kinematic_chain]")
     auto s1 = screw_axis<double>::revolute({0, 0, 1}, {0, 0, 0});
     auto s2 = screw_axis<double>::prismatic({0, 0, 1});
 
-    joint_limits<double> lim{-10, 10};
+    auto lim = testing::limits(-10.0, 10.0);
     std::array<screw_axis<double>, 2> axes = {s1, s2};
     std::array<joint_limits<double>, 2> limits = {lim, lim};
 
@@ -162,4 +153,100 @@ TEST_CASE("kinematic_chain with prismatic", "[kinematic_chain]")
 
     REQUIRE(chain.axes()[0].is_revolute());
     REQUIRE(chain.axes()[1].is_prismatic());
+}
+
+// ============================================================================
+// Construction rejections. All three fail in Release as well as Debug; none of
+// them had a test before.
+// ============================================================================
+
+namespace
+{
+
+template <typename Scalar>
+cartan::screw_axis<Scalar> nonfinite_axis()
+{
+    cartan::vector3<Scalar> axis;
+    axis << std::numeric_limits<Scalar>::quiet_NaN(), 0, 0;
+    return cartan::screw_axis<Scalar>::revolute(axis, {0, 0, 0});
+}
+
+template <typename Scalar>
+cartan::se3<Scalar> nonfinite_home()
+{
+    cartan::vector3<Scalar> t;
+    t << std::numeric_limits<Scalar>::quiet_NaN(), 0, 0;
+    return cartan::se3<Scalar>(cartan::so3<Scalar>::identity(), t);
+}
+
+}
+
+TEMPLATE_TEST_CASE("kinematic_chain rejects an axis-count / limit-count mismatch",
+    "[kinematic_chain][boundary]", double, float)
+{
+    using S = TestType;
+    std::vector<cartan::screw_axis<S>> axes = {
+        cartan::screw_axis<S>::revolute({0, 0, 1}, {0, 0, 0}),
+        cartan::screw_axis<S>::revolute({0, 0, 1}, {1, 0, 0})};
+    std::vector<cartan::joint_limits<S>> one = {cartan::testing::limits(S(-1), S(1))};
+
+    REQUIRE_THROWS_AS(
+        (cartan::kinematic_chain<S, cartan::dynamic>(
+            cartan::se3<S>::identity(), axes, one)),
+        std::invalid_argument);
+}
+
+TEMPLATE_TEST_CASE("kinematic_chain rejects a nonfinite screw axis",
+    "[kinematic_chain][boundary]", double, float)
+{
+    using S = TestType;
+    auto lim = cartan::testing::limits(S(-1), S(1));
+    std::vector<cartan::joint_limits<S>> limits = {lim, lim};
+    std::vector<cartan::screw_axis<S>> poisoned = {
+        nonfinite_axis<S>(), cartan::screw_axis<S>::revolute({0, 0, 1}, {1, 0, 0})};
+
+    REQUIRE_THROWS_AS(
+        (cartan::kinematic_chain<S, cartan::dynamic>(
+            cartan::se3<S>::identity(), poisoned, limits)),
+        std::invalid_argument);
+
+    std::vector<cartan::screw_axis<S>> trailing = {
+        cartan::screw_axis<S>::revolute({0, 0, 1}, {1, 0, 0}), nonfinite_axis<S>()};
+    REQUIRE_THROWS_AS(
+        (cartan::kinematic_chain<S, cartan::dynamic>(
+            cartan::se3<S>::identity(), trailing, limits)),
+        std::invalid_argument);
+}
+
+TEMPLATE_TEST_CASE("kinematic_chain rejects a nonfinite home pose",
+    "[kinematic_chain][boundary]", double, float)
+{
+    using S = TestType;
+    std::vector<cartan::screw_axis<S>> axes = {
+        cartan::screw_axis<S>::revolute({0, 0, 1}, {0, 0, 0})};
+    std::vector<cartan::joint_limits<S>> limits = {cartan::testing::limits(S(-1), S(1))};
+
+    REQUIRE_THROWS_AS(
+        (cartan::kinematic_chain<S, cartan::dynamic>(
+            nonfinite_home<S>(), axes, limits)),
+        std::invalid_argument);
+}
+
+/// A zero-magnitude axis is a separate defect from a nonfinite one and this
+/// guard does not catch it: Eigen's normalized() returns a zero vector unchanged
+/// rather than dividing by zero, so the stored axis is finite and the joint is
+/// simply frozen. Asserted so the boundary between the two is not misread.
+TEMPLATE_TEST_CASE("kinematic_chain still admits a zero-magnitude axis",
+    "[kinematic_chain][boundary]", double, float)
+{
+    using S = TestType;
+    std::vector<cartan::screw_axis<S>> axes = {
+        cartan::screw_axis<S>::revolute(cartan::vector3<S>::Zero(), {0, 0, 0})};
+    std::vector<cartan::joint_limits<S>> limits = {cartan::testing::limits(S(-1), S(1))};
+
+    REQUIRE(cartan::screw_axis<S>::revolute(
+        cartan::vector3<S>::Zero(), {0, 0, 0}).to_vector().allFinite());
+    REQUIRE_NOTHROW(
+        (cartan::kinematic_chain<S, cartan::dynamic>(
+            cartan::se3<S>::identity(), axes, limits)));
 }

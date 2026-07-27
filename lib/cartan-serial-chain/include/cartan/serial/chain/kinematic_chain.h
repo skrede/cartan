@@ -57,23 +57,7 @@ public:
         , m_axes(std::move(axes))
         , m_limits(std::move(limits))
     {
-        // Real runtime invariant: the screw-axis count must match the
-        // joint-limit count. A debug-only assert would be compiled out under
-        // -DNDEBUG (Release), letting a malformed chain construct silently in
-        // a shipped build. With exceptions enabled we fail loudly by throwing;
-        // on exceptions-off targets (bare-metal and ESP-IDF default) a bare
-        // throw would not even compile, so we use the deterministic fail-stop
-        // path instead. Either way a malformed chain never
-        // constructs silently.
-        if (m_axes.size() != m_limits.size())
-        {
-#if defined(__cpp_exceptions) || defined(_CPPUNWIND)
-            throw std::invalid_argument(
-                "kinematic_chain: screw-axis count must match joint-limit count");
-#else
-            ::cartan::detail::fail_stop();
-#endif
-        }
+        validate();
         if constexpr (N == dynamic)
         {
             m_kinds.resize(m_axes.size());
@@ -142,6 +126,53 @@ private:
     screw_storage m_axes;       ///< Space-frame screw axes S1..Sn
     limits_storage m_limits;    ///< Joint limits
     kind_storage m_kinds{};     ///< Cached axis classification per joint
+
+    /// Real runtime invariants, not debug-only assertions. A debug-only assert
+    /// would be compiled out under -DNDEBUG (Release), letting a malformed
+    /// chain construct silently in a shipped build. With exceptions enabled we
+    /// fail loudly by throwing; on exceptions-off targets (bare-metal and
+    /// ESP-IDF default) a bare throw would not even compile, so we use the
+    /// deterministic fail-stop path instead. Either way a malformed chain never
+    /// constructs silently.
+    ///
+    /// The finiteness test is the chain's own responsibility because a screw
+    /// axis built from the normalizing construction spelling is deliberately
+    /// unvalidated: it divides by the input's norm, which turns a nonfinite
+    /// input into a nonfinite axis without complaint. A chain is the first
+    /// place that sees all of its axes together.
+    void validate() const
+    {
+        if (m_axes.size() != m_limits.size())
+        {
+#if defined(__cpp_exceptions) || defined(_CPPUNWIND)
+            throw std::invalid_argument(
+                "kinematic_chain: screw-axis count must match joint-limit count");
+#else
+            ::cartan::detail::fail_stop();
+#endif
+        }
+        if (!axes_are_finite() || !m_home.matrix().allFinite())
+        {
+#if defined(__cpp_exceptions) || defined(_CPPUNWIND)
+            throw std::invalid_argument(
+                "kinematic_chain: screw axes and home pose must be finite");
+#else
+            ::cartan::detail::fail_stop();
+#endif
+        }
+    }
+
+    bool axes_are_finite() const
+    {
+        for (const auto& axis : m_axes)
+        {
+            if (!axis.to_vector().allFinite())
+            {
+                return false;
+            }
+        }
+        return true;
+    }
 };
 
 static_assert(chain<kinematic_chain<double, 3>>,

@@ -22,7 +22,7 @@ namespace cartan
 /// multi_parent_link) fill urdf_error::location when they can be tied to a
 /// specific element. Post-parse failures (branched_kinematic_tree,
 /// link_not_found, sdf_not_supported, missing_joint_limit, zero_axis,
-/// tool_link_unreachable) leave location unset.
+/// invalid_joint_limit, tool_link_unreachable) leave location unset.
 ///
 /// The loader is the library's only untrusted-input surface, so every spec
 /// violation is a strict rejection whose detail names the offending joint or
@@ -41,8 +41,9 @@ enum class urdf_failure
     sdf_not_supported,         ///< SDF loading is not implemented; only URDF is currently supported.
     cyclic_kinematic_tree,     ///< A joint is a self-loop (parent == child) or the tree contains a cycle.
     missing_joint_limit,       ///< A revolute or prismatic joint omits the required <limit lower upper>.
+    invalid_joint_limit,       ///< A joint <limit> is self-contradictory: reversed bounds, or a negative velocity or effort.
     zero_axis,                 ///< A joint <axis> has zero magnitude and cannot be normalized.
-    non_finite_value,          ///< A numeric attribute parsed to NaN or infinity.
+    non_finite_value,          ///< A numeric attribute parsed to NaN or infinity, or overflowed the chain's scalar type.
     duplicate_name,            ///< A link or joint name is declared more than once.
     multi_parent_link,         ///< A link is the child of more than one joint (non-tree topology).
     tool_link_unreachable,     ///< The requested tool link is not reached by the serial walk.

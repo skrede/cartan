@@ -33,7 +33,8 @@ static spp::kinematic_chain<double, 6> make_ur5_like_chain()
     home_trans << 0.817, 0.191, -0.006;
     auto home = spp::se3<double>(spp::so3<double>::identity(), home_trans);
 
-    spp::joint_limits<double> lim{-2 * std::numbers::pi, 2 * std::numbers::pi};
+    auto lim = *spp::joint_limits<double>::make(
+        -2 * std::numbers::pi, 2 * std::numbers::pi);
     return spp::kinematic_chain<double, 6>(home, {s1, s2, s3, s4, s5, s6},
                                   {lim, lim, lim, lim, lim, lim});
 }
@@ -77,8 +78,8 @@ TEST_CASE("halton_seed_generator produces seeds within limits", "[halton][genera
         for (int j = 0; j < 6; ++j)
         {
             auto lim = chain.limits()[static_cast<std::size_t>(j)];
-            CHECK(seed[j] >= lim.position_min);
-            CHECK(seed[j] <= lim.position_max);
+            CHECK(seed[j] >= lim.position_min());
+            CHECK(seed[j] <= lim.position_max());
         }
     }
 }
@@ -139,8 +140,8 @@ TEST_CASE("halton_seed_generator handles more than ten joints", "[halton][genera
         for (int j = 0; j < n; ++j)
         {
             auto lim = chain.limits()[static_cast<std::size_t>(j)];
-            CHECK(seed[j] >= lim.position_min);
-            CHECK(seed[j] <= lim.position_max);
+            CHECK(seed[j] >= lim.position_min());
+            CHECK(seed[j] <= lim.position_max());
         }
     }
 }

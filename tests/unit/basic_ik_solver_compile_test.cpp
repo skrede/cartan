@@ -17,7 +17,7 @@ namespace spp = cartan;
 
 TEST_CASE("clamp_limits clamps each q(i) to bounds", "[ik][limits]")
 {
-    spp::joint_limits<double> lim{-1.0, 1.0};
+    auto lim = *spp::joint_limits<double>::make(-1.0, 1.0);
     using chain_type = spp::kinematic_chain<double, 3>;
     typename chain_type::limits_storage limits = {lim, lim, lim};
 
@@ -33,7 +33,7 @@ TEST_CASE("clamp_limits clamps each q(i) to bounds", "[ik][limits]")
 
 TEST_CASE("no_limits returns q unchanged", "[ik][limits]")
 {
-    spp::joint_limits<double> lim{-1.0, 1.0};
+    auto lim = *spp::joint_limits<double>::make(-1.0, 1.0);
     using chain_type = spp::kinematic_chain<double, 3>;
     typename chain_type::limits_storage limits = {lim, lim, lim};
 

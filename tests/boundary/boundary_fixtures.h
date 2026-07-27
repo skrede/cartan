@@ -31,12 +31,13 @@ screw_axis<Scalar> spaced_revolute_axis(int i)
 template <typename Scalar>
 joint_limits<Scalar> full_turn_limits()
 {
-    return joint_limits<Scalar>{
-        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
+    return *joint_limits<Scalar>::make(
+        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>);
 }
 
-/// screw_axis has no default constructor, so the fixed-size array is built by
-/// expanding the index sequence rather than filled after the fact.
+/// Neither screw_axis nor joint_limits has a default constructor, so the
+/// fixed-size arrays are built by expanding the index sequence rather than
+/// filled after the fact.
 template <typename Scalar>
 std::array<screw_axis<Scalar>, six_joints> six_joint_axes()
 {
@@ -50,9 +51,11 @@ std::array<screw_axis<Scalar>, six_joints> six_joint_axes()
 template <typename Scalar>
 std::array<joint_limits<Scalar>, six_joints> six_joint_limits()
 {
-    std::array<joint_limits<Scalar>, six_joints> limits{};
-    limits.fill(full_turn_limits<Scalar>());
-    return limits;
+    return []<std::size_t... Is>(std::index_sequence<Is...>)
+    {
+        return std::array<joint_limits<Scalar>, six_joints>{
+            (static_cast<void>(Is), full_turn_limits<Scalar>())...};
+    }(std::make_index_sequence<six_joints>{});
 }
 
 template <typename Scalar>

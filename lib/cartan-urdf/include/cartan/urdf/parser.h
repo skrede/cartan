@@ -97,6 +97,38 @@ inline std::optional<double> as_finite_double(const pugi::xml_attribute& attr)
     return raw;
 }
 
+/// Narrow a value that parsed as a finite double to the chain's scalar type,
+/// returning an empty optional when the conversion overflows to an infinity.
+///
+/// This second gate is not redundant with the finiteness test above, and it has
+/// to live here rather than at the limits factory: +/-infinity is the library's
+/// deliberate encoding for an unbounded continuous joint, so once the cast has
+/// happened a bound that overflowed is indistinguishable from one that was
+/// meant to be unbounded. Here the original double is still in hand.
+template <typename Scalar>
+std::optional<Scalar> narrow_finite(double value)
+{
+    const Scalar narrowed = static_cast<Scalar>(value);
+    if (!std::isfinite(narrowed))
+    {
+        return std::nullopt;
+    }
+    return narrowed;
+}
+
+/// Read a numeric XML attribute as the chain's scalar type, rejecting a value
+/// that is non-finite as a double or becomes non-finite under the narrowing.
+template <typename Scalar>
+std::optional<Scalar> as_finite_scalar(const pugi::xml_attribute& attr)
+{
+    auto raw = as_finite_double(attr);
+    if (!raw.has_value())
+    {
+        return std::nullopt;
+    }
+    return narrow_finite<Scalar>(*raw);
+}
+
 /// Consume and return the next whitespace-delimited token from s, advancing s
 /// past it. Returns an empty view when only whitespace remains.
 inline std::string_view next_field(std::string_view& s)
@@ -121,9 +153,9 @@ inline std::string_view next_field(std::string_view& s)
 /// pugixml attribute reader the rest of this parser relies on (both require a
 /// "C" numeric locale, as ROS does). std::from_chars would be locale-free but
 /// its floating-point overload is unavailable below a very recent macOS SDK.
-/// Returns false on any field that fails to parse, is non-finite, or leaves
-/// trailing characters, and on a count other than three; out is written only on
-/// full success.
+/// Returns false on any field that fails to parse, is non-finite as a double or
+/// after narrowing to Scalar, or leaves trailing characters, and on a count
+/// other than three; out is written only on full success.
 template <typename Scalar>
 bool parse_triple(std::string_view s, vector3<Scalar>& out)
 {
@@ -142,7 +174,12 @@ bool parse_triple(std::string_view s, vector3<Scalar>& out)
         {
             return false;
         }
-        values[i] = static_cast<Scalar>(parsed);
+        auto narrowed = narrow_finite<Scalar>(parsed);
+        if (!narrowed.has_value())
+        {
+            return false;
+        }
+        values[i] = *narrowed;
     }
     if (!next_field(s).empty())
     {
@@ -224,7 +261,7 @@ parse_inertial(const pugi::xml_node& inertial_node,
             .detail = "link '" + link_name + "': <inertial> missing <mass> child",
             .location = urdf_source_location{file_path, 0, "inertial"}});
     }
-    auto mass_val = as_finite_double(mass_node.attribute("value"));
+    auto mass_val = as_finite_scalar<Scalar>(mass_node.attribute("value"));
     if (!mass_val.has_value())
     {
         return cartan::unexpected(urdf_error{
@@ -232,7 +269,7 @@ parse_inertial(const pugi::xml_node& inertial_node,
             .detail = "link '" + link_name + "': inertial mass is not finite",
             .location = urdf_source_location{file_path, 0, "inertial"}});
     }
-    out.mass = static_cast<Scalar>(*mass_val);
+    out.mass = *mass_val;
     if (!(out.mass > Scalar(0)))
     {
         return cartan::unexpected(urdf_error{
@@ -273,7 +310,7 @@ parse_inertial(const pugi::xml_node& inertial_node,
              std::pair<const char*, Scalar*>{"iyz", &iyz},
              std::pair<const char*, Scalar*>{"izz", &izz}})
     {
-        auto v = as_finite_double(inertia.attribute(name));
+        auto v = as_finite_scalar<Scalar>(inertia.attribute(name));
         if (!v.has_value())
         {
             return cartan::unexpected(urdf_error{
@@ -281,7 +318,7 @@ parse_inertial(const pugi::xml_node& inertial_node,
                 .detail = "link '" + link_name + "': inertia entry '" + name + "' is not finite",
                 .location = urdf_source_location{file_path, 0, "inertial"}});
         }
-        *slot = static_cast<Scalar>(*v);
+        *slot = *v;
     }
     if (ixx < Scalar(0) || iyy < Scalar(0) || izz < Scalar(0))
     {
@@ -500,7 +537,7 @@ parse_urdf_file(const std::filesystem::path& path)
                 -> std::optional<urdf_error> {
                 auto attr = limit.attribute(attr_name);
                 if (!attr) { return std::nullopt; }
-                auto v = detail::as_finite_double(attr);
+                auto v = detail::as_finite_scalar<Scalar>(attr);
                 if (!v.has_value())
                 {
                     return urdf_error{
@@ -509,7 +546,7 @@ parse_urdf_file(const std::filesystem::path& path)
                             + attr_name + ">",
                         .location = urdf_source_location{path_str, 0, "limit"}};
                 }
-                slot = static_cast<Scalar>(*v);
+                slot = *v;
                 return std::nullopt;
             };
             if (auto err = read_limit_attr("lower", joint.position_min)) { return cartan::unexpected(std::move(*err)); }

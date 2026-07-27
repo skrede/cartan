@@ -335,13 +335,9 @@ build_chain(const parsed_model<Scalar>& model, const load_options& opts = {})
             axes.push_back(screw_axis<Scalar>::revolute(axis_world, point_world));
         }
 
-        joint_limits<Scalar> jl{};
-        if (j.kind == parsed_joint_kind::continuous)
-        {
-            jl.position_min = -std::numeric_limits<Scalar>::infinity();
-            jl.position_max = +std::numeric_limits<Scalar>::infinity();
-        }
-        else
+        Scalar lower = -std::numeric_limits<Scalar>::infinity();
+        Scalar upper = +std::numeric_limits<Scalar>::infinity();
+        if (j.kind != parsed_joint_kind::continuous)
         {
             // Revolute and prismatic joints are bounded; a missing <limit
             // lower upper> is malformed (freezing it to [0,0] would silently
@@ -357,12 +353,19 @@ build_chain(const parsed_model<Scalar>& model, const load_options& opts = {})
                         + " but omits the required <limit lower upper>",
                     .location = std::nullopt});
             }
-            jl.position_min = *j.position_min;
-            jl.position_max = *j.position_max;
+            lower = *j.position_min;
+            upper = *j.position_max;
         }
-        jl.velocity_max = j.velocity_max;
-        jl.effort_max = j.effort_max;
-        limits.push_back(jl);
+        auto jl = joint_limits<Scalar>::make(lower, upper, j.velocity_max, j.effort_max);
+        if (!jl.has_value())
+        {
+            return cartan::unexpected(urdf_error{
+                .kind = urdf_failure::invalid_joint_limit,
+                .detail = "joint '" + j.name + "' has an unusable <limit>: "
+                    + message(jl.error()),
+                .location = std::nullopt});
+        }
+        limits.push_back(*jl);
 
         joint_names.push_back(j.name);
         velocity_max.push_back(j.velocity_max);
