@@ -16,9 +16,9 @@
 
 #include <cmath>
 #include <cstddef>
-#include <optional>
 #include "cartan/expected.h"
 #include <numbers>
+#include <optional>
 
 namespace cartan
 {

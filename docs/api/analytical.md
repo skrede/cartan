@@ -76,8 +76,9 @@ geometric inequality was evaluated and failed, and is then the deficit at that
 inequality in the chain's linear unit; it is absent for every other failure.
 Absence is not zero: a target sitting exactly on the workspace boundary has a
 deficit of zero, so zero cannot also stand for "no magnitude was computed". A
-degenerate geometry, a singular configuration, and a failed back-check all
-carry no magnitude.
+degenerate geometry, a singular configuration, a nonfinite input, and a failed
+back-check all carry no magnitude, including where the reason was decided by a
+Paden-Kahan subproblem and forwarded.
 
 ### analytical_failure
 

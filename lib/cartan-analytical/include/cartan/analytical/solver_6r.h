@@ -20,9 +20,9 @@
 
 #include <array>
 #include <cmath>
-#include <optional>
 #include "cartan/expected.h"
 #include <numbers>
+#include <optional>
 
 namespace cartan
 {
@@ -220,9 +220,8 @@ public:
 
         if (!sp3_result)
         {
-            return cartan::unexpected(analytical_error<scalar_type>{
-                sp3_result.error(),
-                (p_wrist - m_p_ee).norm()});
+            return cartan::unexpected(subproblem_error<scalar_type>(
+                sp3_result.error(), (p_wrist - m_p_ee).norm()));
         }
 
         analytical_result<scalar_type, 6, 8> result;

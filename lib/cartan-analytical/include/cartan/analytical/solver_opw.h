@@ -19,9 +19,9 @@
 #include <array>
 #include <cmath>
 #include <limits>
-#include <optional>
 #include "cartan/expected.h"
 #include <numbers>
+#include <optional>
 #include <algorithm>
 #include <type_traits>
 

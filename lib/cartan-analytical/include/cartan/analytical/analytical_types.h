@@ -57,6 +57,21 @@ struct analytical_error
     std::optional<Scalar> workspace_distance;
 };
 
+/// Build a diagnostic around a reason a subproblem decided, keeping `deficit`
+/// only where that reason admits one. A subproblem distinguishes a target it
+/// cannot reach from degenerate geometry, a singular configuration and a
+/// nonfinite input; only the first stands behind a distance, and on a nonfinite
+/// input the caller's candidate length is itself a NaN.
+template <typename Scalar>
+analytical_error<Scalar> subproblem_error(analytical_failure reason, Scalar deficit)
+{
+    return analytical_error<Scalar>{
+        reason,
+        reason == analytical_failure::unreachable
+            ? std::optional<Scalar>(deficit)
+            : std::nullopt};
+}
+
 /// Multi-solution result for an analytical IK solver. N is the joint count
 /// (compile-time); MaxSolutions is the per-solver upper bound on solution
 /// count (e.g. 2 for planar_2r_solver, 4 for spatial_3r_solver, 8 for
