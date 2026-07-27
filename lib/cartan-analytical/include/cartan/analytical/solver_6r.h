@@ -50,16 +50,6 @@ public:
     static constexpr int joints = 6;
     static constexpr int max_solutions = 8;
 
-    /// The two fields of the module's default acceptance tolerance, named
-    /// separately so a caller can override one without restating the other. The
-    /// construction-time geometry gate (see make()) and the shoulder-singularity
-    /// detector are both anchored to the position field, so that a constructed
-    /// solver is always solvable to the same distance it verifies against.
-    static constexpr scalar_type default_position_tolerance
-        = default_verification_tolerance_v<scalar_type>.position();
-    static constexpr scalar_type default_orientation_tolerance
-        = default_verification_tolerance_v<scalar_type>.orientation();
-
     explicit pieper_6r_solver(
         const Chain& chain,
         verification_tolerance<scalar_type> tolerance
@@ -121,16 +111,22 @@ public:
     ///
     /// Both gates judge a distance, so both read the tolerance's position field
     /// (the same threshold the FK back-check applies to its position residual),
-    /// not the loose 1e-3 default of find_wrist_intersection. Rationale
-    /// (empirically swept, see the 6R solver test suite): a wrist whose axes
-    /// miss each other by a distance d propagates to an end-effector position
-    /// error of ~0.9*d, so any chain admitted with d below the position
-    /// tolerance is guaranteed FK-solvable to it, while
-    /// near-spherical-but-unsolvable wrists (which pass the old 1e-3 gate yet
-    /// miss the solve tolerance by orders of magnitude) are rejected at
-    /// construction. The sub-unit factor keeps the gate free of false accepts;
-    /// the swept transition sits between d equal to the position tolerance
-    /// (solvable) and five times it (unsolvable).
+    /// not the loose 1e-3 default of find_wrist_intersection.
+    ///
+    /// What admission does and does not promise, measured on the swept
+    /// near-spherical family in the 6R solver test suite: a wrist whose axes
+    /// miss each other by a distance d spreads its branches' end-effector
+    /// position error over 0.21*d to 2.04*d. Only the lower factor is below one,
+    /// so an admitted chain is guaranteed to yield **at least one** verifying
+    /// branch -- not all eight. Branches do fall out inside the admitted band:
+    /// at the default tolerance the family returns eight branches at d = 1e-7
+    /// and four at d = 9e-7. Above the gate the whole family fails, which is
+    /// what the old 1e-3 sphericity default let through.
+    ///
+    /// The gate admits d strictly below the position tolerance: it takes
+    /// d = 9e-7 and refuses d = 1e-6 at a tolerance of 1e-6. That edge is
+    /// conservative rather than exact -- d = 1e-6 still yields four verifying
+    /// branches -- and it is the edge a caller can rely on.
     static cartan::expected<pieper_6r_solver, analytical_error<scalar_type>>
     make(const Chain& chain,
          verification_tolerance<scalar_type> tolerance

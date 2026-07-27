@@ -222,23 +222,31 @@ TEST_CASE("2R solver: different link lengths")
 }
 
 TEST_CASE("2R solver: the configured acceptance tolerance reaches the FK "
-          "back-check")
+          "back-check, position field first")
 {
     // The planar closed form is exact on a planar chain -- its residual is
-    // round-off -- so there is no geometry that puts a residual between a tight
-    // configured bound and the module default. What is unambiguous is the
-    // boundary: no residual is below zero, so a solver built at a zero position
-    // tolerance must return nothing, whatever the target. A back-check reading a
-    // fixed default instead of the stored tolerance returns two solutions here.
+    // round-off -- so no geometry puts a residual between a tight configured
+    // bound and the module default. A threshold of zero needs no band: no norm
+    // is below zero. The two fields are driven to zero one at a time, because a
+    // pair of zeros would be satisfied by either field and pin neither.
+    //
+    // This solver checks position only, so the position field must decide both
+    // probes: a loose position field admits, a zero one refuses, and the
+    // orientation field never enters.
     auto chain = make_2r_chain(1.0, 1.0);
     auto target = target_at(1.0, 0, 0.5);
 
     auto at_default = planar_2r_solver(chain).solve(target);
     REQUIRE(at_default.has_value());
-    REQUIRE(at_default->count > 0);
+    CHECK(at_default->count == 2);
 
-    auto at_zero = planar_2r_solver<decltype(chain)>(
-        chain, verification_tolerance<double>(0.0, 0.0)).solve(target);
-    REQUIRE_FALSE(at_zero.has_value());
-    CHECK(at_zero.error().reason == analytical_failure::verification_failed);
+    auto lax_position = planar_2r_solver<decltype(chain)>(
+        chain, verification_tolerance<double>(1e-2, 0.0)).solve(target);
+    REQUIRE(lax_position.has_value());
+    CHECK(lax_position->count == 2);
+
+    auto zero_position = planar_2r_solver<decltype(chain)>(
+        chain, verification_tolerance<double>(0.0, 1e-2)).solve(target);
+    REQUIRE_FALSE(zero_position.has_value());
+    CHECK(zero_position.error().reason == analytical_failure::verification_failed);
 }

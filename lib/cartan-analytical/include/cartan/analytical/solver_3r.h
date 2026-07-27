@@ -53,6 +53,8 @@ public:
         , m_omega{vector3<Scalar>::Zero(), vector3<Scalar>::Zero(), vector3<Scalar>::Zero()}
         , m_q{vector3<Scalar>::Zero(), vector3<Scalar>::Zero(), vector3<Scalar>::Zero()}
         , m_tolerance(tolerance)
+        , m_p_ee(vector3<Scalar>::Zero())
+        , m_valid(false)
     {
         if (chain.num_joints() != 3)
         {
@@ -102,9 +104,7 @@ public:
         // distance constraint decouples theta3 from theta1, theta2.
         Scalar delta = (p_target - r).norm();
 
-        auto sp3_result = paden_kahan_3(
-            m_omega[2], m_q[2], m_p_ee, r, delta,
-            length_tolerance<Scalar>(m_tolerance.position()));
+        auto sp3_result = paden_kahan_3(m_omega[2], m_q[2], m_p_ee, r, delta);
         if (!sp3_result)
         {
             return cartan::unexpected(analytical_error<Scalar>{
@@ -125,8 +125,7 @@ public:
             //   exp(S1*t1) * exp(S2*t2) * p' = p_d
             // with both axes referenced to their intersection point r.
             auto sp2_result = paden_kahan_2(
-                m_omega[0], m_omega[1], r, p_prime, p_target,
-                length_tolerance<Scalar>(m_tolerance.position()));
+                m_omega[0], m_omega[1], r, p_prime, p_target);
             if (!sp2_result)
                 continue;
 
@@ -194,8 +193,8 @@ private:
     std::array<vector3<Scalar>, 3> m_omega;
     std::array<vector3<Scalar>, 3> m_q;
     verification_tolerance<Scalar> m_tolerance;
-    vector3<Scalar> m_p_ee{vector3<Scalar>::Zero()};
-    bool m_valid{false};
+    vector3<Scalar> m_p_ee;
+    bool m_valid;
 };
 
 template <chain Chain>

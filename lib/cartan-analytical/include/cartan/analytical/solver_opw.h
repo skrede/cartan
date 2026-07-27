@@ -272,11 +272,10 @@ public:
     static constexpr int joints = 6;
     static constexpr int max_solutions = 8;
 
-    /// The two fields of the module's default acceptance tolerance, named
-    /// separately so a caller can override one without restating the other. The
-    /// construction-time spherical-wrist gate judges a distance and is anchored
-    /// to the position field, so a constructed solver is always solvable to the
-    /// same distance it verifies against.
+    /// The module default's two fields, republished one scalar at a time
+    /// because the Python bindings need each as a default argument and cannot
+    /// spell the two-field type. Prefer `default_verification_tolerance_v` in
+    /// C++; these exist for the binding layer.
     static constexpr scalar_type default_position_tolerance
         = default_verification_tolerance_v<scalar_type>.position();
     static constexpr scalar_type default_orientation_tolerance

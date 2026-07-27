@@ -220,3 +220,30 @@ TEST_CASE("3R solver: an acceptance tolerance above the module default admits "
         CHECK(residual < 1e-2);
     }
 }
+
+TEST_CASE("3R solver: the configured acceptance tolerance reaches the FK "
+          "back-check, position field first")
+{
+    // Same shape as the 2R case: this solver checks position only, so a zero
+    // position field must refuse every candidate while a zero orientation field
+    // leaves them all standing. One field at a time -- a pair of zeros would be
+    // satisfied by either and pin neither.
+    auto chain = make_3r_chain(0.5, 0.3);
+    Eigen::Vector3d q_known;
+    q_known << 0.3, 0.5, -0.2;
+    auto target = testing::fk_at(chain, q_known).end_effector;
+
+    auto at_default = spatial_3r_solver(chain).solve(target);
+    REQUIRE(at_default.has_value());
+    REQUIRE(at_default->count > 0);
+
+    auto lax_position = spatial_3r_solver<decltype(chain)>(
+        chain, verification_tolerance<double>(1e-2, 0.0)).solve(target);
+    REQUIRE(lax_position.has_value());
+    CHECK(lax_position->count == at_default->count);
+
+    auto zero_position = spatial_3r_solver<decltype(chain)>(
+        chain, verification_tolerance<double>(0.0, 1e-2)).solve(target);
+    REQUIRE_FALSE(zero_position.has_value());
+    CHECK(zero_position.error().reason == analytical_failure::verification_failed);
+}

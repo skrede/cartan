@@ -527,6 +527,31 @@ TEST_CASE("6R Pieper: near-spherical wrist is rejected at construction")
     CHECK_FALSE(fk_solvable(chain, fk.end_effector));
 }
 
+TEST_CASE("6R Pieper: the shoulder-axis gate judges its distance against the "
+          "position field")
+{
+    // The swept near-spherical family has a shoulder gap of exactly zero at
+    // every offset, so the sweep above never reaches this gate. Driving it needs
+    // a chain with a real gap and a tolerance whose two fields disagree: an
+    // orientation field a million times looser must not admit an offset shoulder.
+    auto chain = fixtures::make_offset_shoulder_puma<double>();
+    auto lax_orientation = pieper_6r_solver<decltype(chain)>::make(
+        chain, verification_tolerance<double>(1e-6, 1.0));
+
+    REQUIRE_FALSE(lax_orientation.has_value());
+    CHECK(lax_orientation.error().reason == analytical_failure::degenerate_geometry);
+
+    // The premise: this chain's gap is far above the position field and far
+    // below the orientation one, so the two fields genuinely disagree here.
+    const auto& a0 = chain.axis(0);
+    const auto& a1 = chain.axis(1);
+    double gap = detail::closest_approach_distance<double>(
+        a0.omega().cross(a0.v()), a0.omega(),
+        a1.omega().cross(a1.v()), a1.omega());
+    CHECK(gap > 1e-6);
+    CHECK(gap < 1.0);
+}
+
 TEST_CASE("6R Pieper: shoulder singularity returns the error channel")
 {
     // Wrist center placed on the axis-1 line: joint 1 is undetermined. The
@@ -544,7 +569,11 @@ TEST_CASE("6R Pieper: shoulder singularity returns the error channel")
         - fk.end_effector.rotation().act(Eigen::Vector3d(0.1, 0, 0));
     REQUIRE(std::hypot(wrist_center.x(), wrist_center.y()) < 1e-9);
 
-    auto result = pieper_6r_solver(chain).solve(fk.end_effector);
+    // The orientation field is zero: the radial test judges a distance, so a
+    // test reading the orientation field would compare a norm against zero,
+    // never fire, and report something other than a singular configuration.
+    auto result = pieper_6r_solver<decltype(chain)>(
+        chain, verification_tolerance<double>(1e-6, 0.0)).solve(fk.end_effector);
 
     REQUIRE_FALSE(result.has_value());
     // The reason is asserted, never a joint value.
@@ -558,20 +587,20 @@ TEST_CASE("6R Pieper: wrist-intersection tolerance sweep (construction gate)")
     // acceptance tolerance (1e-6). For a family of near-spherical wrists whose
     // axes miss the common center by a swept distance d, we measure whether the
     // chain is FK-solvable to `tolerance` and whether the factory admits it.
-    // The gate must accept exactly the solvable wrists and reject the rest.
     //
-    // Observed transition (this PUMA geometry): end-effector error ~= 0.9 * d,
-    // so wrists with d <= 1e-6 solve within tolerance while d >= 5e-6 do not.
-    // The factory tolerance sits at the acceptance tolerance, which is the
-    // conservative edge that admits no unsolvable wrist (no false accept).
+    // Measured on this geometry, by an independent forward map: the branches'
+    // end-effector position error spreads over 0.21*d to 2.04*d. Only the lower
+    // factor is sub-unit, so an admitted wrist yields at least one verifying
+    // branch and not all eight -- the count assertion below pins that. The gate
+    // takes d = 9e-7 and refuses d = 1e-6, and by d = 5e-6 no branch verifies.
     // The orientation field is set three orders away from the position field on
     // purpose: both gates judge a distance, so a gate that read the orientation
     // field would admit the unsolvable wrists below.
     const verification_tolerance<double> pos_tol(1e-6, 1e-3);
 
     struct sample { double offset; bool expect_solvable; };
-    const std::array<sample, 7> samples = {{
-        {1e-8, true},  {1e-7, true},  {5e-7, true},
+    const std::array<sample, 9> samples = {{
+        {1e-8, true},  {1e-7, true},  {5e-7, true}, {8e-7, true}, {9e-7, true},
         {5e-6, false}, {1e-5, false}, {1e-4, false}, {1e-3, false},
     }};
 
@@ -594,6 +623,24 @@ TEST_CASE("6R Pieper: wrist-intersection tolerance sweep (construction gate)")
         auto solver = pieper_6r_solver<decltype(chain)>::make(chain, pos_tol);
         CHECK(solver.has_value() == s.expect_solvable);
     }
+
+    // Admission promises one verifying branch, not eight. The wide end of the
+    // admitted band loses half of them, which is the claim the header makes and
+    // the reason it does not claim more.
+    auto wide = testing::unwrap(
+        fixtures::make_near_spherical_wrist_puma<double>(9e-7),
+        "make_near_spherical_wrist_puma");
+    auto narrow = testing::unwrap(
+        fixtures::make_near_spherical_wrist_puma<double>(1e-7),
+        "make_near_spherical_wrist_puma");
+    auto wide_result = pieper_6r_solver(wide).solve(
+        testing::fk_at(wide, q_probe).end_effector);
+    auto narrow_result = pieper_6r_solver(narrow).solve(
+        testing::fk_at(narrow, q_probe).end_effector);
+    REQUIRE(wide_result.has_value());
+    REQUIRE(narrow_result.has_value());
+    CHECK(narrow_result->count == 8);
+    CHECK(wide_result->count == 4);
 }
 
 // Worst and best FK position residual over the branches a solver returned,
@@ -664,6 +711,44 @@ TEST_CASE("6R Pieper: an acceptance tolerance above the module default admits "
     auto [best, worst] = position_residual_range(chain, at_loose, target);
     CHECK(best > 1e-6);
     CHECK(worst < 1e-3);
+}
+
+TEST_CASE("6R Pieper: the solver forwards both fields of its own tolerance to "
+          "the back-check")
+{
+    // The helper-level case below pins the helper. This one pins the forward:
+    // it is the solver's own stored tolerance that must arrive there, field for
+    // field. A threshold of zero needs no residual band -- no norm is below
+    // zero -- so each probe is decided by which field the comparison read.
+    auto exact = make_puma_chain();
+    Eigen::Vector<double, 6> q_known;
+    q_known << 0.3, -0.4, 0.5, 0.2, -0.3, 0.1;
+    auto target = testing::fk_at(exact, q_known).end_effector;
+
+    auto baseline = pieper_6r_solver<decltype(exact)>(exact).solve(target);
+    REQUIRE(baseline.has_value());
+    CHECK(baseline->count == 8);
+
+    // A zero orientation field must reject every branch: a solver that passed
+    // its position field to both comparisons would return all eight.
+    CHECK_FALSE(pieper_6r_solver<decltype(exact)>(
+        exact, verification_tolerance<double>(1e-6, 0.0)).solve(target).has_value());
+
+    // And a zero position field, for the mirror substitution.
+    CHECK_FALSE(pieper_6r_solver<decltype(exact)>(
+        exact, verification_tolerance<double>(0.0, 1e-6)).solve(target).has_value());
+
+    // Neither zero probe separates the fields from a swap of the two, because
+    // both residuals clear any positive threshold on an exact chain. This one
+    // does: the near-spherical wrist's position residual is ~2e-7 while its
+    // orientation residual stays at round-off, so a swapped pair rejects.
+    auto skewed = testing::unwrap(
+        fixtures::make_near_spherical_wrist_puma<double>(1e-7),
+        "make_near_spherical_wrist_puma");
+    auto skewed_target = testing::fk_at(skewed, q_known).end_effector;
+    CHECK(pieper_6r_solver<decltype(skewed)>(
+        skewed, verification_tolerance<double>(1e-6, 1e-12))
+            .solve(skewed_target).has_value());
 }
 
 TEST_CASE("the FK back-check reads a length against the position field and an "

@@ -22,6 +22,7 @@ See [IK Methods](../background/ik-methods.md) | [PoE Kinematics](../background/p
 |------|--------|
 | All analytical | `#include <cartan/analytical.h>` |
 | `cartan::pieper_6r_solver`, `cartan::solve_6r` | `#include <cartan/analytical/solver_6r.h>` |
+| `cartan::opw_6r_solver`, `cartan::opw_parameters` | `#include <cartan/analytical/solver_opw.h>` |
 | `cartan::spatial_3r_solver`, `cartan::solve_3r` | `#include <cartan/analytical/solver_3r.h>` |
 | `cartan::planar_2r_solver`, `cartan::solve_2r` | `#include <cartan/analytical/solver_2r.h>` |
 | `cartan::paden_kahan_1`, `paden_kahan_1_direction`, `paden_kahan_2`, `paden_kahan_3` | `#include <cartan/analytical/paden_kahan.h>` |
@@ -534,9 +535,6 @@ static cartan::expected<pieper_6r_solver, analytical_error<scalar_type>>
 make(const chain_type& chain,
      verification_tolerance<scalar_type> tolerance
          = default_verification_tolerance_v<scalar_type>);
-
-static constexpr scalar_type default_position_tolerance;
-static constexpr scalar_type default_orientation_tolerance;
 ```
 
 Captures the chain by value. Pre-computes the wrist-center geometry from
@@ -546,7 +544,16 @@ back-check compares each residual against its own field, so a length never
 gates an angle. `make` validates the Pieper preconditions before returning a
 solver and judges both of them — the shoulder-axis gap and the wrist
 sphericity — against `position()`, the same threshold the back-check applies,
-so an admitted chain is solvable to the bound the caller asked for.
+so an admitted chain yields at least one branch that verifies to the bound the
+caller asked for.
+
+Admission promises **one** verifying branch, not all eight. Measured on a
+near-spherical family whose wrist axes miss the common center by `d`, the
+branches' position error spreads over `0.21*d` to `2.04*d`; only the lower
+factor is below one. At the module default the family returns eight branches at
+`d = 1e-7` and four at `d = 9e-7`. The gate admits `d` strictly below the
+position tolerance — it takes `9e-7` and refuses `1e-6` at a tolerance of
+`1e-6`.
 
 ### Method
 
@@ -572,6 +579,52 @@ chain and immediately invokes `solve(target)`.
 
 Reference: Lynch & Park, Modern Robotics, Section 6.1.1.
            Murray, Li and Sastry (1994), Section 3.3.
+
+## opw_6r_solver
+
+Closed-form IK for ortho-parallel 6R arms with a spherical wrist and a lateral
+shoulder offset — the geometry `pieper_6r_solver`'s shoulder-intersection gate
+rejects. Returns up to 8 solutions.
+
+```cpp
+template <chain Chain, typename Verification = opw_verified>
+class opw_6r_solver;
+```
+
+`Verification` selects the FK back-check: `opw_verified` filters every branch
+through it and collapses duplicates, `opw_raw` emits every finite branch
+unchecked.
+
+### Factory
+
+```cpp
+static cartan::expected<opw_6r_solver, analytical_error<scalar_type>>
+make(const chain_type& chain,
+     const opw_parameters<scalar_type>& params,
+     verification_tolerance<scalar_type> tolerance
+         = default_verification_tolerance_v<scalar_type>,
+     scalar_type singularity_tolerance = default_singularity_tolerance);
+
+static constexpr scalar_type default_position_tolerance;
+static constexpr scalar_type default_orientation_tolerance;
+static constexpr scalar_type default_singularity_tolerance;
+```
+
+There is no public constructor: `make` validates the OPW preconditions (six
+revolute joints, axis 1 perpendicular to axis 2, axis 2 parallel to axis 3, and
+a spherical wrist within `tolerance.position()`) and is the only way in.
+
+`tolerance` is the FK back-check's acceptance bound, `position()` a distance in
+the chain's linear unit and `orientation()` an angle in radians.
+`singularity_tolerance` is a separate scalar and stays one: it thresholds
+`|sin(theta5)|`, a dimensionless quantity, below which the wrist fold path is
+taken. Its default is pinned empirically rather than copied from the reference
+implementation's `1e-6`; see the constant's comment in the header.
+
+The two `default_*_tolerance` constants republish the module default's two
+fields one scalar at a time, because the Python bindings need each as a default
+argument and cannot spell the two-field type. Prefer
+`default_verification_tolerance_v` in C++.
 
 ## Edge Cases
 

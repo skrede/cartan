@@ -293,3 +293,72 @@ TEST_CASE("OPW: the sin(theta5) fold threshold sits in the empirical "
     CHECK(opw_6r_solver<decltype(chain)>::default_singularity_tolerance > below);
     CHECK(opw_6r_solver<decltype(chain)>::default_singularity_tolerance < above);
 }
+
+TEST_CASE("OPW: the solver forwards both fields of its own tolerance to the "
+          "back-check")
+{
+    // The pre-change code passed the position tolerance to both comparisons and
+    // said so in a comment. That spelling is indistinguishable from the correct
+    // one under any symmetric tolerance, so the two fields are driven to zero
+    // one at a time: no norm is below zero, and a solver reusing one field for
+    // both would return every branch from the first probe.
+    auto chain = fixtures::make_kr6_r900_opw_chain<double>();
+    auto params = fixtures::kr6_r900_opw_parameters<double>();
+    Eigen::Vector<double, 6> q_known;
+    q_known << 0.3, -0.4, 0.5, 0.2, -0.3, 0.1;
+    auto target = testing::fk_at(chain, q_known).end_effector;
+
+    auto baseline = opw_6r_solver<decltype(chain)>::make(chain, params);
+    REQUIRE(baseline.has_value());
+    auto all = baseline->solve(target);
+    REQUIRE(all.has_value());
+    REQUIRE(all->count >= 1);
+
+    auto zero_orientation = opw_6r_solver<decltype(chain)>::make(
+        chain, params, verification_tolerance<double>(1e-6, 0.0));
+    REQUIRE(zero_orientation.has_value());
+    CHECK_FALSE(zero_orientation->solve(target).has_value());
+
+    // The mirror. The KR6 wrist axes meet exactly, so the factory's sphericity
+    // gate still admits at a zero position field and the probe reaches solve().
+    auto zero_position = opw_6r_solver<decltype(chain)>::make(
+        chain, params, verification_tolerance<double>(0.0, 1e-6));
+    REQUIRE(zero_position.has_value());
+    CHECK_FALSE(zero_position->solve(target).has_value());
+
+    // Neither zero probe separates the two fields from a swap of them, because
+    // on an exactly-posed target both residuals are round-off. Just off the
+    // wrist-singular locus the fold path splits them by the tool offset: pinning
+    // theta4 injects an orientation error of ~2*delta and, through the 80 mm
+    // offset, a position error of a twelfth of that. Thresholds placed between
+    // the two are met one way round and not the other.
+    Eigen::Vector<double, 6> q_fold;
+    q_fold << 0.3, -0.4, 0.5, 0.2, 1e-4, 0.1;
+    auto fold_target = testing::fk_at(chain, q_fold).end_effector;
+    auto folded = opw_6r_solver<decltype(chain)>::make(
+        chain, params, verification_tolerance<double>(1e-5, 1e-4), 3e-4);
+    REQUIRE(folded.has_value());
+    auto fold_result = folded->solve(fold_target);
+    REQUIRE(fold_result.has_value());
+
+    // Two exact branches plus the two fold branches, whose residuals
+    // (1.60e-06 in position, 2.00e-05 in orientation) clear their own field and
+    // not the other's.
+    CHECK(fold_result->count == 4);
+    int past_position_field = 0;
+    for (int i = 0; i < fold_result->count; ++i)
+    {
+        const auto& sol = fold_result->solutions[static_cast<std::size_t>(i)];
+        auto fk = testing::fk_at(chain, sol);
+        double oe = (fk.end_effector.rotation().inverse()
+            * fold_target.rotation()).log().norm();
+        double pe = (fk.end_effector.translation()
+            - fold_target.translation()).norm();
+        if (oe > 1e-5)
+        {
+            ++past_position_field;
+            CHECK(pe < 1e-5);
+        }
+    }
+    CHECK(past_position_field == 2);
+}

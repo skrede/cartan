@@ -119,11 +119,16 @@ private:
 
 /// position() is a distance in the chain's linear unit; orientation() is the
 /// norm of the residual rotation vector, in radians.
+///
+/// The constructor is explicit, like the two single-threshold classes above, so
+/// that a bare braced pair cannot appear at a call site: the two fields are in
+/// different units and `{a, b}` shows the reader neither which is which nor that
+/// the argument is a tolerance at all.
 template <typename Scalar>
 class verification_tolerance
 {
 public:
-    constexpr verification_tolerance(Scalar position, Scalar orientation)
+    constexpr explicit verification_tolerance(Scalar position, Scalar orientation)
         : m_position(position)
         , m_orientation(orientation)
     {
