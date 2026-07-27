@@ -42,8 +42,8 @@ static bool verify_without_the_finiteness_test(
     const Eigen::Vector<Scalar, N>& q,
     const spp::se3<Scalar>& target,
     bool check_orientation,
-    Scalar position_tolerance = Scalar(1e-6),
-    Scalar orientation_tolerance = Scalar(1e-6))
+    const spp::verification_tolerance<Scalar>& tolerance
+        = spp::default_verification_tolerance_v<Scalar>)
 {
     Eigen::Vector<Scalar, Eigen::Dynamic> q_dyn(N);
     for (int i = 0; i < N; ++i)
@@ -53,13 +53,13 @@ static bool verify_without_the_finiteness_test(
     auto fk = spp::forward_kinematics_unchecked(chain, q_dyn);
 
     Scalar position_error = (fk.end_effector.translation() - target.translation()).norm();
-    if (position_error >= position_tolerance)
+    if (position_error >= tolerance.position())
         return false;
     if (!check_orientation)
         return true;
     Scalar orientation_error =
         (fk.end_effector.rotation().inverse() * target.rotation()).log().norm();
-    return orientation_error < orientation_tolerance;
+    return orientation_error < tolerance.orientation();
 }
 
 TEMPLATE_TEST_CASE("the unguarded verifier and the shipped one agree on finite candidates",
@@ -78,7 +78,8 @@ TEMPLATE_TEST_CASE("the unguarded verifier and the shipped one agree on finite c
             REQUIRE(verify_without_the_finiteness_test<Scalar, 2>(
                         chain, q, target, check_orientation)
                 == spp::detail::verify_analytical_solution<dyn_chain<Scalar>, 2>(
-                    chain, q, target, check_orientation));
+                    chain, q, target, check_orientation,
+                    spp::default_verification_tolerance_v<Scalar>));
         }
     }
 }
@@ -103,7 +104,7 @@ TEMPLATE_TEST_CASE("the unguarded verifier reports a nonfinite candidate accepta
         // finiteness test now blocks.
         REQUIRE(verify_without_the_finiteness_test<Scalar, 2>(chain, q, target, false));
         REQUIRE_FALSE(spp::detail::verify_analytical_solution<dyn_chain<Scalar>, 2>(
-            chain, q, target, false));
+            chain, q, target, false, spp::default_verification_tolerance_v<Scalar>));
     }
 }
 

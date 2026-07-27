@@ -266,11 +266,12 @@ opw_a1: float = opw_params.a1
 opw_offsets: list[float] = opw_params.offsets
 opw_signs: list[int] = opw_params.sign_corrections
 analytical_opw: cartan.AnalyticalResult = _solve_opw_6r(
-    ik_chain, opw_params, ik_target)
+    ik_chain, opw_params, ik_target, orientation_tolerance=1e-6)
 
 range_status: cartan.RangeStatus = cartan.RangeStatus.in_range
 unwrapped_result: cartan.UnwrappedResult = _solve_unwrapped_opw_6r(
-    ik_chain, opw_params, ik_target, q_seed=ik_q_seed)
+    ik_chain, opw_params, ik_target, q_seed=ik_q_seed,
+    orientation_tolerance=1e-6)
 unwrapped_status: cartan.AnalyticalStatus = unwrapped_result.status
 unwrapped_error_metric: float = unwrapped_result.error_metric
 unwrapped_solutions = unwrapped_result.solutions

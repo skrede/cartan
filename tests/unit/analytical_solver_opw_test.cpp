@@ -21,6 +21,7 @@ using namespace cartan;
 // full-joint-range configurations and re-verifies every returned solution by an
 // independent forward map at 1e-9 (never trusting the solver's own report).
 static constexpr double tolerance = 1e-9;
+static constexpr verification_tolerance<double> acceptance(tolerance, tolerance);
 
 using non_parallel_6r_chain = static_chain<double, revolute_z, revolute_y, revolute_x,
     revolute_x, revolute_y, revolute_x>;
@@ -69,11 +70,11 @@ TEST_CASE("OPW: FK round-trip reconstructs KR6 R900 targets at 1e-9 over a "
     auto chain = fixtures::make_kr6_r900_opw_chain<double>();
     auto params = fixtures::kr6_r900_opw_parameters<double>();
 
-    // Solve AT the correctness bar: the acceptance tolerance binds both the
-    // position and orientation FK back-check, so every emitted solution already
-    // reconstructs the target to 1e-9. The independent re-check below then holds
-    // for every returned solution, not merely the best one.
-    auto solver = opw_6r_solver<decltype(chain)>::make(chain, params, tolerance);
+    // Solve AT the correctness bar: both fields of the acceptance tolerance are
+    // set to it, so every emitted solution already reconstructs the target to
+    // 1e-9 in position and in orientation. The independent re-check below then
+    // holds for every returned solution, not merely the best one.
+    auto solver = opw_6r_solver<decltype(chain)>::make(chain, params, acceptance);
     REQUIRE(solver.has_value());
 
     std::mt19937_64 rng(0xC0FFEE1234ull);
@@ -144,7 +145,7 @@ TEST_CASE("OPW: wrist singularity returns FK-verified folded solutions")
     // FK-verifies at 1e-9" holds: at the exact locus the fold is exact, and any
     // alternate branch that only reaches 1e-8 near a secondary singularity is
     // filtered rather than reported.
-    auto solver = opw_6r_solver<decltype(chain)>::make(chain, params, tolerance);
+    auto solver = opw_6r_solver<decltype(chain)>::make(chain, params, acceptance);
     REQUIRE(solver.has_value());
 
     // Targets ON the wrist-singular locus: internal theta5 = q(4) = 0 exactly,
@@ -211,7 +212,7 @@ TEST_CASE("OPW: the sin(theta5) fold threshold sits in the empirical "
     // Permissive acceptance so BOTH the fold and the naive reconstruction are
     // emitted (not filtered), letting the independent re-check expose each
     // path's true worst-case FK error.
-    const double permissive = 1e-2;
+    const verification_tolerance<double> permissive(1e-2, 1e-2);
 
     // A spread of shoulder/elbow configurations; joint 5 is swept onto the
     // locus so the worst case is taken over the whole family, not one pose.

@@ -173,3 +173,50 @@ TEST_CASE("3R solver: CTAD deduction guide works")
         decltype(solver),
         spatial_3r_solver<static_chain<double, revolute_z, revolute_y, revolute_z>>>);
 }
+
+/// A ZYZ 3R chain whose first two axes miss each other by `gap`, violating the
+/// intersecting-axes precondition the decomposition assumes.
+static zyz_3r_chain make_offset_axes_3r_chain(double gap)
+{
+    auto s0 = screw_axis<double>::revolute({0, 0, 1}, {0, 0, 0});
+    auto s1 = screw_axis<double>::revolute({0, 1, 0}, {gap, 0, 0});
+    auto s2 = screw_axis<double>::revolute({0, 0, 1}, {0.5, 0, 0});
+    auto home = se3<double>(so3<double>::identity(), Eigen::Vector3d(0.8, 0, 0));
+    auto no_limits = testing::limits(-10.0, 10.0);
+    return testing::unwrap(
+        zyz_3r_chain::make(home, {s0, s1, s2}, {no_limits, no_limits, no_limits}),
+        "make_offset_axes_3r_chain");
+}
+
+TEST_CASE("3R solver: an acceptance tolerance above the module default admits "
+          "branches the default rejects")
+{
+    // Axes 1 and 2 miss each other by 1e-4. The subproblems do not see it --
+    // they solve their own equations exactly at the assumed intersection point
+    // -- so four candidates are generated whose FK position residual lands in
+    // [2.57e-05, 1.95e-04]: past the module default, short of 1e-2. Pre-fix the
+    // solver held no tolerance at all and the back-check always read 1e-6.
+    auto chain = make_offset_axes_3r_chain(1e-4);
+    Eigen::Vector3d q_known;
+    q_known << 0.3, 0.5, -0.2;
+    auto target = testing::fk_at(chain, q_known).end_effector;
+
+    auto at_default = spatial_3r_solver(chain).solve(target);
+    REQUIRE_FALSE(at_default.has_value());
+    CHECK(at_default.error().reason == analytical_failure::verification_failed);
+
+    auto at_loose = spatial_3r_solver<decltype(chain)>(
+        chain, verification_tolerance<double>(1e-2, 1e-2)).solve(target);
+    REQUIRE(at_loose.has_value());
+    REQUIRE(at_loose->count > 0);
+
+    for (int i = 0; i < at_loose->count; ++i)
+    {
+        auto fk = testing::fk_at(
+            chain, at_loose->solutions[static_cast<std::size_t>(i)]);
+        double residual =
+            (fk.end_effector.translation() - target.translation()).norm();
+        CHECK(residual > 1e-6);
+        CHECK(residual < 1e-2);
+    }
+}

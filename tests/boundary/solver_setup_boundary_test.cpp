@@ -450,7 +450,8 @@ TEMPLATE_TEST_CASE("the analytical verifier rejects a nonfinite candidate",
             for (bool check_orientation : {false, true})
             {
                 REQUIRE_FALSE(spp::detail::verify_analytical_solution<dyn_chain<Scalar>, 2>(
-                    chain, q, target, check_orientation));
+                    chain, q, target, check_orientation,
+                    spp::default_verification_tolerance_v<Scalar>));
             }
         }
     }
@@ -458,9 +459,9 @@ TEMPLATE_TEST_CASE("the analytical verifier rejects a nonfinite candidate",
     Eigen::Vector<Scalar, 2> finite;
     finite << Scalar(0.2), Scalar(0.2);
     REQUIRE(spp::detail::verify_analytical_solution<dyn_chain<Scalar>, 2>(
-        chain, finite, target, false));
+        chain, finite, target, false, spp::default_verification_tolerance_v<Scalar>));
     REQUIRE(spp::detail::verify_analytical_solution<dyn_chain<Scalar>, 2>(
-        chain, finite, target, true));
+        chain, finite, target, true, spp::default_verification_tolerance_v<Scalar>));
 }
 
 TEMPLATE_TEST_CASE("the analytical verifier refuses a candidate of the wrong length",
@@ -473,5 +474,6 @@ TEMPLATE_TEST_CASE("the analytical verifier refuses a candidate of the wrong len
     Eigen::Vector<Scalar, 2> too_short;
     too_short << Scalar(0.2), Scalar(0.2);
     REQUIRE_FALSE(spp::detail::verify_analytical_solution<dyn_chain<Scalar>, 2>(
-        chain, too_short, target, false));
+        chain, too_short, target, false,
+        spp::default_verification_tolerance_v<Scalar>));
 }

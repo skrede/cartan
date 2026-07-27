@@ -49,17 +49,22 @@ public:
     static constexpr int joints = 6;
     static constexpr int max_solutions = 8;
 
-    /// Default acceptance tolerance for the FK position back-check, mirroring
-    /// detail::verify_analytical_solution. The construction-time geometry gate
-    /// (see make()) and the shoulder-singularity detector are both anchored to
-    /// this value so that a constructed solver is always solvable to the same
-    /// tolerance it verifies against.
-    static constexpr scalar_type default_position_tolerance = scalar_type(1e-6);
+    /// The two fields of the module's default acceptance tolerance, named
+    /// separately so a caller can override one without restating the other. The
+    /// construction-time geometry gate (see make()) and the shoulder-singularity
+    /// detector are both anchored to the position field, so that a constructed
+    /// solver is always solvable to the same distance it verifies against.
+    static constexpr scalar_type default_position_tolerance
+        = default_verification_tolerance_v<scalar_type>.position();
+    static constexpr scalar_type default_orientation_tolerance
+        = default_verification_tolerance_v<scalar_type>.orientation();
 
     explicit pieper_6r_solver(
         const Chain& chain,
-        scalar_type position_tolerance = default_position_tolerance)
-        : m_chain(chain), m_position_tolerance(position_tolerance)
+        verification_tolerance<scalar_type> tolerance
+            = default_verification_tolerance_v<scalar_type>)
+        : m_chain(chain)
+        , m_tolerance(tolerance)
     {
         if (chain.num_joints() != 6)
         {
@@ -113,21 +118,22 @@ public:
     ///   3. the wrist is spherical: axes 4, 5, 6 meet at a common center within
     ///      the acceptance tolerance.
     ///
-    /// The intersection/sphericity gate is anchored to `position_tolerance`
-    /// (the same tolerance the FK back-check uses), not the loose 1e-3 default
-    /// of find_wrist_intersection. Rationale (empirically swept, see the 6R
-    /// solver test suite): a wrist whose axes miss each other by a distance d
-    /// propagates to an end-effector position error of ~0.9*d, so any chain
-    /// admitted with d < position_tolerance is guaranteed FK-solvable to
-    /// position_tolerance, while near-spherical-but-unsolvable wrists (which
-    /// pass the old 1e-3 gate yet miss the solve tolerance by orders of
-    /// magnitude) are rejected at construction. The sub-unit factor keeps the
-    /// gate free of false accepts; the swept transition sits between
-    /// d = position_tolerance (solvable) and d = 5*position_tolerance
-    /// (unsolvable).
+    /// Both gates judge a distance, so both read the tolerance's position field
+    /// (the same threshold the FK back-check applies to its position residual),
+    /// not the loose 1e-3 default of find_wrist_intersection. Rationale
+    /// (empirically swept, see the 6R solver test suite): a wrist whose axes
+    /// miss each other by a distance d propagates to an end-effector position
+    /// error of ~0.9*d, so any chain admitted with d below the position
+    /// tolerance is guaranteed FK-solvable to it, while
+    /// near-spherical-but-unsolvable wrists (which pass the old 1e-3 gate yet
+    /// miss the solve tolerance by orders of magnitude) are rejected at
+    /// construction. The sub-unit factor keeps the gate free of false accepts;
+    /// the swept transition sits between d equal to the position tolerance
+    /// (solvable) and five times it (unsolvable).
     static cartan::expected<pieper_6r_solver, analytical_error<scalar_type>>
     make(const Chain& chain,
-         scalar_type position_tolerance = default_position_tolerance)
+         verification_tolerance<scalar_type> tolerance
+             = default_verification_tolerance_v<scalar_type>)
     {
         if (chain.num_joints() != 6)
         {
@@ -149,7 +155,7 @@ public:
         scalar_type shoulder_gap = detail::closest_approach_distance<scalar_type>(
             a0.omega().cross(a0.v()), a0.omega(),
             a1.omega().cross(a1.v()), a1.omega());
-        if (shoulder_gap > position_tolerance)
+        if (shoulder_gap > tolerance.position())
         {
             return cartan::unexpected(analytical_error<scalar_type>{
                 analytical_failure::degenerate_geometry, shoulder_gap});
@@ -157,14 +163,14 @@ public:
 
         // Assumption (3): spherical wrist at the acceptance tolerance.
         auto wrist = detail::find_wrist_intersection(
-            chain.axis(3), chain.axis(4), chain.axis(5), position_tolerance);
+            chain.axis(3), chain.axis(4), chain.axis(5), tolerance.position());
         if (!wrist)
         {
             return cartan::unexpected(analytical_error<scalar_type>{
                 analytical_failure::degenerate_geometry, scalar_type(0)});
         }
 
-        return pieper_6r_solver(chain, position_tolerance);
+        return pieper_6r_solver(chain, tolerance);
     }
 
     cartan::expected<
@@ -193,7 +199,7 @@ public:
             vector3<scalar_type> to_wrist = p_wrist - m_q[0];
             vector3<scalar_type> radial =
                 to_wrist - m_omega[0].dot(to_wrist) * m_omega[0];
-            if (radial.norm() < m_position_tolerance)
+            if (radial.norm() < m_tolerance.position())
             {
                 return cartan::unexpected(analytical_error<scalar_type>{
                     analytical_failure::singular_configuration, scalar_type(0)});
@@ -213,7 +219,7 @@ public:
 
         auto sp3_result = paden_kahan_3(
             m_omega[2], m_q[2], m_wrist_center_home, r, delta,
-            length_tolerance<scalar_type>(m_position_tolerance));
+            length_tolerance<scalar_type>(m_tolerance.position()));
 
         if (!sp3_result)
         {
@@ -235,7 +241,7 @@ public:
             // SP2: find (theta1, theta2) via two successive rotations
             auto sp2_result = paden_kahan_2(
                 m_omega[0], m_omega[1], r, p_prime, p_wrist,
-                length_tolerance<scalar_type>(m_position_tolerance));
+                length_tolerance<scalar_type>(m_tolerance.position()));
             if (!sp2_result)
                 continue;
 
@@ -262,7 +268,7 @@ public:
                     q_candidate << theta1, theta2, theta3, theta4, theta5, theta6;
 
                     if (detail::verify_analytical_solution(
-                            m_chain, q_candidate, target, true))
+                            m_chain, q_candidate, target, true, m_tolerance))
                     {
                         // Return a single canonical representative per physical
                         // configuration: wrap to (-pi, pi] and drop duplicates
@@ -732,7 +738,7 @@ private:
     vector3<Scalar> m_wrist_center_home;
     vector3<Scalar> m_tool_offset;
     vector3<Scalar> m_p_ee;
-    Scalar m_position_tolerance{default_position_tolerance};
+    verification_tolerance<Scalar> m_tolerance;
     bool m_valid{false};
 };
 

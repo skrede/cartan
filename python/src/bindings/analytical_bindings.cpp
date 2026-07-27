@@ -234,9 +234,11 @@ inline UnwrappedResult unwrap_analytical_result(const char *fn_name, const KC &c
     return out;
 }
 
-inline AnalyticalResult solve_opw_result(const KC &chain, const OPWParametersd &params, const SE3d &target, double position_tolerance, double singularity_tolerance)
+inline AnalyticalResult solve_opw_result(const KC &chain, const OPWParametersd &params, const SE3d &target, double position_tolerance, double singularity_tolerance,
+                                         double orientation_tolerance)
 {
-    auto solver = cartan::opw_6r_solver<KC>::make(chain, params, position_tolerance, singularity_tolerance);
+    auto solver = cartan::opw_6r_solver<KC>::make(
+        chain, params, cartan::verification_tolerance<double>(position_tolerance, orientation_tolerance), singularity_tolerance);
     if(!solver)
     {
         return to_analytical_error_result(solver.error());
@@ -405,37 +407,50 @@ void register_analytical(nb::module_ &m)
 
     analytical.def(
             "solve_opw_6r",
-            [](const KC &chain, const OPWParametersd &params, const SE3d &target, double position_tolerance, double singularity_tolerance) -> AnalyticalResult
+            [](const KC &chain, const OPWParametersd &params, const SE3d &target, double position_tolerance, double singularity_tolerance,
+               double orientation_tolerance) -> AnalyticalResult
             {
                 validate_target_finite("solve_opw_6r", target);
                 nb::gil_scoped_release release;
-                return solve_opw_result(chain, params, target, position_tolerance, singularity_tolerance);
+                return solve_opw_result(chain, params, target, position_tolerance, singularity_tolerance, orientation_tolerance);
             },
             "Closed-form OPW inverse kinematics for offset-shoulder, "
             "ortho-parallel, spherical-wrist 6R arms. Returns up to 8 "
             "FK-verified branches through the same AnalyticalResult contract as "
-            "the other analytical solvers.",
+            "the other analytical solvers. position_tolerance bounds the FK "
+            "back-check's position residual, a distance in the chain's linear "
+            "unit; orientation_tolerance bounds its orientation residual, the "
+            "norm of the residual rotation vector in radians; "
+            "singularity_tolerance is the dimensionless |sin(theta5)| below "
+            "which the wrist fold path is taken.",
             nb::arg("chain"), nb::arg("params"), nb::arg("target").noconvert(),
             nb::arg("position_tolerance") = cartan::opw_6r_solver<KC>::default_position_tolerance,
-            nb::arg("singularity_tolerance") = cartan::opw_6r_solver<KC>::default_singularity_tolerance);
+            nb::arg("singularity_tolerance") = cartan::opw_6r_solver<KC>::default_singularity_tolerance,
+            nb::arg("orientation_tolerance") = cartan::opw_6r_solver<KC>::default_orientation_tolerance);
 
     analytical.def(
             "solve_unwrapped_opw_6r",
             [](const KC &chain, const OPWParametersd &params, const SE3d &target, std::optional<nb::DRef<const VectorXd>> q_seed, double position_tolerance,
-               double singularity_tolerance) -> UnwrappedResult
+               double singularity_tolerance, double orientation_tolerance) -> UnwrappedResult
             {
                 validate_target_finite("solve_unwrapped_opw_6r", target);
                 VectorXd reference = validated_reference("solve_unwrapped_opw_6r", chain, q_seed);
                 nb::gil_scoped_release release;
-                AnalyticalResult raw = solve_opw_result(chain, params, target, position_tolerance, singularity_tolerance);
+                AnalyticalResult raw = solve_opw_result(chain, params, target, position_tolerance, singularity_tolerance, orientation_tolerance);
                 return unwrap_analytical_result("solve_unwrapped_opw_6r", chain, raw, reference);
             },
             "Solve OPW IK and return every branch with a per-solution range tag. "
             "q_seed selects the nearest 2*pi representative when a joint range "
-            "spans multiple turns.",
+            "spans multiple turns. position_tolerance bounds the FK back-check's "
+            "position residual, a distance in the chain's linear unit; "
+            "orientation_tolerance bounds its orientation residual, the norm of "
+            "the residual rotation vector in radians; singularity_tolerance is "
+            "the dimensionless |sin(theta5)| below which the wrist fold path is "
+            "taken.",
             nb::arg("chain"), nb::arg("params"), nb::arg("target").noconvert(), nb::kw_only(), nb::arg("q_seed") = nb::none(),
             nb::arg("position_tolerance") = cartan::opw_6r_solver<KC>::default_position_tolerance,
-            nb::arg("singularity_tolerance") = cartan::opw_6r_solver<KC>::default_singularity_tolerance);
+            nb::arg("singularity_tolerance") = cartan::opw_6r_solver<KC>::default_singularity_tolerance,
+            nb::arg("orientation_tolerance") = cartan::opw_6r_solver<KC>::default_orientation_tolerance);
 
     analytical.def(
             "solve_unwrapped_pieper_6r",

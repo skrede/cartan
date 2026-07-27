@@ -219,3 +219,25 @@ TEST_CASE("2R solver: different link lengths")
         CHECK(error < tolerance);
     }
 }
+
+TEST_CASE("2R solver: the configured acceptance tolerance reaches the FK "
+          "back-check")
+{
+    // The planar closed form is exact on a planar chain -- its residual is
+    // round-off -- so there is no geometry that puts a residual between a tight
+    // configured bound and the module default. What is unambiguous is the
+    // boundary: no residual is below zero, so a solver built at a zero position
+    // tolerance must return nothing, whatever the target. A back-check reading a
+    // fixed default instead of the stored tolerance returns two solutions here.
+    auto chain = make_2r_chain(1.0, 1.0);
+    auto target = target_at(1.0, 0, 0.5);
+
+    auto at_default = planar_2r_solver(chain).solve(target);
+    REQUIRE(at_default.has_value());
+    REQUIRE(at_default->count > 0);
+
+    auto at_zero = planar_2r_solver<decltype(chain)>(
+        chain, verification_tolerance<double>(0.0, 0.0)).solve(target);
+    REQUIRE_FALSE(at_zero.has_value());
+    CHECK(at_zero.error().reason == analytical_failure::verification_failed);
+}

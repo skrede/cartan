@@ -38,8 +38,12 @@ public:
     static constexpr int joints = 2;
     static constexpr int max_solutions = 2;
 
-    explicit planar_2r_solver(const Chain& chain)
+    explicit planar_2r_solver(
+        const Chain& chain,
+        verification_tolerance<scalar_type> tolerance
+            = default_verification_tolerance_v<scalar_type>)
         : m_chain(chain)
+        , m_tolerance(tolerance)
     {
         if (chain.num_joints() != 2)
         {
@@ -108,7 +112,9 @@ public:
     /// closed form reconstructs a bent-home arm and recovers the straight case
     /// when the bend is zero.
     static cartan::expected<planar_2r_solver, analytical_error<scalar_type>>
-    make(const Chain& chain)
+    make(const Chain& chain,
+         verification_tolerance<scalar_type> tolerance
+             = default_verification_tolerance_v<scalar_type>)
     {
         if (chain.num_joints() != 2)
         {
@@ -139,7 +145,7 @@ public:
                 analytical_failure::degenerate_geometry, scalar_type(0)});
         }
 
-        return planar_2r_solver(chain);
+        return planar_2r_solver(chain, tolerance);
     }
 
     cartan::expected<
@@ -220,7 +226,7 @@ public:
         for (std::size_t i = 0; i < static_cast<std::size_t>(result.count); ++i)
         {
             if (detail::verify_analytical_solution(
-                    m_chain, result.solutions[i], target, false))
+                    m_chain, result.solutions[i], target, false, m_tolerance))
             {
                 verified.solutions[static_cast<std::size_t>(verified_count++)]
                     = result.solutions[i];
@@ -249,6 +255,7 @@ private:
     Scalar m_link_length_1{};
     Scalar m_link_length_2{};
     Scalar m_home_bend{};
+    verification_tolerance<Scalar> m_tolerance;
     vector3<Scalar> m_base_point{vector3<Scalar>::Zero()};
     vector3<Scalar> m_plane_normal{vector3<Scalar>::Zero()};
     vector3<Scalar> m_basis_u{vector3<Scalar>::Zero()};

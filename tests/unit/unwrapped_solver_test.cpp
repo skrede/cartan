@@ -196,7 +196,8 @@ TEST_CASE("unwrapped_solver: composes over the OPW solver with identical wrapper
 {
     auto chain = fixtures::make_kr6_r900_opw_chain<double>();
     auto params = fixtures::kr6_r900_opw_parameters<double>();
-    auto inner = opw_6r_solver<decltype(chain)>::make(chain, params, tolerance);
+    auto inner = opw_6r_solver<decltype(chain)>::make(
+        chain, params, verification_tolerance<double>(tolerance, tolerance));
     REQUIRE(inner.has_value());
 
     unwrapped_solver wrapper(*inner);

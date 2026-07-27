@@ -11,12 +11,42 @@
 
 #include <array>
 #include <cmath>
+#include <limits>
 #include <numbers>
+#include <utility>
+#include <algorithm>
+#include <type_traits>
 
 using namespace cartan;
 using Catch::Matchers::WithinAbs;
 
 static constexpr double tolerance = 1e-6;
+
+/// The FK back-check's tolerance parameter carries no default, so a solver that
+/// forgets to forward its own cannot fall back to a third one. Detected rather
+/// than asserted in prose: the first trait must be false and the second true, or
+/// the pair proves nothing.
+template <typename... Args>
+struct back_check_accepts : std::false_type
+{
+};
+
+template <typename... Args>
+    requires requires(Args... args) { detail::verify_analytical_solution(args...); }
+struct back_check_accepts<Args...> : std::true_type
+{
+};
+
+using probe_chain = kinematic_chain<double, dynamic>;
+using probe_config = Eigen::Vector<double, 6>;
+
+static_assert(!back_check_accepts<const probe_chain&, const probe_config&,
+                  const se3<double>&, bool>::value,
+    "the FK back-check must not be callable without a tolerance");
+static_assert(back_check_accepts<const probe_chain&, const probe_config&,
+                  const se3<double>&, bool,
+                  const verification_tolerance<double>&>::value,
+    "the FK back-check must be callable with a two-field tolerance");
 
 using zyy_zyz_6r_chain = static_chain<double, revolute_z, revolute_y, revolute_y,
     revolute_z, revolute_y, revolute_z>;
@@ -532,7 +562,10 @@ TEST_CASE("6R Pieper: wrist-intersection tolerance sweep (construction gate)")
     // so wrists with d <= 1e-6 solve within tolerance while d >= 5e-6 do not.
     // The factory tolerance sits at the acceptance tolerance, which is the
     // conservative edge that admits no unsolvable wrist (no false accept).
-    const double pos_tol = 1e-6;
+    // The orientation field is set three orders away from the position field on
+    // purpose: both gates judge a distance, so a gate that read the orientation
+    // field would admit the unsolvable wrists below.
+    const verification_tolerance<double> pos_tol(1e-6, 1e-3);
 
     struct sample { double offset; bool expect_solvable; };
     const std::array<sample, 7> samples = {{
@@ -559,6 +592,107 @@ TEST_CASE("6R Pieper: wrist-intersection tolerance sweep (construction gate)")
         auto solver = pieper_6r_solver<decltype(chain)>::make(chain, pos_tol);
         CHECK(solver.has_value() == s.expect_solvable);
     }
+}
+
+// Worst and best FK position residual over the branches a solver returned,
+// measured by an independent forward map rather than by the solver.
+template <typename Chain, typename Result>
+static std::pair<double, double> position_residual_range(
+    const Chain& chain, const Result& result, const se3<double>& target)
+{
+    double best = std::numeric_limits<double>::infinity();
+    double worst = 0.0;
+    for (int i = 0; i < result->count; ++i)
+    {
+        auto fk = testing::fk_at(chain, result->solutions[static_cast<std::size_t>(i)]);
+        double pe = (fk.end_effector.translation() - target.translation()).norm();
+        best = std::min(best, pe);
+        worst = std::max(worst, pe);
+    }
+    return {best, worst};
+}
+
+TEST_CASE("6R Pieper: an acceptance tolerance below the module default rejects "
+          "branches the default admits")
+{
+    // Wrist offset 1e-7 puts every branch's FK position residual in
+    // [2.07e-08, 2.04e-07], strictly between a configured 1e-9 and the module
+    // default 1e-6. Pre-fix the solve-time back-check took the helper's 1e-6
+    // default, so a solver built at 1e-9 reported success with eight branches
+    // whose worst residual was 204 times the configured bound.
+    auto chain = testing::unwrap(
+        fixtures::make_near_spherical_wrist_puma<double>(1e-7),
+        "make_near_spherical_wrist_puma");
+    Eigen::Vector<double, 6> q_known;
+    q_known << 0.3, -0.4, 0.5, 0.2, -0.3, 0.1;
+    auto target = testing::fk_at(chain, q_known).end_effector;
+
+    auto at_default = pieper_6r_solver<decltype(chain)>(chain).solve(target);
+    REQUIRE(at_default.has_value());
+    REQUIRE(at_default->count > 0);
+    auto [best, worst] = position_residual_range(chain, at_default, target);
+    CHECK(best > 1e-9);
+    CHECK(worst < 1e-6);
+
+    const verification_tolerance<double> tight(1e-9, 1e-9);
+    auto at_tight = pieper_6r_solver<decltype(chain)>(chain, tight).solve(target);
+    CHECK_FALSE(at_tight.has_value());
+}
+
+TEST_CASE("6R Pieper: an acceptance tolerance above the module default admits "
+          "branches the default rejects")
+{
+    // Wrist offset 1e-4 pushes every branch's residual past the module default,
+    // so a solver at the default reports the arm unreachable. Pre-fix a solver
+    // built at 1e-3 reported the same, because the solve-time back-check
+    // applied the default rather than the configured bound.
+    auto chain = testing::unwrap(
+        fixtures::make_near_spherical_wrist_puma<double>(1e-4),
+        "make_near_spherical_wrist_puma");
+    Eigen::Vector<double, 6> q_known;
+    q_known << 0.3, -0.4, 0.5, 0.2, -0.3, 0.1;
+    auto target = testing::fk_at(chain, q_known).end_effector;
+
+    CHECK_FALSE(pieper_6r_solver<decltype(chain)>(chain).solve(target).has_value());
+
+    const verification_tolerance<double> loose(1e-3, 1e-3);
+    auto at_loose = pieper_6r_solver<decltype(chain)>(chain, loose).solve(target);
+    REQUIRE(at_loose.has_value());
+    REQUIRE(at_loose->count > 0);
+    auto [best, worst] = position_residual_range(chain, at_loose, target);
+    CHECK(best > 1e-6);
+    CHECK(worst < 1e-3);
+}
+
+TEST_CASE("the FK back-check reads a length against the position field and an "
+          "angle against the orientation field")
+{
+    // Two targets displaced from an exactly reachable pose by a known amount in
+    // one quantity each: the rotated target's residual is exactly the rotation
+    // vector's norm, the shifted target's is exactly the translation offset, and
+    // the other residual is zero. Each pair of probes brackets its own residual,
+    // so a threshold read from the wrong field flips one of the four.
+    auto chain = make_puma_chain();
+    Eigen::Vector<double, 6> q_known;
+    q_known << 0.3, -0.4, 0.5, 0.2, -0.3, 0.1;
+    auto exact = testing::fk_at(chain, q_known).end_effector;
+
+    const double displacement = 1e-4;
+    auto rotated = se3<double>(
+        exact.rotation() * so3<double>::exp(Eigen::Vector3d(0, 0, displacement)),
+        exact.translation());
+    auto shifted = se3<double>(exact.rotation(),
+        exact.translation() + Eigen::Vector3d(displacement, 0, 0));
+
+    CHECK(detail::verify_analytical_solution(chain, q_known, rotated, true,
+        verification_tolerance<double>(1e-6, 2 * displacement)));
+    CHECK_FALSE(detail::verify_analytical_solution(chain, q_known, rotated, true,
+        verification_tolerance<double>(1e-3, displacement / 2)));
+
+    CHECK(detail::verify_analytical_solution(chain, q_known, shifted, true,
+        verification_tolerance<double>(2 * displacement, 1e-6)));
+    CHECK_FALSE(detail::verify_analytical_solution(chain, q_known, shifted, true,
+        verification_tolerance<double>(displacement / 2, 1e-3)));
 }
 
 TEST_CASE("6R Pieper: asymmetric ZYX wrist solves via Euler extraction")

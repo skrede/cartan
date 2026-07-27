@@ -142,7 +142,11 @@ inline constexpr verification_tolerance<Scalar> default_verification_tolerance_v
 
 A tolerance is named for the quantity it measures. `verification_tolerance`
 carries the FK back-check's position (linear unit) and orientation (radians, as
-the norm of the residual rotation vector) thresholds separately.
+the norm of the residual rotation vector) thresholds separately. The shared FK
+back-check every analytical solver filters its candidates through takes one of
+these as a **required** parameter with no default, so a solver that holds an
+acceptance tolerance and forgets to forward it does not compile; each of the
+four solvers stores one and forwards it.
 
 **`length_tolerance` is relative, `direction_tolerance` is absolute.** A
 `length_tolerance` residual is compared against `value()` scaled by the larger
@@ -363,12 +367,24 @@ static constexpr int max_solutions = 2;
 ### Constructor
 
 ```cpp
-explicit planar_2r_solver(const chain_type& chain);
+explicit planar_2r_solver(
+    const chain_type& chain,
+    verification_tolerance<scalar_type> tolerance
+        = default_verification_tolerance_v<scalar_type>);
+
+static cartan::expected<planar_2r_solver, analytical_error<scalar_type>>
+make(const chain_type& chain,
+     verification_tolerance<scalar_type> tolerance
+         = default_verification_tolerance_v<scalar_type>);
 ```
 
 Pre-computes the link lengths, the base point, and an orthonormal basis for
 the mechanism plane from the chain's screw axes and home pose. Construction
-is `O(1)` in the chain's joint count.
+is `O(1)` in the chain's joint count. `make` additionally rejects a chain that
+is not two revolute joints or that has a zero-length link. The tolerance is the
+bound the FK back-check applies to each candidate: `position()` is a distance
+in the chain's linear unit and `orientation()` an angle in radians. This solver
+solves position only, so only `position()` gates its results.
 
 ### Method
 
@@ -432,12 +448,18 @@ Decomposition:
 ### Constructor
 
 ```cpp
-explicit spatial_3r_solver(const chain_type& chain);
+explicit spatial_3r_solver(
+    const chain_type& chain,
+    verification_tolerance<scalar_type> tolerance
+        = default_verification_tolerance_v<scalar_type>);
 ```
 
 Captures the chain by value for use during `solve`. Extracts the common
 intersection point of the first two joint axes for use by the subproblem
-decomposition.
+decomposition. The tolerance's `position()` field bounds the FK back-check's
+position residual and is forwarded as the `length_tolerance` of both
+subproblems; `orientation()` is unused, because this solver solves position
+only.
 
 ### Method
 
@@ -500,11 +522,28 @@ Decomposition:
 ### Constructor
 
 ```cpp
-explicit pieper_6r_solver(const chain_type& chain);
+explicit pieper_6r_solver(
+    const chain_type& chain,
+    verification_tolerance<scalar_type> tolerance
+        = default_verification_tolerance_v<scalar_type>);
+
+static cartan::expected<pieper_6r_solver, analytical_error<scalar_type>>
+make(const chain_type& chain,
+     verification_tolerance<scalar_type> tolerance
+         = default_verification_tolerance_v<scalar_type>);
+
+static constexpr scalar_type default_position_tolerance;
+static constexpr scalar_type default_orientation_tolerance;
 ```
 
 Captures the chain by value. Pre-computes the wrist-center geometry from
-the joint-4/5/6 screw axes.
+the joint-4/5/6 screw axes. The tolerance's `position()` field is a distance in
+the chain's linear unit and `orientation()` an angle in radians; the FK
+back-check compares each residual against its own field, so a length never
+gates an angle. `make` validates the Pieper preconditions before returning a
+solver and judges both of them — the shoulder-axis gap and the wrist
+sphericity — against `position()`, the same threshold the back-check applies,
+so an admitted chain is solvable to the bound the caller asked for.
 
 ### Method
 
@@ -543,8 +582,10 @@ Reference: Lynch & Park, Modern Robotics, Section 6.1.1.
   policy (closest-to-seed, distance-to-midpoint, etc.) chooses among
   them.
 - **FK verification gate:** Candidates that algebraically satisfy the
-  subproblem decomposition but fail the FK back-check (within the
-  solver's pose-tolerance) are dropped. If all candidates fail
+  subproblem decomposition but fail the FK back-check are dropped. The bound
+  is the solver's own `verification_tolerance`, not a module-wide default:
+  the position residual is judged against its `position()` field and the
+  orientation residual against `orientation()`. If all candidates fail
   verification, the solver returns
   `analytical_failure::verification_failed`.
 

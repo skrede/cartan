@@ -271,11 +271,15 @@ public:
     static constexpr int joints = 6;
     static constexpr int max_solutions = 8;
 
-    /// Acceptance tolerance for the FK position/orientation back-check, matching
-    /// detail::verify_analytical_solution. The construction-time spherical-wrist
-    /// gate is anchored to the same value so a constructed solver is always
-    /// solvable to the tolerance it verifies against.
-    static constexpr scalar_type default_position_tolerance = scalar_type(1e-6);
+    /// The two fields of the module's default acceptance tolerance, named
+    /// separately so a caller can override one without restating the other. The
+    /// construction-time spherical-wrist gate judges a distance and is anchored
+    /// to the position field, so a constructed solver is always solvable to the
+    /// same distance it verifies against.
+    static constexpr scalar_type default_position_tolerance
+        = default_verification_tolerance_v<scalar_type>.position();
+    static constexpr scalar_type default_orientation_tolerance
+        = default_verification_tolerance_v<scalar_type>.orientation();
 
     /// Threshold on |sin(theta5)| below which the wrist is treated as singular
     /// and the fold path (pin theta4 = 0, recover theta6 by projection) is
@@ -305,7 +309,8 @@ public:
     ///   3. parallel basis: axis 2 is parallel to axis 3
     ///      (|omega1 . omega2| > 1 - sqrt_epsilon);
     ///   4. spherical wrist: axes 4, 5, 6 meet at a common center within the
-    ///      acceptance tolerance (detail::find_wrist_intersection).
+    ///      acceptance tolerance's position field
+    ///      (detail::find_wrist_intersection).
     ///
     /// The lateral shoulder offset (a1 != 0) is accepted -- this is precisely
     /// the geometry Pieper's shoulder-intersection gate rejects. Any
@@ -315,7 +320,8 @@ public:
     static cartan::expected<opw_6r_solver, analytical_error<scalar_type>>
     make(const Chain& chain,
          const opw_parameters<scalar_type>& params,
-         scalar_type position_tolerance = default_position_tolerance,
+         verification_tolerance<scalar_type> tolerance
+             = default_verification_tolerance_v<scalar_type>,
          scalar_type singularity_tolerance = default_singularity_tolerance)
     {
         if (chain.num_joints() != 6)
@@ -355,7 +361,7 @@ public:
 
         // Spherical wrist at the acceptance tolerance.
         auto wrist = detail::find_wrist_intersection(
-            chain.axis(3), chain.axis(4), chain.axis(5), position_tolerance);
+            chain.axis(3), chain.axis(4), chain.axis(5), tolerance.position());
         if (!wrist)
         {
             return cartan::unexpected(analytical_error<scalar_type>{
@@ -363,7 +369,7 @@ public:
         }
 
         return opw_6r_solver(
-            chain, params, position_tolerance, singularity_tolerance);
+            chain, params, tolerance, singularity_tolerance);
     }
 
     cartan::expected<
@@ -590,14 +596,8 @@ public:
 
             if constexpr (std::is_same_v<Verification, opw_verified>)
             {
-                // Gate both position and orientation on the same acceptance
-                // tolerance: `make()` exposes a single tolerance, so it must bind
-                // the orientation check too (verify_analytical_solution otherwise
-                // leaves orientation at its own 1e-6 default, silently ignoring a
-                // tightened tolerance).
                 if (detail::verify_analytical_solution(
-                        m_chain, q_user, target, true,
-                        m_position_tolerance, m_position_tolerance))
+                        m_chain, q_user, target, true, m_tolerance))
                 {
                     const Eigen::Vector<Scalar, 6> q_wrapped = wrap_config(q_user);
                     if (is_duplicate_config(result, q_wrapped))
@@ -643,11 +643,11 @@ private:
     opw_6r_solver(
         const Chain& chain,
         const opw_parameters<scalar_type>& params,
-        scalar_type position_tolerance,
+        verification_tolerance<scalar_type> tolerance,
         scalar_type singularity_tolerance)
         : m_chain(chain)
         , m_params(params)
-        , m_position_tolerance(position_tolerance)
+        , m_tolerance(tolerance)
         , m_singularity_tolerance(singularity_tolerance)
     {
         if (chain.num_joints() != 6)
@@ -712,7 +712,7 @@ private:
     opw_parameters<scalar_type> m_params;
     std::array<vector3<Scalar>, 6> m_omega;
     std::array<vector3<Scalar>, 6> m_q;
-    Scalar m_position_tolerance{default_position_tolerance};
+    verification_tolerance<Scalar> m_tolerance;
     Scalar m_singularity_tolerance{default_singularity_tolerance};
     bool m_valid{false};
 };

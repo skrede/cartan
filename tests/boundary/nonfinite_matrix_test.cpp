@@ -92,7 +92,9 @@ void expect_candidates_refused(
     const Chain& chain, const cartan::se3<Scalar>& target, bool check_orientation)
 {
     const Eigen::Vector<Scalar, 6> home = Eigen::Vector<Scalar, 6>::Zero();
-    REQUIRE(cartan::detail::verify_analytical_solution(chain, home, target, check_orientation));
+    REQUIRE(cartan::detail::verify_analytical_solution(
+        chain, home, target, check_orientation,
+        cartan::default_verification_tolerance_v<Scalar>));
     for (Scalar poison : nonfinite_values<Scalar>())
     {
         for (int i = 0; i < 6; ++i)
@@ -100,7 +102,8 @@ void expect_candidates_refused(
             Eigen::Vector<Scalar, 6> candidate = home;
             candidate(i) = poison;
             REQUIRE_FALSE(cartan::detail::verify_analytical_solution(
-                chain, candidate, target, check_orientation));
+                chain, candidate, target, check_orientation,
+                cartan::default_verification_tolerance_v<Scalar>));
         }
     }
 }

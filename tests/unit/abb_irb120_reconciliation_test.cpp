@@ -18,6 +18,7 @@ using namespace cartan;
 // form never gets to grade its own homework, every returned branch is checked
 // by an independent forward map.
 static constexpr double tolerance = 1e-9;
+static constexpr verification_tolerance<double> acceptance(tolerance, tolerance);
 
 // Worst of position and orientation reconstruction error of q against target.
 template <typename Chain>
@@ -37,7 +38,7 @@ TEST_CASE("IRB120: the reconciled chain factory is a spherical wrist Pieper "
           "admits")
 {
     auto chain = fixtures::make_abb_irb120_chain<double>();
-    auto solver = pieper_6r_solver<decltype(chain)>::make(chain, tolerance);
+    auto solver = pieper_6r_solver<decltype(chain)>::make(chain, acceptance);
 
     // Before the wrist-center reconciliation axes 4,5,6 missed a common point
     // and this gate rejected the chain; now it passes.
@@ -48,7 +49,7 @@ TEST_CASE("IRB120: reconciled-geometry FK accuracy over a workspace-spanning "
           "sample")
 {
     auto chain = fixtures::make_abb_irb120_chain<double>();
-    auto solver = pieper_6r_solver<decltype(chain)>::make(chain, tolerance);
+    auto solver = pieper_6r_solver<decltype(chain)>::make(chain, acceptance);
     REQUIRE(solver.has_value());
 
     std::mt19937_64 rng(0xABB120ull);
