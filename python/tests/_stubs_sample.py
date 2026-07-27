@@ -233,7 +233,7 @@ _solve_all: _SolveAllLike = cast(_SolveAllLike, getattr(_analytical, "solve_all"
 
 analytical_result: cartan.AnalyticalResult = _solve_pieper_6r(ik_chain, ik_target)
 analytical_status: cartan.AnalyticalStatus = analytical_result.status
-analytical_error_metric: float = analytical_result.error_metric
+analytical_error_metric: float | None = analytical_result.error_metric
 analytical_solutions = analytical_result.solutions
 
 _ClosestLike = Callable[..., object]
@@ -273,7 +273,7 @@ unwrapped_result: cartan.UnwrappedResult = _solve_unwrapped_opw_6r(
     ik_chain, opw_params, ik_target, q_seed=ik_q_seed,
     orientation_tolerance=1e-6)
 unwrapped_status: cartan.AnalyticalStatus = unwrapped_result.status
-unwrapped_error_metric: float = unwrapped_result.error_metric
+unwrapped_error_metric: float | None = unwrapped_result.error_metric
 unwrapped_solutions = unwrapped_result.solutions
 unwrapped_tags: list[cartan.RangeStatus] = unwrapped_result.tags
 unwrapped_pieper: cartan.UnwrappedResult = _solve_unwrapped_pieper_6r(

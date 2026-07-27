@@ -57,6 +57,13 @@ using cartan::python::to_analytical_result;
 
 using cartan::python::format_double;
 
+/// __repr__ text for an optional magnitude: Python's own spelling of absence,
+/// so a reader cannot mistake it for a number.
+inline std::string format_error_metric(const std::optional<double> &metric)
+{
+    return metric.has_value() ? format_double(*metric) : std::string("None");
+}
+
 /// Guard each solver lambda against NaN / non-finite target components.
 /// Hard fails raise Python ValueError per the input contract;
 /// joint-count / geometry mismatches are soft fails that flow through the
@@ -291,23 +298,27 @@ void register_analytical(nb::module_ &m)
     // ------------------------------------------------------------------
     // AnalyticalResult value class (def_ro on the three fields). The
     // solutions list is populated on the success path; status carries
-    // the coarse outcome; error_metric is the workspace_distance from
-    // the C++ analytical_error on the unreachable branch and 0.0 on
-    // the success path.
+    // the coarse outcome; error_metric is the optional workspace_distance
+    // from the C++ analytical_error, and is None wherever that diagnostic
+    // carries no magnitude -- including on the success path.
     // ------------------------------------------------------------------
     nb::class_<AnalyticalResult>(analytical, "AnalyticalResult",
-                                 "Closed-form solve outcome with always-populated fields. "
+                                 "Closed-form solve outcome with always-present fields. "
                                  "solutions is the list of joint vectors that survived FK back-check; "
                                  "status names the coarse outcome; error_metric is the workspace "
-                                 "distance magnitude when status == unreachable, otherwise 0.0.")
+                                 "distance magnitude where a geometric inequality failed, and None "
+                                 "wherever no such magnitude was computed.")
             .def_ro("solutions", &AnalyticalResult::solutions)
             .def_ro("status", &AnalyticalResult::status)
-            .def_ro("error_metric", &AnalyticalResult::error_metric)
+            .def_ro("error_metric", &AnalyticalResult::error_metric,
+                    "Workspace-distance magnitude where a geometric inequality failed, "
+                    "else None. Absence is not zero: a target exactly on the workspace "
+                    "boundary has a deficit of zero.")
             .def("__repr__",
                  [](const AnalyticalResult &r)
                  {
                      return "AnalyticalResult(num_solutions=" + std::to_string(r.solutions.size()) + ", status=" + std::to_string(static_cast<int>(r.status))
-                          + ", error_metric=" + format_double(r.error_metric) + ")";
+                          + ", error_metric=" + format_error_metric(r.error_metric) + ")";
                  });
 
     nb::class_<OPWParametersd>(analytical, "OPWParameters", "Geometric OPW parameters for an ortho-parallel spherical-wrist 6R arm.")
@@ -352,12 +363,15 @@ void register_analytical(nb::module_ &m)
             .def_ro("solutions", &UnwrappedResult::solutions)
             .def_ro("tags", &UnwrappedResult::tags)
             .def_ro("status", &UnwrappedResult::status)
-            .def_ro("error_metric", &UnwrappedResult::error_metric)
+            .def_ro("error_metric", &UnwrappedResult::error_metric,
+                    "Workspace-distance magnitude where a geometric inequality failed, "
+                    "else None. Absence is not zero: a target exactly on the workspace "
+                    "boundary has a deficit of zero.")
             .def("__repr__",
                  [](const UnwrappedResult &r)
                  {
                      return "UnwrappedResult(num_solutions=" + std::to_string(r.solutions.size()) + ", status=" + std::to_string(static_cast<int>(r.status))
-                          + ", error_metric=" + format_double(r.error_metric) + ")";
+                          + ", error_metric=" + format_error_metric(r.error_metric) + ")";
                  });
 
     // ------------------------------------------------------------------
@@ -704,7 +718,7 @@ void register_analytical(nb::module_ &m)
                         }
                     default:
                         result.status       = py_analytical_status::degenerate_geometry;
-                        result.error_metric = 0.0;
+                        result.error_metric = std::nullopt;
                         return result;
                 }
 

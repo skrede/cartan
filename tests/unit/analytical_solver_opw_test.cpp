@@ -194,7 +194,8 @@ TEST_CASE("OPW: the error channel is reserved for genuine failures")
     REQUIRE_FALSE(result.has_value());
     CHECK(result.error().reason == analytical_failure::unreachable);
     // The diagnostic carries a positive workspace overshoot, never a joint value.
-    CHECK(result.error().workspace_distance > 0.0);
+    REQUIRE(result.error().workspace_distance.has_value());
+    CHECK(*result.error().workspace_distance > 0.0);
 }
 
 TEST_CASE("OPW: the sin(theta5) fold threshold sits in the empirical "

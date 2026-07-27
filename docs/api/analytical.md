@@ -66,14 +66,17 @@ template <typename Scalar>
 struct analytical_error
 {
     analytical_failure reason;
-    Scalar workspace_distance{};
+    std::optional<Scalar> workspace_distance;
 };
 ```
 
-`reason` names the failure mode. `workspace_distance` is the magnitude (in the
-chain's linear unit) by which the target exceeds the reachable workspace when
-`reason` is `analytical_failure::unreachable`, and zero for other failure
-modes.
+`reason` names the failure mode. `workspace_distance` is present only where a
+geometric inequality was evaluated and failed, and is then the deficit at that
+inequality in the chain's linear unit; it is absent for every other failure.
+Absence is not zero: a target sitting exactly on the workspace boundary has a
+deficit of zero, so zero cannot also stand for "no magnitude was computed". A
+degenerate geometry, a singular configuration, and a failed back-check all
+carry no magnitude.
 
 ### analytical_failure
 

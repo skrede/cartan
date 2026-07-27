@@ -16,6 +16,7 @@
 #include "cartan/detail/epsilon.h"
 
 #include <cmath>
+#include <optional>
 #include "cartan/expected.h"
 
 namespace cartan
@@ -85,7 +86,7 @@ public:
         if (!m_valid)
         {
             return cartan::unexpected(analytical_error<scalar_type>{
-                analytical_failure::degenerate_geometry, scalar_type(0)});
+                analytical_failure::degenerate_geometry, std::nullopt});
         }
 
         vector3<Scalar> p_target = target.translation();
@@ -151,8 +152,7 @@ public:
             return result;
 
         return cartan::unexpected(analytical_error<Scalar>{
-            analytical_failure::verification_failed,
-            (p_target - m_p_ee).norm()});
+            analytical_failure::verification_failed, std::nullopt});
     }
 
     const chain_type& chain() const { return m_chain; }

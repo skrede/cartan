@@ -16,6 +16,7 @@
 
 #include <cmath>
 #include <cstddef>
+#include <optional>
 #include "cartan/expected.h"
 #include <numbers>
 
@@ -119,14 +120,14 @@ public:
         if (chain.num_joints() != 2)
         {
             return cartan::unexpected(analytical_error<scalar_type>{
-                analytical_failure::degenerate_geometry, scalar_type(0)});
+                analytical_failure::degenerate_geometry, std::nullopt});
         }
         for (int i = 0; i < 2; ++i)
         {
             if (!chain.axis(i).is_revolute())
             {
                 return cartan::unexpected(analytical_error<scalar_type>{
-                    analytical_failure::degenerate_geometry, scalar_type(0)});
+                    analytical_failure::degenerate_geometry, std::nullopt});
             }
         }
 
@@ -142,7 +143,7 @@ public:
             || n2 < detail::sqrt_epsilon_v<scalar_type>)
         {
             return cartan::unexpected(analytical_error<scalar_type>{
-                analytical_failure::degenerate_geometry, scalar_type(0)});
+                analytical_failure::degenerate_geometry, std::nullopt});
         }
 
         return planar_2r_solver(chain, tolerance);
@@ -156,7 +157,7 @@ public:
         if (!m_valid)
         {
             return cartan::unexpected(analytical_error<scalar_type>{
-                analytical_failure::degenerate_geometry, scalar_type(0)});
+                analytical_failure::degenerate_geometry, std::nullopt});
         }
 
         vector3<Scalar> p_target = target.translation() - m_base_point;
@@ -237,7 +238,7 @@ public:
         if (verified_count == 0)
         {
             return cartan::unexpected(analytical_error<Scalar>{
-                analytical_failure::verification_failed, Scalar(0)});
+                analytical_failure::verification_failed, std::nullopt});
         }
 
         return verified;

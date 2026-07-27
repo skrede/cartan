@@ -20,6 +20,7 @@
 
 #include <array>
 #include <cmath>
+#include <optional>
 #include "cartan/expected.h"
 #include <numbers>
 
@@ -138,14 +139,14 @@ public:
         if (chain.num_joints() != 6)
         {
             return cartan::unexpected(analytical_error<scalar_type>{
-                analytical_failure::degenerate_geometry, scalar_type(0)});
+                analytical_failure::degenerate_geometry, std::nullopt});
         }
         for (int i = 0; i < 6; ++i)
         {
             if (!chain.axis(i).is_revolute())
             {
                 return cartan::unexpected(analytical_error<scalar_type>{
-                    analytical_failure::degenerate_geometry, scalar_type(0)});
+                    analytical_failure::degenerate_geometry, std::nullopt});
             }
         }
 
@@ -158,7 +159,7 @@ public:
         if (shoulder_gap > tolerance.position())
         {
             return cartan::unexpected(analytical_error<scalar_type>{
-                analytical_failure::degenerate_geometry, shoulder_gap});
+                analytical_failure::degenerate_geometry, std::nullopt});
         }
 
         // Assumption (3): spherical wrist at the acceptance tolerance.
@@ -167,7 +168,7 @@ public:
         if (!wrist)
         {
             return cartan::unexpected(analytical_error<scalar_type>{
-                analytical_failure::degenerate_geometry, scalar_type(0)});
+                analytical_failure::degenerate_geometry, std::nullopt});
         }
 
         return pieper_6r_solver(chain, tolerance);
@@ -181,7 +182,7 @@ public:
         if (!m_valid)
         {
             return cartan::unexpected(analytical_error<scalar_type>{
-                analytical_failure::degenerate_geometry, scalar_type(0)});
+                analytical_failure::degenerate_geometry, std::nullopt});
         }
 
         // Step 1: Compute wrist center position from target pose
@@ -202,7 +203,7 @@ public:
             if (radial.norm() < m_tolerance.position())
             {
                 return cartan::unexpected(analytical_error<scalar_type>{
-                    analytical_failure::singular_configuration, scalar_type(0)});
+                    analytical_failure::singular_configuration, std::nullopt});
             }
         }
 

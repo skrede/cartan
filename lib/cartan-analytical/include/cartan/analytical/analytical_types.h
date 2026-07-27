@@ -4,6 +4,7 @@
 #include "cartan/serial/chain/joint_state.h"
 
 #include <array>
+#include <optional>
 #include "cartan/expected.h"
 
 namespace cartan
@@ -43,15 +44,17 @@ constexpr const char* message(analytical_failure failure)
     return "Unknown analytical_failure";
 }
 
-/// Failure diagnostic for analytical solvers. `reason` names the failure mode;
-/// `workspace_distance` is the magnitude (in the chain's linear unit) by which
-/// the target exceeds the reachable workspace when `reason` is
-/// `analytical_failure::unreachable`, and zero otherwise.
+/// Failure diagnostic for analytical solvers. `reason` names the failure mode.
+/// `workspace_distance` is present only where a geometric inequality was
+/// evaluated and failed, and is then the deficit at that inequality in the
+/// chain's linear unit; it is absent for every other failure. Absence is not
+/// zero: a target sitting exactly on the workspace boundary has a deficit of
+/// zero, so zero cannot also stand for "no magnitude was computed".
 template <typename Scalar>
 struct analytical_error
 {
     analytical_failure reason;
-    Scalar workspace_distance{};
+    std::optional<Scalar> workspace_distance;
 };
 
 /// Multi-solution result for an analytical IK solver. N is the joint count

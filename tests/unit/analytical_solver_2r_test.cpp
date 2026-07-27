@@ -84,7 +84,8 @@ TEST_CASE("2R solver: unreachable target returns error")
 
     REQUIRE(!result.has_value());
     CHECK(result.error().reason == analytical_failure::unreachable);
-    CHECK(result.error().workspace_distance > 0);
+    REQUIRE(result.error().workspace_distance.has_value());
+    CHECK(*result.error().workspace_distance > 0);
 }
 
 TEST_CASE("2R solver: unreachable target inside hole returns error")

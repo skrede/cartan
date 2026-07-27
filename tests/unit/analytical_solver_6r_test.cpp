@@ -498,8 +498,10 @@ TEST_CASE("6R Pieper: offset shoulder is rejected at construction")
 
     REQUIRE_FALSE(solver.has_value());
     CHECK(solver.error().reason == analytical_failure::degenerate_geometry);
-    // The diagnostic carries the shoulder-gap magnitude (~a1).
-    CHECK(solver.error().workspace_distance > 1e-2);
+    // The separation between axes 1 and 2 is a distance to a singular locus,
+    // not an amount by which a target exceeds the workspace, so the diagnostic
+    // carries no magnitude at all.
+    CHECK_FALSE(solver.error().workspace_distance.has_value());
 }
 
 TEST_CASE("6R Pieper: near-spherical wrist is rejected at construction")

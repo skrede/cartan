@@ -19,6 +19,7 @@
 #include <array>
 #include <cmath>
 #include <limits>
+#include <optional>
 #include "cartan/expected.h"
 #include <numbers>
 #include <algorithm>
@@ -327,14 +328,14 @@ public:
         if (chain.num_joints() != 6)
         {
             return cartan::unexpected(analytical_error<scalar_type>{
-                analytical_failure::degenerate_geometry, scalar_type(0)});
+                analytical_failure::degenerate_geometry, std::nullopt});
         }
         for (int i = 0; i < 6; ++i)
         {
             if (!chain.axis(i).is_revolute())
             {
                 return cartan::unexpected(analytical_error<scalar_type>{
-                    analytical_failure::degenerate_geometry, scalar_type(0)});
+                    analytical_failure::degenerate_geometry, std::nullopt});
             }
         }
 
@@ -347,7 +348,7 @@ public:
         if (ortho >= detail::sqrt_epsilon_v<scalar_type>)
         {
             return cartan::unexpected(analytical_error<scalar_type>{
-                analytical_failure::degenerate_geometry, ortho});
+                analytical_failure::degenerate_geometry, std::nullopt});
         }
 
         // Parallel basis: axis 2 parallel to axis 3.
@@ -355,8 +356,7 @@ public:
         if (parallel <= scalar_type(1) - detail::sqrt_epsilon_v<scalar_type>)
         {
             return cartan::unexpected(analytical_error<scalar_type>{
-                analytical_failure::degenerate_geometry,
-                scalar_type(1) - parallel});
+                analytical_failure::degenerate_geometry, std::nullopt});
         }
 
         // Spherical wrist at the acceptance tolerance.
@@ -365,7 +365,7 @@ public:
         if (!wrist)
         {
             return cartan::unexpected(analytical_error<scalar_type>{
-                analytical_failure::degenerate_geometry, scalar_type(0)});
+                analytical_failure::degenerate_geometry, std::nullopt});
         }
 
         return opw_6r_solver(
@@ -380,7 +380,7 @@ public:
         if (!m_valid)
         {
             return cartan::unexpected(analytical_error<scalar_type>{
-                analytical_failure::degenerate_geometry, scalar_type(0)});
+                analytical_failure::degenerate_geometry, std::nullopt});
         }
 
         const opw_parameters<Scalar>& p = m_params;
@@ -632,7 +632,7 @@ public:
                 analytical_failure::unreachable, workspace_distance});
         }
         return cartan::unexpected(analytical_error<scalar_type>{
-            analytical_failure::singular_configuration, scalar_type(0)});
+            analytical_failure::singular_configuration, std::nullopt});
     }
 
     const chain_type& chain() const { return m_chain; }

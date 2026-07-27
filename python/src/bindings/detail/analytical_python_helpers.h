@@ -4,7 +4,7 @@
 /// Binding-internal value types and unwrap helpers for the closed-form
 /// analytical IK surface. AnalyticalResult is the always-returned shape
 /// carrying the multi-solution joint vectors, a coarse-grained status
-/// enum (py_analytical_status), and an error_metric magnitude.
+/// enum (py_analytical_status), and an optional error_metric magnitude.
 ///
 /// py_analytical_status mirrors cartan::analytical_failure plus a Python
 /// success sentinel "ok". The C++ analytical_failure variants are
@@ -20,6 +20,11 @@
 /// emplaces fresh Eigen::VectorXd instances that nanobind marshals to
 /// a Python list[ndarray]. On failure it captures the analytical_error
 /// reason and workspace_distance.
+///
+/// error_metric mirrors the optionality of the C++ workspace_distance and
+/// reaches Python as None wherever no geometric inequality was evaluated,
+/// including on the success path. Zero is a reachable deficit, so it cannot
+/// also stand for an absent one.
 
 #include "cartan/expected.h"
 #include "cartan/analytical/range_status.h"
@@ -30,6 +35,7 @@
 #include <vector>
 #include <cstddef>
 #include <utility>
+#include <optional>
 
 namespace cartan::python {
 
@@ -65,7 +71,7 @@ struct AnalyticalResult
 {
     std::vector<Eigen::VectorXd> solutions;
     py_analytical_status status{py_analytical_status::ok};
-    double error_metric{0.0};
+    std::optional<double> error_metric;
 };
 
 struct UnwrappedResult
@@ -73,7 +79,7 @@ struct UnwrappedResult
     std::vector<Eigen::VectorXd> solutions;
     std::vector<cartan::range_status> tags;
     py_analytical_status status{py_analytical_status::ok};
-    double error_metric{0.0};
+    std::optional<double> error_metric;
 };
 
 inline AnalyticalResult to_analytical_error_result(const cartan::analytical_error<double> &err)
@@ -99,7 +105,7 @@ inline AnalyticalResult to_analytical_result(cartan::expected<cartan::analytical
         out.solutions.emplace_back(r->solutions[static_cast<std::size_t>(i)]);
     }
     out.status       = py_analytical_status::ok;
-    out.error_metric = 0.0;
+    out.error_metric = std::nullopt;
     return out;
 }
 
