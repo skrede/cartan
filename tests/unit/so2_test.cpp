@@ -1,4 +1,5 @@
 #include <cartan/lie/so2.h>
+
 #include <cartan/detail/epsilon.h>
 
 #include <catch2/catch_approx.hpp>
@@ -331,4 +332,33 @@ TEMPLATE_TEST_CASE("so2: from_matrix rejects nonfinite entries",
     expect_entries_rejected<S>(-lim::quiet_NaN(), true);
     expect_entries_rejected<S>(lim::infinity(), false);
     expect_entries_rejected<S>(-lim::infinity(), false);
+}
+
+/// Ties the predicate above to the factory it stands in for. On finite input the
+/// two must agree exactly, so widening either tolerance, or replacing either
+/// comparison, breaks this case -- which the nonfinite corpus above cannot do,
+/// since both of its sides are written here. The marginal matrix straddles the
+/// orthogonality tolerance; the reflection is the only shape that reaches the
+/// determinant test, because scaling a rotation trips orthogonality first.
+TEMPLATE_TEST_CASE("so2: the unguarded chain agrees with from_matrix on finite input",
+    "[so2][nonfinite]", double, float)
+{
+    using S = TestType;
+    const S tol = cartan::detail::sqrt_epsilon_v<S>;
+
+    const cartan::matrix2<S> exact = cartan::so2<S>::exp(S(0.6)).matrix();
+
+    cartan::matrix2<S> marginal = exact;
+    marginal(0, 0) += S(2) * tol;
+
+    cartan::matrix2<S> reflection = cartan::matrix2<S>::Identity();
+    reflection(1, 1) = S(-1);
+
+    const cartan::matrix2<S> gross = cartan::matrix2<S>::Identity() * S(2);
+
+    for (const cartan::matrix2<S>& R : {exact, marginal, reflection, gross})
+    {
+        REQUIRE(unguarded_gate_admits<S>(R)
+            == cartan::so2<S>::from_matrix(R).has_value());
+    }
 }

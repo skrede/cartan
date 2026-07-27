@@ -5,6 +5,32 @@ All notable user-facing changes to this project are documented in this file.
 The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `cartan::lie_failure::non_finite_input`, reported by `so2`/`so3`/`se2`/`se3`
+  `from_matrix`, `so3::from_quaternion`, the frame-tagged `rotation`/`transform`
+  wrappers and `screw_axis::from_vector` when an input component is NaN or
+  infinite. Each factory now tests finiteness on its raw input before any other
+  check, so a nonfinite value is refused rather than admitted by a tolerance
+  comparison that is false for a NaN.
+
+### Changed
+- **Behavior change.** Inputs that were previously accepted are now rejected, and
+  some that were rejected now report a different code. A NaN was accepted by all
+  of the factories above; an infinity was accepted by `so3::from_matrix` outside
+  the (0,0) entry and by the `se2`/`se3` translation blocks. Where a nonfinite
+  input already produced a failure, the code changes to `non_finite_input`:
+  `so2::from_matrix` reported `non_orthogonal` or `improper_rotation` depending on
+  the position, `se2`/`se3::from_matrix` reported `invalid_affine_row`,
+  `so3::from_quaternion` reported `non_unit_quaternion`, and
+  `screw_axis::from_vector` reported `non_unit_screw_axis`. Code matching on the
+  old value for a nonfinite input needs updating; matching for finite input is
+  unaffected.
+- `screw_axis::from_vector` no longer classifies an axis whose angular part holds
+  a NaN as a prismatic joint. `screw_axis::revolute` and `screw_axis::prismatic`
+  are unchanged and still normalize without validating.
+
 ## [0.4.1] - 2026-07-06
 
 ### Added

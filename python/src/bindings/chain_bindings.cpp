@@ -55,8 +55,8 @@ void register_chain(nb::module_& m)
                 return *std::move(r);
             },
             "Construct a ScrewAxis from a 6-vector (omega, v). "
-            "Raises ValueError on invalid axis (e.g., zero omega for revolute, "
-            "or non-unit norm).",
+            "Raises ValueError if v holds a NaN or an infinity, or on an "
+            "invalid axis (e.g., zero omega for revolute, or non-unit norm).",
             nb::arg("v").noconvert());
 
     nb::class_<JointLimitsd>(m, "JointLimits", "Joint position bounds and optional dynamic limits")

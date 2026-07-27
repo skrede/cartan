@@ -100,7 +100,8 @@ enum class lie_failure
     improper_rotation,    // det(R) != 1: a reflection, not a rotation
     non_unit_quaternion,  // ||q||^2 deviates from 1
     invalid_affine_row,   // homogeneous bottom row is not [0..0 1]
-    non_unit_screw_axis   // revolute ||omega|| != 1 or prismatic ||v|| != 1
+    non_unit_screw_axis,  // revolute ||omega|| != 1 or prismatic ||v|| != 1
+    non_finite_input      // an input component is NaN or infinite
 };
 
 auto r = cartan::so3<double>::from_matrix(M);
@@ -109,6 +110,13 @@ if (!r)
 else
     use(*r);
 ```
+
+Every factory listed above tests its raw input for finiteness before any other
+check, so a matrix, quaternion or screw axis containing a NaN or an infinity
+yields `non_finite_input` rather than one of the geometric codes. The order
+matters: `0 * inf` is a NaN, so an infinity laundered by an intervening matrix
+product would reach a `deviation > tol` comparison as a NaN, and that comparison
+is false for a NaN.
 
 ## Policy
 

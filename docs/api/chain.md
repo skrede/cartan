@@ -62,8 +62,11 @@ static cartan::expected<screw_axis, lie_failure> from_vector(const vector6<Scala
 
 Construct from a 6-vector `(omega, v)` with unit constraint validation. For
 revolute axes, requires `||omega|| = 1`. For prismatic axes (`omega ~ 0`),
-requires `||v|| = 1`. Returns `cartan::unexpected(lie_failure::non_unit_screw_axis)`
-on validation failure (see [Error Handling](lie.md#error-handling)).
+requires `||v|| = 1`. Returns `cartan::unexpected(lie_failure::non_finite_input)`
+if any component is NaN or infinite — tested first, before the branch that
+distinguishes revolute from prismatic — and
+`cartan::unexpected(lie_failure::non_unit_screw_axis)` if a finite axis violates
+its unit constraint (see [Error Handling](lie.md#error-handling)).
 
 ### Member Methods
 

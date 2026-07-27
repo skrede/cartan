@@ -1,5 +1,6 @@
 #include <cartan/lie/se3.h>
 #include <cartan/lie/hat_vee.h>
+
 #include <cartan/detail/epsilon.h>
 
 #include <catch2/catch_approx.hpp>
@@ -470,4 +471,43 @@ TEMPLATE_TEST_CASE("se3: from_matrix rejects a nonfinite translation block",
     expect_translation_rejected<S>(-lim::quiet_NaN(), true);
     expect_translation_rejected<S>(lim::infinity(), true);
     expect_translation_rejected<S>(-lim::infinity(), true);
+}
+
+/// Ties the predicate above to the factory it stands in for. On finite input the
+/// two must agree exactly, so widening either tolerance, or replacing either
+/// comparison, breaks this case -- which the nonfinite corpus above cannot do,
+/// since both of its sides are written here. Each shape straddles a different
+/// branch: the affine row, the rotation block's orthogonality, its determinant.
+TEMPLATE_TEST_CASE("se3: the unguarded chain agrees with from_matrix on finite input",
+    "[se3][nonfinite]", double, float)
+{
+    using S = TestType;
+    const S tol = cartan::detail::sqrt_epsilon_v<S>;
+
+    cartan::vector3<S> phi;
+    phi << S(0.3), S(-0.5), S(0.7);
+
+    cartan::matrix4<S> exact = cartan::matrix4<S>::Identity();
+    exact.template block<3, 3>(0, 0) = cartan::so3<S>::exp(phi).matrix();
+    exact.template block<3, 1>(0, 3) << S(0.5), S(-0.3), S(0.7);
+
+    cartan::matrix4<S> marginal_row = exact;
+    marginal_row(3, 1) = S(2) * tol;
+
+    cartan::matrix4<S> marginal_rotation = exact;
+    marginal_rotation(0, 0) += S(2) * tol;
+
+    cartan::matrix4<S> reflection = exact;
+    reflection.template block<3, 3>(0, 0) = cartan::matrix3<S>::Identity();
+    reflection(2, 2) = S(-1);
+
+    cartan::matrix4<S> gross = exact;
+    gross.template block<3, 3>(0, 0) *= S(2);
+
+    for (const cartan::matrix4<S>& T :
+        {exact, marginal_row, marginal_rotation, reflection, gross})
+    {
+        REQUIRE(unguarded_gate_admits<S>(T)
+            == cartan::se3<S>::from_matrix(T).has_value());
+    }
 }

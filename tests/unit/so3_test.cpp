@@ -1,5 +1,6 @@
 #include <cartan/lie/so3.h>
 #include <cartan/lie/hat_vee.h>
+
 #include <cartan/detail/epsilon.h>
 
 #include <catch2/catch_approx.hpp>
@@ -562,6 +563,49 @@ TEMPLATE_TEST_CASE("so3: from_quaternion rejects nonfinite coefficients",
     expect_coefficients_rejected<S>(-lim::quiet_NaN(), true);
     expect_coefficients_rejected<S>(lim::infinity(), false);
     expect_coefficients_rejected<S>(-lim::infinity(), false);
+}
+
+/// Ties the two predicates above to the factories they stand in for. On finite
+/// input each pair must agree exactly, so widening a tolerance or replacing a
+/// comparison in so3::from_matrix or so3::from_quaternion breaks these cases --
+/// which the nonfinite corpus above cannot do, since both of its sides are
+/// written here. The reflection is the only shape that reaches the determinant
+/// test: scaling a rotation trips orthogonality first, so that branch cannot be
+/// straddled marginally while orthogonality still passes.
+TEMPLATE_TEST_CASE("so3: the unguarded chains agree with the factories on finite input",
+    "[so3][nonfinite]", double, float)
+{
+    using S = TestType;
+    const S tol = cartan::detail::sqrt_epsilon_v<S>;
+
+    cartan::vector3<S> phi;
+    phi << S(0.3), S(-0.5), S(0.7);
+    const cartan::matrix3<S> exact = cartan::so3<S>::exp(phi).matrix();
+
+    cartan::matrix3<S> marginal = exact;
+    marginal(0, 0) += S(2) * tol;
+
+    cartan::matrix3<S> reflection = cartan::matrix3<S>::Identity();
+    reflection(2, 2) = S(-1);
+
+    const cartan::matrix3<S> gross = cartan::matrix3<S>::Identity() * S(2);
+
+    for (const cartan::matrix3<S>& R : {exact, marginal, reflection, gross})
+    {
+        REQUIRE(unguarded_matrix_gate_admits<S>(R)
+            == cartan::so3<S>::from_matrix(R).has_value());
+    }
+
+    const cartan::quaternion<S> unit = cartan::so3<S>::exp(phi).quaternion_ref();
+    const cartan::quaternion<S> marginal_q(
+        unit.w() * (S(1) + tol), unit.x(), unit.y(), unit.z());
+    const cartan::quaternion<S> gross_q(S(2), S(3), S(4), S(5));
+
+    for (const cartan::quaternion<S>& q : {unit, marginal_q, gross_q})
+    {
+        REQUIRE(unguarded_quaternion_gate_admits<S>(q)
+            == cartan::so3<S>::from_quaternion(q).has_value());
+    }
 }
 
 TEST_CASE("so3: lie_failure carries a diagnostic for nonfinite input", "[so3][nonfinite]")

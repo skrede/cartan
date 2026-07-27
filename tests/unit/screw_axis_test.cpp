@@ -1,4 +1,5 @@
 #include <cartan/serial/chain/screw_axis.h>
+
 #include <cartan/detail/epsilon.h>
 
 #include <catch2/catch_approx.hpp>
@@ -258,7 +259,45 @@ TEMPLATE_TEST_CASE("screw_axis: a finite unit axis still constructs unchanged",
     auto result = cartan::screw_axis<S>::from_vector(s);
     REQUIRE(result.has_value());
     REQUIRE(result->is_revolute());
-    REQUIRE((result->to_vector() - s).norm() <= cartan::detail::sqrt_epsilon_v<S>);
+    // from_vector copies the components, so the round trip is bit-exact.
+    REQUIRE((result->to_vector() - s).norm() == S(0));
+}
+
+/// Ties the predicate above to the factory it stands in for. On finite input the
+/// two must agree exactly, so widening a tolerance, or moving the branch
+/// selection, breaks this case -- which the nonfinite corpus above cannot do,
+/// since both of its sides are written here. The corpus covers both branches and
+/// straddles the unit tolerance on each.
+TEMPLATE_TEST_CASE("screw_axis: the unguarded chain agrees with from_vector on finite input",
+    "[screw_axis][nonfinite]", double, float)
+{
+    using S = TestType;
+    const S tol = cartan::detail::sqrt_epsilon_v<S>;
+
+    cartan::vector6<S> revolute_unit;
+    revolute_unit << S(0), S(0), S(1), S(0), S(-0.5), S(0);
+
+    cartan::vector6<S> revolute_marginal = revolute_unit;
+    revolute_marginal(2) = S(1) + S(2) * tol;
+
+    cartan::vector6<S> revolute_gross = revolute_unit;
+    revolute_gross(2) = S(2);
+
+    cartan::vector6<S> prismatic_unit;
+    prismatic_unit << S(0), S(0), S(0), S(1), S(0), S(0);
+
+    cartan::vector6<S> prismatic_marginal = prismatic_unit;
+    prismatic_marginal(3) = S(1) + S(2) * tol;
+
+    cartan::vector6<S> prismatic_gross = prismatic_unit;
+    prismatic_gross(3) = S(2);
+
+    for (const cartan::vector6<S>& s : {revolute_unit, revolute_marginal, revolute_gross,
+             prismatic_unit, prismatic_marginal, prismatic_gross})
+    {
+        REQUIRE(unguarded_gate_admits<S>(s)
+            == cartan::screw_axis<S>::from_vector(s).has_value());
+    }
 }
 
 /// revolute() and prismatic() normalize without validating, and keep that

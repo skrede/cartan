@@ -9,12 +9,9 @@ namespace cartan
 /// so3 from_quaternion, the frame-tagged rotation/transform wrappers, and
 /// screw_axis::from_vector.
 ///
-/// Every one of those factories tests finiteness on its raw input before it
-/// forms any product or norm, and the ordering is load-bearing rather than
-/// stylistic: an infinity multiplied by a zero is a NaN, so an infinity in
-/// R(0,1) reaches (R^T * R - I).norm() already laundered into a NaN, and every
-/// `deviation > tol` comparison is false for a NaN. A finiteness test placed
-/// after the arithmetic, or applied to its result, admits the value.
+/// Each factory tests finiteness on its raw input before forming any product or
+/// norm, because 0 * inf is a NaN: an infinity laundered by the arithmetic
+/// reaches the tolerance test as a NaN, and `deviation > tol` is false for a NaN.
 enum class lie_failure
 {
     non_orthogonal,       ///< R^T * R deviates from identity (so2/so3 from_matrix).
