@@ -44,10 +44,53 @@ function(matrix_package_dir cell prefix package out)
     set(${out} "${directory}" PARENT_SCOPE)
 endfunction()
 
+function(matrix_version_compatible file version out)
+    set(PACKAGE_FIND_VERSION "${version}")
+    string(REGEX MATCHALL "[0-9]+" parts "${version}")
+    list(GET parts 0 PACKAGE_FIND_VERSION_MAJOR)
+    list(GET parts 1 PACKAGE_FIND_VERSION_MINOR)
+    list(GET parts 2 PACKAGE_FIND_VERSION_PATCH)
+    set(PACKAGE_VERSION_COMPATIBLE FALSE)
+    include("${file}")
+    set(${out} ${PACKAGE_VERSION_COMPATIBLE} PARENT_SCOPE)
+endfunction()
+
+function(matrix_require_compatibility cell file version accepted)
+    matrix_version_compatible("${file}" "${version}" verdict)
+    if (verdict AND NOT accepted)
+        message(FATAL_ERROR "${cell}: the installed package accepts a request for ${version}, "
+            "which is wider than the compatibility policy it declares")
+    endif ()
+    if (accepted AND NOT verdict)
+        message(FATAL_ERROR "${cell}: the installed package rejects a request for ${version}, "
+            "which the compatibility policy it declares must accept")
+    endif ()
+endfunction()
+
+# The version file decides whether find_package(cartan <version>) resolves at all, so its
+# absence is invisible to every other assertion here. A request for an older patch and a
+# request for an older minor are what separate the declared policy from the three
+# neighbouring ones: a higher minor is rejected by all of them and discriminates nothing.
+function(matrix_require_version cell package_dir)
+    set(file "${package_dir}/cartanConfigVersion.cmake")
+    matrix_require_file("${cell}" "${file}")
+    include("${file}")
+    string(REGEX MATCHALL "[0-9]+" parts "${PACKAGE_VERSION}")
+    list(GET parts 0 major)
+    list(GET parts 1 minor)
+    matrix_require_compatibility("${cell}" "${file}" "${PACKAGE_VERSION}" TRUE)
+    matrix_require_compatibility("${cell}" "${file}" "${major}.${minor}.0" TRUE)
+    if (minor GREATER 0)
+        math(EXPR older "${minor} - 1")
+        matrix_require_compatibility("${cell}" "${file}" "${major}.${older}.0" FALSE)
+    endif ()
+endfunction()
+
 function(matrix_require_export cell prefix enabled)
     matrix_package_dir("${cell}" "${prefix}" cartan package_dir)
     matrix_require_file("${cell}" "${prefix}/include/cartan/version.h")
     matrix_require_file("${cell}" "${package_dir}/cartanTargets.cmake")
+    matrix_require_version("${cell}" "${package_dir}")
     file(READ "${package_dir}/cartanTargets.cmake" exported)
     set(label "the installed export set")
     foreach (backend IN LISTS CARTAN_OPTIONAL_BACKENDS)

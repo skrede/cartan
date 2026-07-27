@@ -10,11 +10,22 @@ static_assert(std::is_same_v<cartan::lm<chain6>, cartan::builtin_lm<chain6, cart
 #ifdef CONSUMER_EXPECTS_ARGMIN
 static_assert(CARTAN_HAS_ARGMIN == 1, "linking the component must supply the feature macro");
 using argmin_backend_solver = cartan::argmin_lm<chain6>;
+#else
+#ifdef CARTAN_HAS_ARGMIN
+#error "the backend feature macro reached a consumer that did not link the component"
+#endif
+#if __has_include(<argmin/solver/step_budget_solver.h>)
+#error "the backend include root reached a consumer that did not link the component"
+#endif
 #endif
 
 #ifdef CONSUMER_EXPECTS_NLOPT
 static_assert(CARTAN_HAS_NLOPT == 1, "linking the component must supply the feature macro");
 using nlopt_backend_solver = cartan::nlopt_slsqp<chain6>;
+#else
+#ifdef CARTAN_HAS_NLOPT
+#error "the backend feature macro reached a consumer that did not link the component"
+#endif
 #endif
 
 int main()
