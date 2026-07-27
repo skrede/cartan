@@ -106,9 +106,30 @@ constexpr const char* message(analytical_failure failure);
 ### Tolerance types
 
 ```cpp
-template <typename Scalar> struct length_tolerance       { Scalar value; };
-template <typename Scalar> struct direction_tolerance    { Scalar value; };
-template <typename Scalar> struct verification_tolerance { Scalar position; Scalar orientation; };
+template <typename Scalar>
+class length_tolerance
+{
+public:
+    constexpr explicit length_tolerance(Scalar value);
+    constexpr Scalar value() const;
+};
+
+template <typename Scalar>
+class direction_tolerance
+{
+public:
+    constexpr explicit direction_tolerance(Scalar value);
+    constexpr Scalar value() const;
+};
+
+template <typename Scalar>
+class verification_tolerance
+{
+public:
+    constexpr verification_tolerance(Scalar position, Scalar orientation);
+    constexpr Scalar position() const;
+    constexpr Scalar orientation() const;
+};
 
 template <typename Scalar>
 inline constexpr length_tolerance<Scalar> default_length_tolerance_v{Scalar(1e-6)};
@@ -119,22 +140,34 @@ inline constexpr verification_tolerance<Scalar> default_verification_tolerance_v
     Scalar(1e-6), Scalar(1e-6)};
 ```
 
-A tolerance is named for the quantity it measures. `length_tolerance` judges a
-residual in the chain's linear unit; `direction_tolerance` judges a
-dimensionless residual between unit direction vectors;
-`verification_tolerance` carries the FK back-check's position (linear unit) and
-orientation (radians, as the norm of the residual rotation vector) thresholds
-separately.
+A tolerance is named for the quantity it measures. `verification_tolerance`
+carries the FK back-check's position (linear unit) and orientation (radians, as
+the norm of the residual rotation vector) thresholds separately.
+
+**`length_tolerance` is relative, `direction_tolerance` is absolute.** A
+`length_tolerance` residual is compared against `value()` scaled by the larger
+of the two displacement norms and one, because round-off in a position residual
+grows linearly with distance from the axis: a fixed threshold tightens as `1/r`
+and rejects correct answers on a large mechanism. `default_length_tolerance_v`
+is therefore one part per million of the working radius — one micrometer at
+unit radius, if that radius happens to be read in meters, but the constant
+carries no assumption about the unit. A `direction_tolerance` judges unit
+direction vectors, for which that same scale factor is exactly one, so the
+threshold is absolute and genuinely dimensionless.
 
 `length_tolerance` and `direction_tolerance` do **not** convert to one another
 in either direction. Passing one where the other is expected is a compile
 error, which is why subproblem 1 has two entry points rather than one that
-takes a bare scalar.
+takes a bare scalar. Both constructors are `explicit` and both values are
+private, so a braced scalar — `f(w, u, v, {1e-6})` — does not slip past the
+distinction either.
 
 `default_direction_tolerance_v` is calibrated on the round-off measured in the
 Pieper wrist decomposition at **double** precision. Single-precision round-off
-there reaches the constant's own magnitude, so instantiating the wrist path at
-`float` is not supported until the constant is re-measured for it.
+there reaches the constant's own magnitude, so instantiating the *asymmetric*
+wrist path (the branch that reaches `paden_kahan_1_direction`) at `float` is
+not supported until the constant is re-measured for it. This is documented, not
+enforced: a `float` solver still instantiates and runs.
 
 ### paden_kahan_2_result
 
@@ -263,7 +296,12 @@ Subproblem 2: two successive rotations about intersecting axes. Finds
 `(theta1, theta2)` such that `exp([omega1]*theta1) * exp([omega2]*theta2)`
 applied at point `q` maps `p` to `p_prime`. Axes `omega1` and `omega2` must
 intersect at `q`. Returns up to 2 solution pairs. The tolerance is forwarded to
-both internal subproblem-1 calls.
+both internal subproblem-1 calls, so every condition subproblem 1 enforces is
+enforced on each candidate pair here too. A nonfinite argument returns
+`analytical_failure::non_finite_input` and a non-unit `omega1` or `omega2`
+returns `analytical_failure::degenerate_geometry`; a candidate pair that fails
+any subproblem-1 condition is skipped, and `analytical_failure::unreachable` is
+reported when no candidate survives.
 
 Reference: Murray, Li and Sastry (1994), Section 3.3.2.
 
@@ -289,6 +327,12 @@ When either point lies on the axis the achieved distance is constant in
 `theta`, so the constraint is met by every angle or by none: within `tolerance`
 of `delta` the result is `analytical_failure::singular_configuration`, outside
 it `analytical_failure::unreachable`.
+
+A nonfinite argument — including `delta` — returns
+`analytical_failure::non_finite_input`, and a non-unit `omega` returns
+`analytical_failure::degenerate_geometry`. Without those guards every
+comparison in the body is false against a NaN and the two-solution branch
+reports `count == 2` NaN angles as a success.
 
 Reference: Murray, Li and Sastry (1994), Section 3.3.3.
 

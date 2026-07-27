@@ -212,7 +212,8 @@ public:
         scalar_type delta = (p_wrist - r).norm();
 
         auto sp3_result = paden_kahan_3(
-            m_omega[2], m_q[2], m_wrist_center_home, r, delta);
+            m_omega[2], m_q[2], m_wrist_center_home, r, delta,
+            length_tolerance<scalar_type>(m_position_tolerance));
 
         if (!sp3_result)
         {
@@ -233,7 +234,8 @@ public:
 
             // SP2: find (theta1, theta2) via two successive rotations
             auto sp2_result = paden_kahan_2(
-                m_omega[0], m_omega[1], r, p_prime, p_wrist);
+                m_omega[0], m_omega[1], r, p_prime, p_wrist,
+                length_tolerance<scalar_type>(m_position_tolerance));
             if (!sp2_result)
                 continue;
 

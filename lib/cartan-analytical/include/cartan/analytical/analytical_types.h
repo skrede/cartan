@@ -72,37 +72,77 @@ struct analytical_result
     auto end() const { return solutions.begin() + count; }
 };
 
-/// Acceptance threshold for a residual measured in the chain's linear unit.
+/// Acceptance threshold for a residual between positions, applied *relative* to
+/// the working radius: a residual is compared against value() scaled by the
+/// larger of the two displacement norms and one. Round-off in a position
+/// residual grows with that radius, so an absolute threshold would tighten as
+/// the chain grows and reject correct answers on a large mechanism.
+///
+/// The constructor is explicit and the value private so that a braced scalar
+/// cannot stand in for one of these where the other threshold type belongs.
 template <typename Scalar>
-struct length_tolerance
+class length_tolerance
 {
-    Scalar value;
+public:
+    constexpr explicit length_tolerance(Scalar value)
+        : m_value(value)
+    {
+    }
+
+    constexpr Scalar value() const { return m_value; }
+
+private:
+    Scalar m_value;
 };
 
 /// Acceptance threshold for a dimensionless residual between unit directions.
-/// Not interchangeable with length_tolerance: no conversion exists, so mixing
-/// the two is a compile error rather than a convention.
+/// The relative scaling above degenerates to a factor of exactly one on unit
+/// arguments, so this threshold is absolute. Not interchangeable with
+/// length_tolerance: no conversion exists, so mixing the two is a compile error.
 template <typename Scalar>
-struct direction_tolerance
+class direction_tolerance
 {
-    Scalar value;
+public:
+    constexpr explicit direction_tolerance(Scalar value)
+        : m_value(value)
+    {
+    }
+
+    constexpr Scalar value() const { return m_value; }
+
+private:
+    Scalar m_value;
 };
 
-/// `position` is a distance in the chain's linear unit; `orientation` is the
+/// position() is a distance in the chain's linear unit; orientation() is the
 /// norm of the residual rotation vector, in radians.
 template <typename Scalar>
-struct verification_tolerance
+class verification_tolerance
 {
-    Scalar position;
-    Scalar orientation;
+public:
+    constexpr verification_tolerance(Scalar position, Scalar orientation)
+        : m_position(position)
+        , m_orientation(orientation)
+    {
+    }
+
+    constexpr Scalar position() const { return m_position; }
+
+    constexpr Scalar orientation() const { return m_orientation; }
+
+private:
+    Scalar m_position;
+    Scalar m_orientation;
 };
 
-/// One micrometre, below which two positions on a robot arm are the same point.
+/// One part per million of the working radius, and one micrometer at unit
+/// radius if that radius is read in meters.
 template <typename Scalar>
 inline constexpr length_tolerance<Scalar> default_length_tolerance_v{Scalar(1e-6)};
 
-/// Calibrated on the Pieper wrist decomposition: its worst accepted residual is
-/// about 7e-12 at double precision, and reaches this value itself at float.
+/// Absolute, and calibrated on the Pieper wrist decomposition, whose worst
+/// accepted residual is about 7e-12 at double precision and reaches this value
+/// itself at float.
 template <typename Scalar>
 inline constexpr direction_tolerance<Scalar> default_direction_tolerance_v{Scalar(1e-6)};
 

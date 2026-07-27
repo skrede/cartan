@@ -500,9 +500,31 @@ void register_analytical(nb::module_ &m)
                 return *r;
             },
             "Paden-Kahan subproblem 1: find theta such that exp([omega]*theta) "
-            "applied at q maps p to p'. Returns None when the constraint has no "
-            "solution (the two points are not equidistant from the axis).",
+            "applied at q maps p to p'. Returns None whenever no angle is "
+            "returned, which covers all of: the two points differ in their "
+            "component along omega; they are not equidistant from the axis; the "
+            "computed angle does not reconstruct p'; both points coincide on the "
+            "axis, so every angle is a solution; an argument is NaN or infinite; "
+            "or omega is not a unit vector.",
             nb::arg("omega").noconvert(), nb::arg("q").noconvert(), nb::arg("p").noconvert(), nb::arg("p_prime").noconvert(), nb::call_guard<nb::gil_scoped_release>());
+
+    analytical.def(
+            "paden_kahan_1_direction",
+            [](const Vec3d &omega, const Vec3d &u, const Vec3d &u_prime) -> std::optional<double>
+            {
+                auto r = cartan::paden_kahan_1_direction<double>(omega, u, u_prime);
+                if(!r)
+                    return std::nullopt;
+                return *r;
+            },
+            "Paden-Kahan subproblem 1 for unit direction vectors about an axis "
+            "through the origin: find theta such that exp([omega]*theta) maps u "
+            "to u'. The residuals it judges are dimensionless, so it takes no "
+            "axis point and requires u and u' to be unit vectors; a position "
+            "pair returns None rather than being judged against a threshold that "
+            "does not apply to it. Returns None on the same conditions as "
+            "paden_kahan_1.",
+            nb::arg("omega").noconvert(), nb::arg("u").noconvert(), nb::arg("u_prime").noconvert(), nb::call_guard<nb::gil_scoped_release>());
 
     analytical.def(
             "paden_kahan_2",
@@ -521,7 +543,11 @@ void register_analytical(nb::module_ &m)
             },
             "Paden-Kahan subproblem 2: find up to two (theta1, theta2) pairs "
             "such that exp([omega1]*theta1) * exp([omega2]*theta2) applied at q "
-            "maps p to p'. Axes omega1 and omega2 must intersect at q.",
+            "maps p to p'. Axes omega1 and omega2 must intersect at q. Returns "
+            "an empty list whenever no pair is returned, which covers a target "
+            "no pair of rotations reaches, a pair whose angles do not "
+            "reconstruct it, parallel axes, a NaN or infinite argument, and a "
+            "non-unit axis.",
             nb::arg("omega1").noconvert(), nb::arg("omega2").noconvert(), nb::arg("q").noconvert(), nb::arg("p").noconvert(), nb::arg("p_prime").noconvert(),
             nb::call_guard<nb::gil_scoped_release>());
 
@@ -542,7 +568,11 @@ void register_analytical(nb::module_ &m)
             },
             "Paden-Kahan subproblem 3: find up to two theta values such that "
             "||exp([omega]*theta)*p - p'|| == delta, with the rotation taken "
-            "about the axis omega through q.",
+            "about the axis omega through q. Returns an empty list whenever no "
+            "angle is returned, which covers an unachievable distance, a point "
+            "on the axis for which the achieved distance is constant and equal "
+            "to delta so every angle is a solution, a NaN or infinite argument "
+            "including delta, and a non-unit axis.",
             nb::arg("omega").noconvert(), nb::arg("q").noconvert(), nb::arg("p").noconvert(), nb::arg("p_prime").noconvert(), nb::arg("delta"),
             nb::call_guard<nb::gil_scoped_release>());
 

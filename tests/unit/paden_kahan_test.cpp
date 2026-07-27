@@ -20,6 +20,11 @@ static_assert(!std::is_convertible_v<direction_tolerance<double>, length_toleran
 static_assert(!std::is_constructible_v<direction_tolerance<double>, length_tolerance<double>>);
 static_assert(!std::is_constructible_v<length_tolerance<double>, direction_tolerance<double>>);
 
+// A braced scalar walks past a type distinction that rests only on the member
+// type, which is why both thresholds are explicit-only rather than aggregates.
+static_assert(!std::is_convertible_v<double, length_tolerance<double>>);
+static_assert(!std::is_convertible_v<double, direction_tolerance<double>>);
+
 TEST_CASE("paden_kahan_1: 90-degree rotation about z through origin")
 {
     vector3<double> omega{0, 0, 1};
@@ -157,18 +162,116 @@ TEST_CASE("paden_kahan_1: returned angles agree with a planar closed form")
     vector3<double> q{0, 0, h};
     vector3<double> p{r, 0, 0};
 
-    int checked = 0;
+    // Counts angles that were actually recovered, not loop trips: a CHECK does
+    // not abort, so a solve that fails or returns a wrong angle leaves the
+    // count short and the assertion below fires.
+    int recovered = 0;
     for (int i = -17; i <= 17; ++i)
     {
         const double angle = i * (std::numbers::pi / 18.0);
         vector3<double> p_prime{r * std::cos(angle), r * std::sin(angle), 0};
 
         auto result = paden_kahan_1(omega, q, p, p_prime);
-        REQUIRE(result.has_value());
+        CHECK(result.has_value());
+        if (!result)
+            continue;
         CHECK_THAT(*result, WithinAbs(angle, 1e-12));
-        ++checked;
+        if (std::abs(*result - angle) < 1e-12)
+            ++recovered;
     }
-    REQUIRE(checked == 35);
+    REQUIRE(recovered == 35);
+}
+
+TEST_CASE("paden_kahan_1: two tolerable errors that compound are refused")
+{
+    // Pins the reconstruction residual, and nothing else does: the axial and
+    // radius conditions each pass here, and only the residual on the original
+    // equation sees that together they exceed the threshold. Disabling the
+    // reconstruction check makes this case return pi/2.
+    const double offset = 0.9e-6;
+    vector3<double> omega{0, 0, 1};
+    vector3<double> q{0, 0, 0};
+    vector3<double> p{1, 0, 0};
+    vector3<double> p_prime{0, 1 + offset, offset};
+
+    // Both scalar conditions pass, stated independently of the implementation.
+    CHECK(std::abs(omega.dot(p_prime - p)) < 1e-6);
+    CHECK(std::abs(p.norm() - std::hypot(1 + offset, 0.0)) < 1e-6);
+
+    // A z-rotation by pi/2 carries (1,0,0) to (0,1,0), which is the closest any
+    // rotation about z gets to p_prime; the closed form is written out here
+    // rather than taken from the rotation helper the implementation uses.
+    vector3<double> best{0, 1, 0};
+    CHECK((best - p_prime).norm() > 1e-6);
+
+    auto result = paden_kahan_1(omega, q, p, p_prime);
+    REQUIRE_FALSE(result.has_value());
+    CHECK(result.error() == analytical_failure::unreachable);
+}
+
+TEST_CASE("paden_kahan_1: the length threshold is relative to the working radius")
+{
+    // An absolute threshold tightens as 1/radius, so exactly consistent
+    // instances on a large mechanism get rejected as unreachable. Pins the
+    // scaling: with an absolute threshold the float rows below fail.
+    const double angle = 0.7;
+    int accepted = 0;
+    for (double radius : {1.0, 10.0, 100.0, 1000.0})
+    {
+        vector3<double> omega{0, 0, 1};
+        vector3<double> q{0, 0, 0};
+        vector3<double> p{radius, 0, 0};
+        vector3<double> p_prime{radius * std::cos(angle), radius * std::sin(angle), 0};
+
+        auto wide = paden_kahan_1(omega, q, p, p_prime);
+        CHECK(wide.has_value());
+        if (wide)
+            ++accepted;
+
+        vector3<float> omega_f{0, 0, 1};
+        vector3<float> q_f{0, 0, 0};
+        vector3<float> p_f{static_cast<float>(radius), 0, 0};
+        vector3<float> p_prime_f{
+            static_cast<float>(radius * std::cos(angle)),
+            static_cast<float>(radius * std::sin(angle)), 0};
+
+        auto narrow = paden_kahan_1(omega_f, q_f, p_f, p_prime_f);
+        CHECK(narrow.has_value());
+        if (narrow)
+            ++accepted;
+    }
+    REQUIRE(accepted == 8);
+}
+
+TEST_CASE("paden_kahan_1_direction: non-unit and nonfinite arguments are refused")
+{
+    // The dimensionless threshold means nothing against a residual of some
+    // other scale, so a position pair must not be judged by it. Before this,
+    // p=(1000,0,0) to (0,1000,0) returned pi/2 with 1e-6 judging a residual of
+    // scale 1000.
+    vector3<double> omega{0, 0, 1};
+
+    auto positions = paden_kahan_1_direction(
+        omega, vector3<double>{1000, 0, 0}, vector3<double>{0, 1000, 0});
+    REQUIRE_FALSE(positions.has_value());
+    CHECK(positions.error() == analytical_failure::degenerate_geometry);
+
+    auto shrunk = paden_kahan_1_direction(
+        omega, vector3<double>{0.5, 0, 0}, vector3<double>{0, 0.5, 0});
+    REQUIRE_FALSE(shrunk.has_value());
+    CHECK(shrunk.error() == analytical_failure::degenerate_geometry);
+
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    auto nonfinite = paden_kahan_1_direction(
+        omega, vector3<double>{nan, 0, 0}, vector3<double>{0, 1, 0});
+    REQUIRE_FALSE(nonfinite.has_value());
+    CHECK(nonfinite.error() == analytical_failure::non_finite_input);
+
+    // The unit pair the wrist decomposition actually passes still solves.
+    auto unit = paden_kahan_1_direction(
+        omega, vector3<double>{1, 0, 0}, vector3<double>{0, 1, 0});
+    REQUIRE(unit.has_value());
+    CHECK_THAT(*unit, WithinAbs(std::numbers::pi / 2, tolerance));
 }
 
 TEST_CASE("paden_kahan_2: two rotations mapping a known point")
@@ -263,6 +366,63 @@ TEST_CASE("paden_kahan_2: a displaced target is refused rather than answered")
     {
         CHECK(result.error() == analytical_failure::unreachable);
     }
+}
+
+TEST_CASE("paden_kahan_3: nonfinite input and a non-unit axis reach the error channel")
+{
+    // Every comparison in the distance constraint is false against a NaN, so
+    // each of these used to skip all four guards and leave through the
+    // two-solution branch reporting count = 2 NaN angles as a success.
+    vector3<double> omega{0, 0, 1};
+    vector3<double> q{0, 0, 0};
+    vector3<double> p{1, 0, 0};
+    vector3<double> p_prime{2, 0, 0};
+    const double delta = std::sqrt(2.0);
+
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const double inf = std::numeric_limits<double>::infinity();
+
+    auto nan_axis = paden_kahan_3(vector3<double>{0, 0, nan}, q, p, p_prime, delta);
+    REQUIRE_FALSE(nan_axis.has_value());
+    CHECK(nan_axis.error() == analytical_failure::non_finite_input);
+
+    auto nan_point = paden_kahan_3(omega, q, vector3<double>{nan, 0, 0}, p_prime, delta);
+    REQUIRE_FALSE(nan_point.has_value());
+    CHECK(nan_point.error() == analytical_failure::non_finite_input);
+
+    auto inf_target = paden_kahan_3(omega, q, p, vector3<double>{inf, 0, 0}, delta);
+    REQUIRE_FALSE(inf_target.has_value());
+    CHECK(inf_target.error() == analytical_failure::non_finite_input);
+
+    auto nan_delta = paden_kahan_3(omega, q, p, p_prime, nan);
+    REQUIRE_FALSE(nan_delta.has_value());
+    CHECK(nan_delta.error() == analytical_failure::non_finite_input);
+
+    auto scaled_axis = paden_kahan_3(vector3<double>{0, 0, 2}, q, p, p_prime, delta);
+    REQUIRE_FALSE(scaled_axis.has_value());
+    CHECK(scaled_axis.error() == analytical_failure::degenerate_geometry);
+}
+
+TEST_CASE("paden_kahan_2: nonfinite input reaches the error channel")
+{
+    // The two-rotation subproblem shares subproblem 1's input gate; pinned here
+    // so the three subproblems are covered by the same standard.
+    vector3<double> omega1{0, 0, 1};
+    vector3<double> omega2{0, 1, 0};
+    vector3<double> q{0, 0, 0};
+    vector3<double> p_prime{0, 1, 0};
+
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+
+    auto nan_point = paden_kahan_2(
+        omega1, omega2, q, vector3<double>{nan, 0, 0}, p_prime);
+    REQUIRE_FALSE(nan_point.has_value());
+    CHECK(nan_point.error() == analytical_failure::non_finite_input);
+
+    auto scaled_axis = paden_kahan_2(
+        vector3<double>{0, 0, 2}, omega2, q, vector3<double>{1, 0, 0}, p_prime);
+    REQUIRE_FALSE(scaled_axis.has_value());
+    CHECK(scaled_axis.error() == analytical_failure::degenerate_geometry);
 }
 
 TEST_CASE("paden_kahan_3: an on-axis instance splits by achievable distance")

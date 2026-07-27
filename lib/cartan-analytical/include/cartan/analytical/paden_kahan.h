@@ -19,7 +19,7 @@ namespace cartan
 ///
 /// Find theta such that exp([omega]*theta) about the axis through q maps p to
 /// p'. Every residual it judges is a difference of positions, so the threshold
-/// is a length in the chain's linear unit.
+/// is a length, applied relative to the working radius.
 ///
 /// Reference: Murray, Li and Sastry (1994), Section 3.3, Subproblem 1.
 template <typename Scalar>
@@ -33,13 +33,18 @@ paden_kahan_1(
 {
     vector3<Scalar> u = p - q;
     vector3<Scalar> u_prime = p_prime - q;
-    return detail::subproblem_1<Scalar>(omega, u, u_prime, tolerance.value);
+    return detail::subproblem_1<Scalar>(omega, u, u_prime, tolerance.value());
 }
 
 /// Paden-Kahan subproblem 1 for unit direction vectors about an axis through
 /// the origin. Every residual it judges is a difference of unit directions and
 /// so is dimensionless; the axis point is dropped because the callers that
 /// carry directions have none.
+///
+/// Both point arguments are required to be unit, because the dimensionless
+/// threshold means nothing against a residual of some other scale. A position
+/// pair therefore reaches the error channel rather than being judged against a
+/// threshold that does not apply to it.
 ///
 /// Reference: Murray, Li and Sastry (1994), Section 3.3, Subproblem 1.
 template <typename Scalar>
@@ -50,7 +55,12 @@ paden_kahan_1_direction(
     const vector3<Scalar>& u_prime,
     direction_tolerance<Scalar> tolerance = default_direction_tolerance_v<Scalar>)
 {
-    return detail::subproblem_1<Scalar>(omega, u, u_prime, tolerance.value);
+    // Ahead of the unit test, which a nonfinite norm fails for the wrong reason.
+    if (!u.allFinite() || !u_prime.allFinite())
+        return cartan::unexpected(analytical_failure::non_finite_input);
+    if (!detail::is_unit_vector(u) || !detail::is_unit_vector(u_prime))
+        return cartan::unexpected(analytical_failure::degenerate_geometry);
+    return detail::subproblem_1<Scalar>(omega, u, u_prime, tolerance.value());
 }
 
 /// Result type for Paden-Kahan subproblem 2 (two rotations, up to 2 solutions).
@@ -160,6 +170,16 @@ paden_kahan_3(
     vector3<Scalar> u = p - q;
     vector3<Scalar> u_prime = p_prime - q;
 
+    // A nonfinite value makes every comparison below false, so without this the
+    // two-solution branch is the one reached and it returns NaN angles as a
+    // success.
+    if (auto failure = detail::subproblem_1_input_failure(omega, u, u_prime))
+        return cartan::unexpected(*failure);
+    if (!std::isfinite(delta))
+        return cartan::unexpected(analytical_failure::non_finite_input);
+
+    Scalar accept = tolerance.value() * detail::acceptance_radius(u, u_prime);
+
     vector3<Scalar> u_perp = u - omega.dot(u) * omega;
     vector3<Scalar> u_prime_perp = u_prime - omega.dot(u_prime) * omega;
 
@@ -181,9 +201,9 @@ paden_kahan_3(
     // it is p' instead that lies on the axis the cross term in the squared
     // residual vanishes identically. So the constraint is met by every angle or
     // by none, and the achieved distance is the one at theta = 0.
-    if (u_perp_norm <= tolerance.value || u_prime_perp_norm <= tolerance.value)
+    if (u_perp_norm <= accept || u_prime_perp_norm <= accept)
     {
-        if (std::abs((u - u_prime).norm() - delta) <= tolerance.value)
+        if (std::abs((u - u_prime).norm() - delta) <= accept)
             return cartan::unexpected(analytical_failure::singular_configuration);
         return cartan::unexpected(analytical_failure::unreachable);
     }

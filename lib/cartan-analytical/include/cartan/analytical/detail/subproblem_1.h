@@ -7,12 +7,23 @@
 #include "cartan/detail/epsilon.h"
 #include "cartan/types.h"
 
+#include <algorithm>
 #include <cmath>
 #include "cartan/expected.h"
 #include <optional>
 
 namespace cartan::detail
 {
+
+/// Deviation of a stored normalized vector's norm from one is dimensionless
+/// round-off, which is where machine precision is the right threshold species.
+/// A nonfinite component makes the comparison false, so callers that care order
+/// this after a finiteness test.
+template <typename Scalar>
+bool is_unit_vector(const vector3<Scalar>& v)
+{
+    return std::abs(v.norm() - Scalar(1)) <= sqrt_epsilon_v<Scalar>;
+}
 
 /// Neither solvability condition below has an answer for a nonfinite input, and
 /// both read omega as a unit vector. The screw-axis type normalizes on
@@ -26,9 +37,19 @@ std::optional<analytical_failure> subproblem_1_input_failure(
 {
     if (!omega.allFinite() || !u.allFinite() || !u_prime.allFinite())
         return analytical_failure::non_finite_input;
-    if (std::abs(omega.norm() - Scalar(1)) > sqrt_epsilon_v<Scalar>)
+    if (!is_unit_vector(omega))
         return analytical_failure::degenerate_geometry;
     return std::nullopt;
+}
+
+/// Radius the subproblem's acceptance threshold is measured relative to.
+/// Round-off in every residual below grows linearly with the working radius, so
+/// a fixed threshold would tighten as the mechanism grows. Unit direction
+/// arguments give exactly one, which is what leaves their threshold absolute.
+template <typename Scalar>
+Scalar acceptance_radius(const vector3<Scalar>& u, const vector3<Scalar>& u_prime)
+{
+    return std::max({u.norm(), u_prime.norm(), Scalar(1)});
 }
 
 /// The two scalar conditions a rotation about omega imposes on a displacement
@@ -80,17 +101,19 @@ cartan::expected<Scalar, analytical_failure> subproblem_1(
 {
     if (auto failure = subproblem_1_input_failure(omega, u, u_prime))
         return cartan::unexpected(*failure);
-    if (!rotation_conditions_hold(omega, u, u_prime, tolerance))
+
+    Scalar accept = tolerance * acceptance_radius(u, u_prime);
+    if (!rotation_conditions_hold(omega, u, u_prime, accept))
         return cartan::unexpected(analytical_failure::unreachable);
 
     vector3<Scalar> u_perp = u - omega.dot(u) * omega;
     vector3<Scalar> u_prime_perp = u_prime - omega.dot(u_prime) * omega;
-    if (u_perp.norm() <= tolerance && u_prime_perp.norm() <= tolerance)
+    if (u_perp.norm() <= accept && u_prime_perp.norm() <= accept)
         return cartan::unexpected(analytical_failure::singular_configuration);
 
     Scalar theta = std::atan2(
         omega.dot(u_perp.cross(u_prime_perp)), u_perp.dot(u_prime_perp));
-    if (!subproblem_1_reconstructs(omega, u, u_prime, theta, tolerance))
+    if (!subproblem_1_reconstructs(omega, u, u_prime, theta, accept))
         return cartan::unexpected(analytical_failure::unreachable);
     return theta;
 }
