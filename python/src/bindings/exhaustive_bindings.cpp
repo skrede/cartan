@@ -154,6 +154,11 @@ void register_exhaustive(nb::module_& m)
                     throw nb::value_error(("ExhaustiveIKRunner.solve: q_seed.size() (" + std::to_string(seed.size())
                                            + ") does not match chain.num_joints() (" + std::to_string(self.chain.num_joints()) + ")").c_str());
                 }
+                if (!seed.allFinite())
+                {
+                    throw nb::value_error("ExhaustiveIKRunner.solve: q_seed contains a NaN or "
+                                          "non-finite component");
+                }
 
                 cartan::convergence_criteria<double> criteria{
                     self.config.position_tol,
@@ -191,9 +196,9 @@ void register_exhaustive(nb::module_& m)
             "starting from `q_seed` (or the zero vector when omitted). "
             "Returns a list of FK-verified cartan.IkResult branches sorted "
             "by `ranking`; the list is empty when no branches converge. "
-            "Hard fails (NaN/non-finite target, q_seed.size() mismatch) "
-            "raise ValueError on the calling thread before the GIL is "
-            "released.");
+            "Hard fails (NaN/non-finite target or q_seed, q_seed.size() "
+            "mismatch) raise ValueError on the calling thread before the GIL "
+            "is released.");
 }
 
 }

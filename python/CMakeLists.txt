@@ -22,6 +22,22 @@ if (CARTAN_PYTHON_STABLE_ABI)
     list(APPEND _cartan_python_module_options STABLE_ABI)
 endif ()
 
+set(_cartan_source_digest_header "${CMAKE_CURRENT_BINARY_DIR}/generated/cartan_source_digest.h")
+set(_cartan_source_digest_script "${CMAKE_CURRENT_SOURCE_DIR}/cmake/source_digest.cmake")
+set(_cartan_source_digest_args
+    "-DCARTAN_DIGEST_ROOT=${PROJECT_SOURCE_DIR}"
+    "-DCARTAN_DIGEST_OUT=${_cartan_source_digest_header}")
+
+# Re-stamped on every build, not at configure time: a header edited under lib/
+# recompiles the extension without reconfiguring, and a stamp that did not move
+# with it would report a stale module as fresh.
+execute_process(COMMAND "${CMAKE_COMMAND}" ${_cartan_source_digest_args} -P "${_cartan_source_digest_script}")
+add_custom_target(_core_source_digest
+    COMMAND "${CMAKE_COMMAND}" ${_cartan_source_digest_args} -P "${_cartan_source_digest_script}"
+    BYPRODUCTS "${_cartan_source_digest_header}"
+    COMMENT "Hashing the sources the Python extension is built from"
+    VERBATIM)
+
 nanobind_add_module(
     _core
     ${_cartan_python_module_options}
@@ -35,7 +51,9 @@ nanobind_add_module(
     src/bindings/exhaustive_bindings.cpp
 )
 
-target_include_directories(_core PRIVATE src/bindings)
+add_dependencies(_core _core_source_digest)
+
+target_include_directories(_core PRIVATE src/bindings "${CMAKE_CURRENT_BINARY_DIR}/generated")
 
 target_link_libraries(_core
     PRIVATE

@@ -94,6 +94,10 @@ inline void validate_ik_inputs(const char* fn_name,
         throw nb::value_error((std::string(fn_name) + ": q_seed.size() (" + std::to_string(q_seed.size())
                                + ") does not match chain.num_joints() (" + std::to_string(chain.num_joints()) + ")").c_str());
     }
+    if (!q_seed.allFinite())
+    {
+        throw nb::value_error((std::string(fn_name) + ": q_seed contains a NaN or non-finite component").c_str());
+    }
 }
 
 template <typename Runner>

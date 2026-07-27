@@ -73,6 +73,26 @@ inline void validate_target_finite(const char *fn_name, const SE3d &target)
     }
 }
 
+/// Both rejections below precede l2_distance, whose +inf fallback would
+/// otherwise rank every candidate equal and hand the caller an arbitrary
+/// branch in answer to "which branch is nearest my seed".
+inline void validate_seed_finite(const char *fn_name, const Eigen::Ref<const VectorXd> &q_seed)
+{
+    if(!q_seed.allFinite())
+    {
+        throw nb::value_error((std::string(fn_name) + ": q_seed contains a NaN or non-finite component").c_str());
+    }
+}
+
+inline void validate_seed_size(const char *fn_name, int expected, const Eigen::Ref<const VectorXd> &q_seed)
+{
+    if(q_seed.size() != expected)
+    {
+        throw nb::value_error(
+                (std::string(fn_name) + ": q_seed.size() (" + std::to_string(q_seed.size()) + ") does not match the joint count (" + std::to_string(expected) + ")").c_str());
+    }
+}
+
 /// L2 distance between two joint vectors after size check. Returns +inf
 /// on size mismatch so ranking falls back to a usable order rather than
 /// throwing inside std::sort or std::min_element comparators.
@@ -164,10 +184,8 @@ inline VectorXd validated_reference(const char *fn_name, const KC &chain, const 
     {
         return reference;
     }
-    if(q_seed->size() != n)
-    {
-        throw nb::value_error((std::string(fn_name) + ": q_seed.size() (" + std::to_string(q_seed->size()) + ") does not match chain.num_joints() (" + std::to_string(n) + ")").c_str());
-    }
+    validate_seed_size(fn_name, n, *q_seed);
+    validate_seed_finite(fn_name, *q_seed);
     reference = q_seed.value();
     return reference;
 }
@@ -544,8 +562,10 @@ void register_analytical(nb::module_ &m)
             "closest_to_seed",
             [](const AnalyticalResult &result, const nb::DRef<const VectorXd> &q_seed) -> std::optional<VectorXd>
             {
+                validate_seed_finite("closest_to_seed", q_seed);
                 if(result.solutions.empty())
                     return std::nullopt;
+                validate_seed_size("closest_to_seed", static_cast<int>(result.solutions.front().size()), q_seed);
                 const VectorXd seed = q_seed;
                 auto it             = std::min_element(result.solutions.begin(), result.solutions.end(),
                                                        [&seed](const VectorXd &a, const VectorXd &b) { return l2_distance(a, seed) < l2_distance(b, seed); });
@@ -565,6 +585,10 @@ void register_analytical(nb::module_ &m)
                     throw nb::value_error(("verify_solution: q.size() (" + std::to_string(q.size()) + ") does not match chain.num_joints() ("
                                            + std::to_string(chain.num_joints()) + ")")
                                                   .c_str());
+                }
+                if(!q.allFinite())
+                {
+                    throw nb::value_error("verify_solution: q contains a NaN or non-finite component");
                 }
                 cartan::convergence_criteria<double> criteria{tolerance, tolerance, 0, 0};
                 return cartan::verify_solution(chain, target, VectorXd(q), criteria);
@@ -606,8 +630,13 @@ void register_analytical(nb::module_ &m)
             [](const KC &chain, const SE3d &target, std::optional<nb::DRef<const VectorXd>> q_seed, int /*rank*/) -> AnalyticalResult
             {
                 validate_target_finite("solve_all", target);
-                AnalyticalResult result;
                 const int n = chain.num_joints();
+                if(q_seed.has_value())
+                {
+                    validate_seed_size("solve_all", n, *q_seed);
+                    validate_seed_finite("solve_all", *q_seed);
+                }
+                AnalyticalResult result;
                 switch(n)
                 {
                     case 6:
