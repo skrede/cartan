@@ -1,6 +1,10 @@
 function(cartan_dependency_is_exportable target out)
+    # A dependency target that does not exist is not exportable. Reporting the
+    # absent case as exportable let an offline configure whose population never
+    # ran install an export file naming a target nothing defines, with every
+    # command exiting zero.
     if (NOT TARGET ${target})
-        set(${out} TRUE PARENT_SCOPE)
+        set(${out} FALSE PARENT_SCOPE)
         return()
     endif ()
     get_target_property(aliased ${target} ALIASED_TARGET)

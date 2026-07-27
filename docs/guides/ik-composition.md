@@ -258,8 +258,13 @@ They are compiled only when Cartan is built with argmin support
 target, which carries both the backend headers and `CARTAN_HAS_ARGMIN`:
 
 ```cmake
+find_package(cartan CONFIG REQUIRED COMPONENTS argmin)
 target_link_libraries(app PRIVATE cartan::cartan cartan::argmin)
 ```
+
+Requesting the component is what makes the package config resolve argmin itself.
+Omit it and the export file still names `argmin::argmin`, but nothing defines it,
+and configuring fails inside `cartanTargets.cmake`.
 
 <!-- cartan:snippet name=argmin-slsqp needs=argmin -->
 ```cpp
@@ -286,9 +291,12 @@ find_package(cartan CONFIG REQUIRED COMPONENTS nlopt)
 target_link_libraries(app PRIVATE cartan::cartan cartan::nlopt)
 ```
 
-An installed NLopt is used when one is available; otherwise the build falls back
-to a pinned upstream revision, and an install of Cartan is then refused, because
-a dependency built inside the build tree belongs to no export set.
+An installed NLopt is used when one is available; the configure step reports which
+provider won. Otherwise the build falls back to a pinned upstream revision, which
+is built inside the build tree and so belongs to no export set: `CARTAN_ENABLE_INSTALL`
+then defaults off, and `cmake --install` succeeds having installed nothing. Pass
+`-DCARTAN_ENABLE_INSTALL=ON` to turn that silence into a refusal naming the
+dependency that cannot be exported.
 
 ## Mixing Families
 

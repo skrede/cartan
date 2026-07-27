@@ -63,6 +63,7 @@ include(FetchContent)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/CartanOptionalBackends.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/CartanBackendContract.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/CartanInstallSurface.cmake)
 
 cmake_language(DEFER CALL cartan_assert_no_unregistered_backend)

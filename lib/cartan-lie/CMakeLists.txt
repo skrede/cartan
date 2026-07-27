@@ -18,7 +18,10 @@ if (NOT TARGET Eigen3::Eigen)
             "${eigen3_SOURCE_DIR}"
         )
     else ()
-        find_package(Eigen3 CONFIG REQUIRED)
+        # GLOBAL: an imported target is otherwise scoped to this directory, and
+        # the install-surface gate runs at the root, where it would see no
+        # target at all rather than the imported one it is there to inspect.
+        find_package(Eigen3 CONFIG REQUIRED GLOBAL)
 
         get_target_property(_eigen_aliased Eigen3::Eigen ALIASED_TARGET)
         if (_eigen_aliased)
