@@ -113,7 +113,7 @@ using six_joint_static_chain = static_chain<Scalar,
 template <typename Scalar>
 six_joint_static_chain<Scalar> make_six_joint_static_chain()
 {
-    return six_joint_static_chain<Scalar>(
+    return *six_joint_static_chain<Scalar>::make(
         six_joint_home<Scalar>(), six_joint_axes<Scalar>(), six_joint_limits<Scalar>());
 }
 

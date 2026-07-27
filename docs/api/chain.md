@@ -252,10 +252,29 @@ joint_kind detect_joint_kind(const screw_axis<Scalar>& axis);
 ```
 
 Inspect a `screw_axis` and return its `joint_kind`. Recognizes axes whose
-`omega` (revolute) or `v` (prismatic) is exactly `±e_x`, `±e_y`, or `±e_z`
-within `sqrt(epsilon)`. The sign is irrelevant: downstream specializations
-read the magnitude from the axis itself. All other axes return
-`joint_kind::general`.
+`omega` (revolute) or `v` (prismatic) is `±e_x`, `±e_y`, or `±e_z` to
+within a per-component deviation of `1e-9`. The sign is irrelevant:
+downstream specializations read the magnitude from the axis itself. All
+other axes, and every nonfinite one, return `joint_kind::general`.
+
+The tolerance is absolute and the same in every scalar type, rather than
+derived from machine precision. A precision-derived threshold is `1.5e-8`
+in `double` but `3.4e-4` in `float`, which would silently discard a
+misalignment of about a hundredth of a degree in single precision — the
+same code safe in one scalar and unsafe in another. At `1e-9` the snap
+licenses at most `1.4 · n · L · δ` of position error and `1.7 · n · δ` of
+orientation error, for a joint count `n` and a maximum moment arm `L`;
+about 13 nm on a 7-joint, 1.3 m arm.
+
+One consequence is worth stating plainly, because it is visible in
+practice. Composing a description's `<origin rpy>` rotations in `float`
+produces axis components around `1.7e-7` — `sin(pi)` evaluated in single
+precision, not noise inherited from the description — which is well above
+this tolerance. So chains from `load_urdf<float>` are classified `general`
+and take the generic evaluation path rather than a specialization. That
+is a performance cost and not a correctness one: the generic path
+evaluates the true axis and is strictly the more faithful of the two. A
+`double` parse is unaffected; its worst measured deviation is `4.1e-10`.
 
 ## kinematic_chain
 
@@ -360,10 +379,10 @@ using limits_storage = std::array<joint_limits<Scalar>, sizeof...(Joints)>;
 using axes_storage = std::array<screw_axis<Scalar>, sizeof...(Joints)>;
 ```
 
-### Constructor
+### Construction
 
 ```cpp
-static_chain(
+static cartan::expected<static_chain, chain_failure> make(
     const se3<Scalar>& home,
     axes_storage axes,
     limits_storage limits);
@@ -374,6 +393,28 @@ static_chain(
   pack.
 - `limits` — Joint position/velocity limits, fixed-size by the parameter
   pack.
+
+`make` is the only way to obtain a `static_chain`; the constructor is
+private. Two failures are possible, and both are returned as values, so a
+release build behaves exactly as a debug build does:
+
+- `chain_failure::non_finite_input` — the home pose or any screw-axis
+  component is NaN or infinite. The `screw_axis::revolute` and
+  `screw_axis::prismatic` factories normalize without validating, so a
+  nonfinite input reaches the axis silently; this is where it is caught.
+- `chain_failure::tag_axis_contradiction` — a stored axis is not the
+  principal axis its compile-time tag names. The comparison is exact, with
+  no tolerance: the tag and the axis both come from the caller, so a near
+  match is a contradiction rather than a rounding artifact. Either sign is
+  accepted — only the axis *line* is constrained, so a joint whose
+  description gives `axis="0 0 -1"` stays expressible under `revolute_z`,
+  and the specialization recovers the sign from the axis itself.
+
+The check matters because the tag-dispatched fast path reads the component
+its tag names as the signed magnitude. A screw about `y` stored under
+`revolute_z` would read a zero there, and the joint would contribute
+nothing at any joint value — a plausible pose for a robot with one
+immovable joint.
 
 ### Accessors
 

@@ -66,6 +66,11 @@ cartan_add_boundary_test(velocity_shape_boundary_test velocity_shape_boundary_te
 cartan_add_boundary_test(fk_boundary_test fk_boundary_test.cpp)
 cartan_add_boundary_test(jacobian_boundary_test jacobian_boundary_test.cpp)
 
+# The tag/axis and classification cells are wrong-value cells with no sanitizer
+# signature, and their demonstrations construct no group element from nonfinite
+# data, so nothing here depends on NDEBUG either.
+cartan_add_boundary_test(axis_classification_test axis_classification_test.cpp)
+
 # Capability probes rather than a search of CMAKE_CXX_FLAGS: a flag can arrive
 # through CMAKE_CXX_FLAGS_<CONFIG>, a toolchain file, add_compile_options() or a
 # different spelling of the sanitizer list, and a substring test that misses it
