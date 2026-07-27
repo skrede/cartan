@@ -246,6 +246,34 @@ TEST_CASE("6R Pieper: unreachable target returns error")
     CHECK(result.error().reason == analytical_failure::unreachable);
 }
 
+TEST_CASE("6R Pieper: a target whose branches are all rejected reports a failed "
+          "verification")
+{
+    // A target inside the reachable set, taken straight from the chain's own FK,
+    // with the orientation field of the acceptance tolerance driven to zero: the
+    // subproblems still place every branch, and the back-check refuses all of
+    // them because no residual rotation is below zero. Pre-fix the terminal
+    // report called that target unreachable and handed back 0.2632769720, the
+    // displacement between the requested and home wrist centers -- a number that
+    // certifies nothing about the workspace and is not a deficit at any
+    // inequality the solver evaluated.
+    auto chain = make_puma_chain();
+    Eigen::Vector<double, 6> q_known;
+    q_known << 0.3, -0.4, 0.5, 0.2, -0.3, 0.1;
+    auto target = testing::fk_at(chain, q_known).end_effector;
+
+    // The premise: at the module default this same target solves, so nothing
+    // about it is out of reach.
+    REQUIRE(pieper_6r_solver(chain).solve(target).has_value());
+
+    auto result = pieper_6r_solver<decltype(chain)>(
+        chain, verification_tolerance<double>(1e-6, 0.0)).solve(target);
+
+    REQUIRE_FALSE(result.has_value());
+    CHECK(result.error().reason == analytical_failure::verification_failed);
+    CHECK_FALSE(result.error().workspace_distance.has_value());
+}
+
 TEST_CASE("6R Pieper: wrist singularity (theta5 near zero)")
 {
     auto chain = make_puma_chain();

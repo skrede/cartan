@@ -57,19 +57,15 @@ struct analytical_error
     std::optional<Scalar> workspace_distance;
 };
 
-/// Build a diagnostic around a reason a subproblem decided, keeping `deficit`
-/// only where that reason admits one. A subproblem distinguishes a target it
-/// cannot reach from degenerate geometry, a singular configuration and a
-/// nonfinite input; only the first stands behind a distance, and on a nonfinite
-/// input the caller's candidate length is itself a NaN.
+/// Build a diagnostic around a reason a subproblem decided. Whichever reason it
+/// is, the inequality that failed is inside the subproblem, whose error channel
+/// carries no payload, so the reason travels alone: a caller substituting some
+/// length it happens to have to hand would report a magnitude in the right unit
+/// at an inequality nothing evaluated, which is worse than reporting none.
 template <typename Scalar>
-analytical_error<Scalar> subproblem_error(analytical_failure reason, Scalar deficit)
+analytical_error<Scalar> subproblem_error(analytical_failure reason)
 {
-    return analytical_error<Scalar>{
-        reason,
-        reason == analytical_failure::unreachable
-            ? std::optional<Scalar>(deficit)
-            : std::nullopt};
+    return analytical_error<Scalar>{reason, std::nullopt};
 }
 
 /// Multi-solution result for an analytical IK solver. N is the joint count

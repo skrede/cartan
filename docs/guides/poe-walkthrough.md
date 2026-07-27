@@ -71,6 +71,7 @@ Combine the screw axes, home configuration, and joint limits into a
 `kinematic_chain`. The template parameters are `<Scalar, N>` -- the scalar type
 first, then the joint count:
 
+<!-- cartan:unbuilt kind=illustration reason="continues the running example, using the screw axes and the home pose the earlier blocks defined" -->
 ```cpp
 // Joint limits: [-pi, pi] for each joint.
 auto lim = cartan::joint_limits<double>::make(-std::numbers::pi, std::numbers::pi).value();
@@ -85,6 +86,7 @@ cartan::kinematic_chain<double, 3> chain(
 For chains where the DOF is determined at runtime, use `cartan::dynamic` and
 `to_dynamic()` to erase the compile-time size of an existing fixed chain:
 
+<!-- cartan:unbuilt kind=illustration reason="continues the running example, using the chain the earlier blocks built" -->
 ```cpp
 // Dynamic-size chain (N determined at runtime).
 cartan::kinematic_chain<double, cartan::dynamic> dyn_chain = chain.to_dynamic();
@@ -107,6 +109,7 @@ to. That accessor throws `bad_expected_access` carrying the
 failure, or fail-stops on the exceptions-off targets cartan supports; the
 complete example in section 6 shows the form to copy.
 
+<!-- cartan:unbuilt kind=illustration reason="continues the running example, using the chain the earlier blocks built" -->
 ```cpp
 Eigen::Vector3d q{0.5, -0.3, 0.8};   // joint angles in radians
 auto fk = cartan::forward_kinematics(chain, q).value();
@@ -127,6 +130,7 @@ The **space Jacobian** maps joint velocities to the spatial twist of the
 end-effector. The **body Jacobian** maps to the body-frame twist. Both take the
 chain and the cached `fk_result`:
 
+<!-- cartan:unbuilt kind=illustration reason="continues the running example, using the chain and the cached result the earlier blocks produced" -->
 ```cpp
 // Space Jacobian: V_s = J_s(q) * dq
 auto Js = cartan::space_jacobian(chain, fk).value();

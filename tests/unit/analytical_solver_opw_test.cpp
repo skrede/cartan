@@ -82,6 +82,7 @@ TEST_CASE("OPW: FK round-trip reconstructs KR6 R900 targets at 1e-9 over a "
         -std::numbers::pi, std::numbers::pi);
 
     constexpr int samples = 1200;
+    int branches = 0;
     for (int t = 0; t < samples; ++t)
     {
         Eigen::Vector<double, 6> q_known;
@@ -94,6 +95,7 @@ TEST_CASE("OPW: FK round-trip reconstructs KR6 R900 targets at 1e-9 over a "
         INFO("sample " << t << " q_known = " << q_known.transpose());
         REQUIRE(result.has_value());
         REQUIRE(result->count >= 1);
+        branches += result->count;
 
         for (int i = 0; i < result->count; ++i)
         {
@@ -103,6 +105,12 @@ TEST_CASE("OPW: FK round-trip reconstructs KR6 R900 targets at 1e-9 over a "
             CHECK(fk_error(chain, sol, target) < tolerance);
         }
     }
+
+    // Skipping a shoulder family whose arc-cosine denominator vanishes is the
+    // one change on the success path, so the branches this sweep returns are
+    // counted against what it returned before that skip existed. Every target
+    // solving is already required above; this bounds how many ways it solves.
+    CHECK(branches >= 9172);
 }
 
 TEST_CASE("OPW: make() accepts the offset-shoulder KR6 R900 chain")

@@ -30,6 +30,7 @@ See [SO(2) Theory](../background/so2.md) | [SE(2) Theory](../background/se2.md) 
 
 Defined in `types.h`. Thin aliases over Eigen types used throughout Cartan.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar, std::size_t N>
 using vector = Eigen::Matrix<Scalar, static_cast<int>(N), 1>;
@@ -63,6 +64,7 @@ using quaternion = Eigen::Quaternion<Scalar>;
 
 Defined in `detail/epsilon.h`. Compile-time numerical thresholds for Taylor branch switching.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 namespace cartan::detail {
 
@@ -81,6 +83,7 @@ inline constexpr Scalar sqrt_epsilon_v;  // sqrt(epsilon), computed at compile t
 
 Defined in `expected.h`. The validating factories (`from_matrix`, `from_quaternion`, `screw_axis::from_vector`) return their result in a `cartan::expected<T, E>`, a sum type holding either a value of `T` or an error of `E`.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename T, typename E>
 class expected;   // holds either a T (success) or an E (failure)
@@ -93,6 +96,7 @@ class unexpected;  // wraps an error value for expected's error state
 
 The Lie factories report failure through the `cartan::lie_failure` enum (see `lie_failure.h`), an allocation-free, matchable error code shared by `so2`/`so3`/`se2`/`se3` `from_matrix`, `so3::from_quaternion`, the frame-tagged `rotation`/`transform` wrappers, and `screw_axis::from_vector`. `cartan::message(lie_failure)` maps a code to a static human-readable diagnostic.
 
+<!-- cartan:unbuilt kind=illustration reason="lists the enumeration beside a use of it whose matrix and consumer the reader supplies" -->
 ```cpp
 enum class lie_failure
 {
@@ -122,6 +126,7 @@ is false for a NaN.
 
 Defined in `policy.h`. Controls normalization and assertion behavior on construction.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 struct strict_policy
 {
@@ -151,6 +156,7 @@ concept lie_group_policy = requires {
 
 ### lie_group_policy concept
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename P>
 concept lie_group_policy = requires {
@@ -168,6 +174,7 @@ both satisfy it.
 
 ### trusted_unit_t and trusted_unit
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 struct trusted_unit_t {};
 inline constexpr trusted_unit_t trusted_unit{};
@@ -194,6 +201,7 @@ Defined in `se3_left_jacobian.h`. SE(3) left Jacobian and its inverse,
 plus the `Q` matrix used in the SE(3) left-Jacobian decomposition. Uses
 cartan's omega-first twist convention throughout.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar>
 matrix3<Scalar> se3_Q_matrix(const vector3<Scalar>& omega, const vector3<Scalar>& rho);
@@ -202,6 +210,7 @@ matrix3<Scalar> se3_Q_matrix(const vector3<Scalar>& omega, const vector3<Scalar>
 `Q` matrix appearing in the bottom-left 3x3 block of the SE(3) left
 Jacobian decomposition. Adapted from Barfoot to omega-first ordering.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar>
 matrix6<Scalar> se3_left_jacobian(const vector6<Scalar>& xi);
@@ -211,6 +220,7 @@ SE(3) left Jacobian for the twist `xi = (omega, rho)` (omega-first).
 Block structure: top-left `J_so3(omega)`, top-right zero, bottom-left
 `Q(omega, rho)`, bottom-right `J_so3(omega)`.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar>
 matrix6<Scalar> se3_left_jacobian_inv(const vector6<Scalar>& xi);
@@ -228,6 +238,7 @@ Reference: Barfoot, *State Estimation for Robotics*, Eq. 8.91 (left
 
 2D rotation group. Internal representation: `(cos, sin)` pair.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar, typename Policy = strict_policy>
 class so2;
@@ -235,18 +246,21 @@ class so2;
 
 ### Static Methods
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 static so2 exp(Scalar theta);
 ```
 
 Exponential map: angle (radians) to SO(2) rotation.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 static so2 identity();
 ```
 
 Identity element (zero rotation).
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 static cartan::expected<so2, lie_failure> from_matrix(const matrix2<Scalar>& R);
 ```
@@ -255,18 +269,21 @@ Construct from 2x2 rotation matrix with validation. Returns error if `R^T * R` d
 
 ### Member Methods
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 Scalar log() const;
 ```
 
 Logarithmic map: rotation to angle in `(-pi, pi]`.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 so2 inverse() const;
 ```
 
 Group inverse (`R^{-1} = R^T`).
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename P2>
 auto operator*(const so2<Scalar, P2>& rhs) const -> so2<Scalar, stricter_policy<Policy, P2>>;
@@ -274,18 +291,21 @@ auto operator*(const so2<Scalar, P2>& rhs) const -> so2<Scalar, stricter_policy<
 
 Group composition via angle-addition formulas. Result policy is the stricter of the two operands.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 matrix2<Scalar> matrix() const;
 ```
 
 Convert to 2x2 rotation matrix `[[cos, -sin], [sin, cos]]`.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 Scalar angle() const;
 ```
 
 Angle accessor (same as `log()`).
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 Scalar cos_angle() const;
 Scalar sin_angle() const;
@@ -293,6 +313,7 @@ Scalar sin_angle() const;
 
 Direct access to cosine and sine components.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 vector2<Scalar> act(const vector2<Scalar>& v) const;
 ```
@@ -303,6 +324,7 @@ Rotate a 2D vector: `R * v`.
 
 2D rigid body transformation group. Internal representation: `so2` rotation + `vector2` translation.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar, typename Policy = strict_policy>
 class se2;
@@ -310,18 +332,21 @@ class se2;
 
 ### Static Methods
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 static se2 exp(const vector3<Scalar>& v);
 ```
 
 Exponential map: `se(2)` twist `(omega, vx, vy)` to SE(2) transform. Omega-first convention. Handles `omega ~ 0` via Taylor expansion to avoid division by zero.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 static se2 identity();
 ```
 
 Identity element (no rotation, no translation).
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 static cartan::expected<se2, lie_failure> from_matrix(const Eigen::Matrix<Scalar, 3, 3>& T);
 ```
@@ -330,18 +355,21 @@ Construct from 3x3 homogeneous matrix with validation. Checks rotation block and
 
 ### Member Methods
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 vector3<Scalar> log() const;
 ```
 
 Logarithmic map: SE(2) to twist `(omega, vx, vy)`. Handles `omega ~ 0` via Taylor expansion.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 se2 inverse() const;
 ```
 
 Group inverse: `T^{-1} = (R^{-1}, -R^{-1} * t)`.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename P2>
 auto operator*(const se2<Scalar, P2>& rhs) const -> se2<Scalar, stricter_policy<Policy, P2>>;
@@ -349,18 +377,21 @@ auto operator*(const se2<Scalar, P2>& rhs) const -> se2<Scalar, stricter_policy<
 
 Group composition.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 Eigen::Matrix<Scalar, 3, 3> matrix() const;
 ```
 
 Convert to 3x3 homogeneous transformation matrix.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 Eigen::Matrix<Scalar, 3, 3> adjoint() const;
 ```
 
 3x3 adjoint representation acting on `se(2)` twists.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 const so2<Scalar, Policy>& rotation() const;
 const vector2<Scalar>& translation() const;
@@ -368,6 +399,7 @@ const vector2<Scalar>& translation() const;
 
 Access rotation and translation components.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 vector2<Scalar> act(const vector2<Scalar>& p) const;
 ```
@@ -378,6 +410,7 @@ Transform a 2D point: `R * p + t`.
 
 3D rotation group. Internal representation: unit quaternion (`Eigen::Quaternion<Scalar>`).
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar, typename Policy = strict_policy>
 class so3;
@@ -385,6 +418,7 @@ class so3;
 
 ### Constructors
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 explicit so3(const quaternion<Scalar>& q);
 ```
@@ -393,6 +427,7 @@ Construct from a quaternion. Under `strict_policy` the input is normalized
 to unit length on construction; under `fast_policy` the input is taken
 as-is.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 so3(const quaternion<Scalar>& q, trusted_unit_t);
 ```
@@ -405,48 +440,56 @@ axis-aligned `exp`).
 
 ### Static Methods
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 static so3 exp(const vector3<Scalar>& phi);
 ```
 
 Exponential map: axis-angle vector `phi` (axis * angle) to SO(3) via quaternion form. Uses Taylor expansion near `||phi|| ~ 0` for numerical stability.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 static so3 identity();
 ```
 
 Identity element (unit quaternion `w=1`).
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 static cartan::expected<so3, lie_failure> from_matrix(const matrix3<Scalar>& R);
 ```
 
 Construct from 3x3 rotation matrix with validation.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 static cartan::expected<so3, lie_failure> from_quaternion(const quaternion<Scalar>& q);
 ```
 
 Construct from quaternion with unit-norm validation.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 static matrix3<Scalar> left_jacobian(const vector3<Scalar>& phi);
 ```
 
 SO(3) left Jacobian `J_l(phi)`. Used in SE(3) exponential map.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 static matrix3<Scalar> right_jacobian(const vector3<Scalar>& phi);
 ```
 
 SO(3) right Jacobian: `J_r(phi) = J_l(-phi)`.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 static matrix3<Scalar> left_jacobian_inv(const vector3<Scalar>& phi);
 ```
 
 Inverse left Jacobian `J_l^{-1}(phi)`. Used in SE(3) logarithmic map.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 static matrix3<Scalar> right_jacobian_inv(const vector3<Scalar>& phi);
 ```
@@ -455,18 +498,21 @@ Inverse right Jacobian: `J_r^{-1}(phi) = J_l^{-1}(-phi)`.
 
 ### Member Methods
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 vector3<Scalar> log() const;
 ```
 
 Logarithmic map: SO(3) to axis-angle vector via quaternion `atan2` approach. Avoids the `theta ~ pi` eigenvector branch entirely; only `theta ~ 0` needs Taylor.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 so3 inverse() const;
 ```
 
 Group inverse via quaternion conjugate.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename P2>
 auto operator*(const so3<Scalar, P2>& rhs) const -> so3<Scalar, stricter_policy<Policy, P2>>;
@@ -474,30 +520,35 @@ auto operator*(const so3<Scalar, P2>& rhs) const -> so3<Scalar, stricter_policy<
 
 Group composition via Hamilton quaternion product.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 matrix3<Scalar> adjoint() const;
 ```
 
 Adjoint representation: `Ad_R = R` (the rotation matrix itself for SO(3)).
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 matrix3<Scalar> coadjoint() const;
 ```
 
 Coadjoint representation: `Ad_R^{-T} = R` for SO(3) (since R is orthogonal).
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 matrix3<Scalar> matrix() const;
 ```
 
 Convert to 3x3 rotation matrix.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 const quaternion<Scalar>& quaternion_ref() const;
 ```
 
 Access the internal quaternion (read-only).
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 vector3<Scalar> act(const vector3<Scalar>& v) const;
 ```
@@ -514,6 +565,7 @@ Rotate a 3D vector: `R * v`.
 
 3D rigid body transformation group. Internal representation: `so3` rotation + `vector3` translation. 7 scalars total (4 quaternion + 3 translation).
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar, typename Policy = strict_policy>
 class se3;
@@ -521,12 +573,14 @@ class se3;
 
 ### Constructors
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 se3(const so3<Scalar, Policy>& rot, const vector3<Scalar>& trans);
 ```
 
 Construct from rotation and translation components.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename P2>
 se3(const se3<Scalar, P2>& other, trusted_unit_t);
@@ -540,18 +594,21 @@ is rebinding the policy on the boundary of an FK accumulator.
 
 ### Static Methods
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 static se3 exp(const vector6<Scalar>& v);
 ```
 
 Exponential map: `se(3)` twist `(omega, rho)` to SE(3) transform. Omega-first convention. Uses `so3::left_jacobian` for the translation component: `t = J_l(omega) * rho`.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 static se3 identity();
 ```
 
 Identity element.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 static cartan::expected<se3, lie_failure> from_matrix(const matrix4<Scalar>& T);
 ```
@@ -560,18 +617,21 @@ Construct from 4x4 homogeneous matrix with validation. Checks rotation block and
 
 ### Member Methods
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 vector6<Scalar> log() const;
 ```
 
 Logarithmic map: SE(3) to twist `(omega, rho)`. Uses `so3::left_jacobian_inv` for the linear component: `rho = J_l^{-1}(omega) * t`.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 se3 inverse() const;
 ```
 
 Group inverse: `T^{-1} = (R^{-1}, -R^{-1} * t)`.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename P2>
 auto operator*(const se3<Scalar, P2>& rhs) const -> se3<Scalar, stricter_policy<Policy, P2>>;
@@ -579,6 +639,7 @@ auto operator*(const se3<Scalar, P2>& rhs) const -> se3<Scalar, stricter_policy<
 
 Group composition.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename P2>
 se3<Scalar, fast_policy> compose_trusted(const se3<Scalar, P2>& rhs) const;
@@ -590,6 +651,7 @@ Designed for FK chain accumulators where `N` successive unit-quaternion
 products keep `||q||^2 - 1` bounded by `O(N * eps)`, making per-step
 renormalization wasted work.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 matrix6<Scalar> adjoint() const;
 ```
@@ -601,18 +663,21 @@ matrix6<Scalar> adjoint() const;
 ```
 where `[p]` is the skew-symmetric matrix of the translation.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 matrix6<Scalar> coadjoint() const;
 ```
 
 Coadjoint representation: `Ad_T^{-T}`.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 matrix4<Scalar> matrix() const;
 ```
 
 Convert to 4x4 homogeneous transformation matrix.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 const so3<Scalar, Policy>& rotation() const;
 const vector3<Scalar>& translation() const;
@@ -620,6 +685,7 @@ const vector3<Scalar>& translation() const;
 
 Access rotation and translation components.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 vector3<Scalar> act(const vector3<Scalar>& p) const;
 ```
@@ -632,6 +698,7 @@ Defined in `hat_vee.h`. Isomorphisms between vectors and Lie algebra matrices.
 
 ### hat (3-vector)
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar>
 matrix3<Scalar> hat(const vector3<Scalar>& v);
@@ -641,6 +708,7 @@ Constructs a 3x3 skew-symmetric matrix from a 3-vector. Property: `hat(v) * w = 
 
 ### vee (3x3)
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar>
 vector3<Scalar> vee(const matrix3<Scalar>& S);
@@ -650,6 +718,7 @@ Extracts a 3-vector from a 3x3 skew-symmetric matrix. Inverse of `hat`: `vee(hat
 
 ### hat (6-vector)
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar>
 matrix4<Scalar> hat(const vector6<Scalar>& V);
@@ -659,6 +728,7 @@ Constructs a 4x4 `se(3)` twist matrix from a 6-vector `(omega, v)`. Layout: top-
 
 ### vee (4x4)
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar>
 vector6<Scalar> vee(const matrix4<Scalar>& M);
@@ -672,6 +742,7 @@ Defined in `axis_angle.h`. Axis-angle representation and screw parameter extract
 
 ### Structs
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar>
 struct axis_angle {
@@ -689,6 +760,7 @@ struct screw_params {
 
 ### Functions
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar, typename Policy>
 axis_angle<Scalar> to_axis_angle(const so3<Scalar, Policy>& r);
@@ -696,6 +768,7 @@ axis_angle<Scalar> to_axis_angle(const so3<Scalar, Policy>& r);
 
 Extract axis-angle from SO(3) via the log map. For `theta ~ 0`, returns zero angle with `UnitX` as arbitrary axis.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar>
 so3<Scalar> from_axis_angle(const axis_angle<Scalar>& aa);
@@ -703,6 +776,7 @@ so3<Scalar> from_axis_angle(const axis_angle<Scalar>& aa);
 
 Convert axis-angle to SO(3) via the exp map.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar>
 axis_angle<Scalar> from_angle_axis_vector(const vector3<Scalar>& phi);
@@ -710,6 +784,7 @@ axis_angle<Scalar> from_angle_axis_vector(const vector3<Scalar>& phi);
 
 Parse an angle-axis vector `phi = theta * axis` into axis and angle components.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar>
 screw_params<Scalar> to_screw_params(const vector3<Scalar>& omega, const vector3<Scalar>& v);
@@ -726,6 +801,7 @@ For pure translation (`||omega|| ~ 0`): `s_hat = v / ||v||`, `q = 0`,
 
 Defined in `quaternion_utils.h`. Utility functions supplementing Eigen's quaternion type.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar>
 quaternion<Scalar> quat_slerp(const quaternion<Scalar>& q1, const quaternion<Scalar>& q2, Scalar t);
@@ -733,6 +809,7 @@ quaternion<Scalar> quat_slerp(const quaternion<Scalar>& q1, const quaternion<Sca
 
 Spherical linear interpolation between two unit quaternions. `t` in `[0, 1]`.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar>
 quaternion<Scalar> quat_normalize(const quaternion<Scalar>& q);
@@ -740,6 +817,7 @@ quaternion<Scalar> quat_normalize(const quaternion<Scalar>& q);
 
 Normalize a quaternion to unit length.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar>
 matrix3<Scalar> quat_to_matrix(const quaternion<Scalar>& q);
@@ -747,6 +825,7 @@ matrix3<Scalar> quat_to_matrix(const quaternion<Scalar>& q);
 
 Convert unit quaternion to 3x3 rotation matrix.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar>
 quaternion<Scalar> matrix_to_quat(const matrix3<Scalar>& R);
@@ -754,6 +833,7 @@ quaternion<Scalar> matrix_to_quat(const matrix3<Scalar>& R);
 
 Convert 3x3 rotation matrix to quaternion.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar>
 quaternion<Scalar> from_wxyz(Scalar w, Scalar x, Scalar y, Scalar z);
@@ -761,6 +841,7 @@ quaternion<Scalar> from_wxyz(Scalar w, Scalar x, Scalar y, Scalar z);
 
 Named constructor: w-first order `(w, x, y, z)`.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar>
 quaternion<Scalar> from_xyzw(Scalar x, Scalar y, Scalar z, Scalar w);
@@ -768,6 +849,7 @@ quaternion<Scalar> from_xyzw(Scalar x, Scalar y, Scalar z, Scalar w);
 
 Named constructor: xyzw order (Eigen internal storage order).
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar>
 vector<Scalar, 4> to_wxyz(const quaternion<Scalar>& q);
@@ -775,6 +857,7 @@ vector<Scalar, 4> to_wxyz(const quaternion<Scalar>& q);
 
 Serialize quaternion to `[w, x, y, z]` 4-vector.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar>
 quaternion<Scalar> quat_hamilton_product(const quaternion<Scalar>& q1, const quaternion<Scalar>& q2);
@@ -788,6 +871,7 @@ Defined in `twist.h`. Twist (spatial velocity) representation and screw motion d
 
 ### Structs
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar>
 struct twist {
@@ -808,6 +892,7 @@ struct screw_motion {
 
 ### Functions
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar>
 se3<Scalar> twist_to_se3(const twist<Scalar>& tw, Scalar theta);
@@ -815,6 +900,7 @@ se3<Scalar> twist_to_se3(const twist<Scalar>& tw, Scalar theta);
 
 Compute the rigid body motion from a unit twist applied for angle/distance `theta`. Returns `se3::exp(theta * twist_vector)`.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar, typename Policy>
 twist<Scalar> se3_to_twist(const se3<Scalar, Policy>& T);
@@ -822,6 +908,7 @@ twist<Scalar> se3_to_twist(const se3<Scalar, Policy>& T);
 
 Extract twist from SE(3) via the log map.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar>
 screw_motion<Scalar> to_screw_motion(const twist<Scalar>& tw);
@@ -829,6 +916,7 @@ screw_motion<Scalar> to_screw_motion(const twist<Scalar>& tw);
 
 Decompose a twist into screw motion parameters. For rotation (`||omega|| > epsilon`): `theta = ||omega||`, `d = h * theta`. For pure translation: `theta = 0`, `d = ||v||`.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar>
 twist<Scalar> from_screw_motion(const screw_motion<Scalar>& sm);

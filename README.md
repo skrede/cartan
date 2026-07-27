@@ -66,6 +66,7 @@ cartan owns kinematics and stays out of everything else.
 
 ### CMake FetchContent (recommended)
 
+<!-- cartan:recipe kind=cmake name=fetchcontent -->
 ```cmake
 include(FetchContent)
 set(CARTAN_CMAKE_FETCH_DEPS ON)
@@ -86,6 +87,7 @@ generates no install rules under it.
 
 ### find_package
 
+<!-- cartan:recipe kind=cmake name=find-package -->
 ```cmake
 find_package(cartan CONFIG REQUIRED)
 target_link_libraries(my_app PRIVATE cartan::cartan)
@@ -101,6 +103,7 @@ Cartan ships an `idf_component.yml` at the repo root. Add it to your firmware
 project's `main/idf_component.yml` once it is published to the ESP Component
 Registry, or pin a Git revision directly:
 
+<!-- cartan:unbuilt kind=sketch reason="a stanza for a consumer's component manifest, published for a registry this repository does not build against" -->
 ```yaml
 dependencies:
   skrede/cartan:

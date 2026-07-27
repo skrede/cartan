@@ -160,6 +160,7 @@ The limits policies are stateless structs consumed by the solve policies that
 `basic_ik_runner` drives. All of them satisfy a common interface, templated on
 the chain type:
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain>
 static void enforce(
@@ -170,6 +171,7 @@ static void enforce(
 The `null_space_limits` policy additionally provides an extended overload,
 detected at compile time via the `has_extended_enforce` concept:
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain>
 static void enforce_extended(

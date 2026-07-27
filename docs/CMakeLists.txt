@@ -12,14 +12,19 @@
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
 set(_doc_snippet_extractor ${CMAKE_SOURCE_DIR}/tools/extract_doc_snippets.py)
+set(_doc_snippet_readme ${CMAKE_SOURCE_DIR}/README.md)
 set(_doc_snippet_gen_dir ${CMAKE_CURRENT_BINARY_DIR}/doc_snippets)
 
-# Regenerate the snippets at configure time. A malformed sentinel makes the
-# extractor exit non-zero, which we promote to a hard configure error so the gate
-# fails loudly rather than silently dropping a snippet.
+# Regenerate the snippets at configure time. A malformed sentinel, an unclassified
+# fence or a corpus that yields nothing makes the extractor exit non-zero, which we
+# promote to a hard configure error so the gate fails loudly rather than reporting
+# a count nobody acts on. The README is scanned alongside the guides because it
+# carries the recipe most consumers copy.
 execute_process(
     COMMAND ${Python3_EXECUTABLE} ${_doc_snippet_extractor}
             --docs-root ${CMAKE_CURRENT_SOURCE_DIR}
+            --extra-file ${_doc_snippet_readme}
+            --require-classified
             --out ${_doc_snippet_gen_dir}
     RESULT_VARIABLE _doc_snippet_result
     OUTPUT_VARIABLE _doc_snippet_output
@@ -32,11 +37,13 @@ endif ()
 
 message(STATUS "Documentation snippets: ${_doc_snippet_output}")
 
-# Re-run extraction whenever the extractor or any markdown source changes, so an
+# Re-run extraction whenever the extractor or any scanned document changes, so an
 # incremental build after a doc edit picks up the new snippets.
 file(GLOB_RECURSE _doc_snippet_markdown CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/*.md)
+file(GLOB _doc_snippet_modules CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/tools/doc_snippets/*.py)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-    ${_doc_snippet_extractor} ${_doc_snippet_markdown})
+    ${_doc_snippet_extractor} ${_doc_snippet_modules} ${_doc_snippet_readme}
+    ${_doc_snippet_markdown})
 
 # Each extractor group compiles in its own object library against the target that
 # owns that group's API, and takes its include roots, language level and feature
@@ -57,21 +64,29 @@ set(_doc_snippet_compiled 0)
 foreach (_group IN LISTS _doc_snippet_groups)
     file(GLOB _group_sources CONFIGURE_DEPENDS ${_doc_snippet_gen_dir}/${_group}/*.cpp)
     list(LENGTH _group_sources _group_count)
-    if (_group_count EQUAL 0)
-        continue ()
-    endif ()
 
     string(TOUPPER ${_group} _group_upper)
     if (NOT _group STREQUAL core)
         # The extractor emits every marked snippet regardless of the build
         # configuration; a gated group is compiled only when its option is on.
+        # An enabled group holding nothing is reported too, because an empty
+        # group and a disabled one read alike and mean different things.
         if (NOT CARTAN_BUILD_${_group_upper})
             message(STATUS "Documentation snippets: skipping ${_group_count} "
                 "'${_group}' snippet(s) (CARTAN_BUILD_${_group_upper}=OFF)")
             continue ()
         endif ()
+        if (_group_count EQUAL 0)
+            message(STATUS "Documentation snippets: no '${_group}' snippet exists to compile "
+                "(CARTAN_BUILD_${_group_upper}=ON)")
+            continue ()
+        endif ()
         message(STATUS "Documentation snippets: compiling ${_group_count} "
             "'${_group}' snippet(s) (CARTAN_BUILD_${_group_upper}=ON)")
+    endif ()
+
+    if (_group_count EQUAL 0)
+        continue ()
     endif ()
 
     # The umbrella comes first in every group: a component links only its own

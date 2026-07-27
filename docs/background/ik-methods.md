@@ -278,6 +278,7 @@ units are allocated.
 
 Every solver satisfies the `solve_policy` concept:
 
+<!-- cartan:unbuilt kind=sketch reason="the requires-clause parameters are elided, so the concept reads as its shape rather than as its declaration" -->
 ```cpp
 concept solve_policy = requires(S& s, ...) {
     { s.setup(chain, target, q0, criteria) };

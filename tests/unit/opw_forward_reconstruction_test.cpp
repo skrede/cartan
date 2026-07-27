@@ -105,3 +105,35 @@ TEST_CASE(
     CHECK(worst_position < tolerance);
     CHECK(worst_orientation < tolerance);
 }
+
+/// The same gate for the synthetic offset-plane arm. Its nonzero out-of-plane
+/// offset b is the only reason the lateral-cylinder guard can be driven at all,
+/// so an offset present in the parameter map but absent from the screw model
+/// would leave a diagnostic case asserting against a robot the chain is not.
+TEST_CASE(
+    "OPW forward map reconstructs the offset-plane screw model at 1e-9",
+    "[analytical][opw]")
+{
+    const auto chain = fixtures::make_offset_plane_opw_chain<double>();
+    const auto params = fixtures::offset_plane_opw_parameters<double>();
+
+    constexpr double tolerance = 1e-9;
+    const double pi = std::numbers::pi_v<double>;
+
+    std::mt19937_64 rng(0xB0FFEEULL);
+    std::uniform_real_distribution<double> joint(-pi, pi);
+
+    for (int sample = 0; sample < 500; ++sample)
+    {
+        Eigen::Vector<double, 6> q;
+        for (int j = 0; j < 6; ++j)
+            q(j) = joint(rng);
+
+        const auto fk = testing::fk_at(chain, q).end_effector;
+        const auto err = reconstruction_at(params, q, fk);
+
+        INFO("sample " << sample << " q = " << q.transpose());
+        REQUIRE(err.position < tolerance);
+        REQUIRE(err.orientation < tolerance);
+    }
+}

@@ -37,6 +37,7 @@ See [IK Methods](../background/ik-methods.md) | [PoE Kinematics](../background/p
 
 Multi-solution result for an analytical solver.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar, int N, int MaxSolutions>
 struct analytical_result
@@ -62,6 +63,7 @@ subset (idiomatic ranged-`for`).
 
 Failure diagnostic returned via `cartan::expected<..., analytical_error<Scalar>>`.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar>
 struct analytical_error
@@ -82,6 +84,7 @@ Paden-Kahan subproblem and forwarded.
 
 ### analytical_failure
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 enum class analytical_failure
 {
@@ -110,6 +113,7 @@ constexpr const char* message(analytical_failure failure);
 
 ### Tolerance types
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar>
 class length_tolerance
@@ -180,6 +184,7 @@ enforced: a `float` solver still instantiates and runs.
 
 ### paden_kahan_2_result
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar>
 struct paden_kahan_2_result
@@ -194,6 +199,7 @@ Result of Paden-Kahan subproblem 2 (two intersecting axes). Carries up to 2
 
 ### paden_kahan_3_result
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar>
 struct paden_kahan_3_result
@@ -208,6 +214,7 @@ Carries up to 2 angle solutions; only the first `count` entries are populated.
 
 ## analytical_solver concept
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename S>
 concept analytical_solver = requires
@@ -237,6 +244,7 @@ are reported to the caller. `planar_2r_solver`, `spatial_3r_solver`, and
 
 ### paden_kahan_1
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar>
 cartan::expected<Scalar, analytical_failure>
@@ -269,6 +277,7 @@ Reference: Murray, Li and Sastry (1994), Section 3.3, Subproblem 1.
 
 ### paden_kahan_1_direction
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar>
 cartan::expected<Scalar, analytical_failure>
@@ -289,6 +298,7 @@ Reference: Murray, Li and Sastry (1994), Section 3.3, Subproblem 1.
 
 ### paden_kahan_2
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar>
 cartan::expected<paden_kahan_2_result<Scalar>, analytical_failure>
@@ -316,6 +326,7 @@ Reference: Murray, Li and Sastry (1994), Section 3.3.2.
 
 ### paden_kahan_3
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar>
 cartan::expected<paden_kahan_3_result<Scalar>, analytical_failure>
@@ -351,6 +362,7 @@ Closed-form IK for a planar 2R mechanism (two revolute joints whose axes are
 parallel and define a common mechanism plane). Returns up to 2 solutions
 ("elbow up" / "elbow down").
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain>
 class planar_2r_solver;
@@ -362,6 +374,7 @@ both joints revolute. The joint count and revolute-only requirement are checked
 at construction; a chain that violates them yields a solver that fails every
 `solve` with `analytical_failure::degenerate_geometry`.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 using chain_type = Chain;
 using scalar_type = typename Chain::scalar_type;
@@ -371,6 +384,7 @@ static constexpr int max_solutions = 2;
 
 ### Constructor
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 explicit planar_2r_solver(
     const chain_type& chain,
@@ -393,6 +407,7 @@ solves position only, so only `position()` gates its results.
 
 ### Method
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 cartan::expected<analytical_result<scalar_type, 2, 2>, analytical_error<scalar_type>>
 solve(const se3<scalar_type>& target) const;
@@ -407,6 +422,7 @@ verified solutions are returned.
 
 ### Free function
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar, joint_tag... Joints>
 auto solve_2r(
@@ -425,6 +441,7 @@ inverse kinematics).
 Closed-form IK for spatial 3R mechanisms using Paden-Kahan subproblems.
 Returns up to 4 solutions.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain>
 class spatial_3r_solver;
@@ -435,6 +452,7 @@ mechanism. The solver requires that the first two joint axes intersect at a comm
 (the standard configuration for 3R mechanisms, e.g. spherical wrists with
 an offset third joint).
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 using chain_type = Chain;
 using scalar_type = typename Chain::scalar_type;
@@ -452,6 +470,7 @@ Decomposition:
 
 ### Constructor
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 explicit spatial_3r_solver(
     const chain_type& chain,
@@ -468,6 +487,7 @@ only.
 
 ### Method
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 cartan::expected<analytical_result<scalar_type, 3, 4>, analytical_error<scalar_type>>
 solve(const se3<scalar_type>& target) const;
@@ -478,6 +498,7 @@ Returns up to 4 verified joint configurations achieving the target pose
 
 ### Free function
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar, joint_tag... Joints>
 auto solve_3r(
@@ -496,6 +517,7 @@ Manipulation* (1994), Section 3.3.
 Closed-form IK for 6R mechanisms with Pieper geometry (last three revolute
 axes intersecting at a common wrist center). Returns up to 8 solutions.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain>
 class pieper_6r_solver;
@@ -507,6 +529,7 @@ center decomposition assumes joints 4, 5, 6 share a common intersection
 point (Pieper geometry). Industrial 6R arms commonly satisfy this
 constraint (KR6 R900, PUMA 560, ABB IRB120 with appropriate geometry, etc.).
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 using chain_type = Chain;
 using scalar_type = typename Chain::scalar_type;
@@ -526,6 +549,7 @@ Decomposition:
 
 ### Constructor
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 explicit pieper_6r_solver(
     const chain_type& chain,
@@ -558,6 +582,7 @@ position tolerance — it takes `9e-7` and refuses `1e-6` at a tolerance of
 
 ### Method
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 cartan::expected<analytical_result<scalar_type, 6, 8>, analytical_error<scalar_type>>
 solve(const se3<scalar_type>& target) const;
@@ -568,6 +593,7 @@ pose (both position and orientation).
 
 ### Free function
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar, joint_tag... Joints>
 auto solve_6r(
@@ -587,6 +613,7 @@ Closed-form IK for ortho-parallel 6R arms with a spherical wrist and a lateral
 shoulder offset — the geometry `pieper_6r_solver`'s shoulder-intersection gate
 rejects. Returns up to 8 solutions.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename Verification = opw_verified>
 class opw_6r_solver;
@@ -598,6 +625,7 @@ unchecked.
 
 ### Factory
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 static cartan::expected<opw_6r_solver, analytical_error<scalar_type>>
 make(const chain_type& chain,

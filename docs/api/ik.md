@@ -52,6 +52,7 @@ Branch on the result and report through `cartan::message` instead, as the
 complete example in the
 [IK composition guide](../guides/ik-composition.md#complete-example) does.
 
+<!-- cartan:unbuilt kind=illustration reason="carries its own include directives above the statements, which a fragment wrapper cannot host inside a function" -->
 ```cpp
 #include <cartan/serial_chain.h>
 #include <numbers>
@@ -89,6 +90,7 @@ payload).
 
 ## basic_ik_runner
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename... Policies>
     requires (sizeof...(Policies) >= 1)
@@ -108,6 +110,7 @@ the first policy.
 
 ### setup
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 void setup(
     const chain_type& chain,
@@ -124,6 +127,7 @@ deterministic Halton seeds within joint limits.
 
 ### step
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 ik_status step();
 ```
@@ -134,6 +138,7 @@ active (non-parked) policies.
 
 ### step_n
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 ik_status step_n(int n);
 ```
@@ -142,6 +147,7 @@ Execute `n` round-robin rounds, stopping early on terminal status.
 
 ### solve
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 cartan::expected<ik_result<scalar_type, joints>, ik_error<scalar_type, joints>>
 solve();
@@ -155,6 +161,7 @@ until all policies are parked or `max_total_iterations` is hit.
 
 ### Query methods
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 bool converged() const;
 scalar_type error_norm() const;
@@ -178,6 +185,7 @@ threads without synchronization.
 
 Defined in `<cartan/serial/ik/solvers.h>`:
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain>
 using speed_ik_runner = cartan::restart_wrapper<Chain,
@@ -199,6 +207,7 @@ races the two via `basic_ik_runner`.
 
 ### Builders
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain> auto make_solver();
 template <chain Chain> auto make_speed_ik_runner();
@@ -211,6 +220,7 @@ materialization point. The composable `make_solver` accepts chained
 `.policy(p)` calls and produces a `basic_ik_runner` of the accumulated
 policies:
 
+<!-- cartan:unbuilt kind=sketch reason="names a chain type the page never defines, so it shows the builder's shape" -->
 ```cpp
 auto solver = cartan::make_solver<MyChain>()
     .policy(cartan::lm<MyChain>{})
@@ -220,6 +230,7 @@ auto solver = cartan::make_solver<MyChain>()
 
 ## solve_policy concept
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 namespace cartan {
 
@@ -258,6 +269,7 @@ accumulates `units_consumed` against `convergence_criteria::max_total_work_units
 
 ### step_one helper
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename S>
     requires cartan::solve_policy<S>
@@ -271,6 +283,7 @@ step-by-step visibility into solver progress.
 
 ## convergence_criteria
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar = double>
 struct convergence_criteria
@@ -302,6 +315,7 @@ Lynch & Park, Modern Robotics, Ch. 6.2.
 
 ### ik_status
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 enum class ik_status
 {
@@ -342,6 +356,7 @@ match it. `basic_ik_runner` maps a latched status onto the same-named
 
 ### ik_termination_reason
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 enum class ik_termination_reason
 {
@@ -373,6 +388,7 @@ propagates the reported value into `ik_error::termination_reason`.
 
 ### ik_objective
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 enum class ik_objective
 {
@@ -390,6 +406,7 @@ select the best converged result by min error norm, max manipulability
 
 ### ik_failure
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 enum class ik_failure
 {
@@ -416,6 +433,7 @@ or an infinity.
 
 ### step_metrics
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar = double>
 struct step_metrics
@@ -431,6 +449,7 @@ is the number of algorithmic work units charged by the call;
 
 ### step_result
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar = double>
 struct step_result
@@ -446,6 +465,7 @@ shape.
 
 ### solver_options
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar = double>
 struct solver_options
@@ -462,6 +482,7 @@ reproducible secondary-policy seeding.
 
 ### ik_result
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar = double, int N = dynamic>
 struct ik_result
@@ -478,6 +499,7 @@ the solution in multi-policy racing.
 
 ### ik_error
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar = double, int N = dynamic>
 struct ik_error
@@ -500,6 +522,7 @@ Stateless policy structs controlling joint-limit enforcement on the hot path.
 
 ### no_limits
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 struct no_limits;
 ```
@@ -514,6 +537,7 @@ semantics; `no_limits` is the correct default for the LM family.
 
 ### clamp_limits
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 struct clamp_limits;
 ```
@@ -526,6 +550,7 @@ enforce box constraints internally (`argmin_slsqp`, `argmin_bobyqa`,
 
 ### null_space_limits
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 struct null_space_limits;
 ```
@@ -541,6 +566,7 @@ Reference: Lynch & Park, Modern Robotics, Ch. 6.3, p. 235-237.
 
 ## error_weight
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar = double>
 struct error_weight
@@ -562,6 +588,7 @@ all components.
 
 ### cartan::lm
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename LimitsPolicy = no_limits>
 using lm = builtin_lm<Chain, LimitsPolicy>;
@@ -578,6 +605,7 @@ Reference: Lynch & Park, Modern Robotics, Ch. 6.2, p. 227-233.
 
 ### cartan::lbfgsb
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 using lbfgsb = builtin_lbfgsb<Chain, LimitsPolicy>;
@@ -593,6 +621,7 @@ Reference: Byrd, Lu, Nocedal, Zhu, "A Limited Memory Algorithm for Bound
 
 ### cartan::projected_lm
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename LimitsPolicy = no_limits>
 class projected_lm;
@@ -607,6 +636,7 @@ the bare `projected_lm` already delivers the multi-start behavior.
 
 ### cartan::dls
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 class dls;
@@ -618,6 +648,7 @@ as the smallest singular value drops below a threshold.
 
 ### cartan::newton_raphson
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 class newton_raphson;
@@ -632,6 +663,7 @@ Reference: Nocedal & Wright, *Numerical Optimization*, Ch. 3 (line
 
 ### cartan::argmin_lm
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename LimitsPolicy = no_limits>
 class argmin_lm;
@@ -644,6 +676,7 @@ LM is unconstrained.
 
 ### cartan::argmin_lbfgsb
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 class argmin_lbfgsb;
@@ -656,6 +689,7 @@ Reference: Byrd, Lu, Nocedal, Zhu (1995).
 
 ### cartan::argmin_slsqp
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain,
           typename LimitsPolicy = clamp_limits,
@@ -672,6 +706,7 @@ four-criterion convergence policy in favor of alternatives like
 
 ### cartan::argmin_bobyqa
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 class argmin_bobyqa;
@@ -686,6 +721,7 @@ Reference: Powell, M.J.D., "The BOBYQA Algorithm for Bound Constrained
 
 ### cartan::argmin_projected_gn
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 class argmin_projected_gn;
@@ -695,6 +731,7 @@ argmin-backed projected Gauss-Newton with active-set bounds.
 
 ### cartan::argmin_projected_gradient_gn
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 class argmin_projected_gradient_gn;
@@ -704,6 +741,7 @@ argmin-backed projected-gradient Gauss-Newton with Armijo backtracking.
 
 ### cartan::nlopt_slsqp
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 class nlopt_slsqp;
@@ -714,6 +752,7 @@ NLopt. Guarded by `CARTAN_HAS_NLOPT`.
 
 ### cartan::nlopt_bobyqa
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 class nlopt_bobyqa;
@@ -724,6 +763,7 @@ NLopt. Guarded by `CARTAN_HAS_NLOPT`.
 
 ### cartan::nw_sqp
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 class nw_sqp;
@@ -735,6 +775,7 @@ Reference: Nocedal & Wright, *Numerical Optimization*, Ch. 18 (SQP).
 
 ### cartan::filter_nw_sqp
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 class filter_nw_sqp;
@@ -744,6 +785,7 @@ argmin-backed filter Nocedal-Wright SQP.
 
 ### cartan::filter_slsqp
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 class filter_slsqp;
@@ -753,6 +795,7 @@ argmin-backed filter SLSQP with box constraints.
 
 ### cartan::mma
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 class mma;
@@ -762,6 +805,7 @@ argmin-backed Method of Moving Asymptotes.
 
 ### cartan::gcmma
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 class gcmma;
@@ -774,6 +818,7 @@ convergence guarantee.
 
 ### cartan::cmaes
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 class cmaes;
@@ -785,6 +830,7 @@ is unavailable or unreliable.
 
 ### cartan::augmented_lagrangian
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 class augmented_lagrangian;
@@ -794,6 +840,7 @@ argmin-backed augmented Lagrangian solver for constrained IK.
 
 ## restart_wrapper
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 namespace cartan {
 
@@ -834,6 +881,7 @@ Reference: Beeson & Ames, "TRAC-IK", 2015 (multi-start strategy).
 
 ### exhaustive_ik_runner
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename Policy>
     requires cartan::solve_policy<Policy>
@@ -845,6 +893,7 @@ enumeration, deduplicating by joint-space proximity.
 
 ### exhaustive_options
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar = double>
 struct exhaustive_options
@@ -861,6 +910,7 @@ struct exhaustive_options
 
 ### exhaustive_result
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar = double, int N = dynamic>
 struct exhaustive_result
@@ -881,6 +931,7 @@ empty `solutions` with no `failure`, which is a different answer.
 
 ### ranking_strategy
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 enum class ranking_strategy
 {
@@ -904,6 +955,7 @@ FK-based validation free functions for IK results. Both live in
 
 ### verify_solution
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain>
 bool verify_solution(
@@ -922,6 +974,7 @@ building custom multi-start drivers that need an explicit FK back-check.
 
 ### filter_valid_solutions
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename Scalar, int N>
 std::vector<ik_result<Scalar, N>> filter_valid_solutions(

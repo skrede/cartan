@@ -107,8 +107,8 @@ public:
         auto sp3_result = paden_kahan_3(m_omega[2], m_q[2], m_p_ee, r, delta);
         if (!sp3_result)
         {
-            return cartan::unexpected(subproblem_error<Scalar>(
-                sp3_result.error(), (p_target - m_p_ee).norm()));
+            return cartan::unexpected(
+                subproblem_error<Scalar>(sp3_result.error()));
         }
 
         analytical_result<Scalar, 3, 4> result;

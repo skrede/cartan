@@ -78,6 +78,7 @@ cross-referenced back to a section three screens above them.
 Result of forward kinematics via Product of Exponentials. Caches all
 intermediate products for Jacobian reuse.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar = double, int N = dynamic>
 struct fk_result
@@ -94,6 +95,7 @@ struct fk_result
 
 ### Methods
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 int num_joints() const;
 ```
@@ -106,6 +108,7 @@ Three overloads cover the supported chain types.
 
 ### kinematic_chain overload
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar, int N, typename Derived>
 cartan::expected<fk_result<Scalar, N>, chain_failure> forward_kinematics(
@@ -130,6 +133,7 @@ uses a runtime loop.
 
 ### static_chain overload
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar, joint_tag... Joints, typename Derived>
 cartan::expected<fk_result<Scalar, sizeof...(Joints)>, chain_failure> forward_kinematics(
@@ -150,6 +154,7 @@ overload via partial ordering on `static_chain<Scalar, Joints...>`.
 
 ### Generic chain overload
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename Derived>
 cartan::expected<fk_result<typename Chain::scalar_type, Chain::joints>, chain_failure>
@@ -177,6 +182,7 @@ the per-joint cumulative intermediates, avoiding the quaternion product in
 compose and the quaternion-to-matrix conversion that downstream Jacobian
 computation would otherwise pay on every column.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar, int N, typename Derived>
 cartan::expected<fk_matrix_result<Scalar, N>, chain_failure> forward_kinematics_matrix(
@@ -207,6 +213,7 @@ when SE(3) composition or `act(p)` is the downstream consumer.
 
 ### fk_matrix_result
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar = double, int N = dynamic>
 struct fk_matrix_result
@@ -222,6 +229,7 @@ see below) rather than `se3<Scalar>`.
 
 ### pose_matrix
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar>
 struct pose_matrix
@@ -241,6 +249,7 @@ computations would otherwise pay on every column.
 
 Space Jacobian mapping joint velocities to the end-effector spatial twist.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar, int N>
 cartan::expected<jacobian_matrix<Scalar, N>, chain_failure> space_jacobian(
@@ -274,6 +283,7 @@ Dispatch: same compile-time unrolling as `forward_kinematics` for `N=1-7`.
 
 Body Jacobian mapping joint velocities to the end-effector body-frame twist.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar, int N>
 cartan::expected<jacobian_matrix<Scalar, N>, chain_failure> body_jacobian(
@@ -292,6 +302,7 @@ pose from `fk`. Maps joint velocities to the body-frame twist:
 
 ## jacobian_matrix
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar, int N>
 using jacobian_matrix = std::conditional_t<
@@ -308,6 +319,7 @@ fixed-column or dynamic-column storage based on `N`.
 
 Compute the end-effector spatial twist from joint positions and velocities.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar, int N, typename QDerived, typename DqDerived>
 cartan::expected<vector6<Scalar>, chain_failure> end_effector_velocity(
@@ -326,6 +338,7 @@ components. Otherwise the call returns
 `chain_failure::dimension_mismatch` or `chain_failure::non_finite_input`,
 with the joint positions validated before the joint velocities.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar, int N>
 vector6<Scalar> end_effector_velocity_unchecked(

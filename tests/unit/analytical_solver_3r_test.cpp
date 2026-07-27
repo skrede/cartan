@@ -121,6 +121,27 @@ TEST_CASE("3R solver: unreachable target returns error")
     CHECK(result.error().reason == analytical_failure::unreachable);
 }
 
+TEST_CASE("3R solver: an unreachable target carries no substituted length")
+{
+    // The inequality that failed is inside the distance-constraint subproblem,
+    // whose error channel carries no payload, so the reason travels alone.
+    // Pre-fix the report carried 172.7444355, the distance from the target to
+    // the home end-effector position -- a length no inequality in this solve
+    // compared against anything, and one that vanishes for a target sitting at
+    // the home end-effector even when the failure is real.
+    auto chain = make_3r_chain(0.5, 0.3);
+    const Eigen::Vector3d far_point(100.0, 100.0, 100.0);
+    auto result = spatial_3r_solver(chain).solve(
+        se3<double>(so3<double>::identity(), far_point));
+
+    REQUIRE_FALSE(result.has_value());
+    CHECK(result.error().reason == analytical_failure::unreachable);
+    CHECK_FALSE(result.error().workspace_distance.has_value());
+    // The premise: the substituted length really was this one.
+    CHECK_THAT((far_point - chain.home().translation()).norm(),
+        WithinAbs(172.7444355, 1e-6));
+}
+
 TEST_CASE("3R solver: convenience function solve_3r works")
 {
     auto chain = make_3r_chain(0.5, 0.3);

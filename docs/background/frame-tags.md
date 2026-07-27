@@ -11,6 +11,7 @@ frame composition errors at compile time with zero runtime overhead.
 In traditional robotics code, transformations are plain matrices or SE(3)
 objects with no frame information:
 
+<!-- cartan:unbuilt kind=illustration reason="a deliberately wrong composition, shown so the following section can correct it" -->
 ```cpp
 se3<double> T_world_base = /* ... */;
 se3<double> T_tool_base  = /* ... */;
@@ -38,6 +39,7 @@ These frame mismatch bugs are:
 Cartan wraps SO(3) and SE(3) in frame-tagged templates where the `From` and
 `To` frames are type parameters:
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename From, typename To, typename Scalar = double>
 struct transform
@@ -60,6 +62,7 @@ operand. Mismatches are compile errors.
 
 ### The Fix in Practice
 
+<!-- cartan:unbuilt kind=sketch reason="elides the transform values with a placeholder, so the block shows a rule and not a computation" -->
 ```cpp
 struct World {};
 struct Base {};
@@ -84,6 +87,7 @@ The compiler catches the frame mismatch before the code ever runs.
 Frame tags are user-defined empty structs. They carry no data and exist purely
 in the type system:
 
+<!-- cartan:unbuilt kind=illustration reason="defines the reader's own frame tags and touches nothing cartan declares" -->
 ```cpp
 struct World {};
 struct Base {};
@@ -103,6 +107,7 @@ Frame tags can be any type -- empty structs are the convention, but enum
 classes, integral non-type template parameter wrappers, or any other type
 work equally well:
 
+<!-- cartan:unbuilt kind=sketch reason="the adapter this form needs is named in the block and deliberately not shown" -->
 ```cpp
 enum class Frame { world, base, tool };
 
@@ -117,6 +122,7 @@ constraints:
 
 ### Transform Composition
 
+<!-- cartan:unbuilt kind=sketch reason="an equation over types rather than a sequence of C++ statements" -->
 ```cpp
 transform<A, B> * transform<B, C> = transform<A, C>   // OK
 transform<A, B> * transform<D, C>                      // Compile error (B != D)
@@ -124,6 +130,7 @@ transform<A, B> * transform<D, C>                      // Compile error (B != D)
 
 ### Inverse
 
+<!-- cartan:unbuilt kind=sketch reason="an equation over types rather than a sequence of C++ statements" -->
 ```cpp
 transform<A, B>.inverse() = transform<B, A>
 ```
@@ -132,6 +139,7 @@ transform<A, B>.inverse() = transform<B, A>
 
 The same rules apply to `rotation<From, To>`:
 
+<!-- cartan:unbuilt kind=sketch reason="an equation over types rather than a sequence of C++ statements" -->
 ```cpp
 rotation<A, B> * rotation<B, C> = rotation<A, C>       // OK
 rotation<A, B>.inverse() = rotation<B, A>
@@ -139,6 +147,7 @@ rotation<A, B>.inverse() = rotation<B, A>
 
 ### Identity
 
+<!-- cartan:unbuilt kind=sketch reason="an equation over types rather than a sequence of C++ statements" -->
 ```cpp
 transform<A, A>::identity()   // Identity in frame A
 rotation<A, A>::identity()    // Identity rotation in frame A
@@ -149,6 +158,7 @@ rotation<A, A>::identity()    // Identity rotation in frame A
 Frame tags enable long composition chains where each intermediate frame is
 verified:
 
+<!-- cartan:unbuilt kind=sketch reason="composes over intermediate frames the page never defines" -->
 ```cpp
 transform<World, Base>    T_wb;
 transform<Base, Shoulder> T_bs;

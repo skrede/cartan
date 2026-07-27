@@ -34,6 +34,7 @@ Screw axis for a kinematic joint in PoE form. Revolute joints have a unit
 rotation axis (`||omega|| = 1`); prismatic joints have `omega = 0` and unit
 translation direction (`||v|| = 1`).
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar = double>
 class screw_axis;
@@ -41,6 +42,7 @@ class screw_axis;
 
 ### Static Factory Methods
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 static screw_axis revolute(const vector3<Scalar>& axis, const vector3<Scalar>& point);
 ```
@@ -49,6 +51,7 @@ Construct a revolute joint screw axis. `axis` is the rotation axis direction
 (will be normalized). `point` is a point on the rotation axis. The linear
 component is computed as `v = -omega x point`.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 static screw_axis prismatic(const vector3<Scalar>& direction);
 ```
@@ -56,6 +59,7 @@ static screw_axis prismatic(const vector3<Scalar>& direction);
 Construct a prismatic joint screw axis. `direction` is the translation
 direction (will be normalized). Sets `omega = 0`.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 static cartan::expected<screw_axis, lie_failure> from_vector(const vector6<Scalar>& vec);
 ```
@@ -70,6 +74,7 @@ its unit constraint (see [Error Handling](lie.md#error-handling)).
 
 ### Member Methods
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 const vector3<Scalar>& omega() const;
 const vector3<Scalar>& v() const;
@@ -77,12 +82,14 @@ const vector3<Scalar>& v() const;
 
 Angular and linear velocity components.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 vector6<Scalar> to_vector() const;
 ```
 
 Export as 6-vector `(omega, v)` in omega-first convention.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 bool is_revolute() const;
 bool is_prismatic() const;
@@ -99,6 +106,7 @@ one, so no ordinary expression constructs an invalid set of limits or assigns a
 valid one back into an invalid state. The type is still trivially copyable, so
 `std::bit_cast` and `std::memcpy` remain well-defined routes around that.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar = double>
 class joint_limits
@@ -189,6 +197,7 @@ Joint state holding a position vector and an optional velocity vector.
 Parameterized by scalar type and joint count `N` (fixed or
 `cartan::dynamic`).
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar = double, int N = dynamic>
 struct joint_state
@@ -203,12 +212,14 @@ it is `Eigen::VectorX<Scalar>`.
 
 ### Methods
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 static joint_state from_position(const position_type& q);
 ```
 
 Create a joint state from position only (no velocity).
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 int num_joints() const;
 ```
@@ -222,6 +233,7 @@ joints (axis aligned with `+e_x`, `+e_y`, or `+e_z`). Used as template
 parameter packs in `static_chain` to encode joint types at compile time and
 enable `if constexpr` dispatch on joint type in FK / Jacobian.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 struct revolute_x { static constexpr bool is_revolute = true; /* ... */ };
 struct revolute_y { static constexpr bool is_revolute = true; /* ... */ };
@@ -241,6 +253,7 @@ Each tag exposes:
 
 ## joint_tag concept
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename T>
 concept joint_tag = requires {
@@ -258,6 +271,7 @@ concept.
 Runtime axis classification used by `kinematic_chain` to dispatch into
 the same compile-time specializations as `static_chain`.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 enum class joint_kind : std::uint8_t
 {
@@ -278,6 +292,7 @@ enum class joint_kind : std::uint8_t
 
 ### detect_joint_kind
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar>
 joint_kind detect_joint_kind(const screw_axis<Scalar>& axis);
@@ -373,6 +388,7 @@ T(q) = exp([S1]q1) * exp([S2]q2) * ... * exp([Sn]qn) * M
 where `S_i` are space-frame screw axes and `M` is the home
 (zero-configuration) end-effector pose.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar = double, int N = dynamic>
 class kinematic_chain;
@@ -387,6 +403,7 @@ class kinematic_chain;
 
 ### Constructor
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 kinematic_chain(
     const se3<Scalar>& home,
@@ -407,6 +424,7 @@ FK / Jacobian can dispatch into compile-time specializations.
 
 ### Accessors
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 const se3<Scalar>& home() const;
 const screw_storage& axes() const;
@@ -419,6 +437,7 @@ const kind_storage& kinds() const;
 
 ### Conversion
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 kinematic_chain<Scalar, dynamic> to_dynamic() const
     requires (N != dynamic);
@@ -434,6 +453,7 @@ as template parameters via joint tags; runtime link data (home pose,
 screw axes, joint limits) is stored in fixed-size `std::array` containers
 sized by the parameter pack.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar, joint_tag... Joints>
 class static_chain;
@@ -457,6 +477,7 @@ knowledge for measurable speed wins over the generic
 
 ### Type Aliases
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 using scalar_type = Scalar;
 static constexpr int joints = sizeof...(Joints);
@@ -466,6 +487,7 @@ using axes_storage = std::array<screw_axis<Scalar>, sizeof...(Joints)>;
 
 ### Construction
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 static cartan::expected<static_chain, chain_failure> make(
     const se3<Scalar>& home,
@@ -521,6 +543,7 @@ makes the approximation explicit and yours — or use
 
 ### Accessors
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 const se3<Scalar>& home() const;
 int num_joints() const;
@@ -531,6 +554,7 @@ const limits_storage& limits() const;
 
 ## chain concept
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename C>
 concept chain = requires(const C& c, int i)
@@ -559,6 +583,7 @@ Compile-time selector between `std::array` (fixed `N`) and `std::vector`
 
 The `dynamic` sentinel (`= -1`) it keys on is declared in `<cartan/types.h>`.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 namespace detail {
 

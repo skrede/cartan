@@ -117,9 +117,9 @@ TEST_CASE("analytical diagnostics: a 3R failure that evaluated no inequality car
     absent("3R solve: subproblem reports a singular configuration",
         spatial_3r_solver<dyn_chain>(chain_of(zyy, {0.4, 0, 0})).solve(at(0, 0, 0.4)));
 
-    // A subproblem that does report an unreachable target keeps its deficit.
-    CHECK(subproblem_error<double>(analytical_failure::unreachable, 2.5)
-        .workspace_distance.value_or(-1.0) == 2.5);
+    // A forwarded subproblem reason carries nothing, unreachable included.
+    CHECK_FALSE(subproblem_error<double>(analytical_failure::unreachable)
+        .workspace_distance.has_value());
 }
 
 TEST_CASE("analytical diagnostics: a 6R failure that evaluated no inequality carries nothing")
@@ -143,7 +143,7 @@ TEST_CASE("analytical diagnostics: a 6R failure that evaluated no inequality car
     absent("6R solve: subproblem reports a nonfinite input",
         pieper_6r_solver<dyn_chain>(puma).solve(at(nan_v, 0, 0)));
 
-    deficit("6R solve: no branch verified",
+    absent("6R solve: subproblem reports an unreachable target",
         pieper_6r_solver<dyn_chain>(puma).solve(at(50, 50, 50)));
 }
 

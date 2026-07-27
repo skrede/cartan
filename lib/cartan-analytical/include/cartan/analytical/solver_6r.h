@@ -94,8 +94,6 @@ public:
         vector3<scalar_type> tool_offset_world =
             chain.home().translation() - m_wrist_center_home;
         m_tool_offset = chain.home().rotation().inverse().act(tool_offset_world);
-
-        m_p_ee = chain.home().translation();
     }
 
     /// Construction-time geometry validation. Returns a ready solver only when
@@ -220,8 +218,8 @@ public:
 
         if (!sp3_result)
         {
-            return cartan::unexpected(subproblem_error<scalar_type>(
-                sp3_result.error(), (p_wrist - m_p_ee).norm()));
+            return cartan::unexpected(
+                subproblem_error<scalar_type>(sp3_result.error()));
         }
 
         analytical_result<scalar_type, 6, 8> result;
@@ -288,9 +286,11 @@ public:
         if (result.count > 0)
             return result;
 
+        // Branches were generated and every one was rejected. Rejecting a
+        // candidate is not a proof that no solution exists, so the report names
+        // the rejection and claims nothing about the workspace.
         return cartan::unexpected(analytical_error<scalar_type>{
-            analytical_failure::unreachable,
-            (p_wrist - m_wrist_center_home).norm()});
+            analytical_failure::verification_failed, std::nullopt});
     }
 
 private:
@@ -733,7 +733,6 @@ private:
     std::array<vector3<Scalar>, 6> m_q;
     vector3<Scalar> m_wrist_center_home;
     vector3<Scalar> m_tool_offset;
-    vector3<Scalar> m_p_ee;
     verification_tolerance<Scalar> m_tolerance;
     bool m_valid{false};
 };

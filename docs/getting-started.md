@@ -11,6 +11,7 @@
 
 ### FetchContent (recommended)
 
+<!-- cartan:recipe kind=cmake name=fetchcontent -->
 ```cmake
 include(FetchContent)
 set(CARTAN_CMAKE_FETCH_DEPS ON)
@@ -31,6 +32,7 @@ generates no install rules under it.
 
 ### find_package
 
+<!-- cartan:recipe kind=cmake name=find-package -->
 ```cmake
 find_package(cartan CONFIG REQUIRED)
 target_link_libraries(my_app PRIVATE cartan::cartan)
@@ -44,6 +46,7 @@ step refuses to generate an install surface it cannot make resolvable.
 
 Map an axis-angle vector into SO(3) via the exponential map and recover it via the logarithmic map; the round-trip error is near machine epsilon.
 
+<!-- cartan:snippet name=so3-exp-log-round-trip tu -->
 ```cpp
 #include <cartan/lie/so3.h>
 #include <iostream>
@@ -63,6 +66,7 @@ int main()
 Save this as `main.cpp` and create the following `CMakeLists.txt` in the
 same directory:
 
+<!-- cartan:recipe kind=cmake name=hello-cartan-project -->
 ```cmake
 cmake_minimum_required(VERSION 3.28)
 project(hello_cartan)
@@ -84,6 +88,7 @@ target_link_libraries(hello_cartan PRIVATE cartan::cartan)
 
 Build and run:
 
+<!-- cartan:recipe kind=shell name=build-and-run -->
 ```bash
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
@@ -101,6 +106,7 @@ Round-trip error: 1.38778e-16
 
 Compose a rigid-body transform from a 6-vector twist via the SE(3) exponential map, then recover the twist via the logarithm.
 
+<!-- cartan:snippet name=se3-exp-log-round-trip tu -->
 ```cpp
 #include <cartan/lie/se3.h>
 #include <iostream>
@@ -126,6 +132,7 @@ at the identity is that twist, and `log()` recovers the original twist.
 
 Build a 2-link planar arm programmatically from screw axes and compute the end-effector pose at a joint configuration.
 
+<!-- cartan:snippet name=planar-2r-forward-kinematics tu -->
 ```cpp
 #include <cartan/serial_chain.h>
 #include <iostream>
@@ -182,6 +189,7 @@ Now run inverse kinematics on the same arm. We pick a known joint
 configuration, FK-walk it to a target pose, and back-solve from a
 different seed using Levenberg-Marquardt.
 
+<!-- cartan:snippet name=planar-2r-inverse-kinematics tu -->
 ```cpp
 #include <cartan/serial_chain.h>
 #include <iostream>

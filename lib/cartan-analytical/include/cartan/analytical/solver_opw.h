@@ -392,23 +392,29 @@ public:
         // Step 1: wrist center = flange - c4 * approach axis.
         const vector3<Scalar> center = translation - p.c4 * matrix.col(2);
 
-        // Domain and reach diagnostics: only genuine out-of-workspace targets
-        // set domain_failed; near-singular loci are left to the FK back-check.
+        // Only genuine out-of-workspace targets set domain_failed; near-singular
+        // loci are left to the FK back-check. The deficit stays absent wherever
+        // no inequality measured one: zero already means "on the boundary".
         bool domain_failed = false;
-        Scalar workspace_distance = Scalar(0);
+        std::optional<Scalar> workspace_deficit;
 
-        // Step 2: theta1 -- guard the lateral-offset cylinder the wrist center
-        // must lie outside of (c.x^2 + c.y^2 >= b^2).
-        const Scalar nx1_arg =
-            center.x() * center.x() + center.y() * center.y() - p.b * p.b;
-        if (nx1_arg < -sqrt_eps)
+        // Step 2: theta1 -- guard the lateral-offset cylinder of radius |b| the
+        // wrist center must lie outside of. The excess is radial, the difference
+        // of the two lengths: the square root of the difference of their squares
+        // is a chord half-length, which overstates the radial excess without
+        // bound as the radius approaches the offset.
+        const Scalar lateral_radius = std::hypot(center.x(), center.y());
+        const bool inside_cylinder =
+            lateral_radius < std::abs(p.b) - m_tolerance.position();
+        if (inside_cylinder)
         {
             domain_failed = true;
-            workspace_distance = std::sqrt(-nx1_arg);
+            workspace_deficit = std::abs(p.b) - lateral_radius;
         }
+
         const Scalar nx1 = std::sqrt(std::clamp(
-            nx1_arg, Scalar(0), std::numeric_limits<Scalar>::infinity()))
-            - p.a1;
+            center.x() * center.x() + center.y() * center.y() - p.b * p.b,
+            Scalar(0), std::numeric_limits<Scalar>::infinity())) - p.a1;
 
         const Scalar tmp1 = std::atan2(center.y(), center.x());
         const Scalar tmp2 = std::atan2(p.b, nx1 + p.a1);
@@ -430,24 +436,29 @@ public:
             s2_2, Scalar(0), std::numeric_limits<Scalar>::infinity()));
         const Scalar k_reach = std::sqrt(kappa_2);
 
-        // Triangle-inequality reach check (diagnostic; routes to unreachable).
+        // Triangle-inequality reach check on both shoulder families. They are
+        // alternatives, so the target is out of reach only when both violate it,
+        // and the deficit is then the smaller of the two -- the motion that
+        // brings the nearer family into reach. Inside the cylinder nx1 came from
+        // a clamp, so neither distance measures anything.
         const Scalar reach_max = p.c2 + k_reach;
         const Scalar reach_min = std::abs(p.c2 - k_reach);
-        const Scalar reach_deficit = std::max(
-            {Scalar(0), s1 - reach_max, reach_min - s1});
-        if (reach_deficit > sqrt_eps)
+        const Scalar reach_deficit_front = std::max({Scalar(0), s1 - reach_max, reach_min - s1});
+        const Scalar reach_deficit_back = std::max({Scalar(0), s2 - reach_max, reach_min - s2});
+        const Scalar reach_deficit = std::min(reach_deficit_front, reach_deficit_back);
+        if (!inside_cylinder && reach_deficit > sqrt_eps)
         {
             domain_failed = true;
-            workspace_distance = std::max(workspace_distance, reach_deficit);
+            workspace_deficit = reach_deficit;
         }
 
         // acos with domain clamping; a genuine (beyond-rounding) out-of-range
-        // ratio marks the target unreachable, while a vanishing denominator is
-        // a singular locus (not a reach failure).
-        auto acos_ratio = [&](Scalar num, Scalar den) -> Scalar
+        // ratio marks the target unreachable with no deficit to report, and a
+        // vanishing denominator leaves the angle undefined rather than substituted.
+        auto acos_ratio = [&](Scalar num, Scalar den) -> std::optional<Scalar>
         {
             if (std::abs(den) < sqrt_eps)
-                return detail::safe_acos(Scalar(0));
+                return std::nullopt;
             const Scalar ratio = num / den;
             if (std::abs(ratio) > Scalar(1) + sqrt_eps)
                 domain_failed = true;
@@ -455,36 +466,43 @@ public:
         };
 
         const Scalar tmp5 = s1_2 + c2_2 - kappa_2;
-        const Scalar tmp13 = acos_ratio(tmp5, Scalar(2) * s1 * p.c2);
+        const std::optional<Scalar> tmp13 = acos_ratio(tmp5, Scalar(2) * s1 * p.c2);
         const Scalar tmp14 = std::atan2(nx1, tmp3);
-        const Scalar theta2_i = -tmp13 + tmp14;
-        const Scalar theta2_ii = tmp13 + tmp14;
 
         const Scalar tmp6 = s2_2 + c2_2 - kappa_2;
-        const Scalar tmp15 = acos_ratio(tmp6, Scalar(2) * s2 * p.c2);
+        const std::optional<Scalar> tmp15 = acos_ratio(tmp6, Scalar(2) * s2 * p.c2);
         const Scalar tmp16 = std::atan2(nx1 + Scalar(2) * p.a1, tmp3);
-        const Scalar theta2_iii = -tmp15 - tmp16;
-        const Scalar theta2_iv = tmp15 - tmp16;
 
         const Scalar tmp7 = s1_2 - c2_2 - kappa_2;
         const Scalar tmp8 = s2_2 - c2_2 - kappa_2;
         const Scalar tmp9 = Scalar(2) * p.c2 * k_reach;
         const Scalar tmp10 = std::atan2(p.a2, p.c3);
-        const Scalar tmp11 = acos_ratio(tmp7, tmp9);
-        const Scalar theta3_i = tmp11 - tmp10;
-        const Scalar theta3_ii = -tmp11 - tmp10;
-        const Scalar tmp12 = acos_ratio(tmp8, tmp9);
-        const Scalar theta3_iii = tmp12 - tmp10;
-        const Scalar theta3_iv = -tmp12 - tmp10;
+        const std::optional<Scalar> tmp11 = acos_ratio(tmp7, tmp9);
+        const std::optional<Scalar> tmp12 = acos_ratio(tmp8, tmp9);
 
         // Per (theta1, theta2, theta3) branch j = shoulder * 2 + elbow:
-        //   j = 0 front/up, 1 front/down, 2 back/up, 3 back/down.
+        //   j = 0 front/up, 1 front/down, 2 back/up, 3 back/down. A family's four
+        //   angles come from its own two arc-cosines, so one undefined arc-cosine
+        //   leaves the family undefined and it emits no branch below.
+        const bool front_defined = tmp13.has_value() && tmp11.has_value();
+        const bool back_defined = tmp15.has_value() && tmp12.has_value();
+
         const std::array<Scalar, 4> theta1_j{
             theta1_i, theta1_i, theta1_ii, theta1_ii};
-        const std::array<Scalar, 4> theta2_j{
-            theta2_i, theta2_ii, theta2_iii, theta2_iv};
-        const std::array<Scalar, 4> theta3_j{
-            theta3_i, theta3_ii, theta3_iii, theta3_iv};
+        std::array<Scalar, 4> theta2_j{};
+        std::array<Scalar, 4> theta3_j{};
+        if (front_defined)
+        {
+            theta2_j = {tmp14 - *tmp13, tmp14 + *tmp13, Scalar(0), Scalar(0)};
+            theta3_j = {*tmp11 - tmp10, -*tmp11 - tmp10, Scalar(0), Scalar(0)};
+        }
+        if (back_defined)
+        {
+            theta2_j[2] = -*tmp15 - tmp16;
+            theta2_j[3] = *tmp15 - tmp16;
+            theta3_j[2] = *tmp12 - tmp10;
+            theta3_j[3] = -*tmp12 - tmp10;
+        }
         const std::array<Scalar, 4> sin1{
             std::sin(theta1_i), std::sin(theta1_i),
             std::sin(theta1_ii), std::sin(theta1_ii)};
@@ -561,6 +579,8 @@ public:
             const int elbow = (key >> 1) & 1;
             const int wrist = key & 1;
             const std::size_t j = static_cast<std::size_t>(shoulder * 2 + elbow);
+            if (!(shoulder == 0 ? front_defined : back_defined))
+                continue;
 
             Scalar q4 = theta4_base[j];
             Scalar q5 = theta5_base[j];
@@ -628,7 +648,7 @@ public:
         if (domain_failed)
         {
             return cartan::unexpected(analytical_error<scalar_type>{
-                analytical_failure::unreachable, workspace_distance});
+                analytical_failure::unreachable, workspace_deficit});
         }
         return cartan::unexpected(analytical_error<scalar_type>{
             analytical_failure::singular_configuration, std::nullopt});
