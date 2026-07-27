@@ -38,9 +38,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Two of the four numbers this job publishes differ only by one gcovr flag's
+      # semantics, so an unpinned gcovr is an unpinned verdict.
       - name: Install gcovr
         if: matrix.coverage
-        run: pip install gcovr
+        run: pip install gcovr==8.6
 
       - name: Configure
         env:
@@ -53,6 +55,7 @@ jobs:
               -DCMAKE_C_FLAGS="--coverage" \
               -DCARTAN_BUILD_TESTS=ON \
               -DCARTAN_BUILD_EXAMPLES=OFF \
+              -DCARTAN_BUILD_URDF=ON \
               -DCARTAN_CMAKE_FETCH_DEPS=ON
           else
             cmake . -B build -DCMAKE_BUILD_TYPE=Release \
@@ -66,26 +69,57 @@ jobs:
         run: cmake --build build
 
       - name: Test
-        run: cd build && ctest --output-on-failure
+        run: cd build && ctest --output-on-failure --no-tests=error
 
+      # gcov keeps one record per template instantiation. The first invocation sums
+      # them, so a header line instantiated five times weighs five; the second
+      # collapses them, so a line counts once and is covered if any instantiation
+      # ran it. The two answer different questions and both are published.
       - name: Generate coverage
         if: matrix.coverage
         run: |
           gcovr build \
             --root . \
             --gcov-executable "${{ matrix.gcov_executable }}" \
-            --filter 'lib/cartan/include/cartan/' \
-             \
-            --gcov-ignore-errors=source_not_found \
-            --xml coverage.xml
+            --filter lib/cartan-lie/include/ \
+            --filter lib/cartan-serial-chain/include/ \
+            --filter lib/cartan-analytical/include/ \
+            --filter lib/cartan-urdf/include/ \
+            --xml coverage-unmerged.xml \
+            --txt coverage-unmerged.txt
+          gcovr build \
+            --root . \
+            --gcov-executable "${{ matrix.gcov_executable }}" \
+            --merge-lines \
+            --filter lib/cartan-lie/include/ \
+            --filter lib/cartan-serial-chain/include/ \
+            --filter lib/cartan-analytical/include/ \
+            --filter lib/cartan-urdf/include/ \
+            --xml coverage-merged.xml \
+            --txt coverage-merged.txt
+          python3 tools/check_coverage_report.py \
+            --unmerged coverage-unmerged.xml \
+            --merged coverage-merged.xml \
+            --unmeasured tools/coverage_unmeasured.txt \
+            --source-root .
 
       - name: Upload to Codecov
         if: matrix.coverage
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
         with:
-          files: coverage.xml
+          files: coverage-unmerged.xml
           token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: false
+          fail_ci_if_error: true
+
+      - name: Upload coverage reports
+        if: matrix.coverage
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: coverage-${{ matrix.compiler }}
+          path: |
+            coverage-merged.xml
+            coverage-unmerged.txt
+            coverage-merged.txt
 
   sanitize:
     strategy:
