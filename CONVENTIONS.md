@@ -239,16 +239,23 @@ initialization-order constraint in **Construction**.
   on a new file, then wrap by hand. Pointing it at an existing file rewrites the file rather than
   confirming it.
 - `.clang-tidy` is a gate over a stated **subset** of its checks, and the subset lives in the
-  configuration itself: a check written with a leading `-` is off and carries the reason it is off,
-  and every check left on is promoted to an error. There is no category the linter reports and the
-  build tolerates, and widening the gate is one edit to that one file.
+  configuration rather than in the job: a check written with a leading `-` is off and carries the
+  reason it is off, and every check left on is promoted to an error. There is no category the linter
+  reports and the build tolerates. Two files hold the set — the root one, and `tests/.clang-tidy`,
+  which turns off two checks whose findings here are the test doing its job. That second file is
+  written as a directory-scoped exclusion but is not one today: clang-tidy resolves its configuration
+  from each translation unit's own source file, and since the library is header-only every unit is a
+  test, so those two checks are off project-wide. Widening or narrowing the gate means reading both.
 - The per-function size and cognitive-complexity checks are not in that subset. They are measured
   and fail nothing, as the function-size note above says; `EXCEPTIONS.md` carries the count and what
   would move them in.
-- So what a machine checks is: file size against `EXCEPTIONS.md`, and the linter's gated subset.
-  The rest of this document — the include order, the comment policy, the class layout, the shapes
-  below, the ownership rules, the spelling — is guidance a reviewer applies. A convention no tool
-  enforces still binds the change; it is a person rather than a build that catches it.
+- So what a machine checks is: file size against `EXCEPTIONS.md`, and the linter's gated subset over
+  the headers some test actually includes. A header no test, example or benchmark reaches is not
+  linted at all — around two dozen are in that position, the public umbrella headers among them — so
+  a green lane is not a statement about every file. The rest of this document — the include order,
+  the comment policy, the class layout, the shapes below, the ownership rules, the spelling — is
+  guidance a reviewer applies. A convention no tool enforces still binds the change; it is a person
+  rather than a build that catches it.
 
 ### Shape (readability guidelines, not rigid rules)
 

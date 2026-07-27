@@ -67,9 +67,12 @@ ctest --test-dir build/dev --output-on-failure
 ```
 
 The `dev-full` preset adds examples, property tests, the URDF module and
-the fuzz targets. The fuzz targets are built with libFuzzer, so that
-preset needs a Clang toolchain; GCC rejects `-fsanitize=fuzzer` and the
-configure fails there.
+the fuzz targets. The fuzz targets are built with libFuzzer and are
+guarded on the compiler reporting itself as `Clang` exactly, so the preset
+configures only under LLVM Clang: GCC rejects `-fsanitize=fuzzer`, and
+Apple's toolchain reports `AppleClang`, which the guard does not accept.
+On macOS, and with GCC, build the other targets with `dev` and set the
+fuzz option separately under an LLVM Clang.
 
 The benchmark suite is gated behind `CARTAN_BUILD_BENCHMARKS`; each
 third-party comparison dependency (orocos-kdl, TRAC-IK, pinocchio) is

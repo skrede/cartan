@@ -160,8 +160,10 @@ readability-function-cognitive-complexity,
 # real copies on the solver paths. An optimization to measure rather than a mechanical
 # rewrite performed to clear a gate.,
 -performance-unnecessary-copy-initialization,
-# concentrated in the expected shim whose storage is a union initialized through its
-# discriminator rather than through an init list.,
+# two shapes. Seven sites are the expected shim whose union storage is initialized through
+# its discriminator rather than through an init list. The other four are analytical result
+# aggregates whose contract is that only the first count entries of the solution array are
+# populated -- zeroing the rest is work spent producing values no caller may read.,
 -cppcoreguidelines-pro-type-member-init,
 # the two-line nested namespace spelling is uniform across the detail headers. Adopting the
 # concatenated form is a rename touching all of them at once.,

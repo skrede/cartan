@@ -39,6 +39,7 @@ jobs:
   linter:
     runs-on: ubuntu-24.04
     name: clang-tidy over the compile database
+    timeout-minutes: 45
 
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -70,46 +71,67 @@ jobs:
             -DCARTAN_BUILD_URDF=ON \
             -DCARTAN_CMAKE_FETCH_DEPS=ON
 
-      # An empty or module-map-carrying database lints nothing and exits zero, which
-      # is the shape of a gate that reports clean having read no code.
-      - name: Assert the compile database is usable
+      # Fetching the dependencies puts their sources in the database -- a hundred and
+      # seven entries against this project's eighty-odd -- and they are not ours to
+      # lint: they carry findings from checks this gate enables, and one of them ships
+      # a check list of its own that replaces this repository's for every one of its
+      # units. So the linter reads a database holding only first-party units. An empty
+      # or module-map-carrying database is the other direction of the same fault: it
+      # lints nothing and exits zero.
+      - name: Build the first-party compile database
         run: |
           python3 - <<'PY'
-          import json, sys
+          import json, os, sys
           db = json.load(open('build/compile_commands.json'))
-          print(f'translation units: {len(db)}')
-          if len(db) < 60:
-              sys.exit(f'compile database holds {len(db)} entries; expected the full test set')
-          bad = [e['file'] for e in db if 'modmap' in e['command']]
+          def cmd(e):
+              return e.get('command', ' '.join(e.get('arguments', [])))
+          ours = [e for e in db if '/_deps/' not in e['file']]
+          print(f'database entries: {len(db)}, first-party: {len(ours)}')
+          if len(ours) < 60:
+              sys.exit(f'only {len(ours)} first-party entries; expected the full test set')
+          bad = [e['file'] for e in ours if 'modmap' in cmd(e)]
           if bad:
               sys.exit(f'{len(bad)} entries reference a module map that only a build produces')
+          os.makedirs('build/tidy', exist_ok=True)
+          json.dump(ours, open('build/tidy/compile_commands.json', 'w'))
+          open('build/tidy/first-unit.txt', 'w').write(ours[0]['file'])
           PY
 
-      # clang-tidy falls back to a built-in check set when it does not find the
-      # repository's configuration, and a fallback run is quiet: the checks this gate
-      # is made of are simply absent and it exits clean having enforced nothing. So
-      # assert the effective set is ours before trusting a green run.
-      - name: Assert the repository configuration is in effect
+      # clang-tidy resolves its configuration from each unit's own source file, not
+      # from the working directory, so a check set listed without naming a file is not
+      # the set the lint will use. Every unit here lives under tests/, which carries a
+      # configuration of its own; asking about the root one would certify a file that
+      # governs nothing being linted. The count is asserted because the sentinels
+      # survive a configuration that has thrown almost everything away, and because
+      # surrendering a check should be a visible two-line diff rather than a silent
+      # one-line one.
+      - name: Assert the repository configuration governs the units being linted
         run: |
-          clang-tidy-18 --list-checks > enabled.txt
-          if ! grep -qx '    modernize-use-transparent-functors' enabled.txt; then
+          UNIT=$(cat build/tidy/first-unit.txt)
+          clang-tidy-18 --list-checks -p build/tidy "$UNIT" > build/enabled.txt
+          COUNT=$(grep -c '^    ' build/enabled.txt)
+          echo "effective checks for $UNIT: $COUNT"
+          if ! grep -qx '    modernize-use-transparent-functors' build/enabled.txt; then
             echo 'the effective check set is not this repository configuration'
             exit 1
           fi
-          if grep -qx '    readability-function-size' enabled.txt; then
+          if grep -qx '    readability-function-size' build/enabled.txt; then
             echo 'a check the configuration disables is enabled, so it was not read'
             exit 1
           fi
-          echo "enabled checks: $(grep -c '^    ' enabled.txt)"
+          if [ "$COUNT" -lt 128 ]; then
+            echo "only $COUNT checks are in force; the gated set has been narrowed"
+            exit 1
+          fi
 
-      # The gated set is the check list in .clang-tidy and nothing else; no check
-      # names appear here. Promoting every remaining finding to an error is what makes
-      # this a gate rather than a report.
+      # The gated set is the check list in .clang-tidy and the one under tests/, and
+      # nothing else; no check names appear here. Promoting every remaining finding to
+      # an error is what makes this a gate rather than a report.
       - name: Lint
         run: |
           run-clang-tidy-18 \
             -clang-tidy-binary clang-tidy-18 \
-            -p build \
+            -p build/tidy \
             -header-filter='.*/lib/cartan-.*' \
             -warnings-as-errors='*' \
-            -j2
+            -j"$(nproc)"

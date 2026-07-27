@@ -56,7 +56,8 @@ ContinuationIndentWidth: 8
 IndentCaseBlocks: true
 IndentCaseLabels: true
 IndentGotoLabels: false
-IndentPPDirectives: None
+IndentPPDirectives: AfterHash
+PPIndentWidth: 2
 IndentWidth: 4
 InsertNewlineAtEOF: true
 KeepEmptyLinesAtTheStartOfBlocks: true
