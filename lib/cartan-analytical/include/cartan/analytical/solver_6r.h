@@ -4,6 +4,7 @@
 #include "cartan/analytical/analytical_types.h"
 #include "cartan/analytical/analytical_solver.h"
 #include "cartan/analytical/paden_kahan.h"
+#include "cartan/analytical/detail/axis_rotation.h"
 #include "cartan/analytical/detail/clamped_trig.h"
 #include "cartan/analytical/detail/fk_verification.h"
 #include "cartan/analytical/detail/wrist_center.h"
@@ -227,7 +228,7 @@ public:
         {
             scalar_type theta3 = sp3_result->solutions[static_cast<std::size_t>(i)];
 
-            vector3<scalar_type> p_prime = rotate_point_about_axis(
+            vector3<scalar_type> p_prime = detail::rotate_point_about_axis(
                 m_omega[2], m_q[2], m_wrist_center_home, theta3);
 
             // SP2: find (theta1, theta2) via two successive rotations
@@ -339,21 +340,6 @@ private:
                 return true;
         }
         return false;
-    }
-
-    /// Rotate a point about a screw axis by theta (Rodrigues).
-    static vector3<Scalar> rotate_point_about_axis(
-        const vector3<Scalar>& omega,
-        const vector3<Scalar>& q,
-        const vector3<Scalar>& p,
-        Scalar theta)
-    {
-        vector3<Scalar> v = p - q;
-        Scalar ct = std::cos(theta);
-        Scalar st = std::sin(theta);
-        return q + ct * v
-            + (Scalar(1) - ct) * omega.dot(v) * omega
-            + st * omega.cross(v);
     }
 
     /// Find the reference point for axes 1-2 (closest approach midpoint).
@@ -614,8 +600,6 @@ private:
         // SP3 on w5: rotate p'' about w5 to match a distance constraint.
         // This is the most robust general approach.
 
-        vector3<Scalar> origin = vector3<Scalar>::Zero();
-
         // SP3: find theta5 such that
         // || exp(w5*t5) * exp(w6*t6) * p - q || = || exp(-w4*t4) * p' - q ||
         // Since we don't know t4 yet, use the distance trick:
@@ -698,7 +682,7 @@ private:
             vector3<Scalar> R5_w6 = R5.act(w6);
             vector3<Scalar> R_w6 = R * w6;
 
-            auto t4_result = paden_kahan_1(w4, origin, R5_w6, R_w6);
+            auto t4_result = paden_kahan_1_direction(w4, R5_w6, R_w6);
             if (!t4_result)
                 continue;
             Scalar t4 = *t4_result;
@@ -727,7 +711,7 @@ private:
             }
             vector3<Scalar> ref_rotated = R6_computed.act(ref);
 
-            auto t6_result = paden_kahan_1(w6, origin, ref, ref_rotated);
+            auto t6_result = paden_kahan_1_direction(w6, ref, ref_rotated);
             if (!t6_result)
                 continue;
             Scalar t6 = *t6_result;

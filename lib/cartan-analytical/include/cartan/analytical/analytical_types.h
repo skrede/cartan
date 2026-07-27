@@ -72,6 +72,44 @@ struct analytical_result
     auto end() const { return solutions.begin() + count; }
 };
 
+/// Acceptance threshold for a residual measured in the chain's linear unit.
+template <typename Scalar>
+struct length_tolerance
+{
+    Scalar value;
+};
+
+/// Acceptance threshold for a dimensionless residual between unit directions.
+/// Not interchangeable with length_tolerance: no conversion exists, so mixing
+/// the two is a compile error rather than a convention.
+template <typename Scalar>
+struct direction_tolerance
+{
+    Scalar value;
+};
+
+/// `position` is a distance in the chain's linear unit; `orientation` is the
+/// norm of the residual rotation vector, in radians.
+template <typename Scalar>
+struct verification_tolerance
+{
+    Scalar position;
+    Scalar orientation;
+};
+
+/// One micrometre, below which two positions on a robot arm are the same point.
+template <typename Scalar>
+inline constexpr length_tolerance<Scalar> default_length_tolerance_v{Scalar(1e-6)};
+
+/// Calibrated on the Pieper wrist decomposition: its worst accepted residual is
+/// about 7e-12 at double precision, and reaches this value itself at float.
+template <typename Scalar>
+inline constexpr direction_tolerance<Scalar> default_direction_tolerance_v{Scalar(1e-6)};
+
+template <typename Scalar>
+inline constexpr verification_tolerance<Scalar> default_verification_tolerance_v{
+    Scalar(1e-6), Scalar(1e-6)};
+
 }
 
 #endif

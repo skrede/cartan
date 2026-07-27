@@ -24,9 +24,10 @@ See [IK Methods](../background/ik-methods.md) | [PoE Kinematics](../background/p
 | `cartan::pieper_6r_solver`, `cartan::solve_6r` | `#include <cartan/analytical/solver_6r.h>` |
 | `cartan::spatial_3r_solver`, `cartan::solve_3r` | `#include <cartan/analytical/solver_3r.h>` |
 | `cartan::planar_2r_solver`, `cartan::solve_2r` | `#include <cartan/analytical/solver_2r.h>` |
-| `cartan::paden_kahan_1`, `paden_kahan_2`, `paden_kahan_3` | `#include <cartan/analytical/paden_kahan.h>` |
+| `cartan::paden_kahan_1`, `paden_kahan_1_direction`, `paden_kahan_2`, `paden_kahan_3` | `#include <cartan/analytical/paden_kahan.h>` |
 | `cartan::paden_kahan_2_result`, `paden_kahan_3_result` | `#include <cartan/analytical/paden_kahan.h>` |
 | `cartan::analytical_result`, `analytical_error`, `analytical_failure` | `#include <cartan/analytical/analytical_types.h>` |
+| `cartan::length_tolerance`, `direction_tolerance`, `verification_tolerance` | `#include <cartan/analytical/analytical_types.h>` |
 | `cartan::analytical_solver` concept | `#include <cartan/analytical/analytical_solver.h>` |
 
 ## Result Types
@@ -102,6 +103,39 @@ constexpr const char* message(analytical_failure failure);
 
 `message()` returns a static diagnostic string; it allocates nothing.
 
+### Tolerance types
+
+```cpp
+template <typename Scalar> struct length_tolerance       { Scalar value; };
+template <typename Scalar> struct direction_tolerance    { Scalar value; };
+template <typename Scalar> struct verification_tolerance { Scalar position; Scalar orientation; };
+
+template <typename Scalar>
+inline constexpr length_tolerance<Scalar> default_length_tolerance_v{Scalar(1e-6)};
+template <typename Scalar>
+inline constexpr direction_tolerance<Scalar> default_direction_tolerance_v{Scalar(1e-6)};
+template <typename Scalar>
+inline constexpr verification_tolerance<Scalar> default_verification_tolerance_v{
+    Scalar(1e-6), Scalar(1e-6)};
+```
+
+A tolerance is named for the quantity it measures. `length_tolerance` judges a
+residual in the chain's linear unit; `direction_tolerance` judges a
+dimensionless residual between unit direction vectors;
+`verification_tolerance` carries the FK back-check's position (linear unit) and
+orientation (radians, as the norm of the residual rotation vector) thresholds
+separately.
+
+`length_tolerance` and `direction_tolerance` do **not** convert to one another
+in either direction. Passing one where the other is expected is a compile
+error, which is why subproblem 1 has two entry points rather than one that
+takes a bare scalar.
+
+`default_direction_tolerance_v` is calibrated on the round-off measured in the
+Pieper wrist decomposition at **double** precision. Single-precision round-off
+there reaches the constant's own magnitude, so instantiating the wrist path at
+`float` is not supported until the constant is re-measured for it.
+
 ### paden_kahan_2_result
 
 ```cpp
@@ -168,16 +202,48 @@ paden_kahan_1(
     const vector3<Scalar>& omega,
     const vector3<Scalar>& q,
     const vector3<Scalar>& p,
-    const vector3<Scalar>& p_prime);
+    const vector3<Scalar>& p_prime,
+    length_tolerance<Scalar> tolerance = default_length_tolerance_v<Scalar>);
 ```
 
-Subproblem 1: rotation about a single axis. Finds `theta` such that
-`exp([omega] * theta)` applied at point `q` maps point `p` to point `p_prime`.
-Both `p` and `p_prime` must be equidistant from the axis of rotation; if they
-are not, returns `analytical_failure::unreachable`. Returns a single angle on
-success.
+Subproblem 1, position form: rotation about a single axis. Finds `theta` such
+that `exp([omega] * theta)` applied at point `q` maps point `p` to point
+`p_prime`.
 
-Reference: Murray, Li and Sastry (1994), Section 3.3.1.
+A rotation about `omega` is the identity on the axial part of a displacement
+from the axis and a planar rotation on the perpendicular part, so both must
+agree: the two points must share their component along `omega` and their
+distance from the axis. The computed angle is then required to reconstruct
+`p_prime` from `p`. Failing any of the three returns
+`analytical_failure::unreachable`.
+
+Two points coinciding on the axis satisfy the equation for every angle and
+return `analytical_failure::singular_configuration`; the function does not
+enumerate that continuum. A nonfinite argument returns
+`analytical_failure::non_finite_input` and a non-unit `omega` returns
+`analytical_failure::degenerate_geometry`.
+
+Reference: Murray, Li and Sastry (1994), Section 3.3, Subproblem 1.
+
+### paden_kahan_1_direction
+
+```cpp
+template <typename Scalar>
+cartan::expected<Scalar, analytical_failure>
+paden_kahan_1_direction(
+    const vector3<Scalar>& omega,
+    const vector3<Scalar>& u,
+    const vector3<Scalar>& u_prime,
+    direction_tolerance<Scalar> tolerance = default_direction_tolerance_v<Scalar>);
+```
+
+Subproblem 1 for unit direction vectors about an axis through the origin. Same
+conditions and same failure vocabulary as the position form, but every residual
+it judges is a difference of unit directions and so is dimensionless — hence the
+`direction_tolerance` and the absence of an axis-point argument. This is the
+form the Pieper wrist decomposition uses.
+
+Reference: Murray, Li and Sastry (1994), Section 3.3, Subproblem 1.
 
 ### paden_kahan_2
 
@@ -189,13 +255,15 @@ paden_kahan_2(
     const vector3<Scalar>& omega2,
     const vector3<Scalar>& q,
     const vector3<Scalar>& p,
-    const vector3<Scalar>& p_prime);
+    const vector3<Scalar>& p_prime,
+    length_tolerance<Scalar> tolerance = default_length_tolerance_v<Scalar>);
 ```
 
 Subproblem 2: two successive rotations about intersecting axes. Finds
 `(theta1, theta2)` such that `exp([omega1]*theta1) * exp([omega2]*theta2)`
 applied at point `q` maps `p` to `p_prime`. Axes `omega1` and `omega2` must
-intersect at `q`. Returns up to 2 solution pairs.
+intersect at `q`. Returns up to 2 solution pairs. The tolerance is forwarded to
+both internal subproblem-1 calls.
 
 Reference: Murray, Li and Sastry (1994), Section 3.3.2.
 
@@ -209,12 +277,18 @@ paden_kahan_3(
     const vector3<Scalar>& q,
     const vector3<Scalar>& p,
     const vector3<Scalar>& p_prime,
-    Scalar delta);
+    Scalar delta,
+    length_tolerance<Scalar> tolerance = default_length_tolerance_v<Scalar>);
 ```
 
 Subproblem 3: rotation with distance constraint. Finds `theta` such that
 `|| exp([omega]*theta) * p - p_prime || = delta`, where rotation is about
 axis `omega` through point `q`. Returns up to 2 solutions.
+
+When either point lies on the axis the achieved distance is constant in
+`theta`, so the constraint is met by every angle or by none: within `tolerance`
+of `delta` the result is `analytical_failure::singular_configuration`, outside
+it `analytical_failure::unreachable`.
 
 Reference: Murray, Li and Sastry (1994), Section 3.3.3.
 

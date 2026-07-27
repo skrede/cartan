@@ -4,12 +4,21 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <cmath>
+#include <limits>
 #include <numbers>
+#include <type_traits>
 
 using namespace cartan;
 using Catch::Matchers::WithinAbs;
 
 static constexpr double tolerance = 1e-10;
+
+// The separation of the two threshold species is only worth its cost if the
+// compiler enforces it, so pin it here rather than trusting a naming convention.
+static_assert(!std::is_convertible_v<length_tolerance<double>, direction_tolerance<double>>);
+static_assert(!std::is_convertible_v<direction_tolerance<double>, length_tolerance<double>>);
+static_assert(!std::is_constructible_v<direction_tolerance<double>, length_tolerance<double>>);
+static_assert(!std::is_constructible_v<length_tolerance<double>, direction_tolerance<double>>);
 
 TEST_CASE("paden_kahan_1: 90-degree rotation about z through origin")
 {
@@ -61,13 +70,12 @@ TEST_CASE("paden_kahan_1: negative angle")
     CHECK_THAT(*result, WithinAbs(-std::numbers::pi / 2, tolerance));
 }
 
-TEST_CASE("paden_kahan_1: point on axis returns error (no NaN in success)")
+TEST_CASE("paden_kahan_1: coincident points on the axis are a singular instance")
 {
-    // A point lying ON the rotation axis has zero perpendicular component:
-    // both u_perp and u_prime_perp vanish, so the raw formula divides 0/0 and
-    // yields NaN. The equidistance gate passes (0 ~= 0), so a NaN must not leak
-    // out through the success channel -- the degenerate geometry must be
-    // signalled on the error channel instead.
+    // Two coincident points on the axis satisfy the equation for every angle.
+    // The reported reason used to be degenerate_geometry, which names the
+    // chain's geometry when the geometry is fine and the instance is what has a
+    // continuum of answers.
     vector3<double> omega{0, 0, 1};
     vector3<double> q{0, 0, 0};
     vector3<double> p{0, 0, 2};
@@ -75,7 +83,92 @@ TEST_CASE("paden_kahan_1: point on axis returns error (no NaN in success)")
 
     auto result = paden_kahan_1(omega, q, p, p_prime);
     REQUIRE_FALSE(result.has_value());
-    CHECK(result.error() == analytical_failure::degenerate_geometry);
+    CHECK(result.error() == analytical_failure::singular_configuration);
+}
+
+TEST_CASE("paden_kahan_1: an axial displacement admits no rotation")
+{
+    // No rotation about z can change a z component, yet the axial components
+    // were computed and discarded, so this instance used to return pi/2 with a
+    // reconstruction residual of a full unit length.
+    vector3<double> omega{0, 0, 1};
+    vector3<double> q{0, 0, 0};
+    vector3<double> p{1, 0, 0};
+    vector3<double> p_prime{0, 1, 1};
+
+    auto result = paden_kahan_1(omega, q, p, p_prime);
+    REQUIRE_FALSE(result.has_value());
+    CHECK(result.error() == analytical_failure::unreachable);
+}
+
+TEST_CASE("paden_kahan_1: two axis points at different heights are unreachable")
+{
+    // Both points lie on the axis, so no rotation moves one onto the other.
+    // The on-axis branch used to fire first and report degenerate_geometry,
+    // naming the geometry rather than the absent solution.
+    vector3<double> omega{0, 0, 1};
+    vector3<double> q{0, 0, 0};
+    vector3<double> p{0, 0, 2};
+    vector3<double> p_prime{0, 0, 3};
+
+    auto result = paden_kahan_1(omega, q, p, p_prime);
+    REQUIRE_FALSE(result.has_value());
+    CHECK(result.error() == analytical_failure::unreachable);
+}
+
+TEST_CASE("paden_kahan_1: nonfinite input and a non-unit axis reach the error channel")
+{
+    // A NaN point used to travel through every comparison and leave as a NaN
+    // angle on the success channel; a doubled axis used to be silently treated
+    // as a unit one.
+    vector3<double> omega{0, 0, 1};
+    vector3<double> q{0, 0, 0};
+    vector3<double> p{1, 0, 0};
+    vector3<double> p_prime{0, 1, 0};
+
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const double inf = std::numeric_limits<double>::infinity();
+
+    auto nan_point = paden_kahan_1(omega, q, vector3<double>{nan, 0, 0}, p_prime);
+    REQUIRE_FALSE(nan_point.has_value());
+    CHECK(nan_point.error() == analytical_failure::non_finite_input);
+
+    auto inf_target = paden_kahan_1(omega, q, p, vector3<double>{0, inf, 0});
+    REQUIRE_FALSE(inf_target.has_value());
+    CHECK(inf_target.error() == analytical_failure::non_finite_input);
+
+    auto nan_axis = paden_kahan_1(vector3<double>{0, 0, nan}, q, p, p_prime);
+    REQUIRE_FALSE(nan_axis.has_value());
+    CHECK(nan_axis.error() == analytical_failure::non_finite_input);
+
+    auto scaled_axis = paden_kahan_1(vector3<double>{0, 0, 2}, q, p, p_prime);
+    REQUIRE_FALSE(scaled_axis.has_value());
+    CHECK(scaled_axis.error() == analytical_failure::degenerate_geometry);
+}
+
+TEST_CASE("paden_kahan_1: returned angles agree with a planar closed form")
+{
+    // The angle a z-rotation needs to carry (r, 0, h) to (r cos a, r sin a, h)
+    // is a, written out here rather than taken from the rotation helper the
+    // implementation itself uses.
+    const double r = 1.7;
+    const double h = -0.4;
+    vector3<double> omega{0, 0, 1};
+    vector3<double> q{0, 0, h};
+    vector3<double> p{r, 0, 0};
+
+    int checked = 0;
+    for (int i = -17; i <= 17; ++i)
+    {
+        const double angle = i * (std::numbers::pi / 18.0);
+        vector3<double> p_prime{r * std::cos(angle), r * std::sin(angle), 0};
+
+        auto result = paden_kahan_1(omega, q, p, p_prime);
+        REQUIRE(result.has_value());
+        CHECK_THAT(*result, WithinAbs(angle, 1e-12));
+        ++checked;
+    }
+    REQUIRE(checked == 35);
 }
 
 TEST_CASE("paden_kahan_2: two rotations mapping a known point")
@@ -129,6 +222,66 @@ TEST_CASE("paden_kahan_2: degenerate case (parallel axes)")
     auto result = paden_kahan_2(omega1, omega2, q, p, p_prime);
     REQUIRE_FALSE(result.has_value());
     CHECK(result.error() == analytical_failure::degenerate_geometry);
+}
+
+TEST_CASE("paden_kahan_2: a displaced target is refused rather than answered")
+{
+    // Guards the composed pair: whichever condition catches it, no pair that
+    // fails to reconstruct the displaced target may leave on the success
+    // channel. Reconstruction here is an explicit pair of axis-angle rotations,
+    // not the helper the implementation calls.
+    vector3<double> omega1{0, 0, 1};
+    vector3<double> omega2{0, 1, 0};
+    vector3<double> q{0, 0, 0};
+
+    const double theta1 = std::numbers::pi / 3;
+    const double theta2 = std::numbers::pi / 4;
+    const double c2 = std::cos(theta2);
+    const double s2 = std::sin(theta2);
+    vector3<double> p{1, 0, 0};
+    vector3<double> consistent{
+        c2 * std::cos(theta1), c2 * std::sin(theta1), -s2};
+    vector3<double> displaced = consistent + vector3<double>{1e-3, 0, 0};
+
+    auto result = paden_kahan_2(omega1, omega2, q, p, displaced);
+    if (result.has_value())
+    {
+        for (int i = 0; i < result->count; ++i)
+        {
+            auto [t1, t2] = result->solutions[static_cast<std::size_t>(i)];
+            const double a = std::cos(t2);
+            const double b = std::sin(t2);
+            vector3<double> mid{a, 0, -b};
+            vector3<double> got{
+                mid.x() * std::cos(t1) - mid.y() * std::sin(t1),
+                mid.x() * std::sin(t1) + mid.y() * std::cos(t1),
+                mid.z()};
+            CHECK((got - displaced).norm() < 1e-6);
+        }
+    }
+    else
+    {
+        CHECK(result.error() == analytical_failure::unreachable);
+    }
+}
+
+TEST_CASE("paden_kahan_3: an on-axis instance splits by achievable distance")
+{
+    // The rotation cannot move a point lying on its own axis, so the achieved
+    // distance is constant in the angle. Both halves used to be reported as
+    // degenerate_geometry, which names neither the continuum nor its absence.
+    vector3<double> omega{0, 0, 1};
+    vector3<double> q{0, 0, 0};
+    vector3<double> p{0, 0, 1};
+    vector3<double> p_prime{0, 0, 0};
+
+    auto achievable = paden_kahan_3(omega, q, p, p_prime, 1.0);
+    REQUIRE_FALSE(achievable.has_value());
+    CHECK(achievable.error() == analytical_failure::singular_configuration);
+
+    auto impossible = paden_kahan_3(omega, q, p, p_prime, 5.0);
+    REQUIRE_FALSE(impossible.has_value());
+    CHECK(impossible.error() == analytical_failure::unreachable);
 }
 
 TEST_CASE("paden_kahan_3: two solutions for distance constraint")

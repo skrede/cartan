@@ -4,6 +4,7 @@
 #include "cartan/analytical/analytical_types.h"
 #include "cartan/analytical/analytical_solver.h"
 #include "cartan/analytical/paden_kahan.h"
+#include "cartan/analytical/detail/axis_rotation.h"
 #include "cartan/analytical/detail/fk_verification.h"
 
 #include "cartan/serial/chain/joint_tags.h"
@@ -108,7 +109,7 @@ public:
         {
             Scalar theta3 = sp3_result->solutions[static_cast<std::size_t>(i)];
 
-            vector3<Scalar> p_prime = rotate_point_about_axis(
+            vector3<Scalar> p_prime = detail::rotate_point_about_axis(
                 m_omega[2], m_q[2], m_p_ee, theta3);
 
             // SP2: find (theta1, theta2) such that
@@ -151,20 +152,6 @@ private:
     /// solve() body verbatim after the class template was re-shaped from
     /// <typename Scalar, joint_tag... Joints> to <chain Chain>.
     using Scalar = scalar_type;
-
-    static vector3<Scalar> rotate_point_about_axis(
-        const vector3<Scalar>& omega,
-        const vector3<Scalar>& q,
-        const vector3<Scalar>& p,
-        Scalar theta)
-    {
-        vector3<Scalar> v = p - q;
-        Scalar ct = std::cos(theta);
-        Scalar st = std::sin(theta);
-        return q + ct * v
-            + (Scalar(1) - ct) * omega.dot(v) * omega
-            + st * omega.cross(v);
-    }
 
     /// Find the intersection point of two lines (or closest approach midpoint).
     /// Line i: point q_i + t * omega_i.
