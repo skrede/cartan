@@ -413,12 +413,27 @@ cartan::expected<analytical_result<scalar_type, 2, 2>, analytical_error<scalar_t
 solve(const se3<scalar_type>& target) const;
 ```
 
-Solves position-only IK for the given target end-effector pose. The
-target's translation is projected onto the mechanism plane; the law of
-cosines yields the elbow angle, and the shoulder angle follows.
-Solutions outside `[L1 - L2, L1 + L2]` reach are rejected as
-`analytical_failure::unreachable`. Each candidate is FK-verified; only
-verified solutions are returned.
+Solves position-only IK for the given target end-effector pose.
+
+The derivation assumes a target lying in the mechanism plane, and that plane is
+the reachable set: a target whose distance out of it exceeds the tolerance's
+`position()` is `analytical_failure::unreachable` and carries that distance as
+its `workspace_distance`. The in-plane distance is then compared, as a length,
+against the reach interval `[|L1 - L2|, L1 + L2]` widened by the same
+acceptance length; a target outside the interval is `unreachable` and carries
+the deficit at whichever inequality failed. A target within the acceptance
+length of a reach boundary is solved rather than refused, so the gate and the
+back-check agree on what counts as the same point.
+
+Equal links reaching the base point are `analytical_failure::singular_configuration`,
+with no `workspace_distance` and no solutions. The shoulder angle is free there
+and the elbow folds back along the first link, so a continuum of configurations
+attains the target; one arbitrary member of that continuum would read as a
+complete answer, so none is returned. A caller wanting a member of the family
+fixes one joint angle and solves for the other.
+
+Otherwise the law of cosines yields the elbow angle and the shoulder angle
+follows. Each candidate is FK-verified; only verified solutions are returned.
 
 ### Free function
 

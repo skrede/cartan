@@ -13,6 +13,7 @@
 
 using namespace cartan;
 using Catch::Matchers::WithinAbs;
+using Catch::Matchers::WithinRel;
 
 static constexpr double tolerance = 1e-6;
 
@@ -249,4 +250,77 @@ TEST_CASE("2R solver: the configured acceptance tolerance reaches the FK "
         chain, verification_tolerance<double>(0.0, 1e-2)).solve(target);
     REQUIRE_FALSE(zero_position.has_value());
     CHECK(zero_position.error().reason == analytical_failure::verification_failed);
+}
+
+// The assertion is on the reason and not on the success flag. Equal links
+// reaching their own base point divide zero by zero for the shoulder angle, and
+// what a caller sees of that depends on which downstream guard catches the
+// resulting candidate; the reason is wrong in every configuration, so it is the
+// one observable that pins the classification.
+TEST_CASE("2R solver: equal links reaching the base point are singular")
+{
+    auto chain = make_2r_chain(1.0, 1.0);
+    auto result = planar_2r_solver(chain).solve(target_at(0, 0, 0));
+
+    REQUIRE_FALSE(result.has_value());
+    CHECK(result.error().reason == analytical_failure::singular_configuration);
+    CHECK_FALSE(result.error().workspace_distance.has_value());
+}
+
+// Reaching the base point folds one link back along the other, so the deficit
+// is exactly the length the shorter link falls short by. The expectation is
+// derived from the two lengths the fixture is built from, never from the
+// solver. While the reach gates compared squared lengths against a
+// dimensionless constant, a difference this small left the target inside the
+// gate: a genuine reach violation was reported as a failed back-check carrying
+// no deficit at all.
+TEST_CASE("2R solver: a near-equal-link base-point target carries its deficit")
+{
+    constexpr double link_1 = 1.0;
+    constexpr double link_2 = 1.0 - 1e-4;
+    auto chain = make_2r_chain(link_1, link_2);
+    auto result = planar_2r_solver(chain).solve(target_at(0, 0, 0));
+
+    REQUIRE_FALSE(result.has_value());
+    CHECK(result.error().reason == analytical_failure::unreachable);
+    REQUIRE(result.error().workspace_distance.has_value());
+    CHECK_THAT(*result.error().workspace_distance,
+        WithinRel(std::abs(link_1 - link_2), 1e-9));
+}
+
+// A reach gate and the back-check must agree on what counts as the same point:
+// a gate tighter than the acceptance length refuses a target whose solution the
+// same solver would go on to certify. This target is a hundredth of the
+// acceptance length beyond the fully extended boundary, and against squared
+// lengths offset by a dimensionless constant the gate was tighter than that by
+// orders of magnitude and refused it as unreachable.
+TEST_CASE("2R solver: a target inside the acceptance length of the boundary is solved")
+{
+    auto chain = make_2r_chain(1.0, 1.0);
+    auto reached = Eigen::Vector3d(2.0 + 1e-8, 0, 0);
+    auto result = planar_2r_solver(chain).solve(target_at(reached.x(), 0, 0));
+
+    REQUIRE(result.has_value());
+    REQUIRE(result->count == 1);
+    auto fk = testing::fk_at(chain, result->solutions[0]);
+    CHECK((fk.end_effector.translation() - reached).norm() < tolerance);
+}
+
+// The fixture's joints turn about y, so its mechanism plane is the xz plane and
+// a y displacement leaves it. The in-plane part of this target sits mid-annulus
+// and is comfortably reachable, so the case pins the plane precondition rather
+// than a reach violation. Until the precondition was enforced at solve time the
+// derivation's in-plane assumption was simply taken: the solver answered for the
+// in-plane shadow, and the FK back-check threw that answer away and reported a
+// failed verification.
+TEST_CASE("2R solver: a target off the mechanism plane is unreachable")
+{
+    constexpr double out_of_plane = 0.1;
+    auto chain = make_2r_chain(1.0, 1.0);
+    auto result = planar_2r_solver(chain).solve(target_at(1.0, out_of_plane, 0));
+
+    REQUIRE_FALSE(result.has_value());
+    CHECK(result.error().reason == analytical_failure::unreachable);
+    REQUIRE(result.error().workspace_distance.has_value());
+    CHECK_THAT(*result.error().workspace_distance, WithinRel(out_of_plane, 1e-12));
 }

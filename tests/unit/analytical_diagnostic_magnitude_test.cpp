@@ -88,9 +88,9 @@ TEST_CASE("analytical diagnostics: a 2R failure that evaluated no inequality car
         chain_of({rev(y, {0, 0, 0}), rev(y, {0, 0, 0})}, {1, 0, 0})));
     absent("2R solve: invalid state",
         planar_2r_solver<dyn_chain>(three).solve(at(1, 0, 0)));
-    // In reach once projected onto the plane, but off it: nothing back-checks.
-    absent("2R solve: verification failed",
-        planar_2r_solver<dyn_chain>(two).solve(at(1.0, 0.5, 0.0)));
+    // A zero acceptance length rejects every candidate, evaluating no inequality.
+    absent("2R solve: verification failed", planar_2r_solver<dyn_chain>(
+        two, verification_tolerance<double>(0.0, 0.0)).solve(at(1, 0, 0)));
 
     deficit("2R solve: beyond the outer reach",
         planar_2r_solver<dyn_chain>(two).solve(at(5, 0, 0)));

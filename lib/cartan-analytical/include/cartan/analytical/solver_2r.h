@@ -166,32 +166,24 @@ public:
         Scalar u = p_target.dot(m_basis_u);
         Scalar v = p_target.dot(m_basis_v);
 
-        Scalar dist_sq = u * u + v * v;
+        Scalar out_of_plane = p_target.dot(m_plane_normal);
+        Scalar dist = std::hypot(u, v);
+
+        if (std::optional<analytical_error<Scalar>> rejection
+                = reject_target(out_of_plane, dist))
+        {
+            return cartan::unexpected(*rejection);
+        }
+
         Scalar L1 = m_link_length_1;
         Scalar L2 = m_link_length_2;
-        Scalar max_reach = L1 + L2;
-        Scalar min_reach = std::abs(L1 - L2);
-
-        if (dist_sq > max_reach * max_reach + detail::sqrt_epsilon_v<Scalar>)
-        {
-            Scalar workspace_dist = std::sqrt(dist_sq) - max_reach;
-            return cartan::unexpected(analytical_error<Scalar>{
-                analytical_failure::unreachable, workspace_dist});
-        }
-        if (dist_sq < min_reach * min_reach - detail::sqrt_epsilon_v<Scalar>)
-        {
-            Scalar workspace_dist = min_reach - std::sqrt(dist_sq);
-            return cartan::unexpected(analytical_error<Scalar>{
-                analytical_failure::unreachable, workspace_dist});
-        }
 
         // Law of cosines for elbow angle
-        Scalar cos_beta = (L1 * L1 + L2 * L2 - dist_sq) / (Scalar(2) * L1 * L2);
+        Scalar cos_beta = (L1 * L1 + L2 * L2 - dist * dist) / (Scalar(2) * L1 * L2);
         Scalar beta = detail::safe_acos(cos_beta);
 
         // Shoulder angle helper
-        Scalar dist = std::sqrt(dist_sq);
-        Scalar cos_alpha = (dist_sq + L1 * L1 - L2 * L2) / (Scalar(2) * L1 * dist);
+        Scalar cos_alpha = (dist * dist + L1 * L1 - L2 * L2) / (Scalar(2) * L1 * dist);
         Scalar alpha = detail::safe_acos(cos_alpha);
 
         // Base angle to target in the projected plane
@@ -262,6 +254,43 @@ private:
     vector3<Scalar> m_basis_u{vector3<Scalar>::Zero()};
     vector3<Scalar> m_basis_v{vector3<Scalar>::Zero()};
     bool m_valid{false};
+
+    /// The targets the planar closed form has no answer for, decided ahead of
+    /// the law of cosines that divides by the in-plane distance. Every gate
+    /// compares a length against the acceptance length the back-check applies.
+    /// An absent diagnostic means the target passed all four.
+    std::optional<analytical_error<Scalar>> reject_target(
+        Scalar out_of_plane, Scalar dist) const
+    {
+        Scalar accept = m_tolerance.position();
+        Scalar max_reach = m_link_length_1 + m_link_length_2;
+        Scalar min_reach = std::abs(m_link_length_1 - m_link_length_2);
+
+        // The mechanism plane is the reachable set, so a target off it is out of
+        // reach; the distance out of the plane is that reach violation, not a
+        // shadow to be projected onto and solved silently.
+        if (std::abs(out_of_plane) > accept)
+            return analytical_error<Scalar>{
+                analytical_failure::unreachable, std::abs(out_of_plane)};
+
+        // Equal links reaching the base point: the shoulder angle is free and
+        // the elbow folds back along the first link, so a continuum of
+        // configurations attains the target. The solver does not enumerate that
+        // continuum; a caller wanting one member of it fixes one joint angle and
+        // solves for the other.
+        if (dist <= accept && min_reach <= accept)
+            return analytical_error<Scalar>{
+                analytical_failure::singular_configuration, std::nullopt};
+
+        if (dist > max_reach + accept)
+            return analytical_error<Scalar>{
+                analytical_failure::unreachable, dist - max_reach};
+        if (dist < min_reach - accept)
+            return analytical_error<Scalar>{
+                analytical_failure::unreachable, min_reach - dist};
+
+        return std::nullopt;
+    }
 };
 
 template <chain Chain>
