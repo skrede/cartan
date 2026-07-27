@@ -35,10 +35,13 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "CMAKE_C_COMPILER": "clang",
+                "CMAKE_CXX_COMPILER": "clang++",
                 "CARTAN_BUILD_TESTS": "ON",
                 "CARTAN_BUILD_EXAMPLES": "ON",
                 "CARTAN_BUILD_FUZZ_TESTS": "ON",
                 "CARTAN_BUILD_PROPERTY_TESTS": "ON",
+                "CARTAN_BUILD_URDF": "ON",
                 "CARTAN_BUILD_ARGMIN": "ON",
                 "CARTAN_CMAKE_FETCH_DEPS": "ON"
             }
@@ -131,8 +134,10 @@
             "binaryDir": "${sourceDir}/build/fuzz",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_C_COMPILER": "clang",
+                "CMAKE_CXX_COMPILER": "clang++",
                 "CARTAN_BUILD_FUZZ_TESTS": "ON",
-                "CARTAN_BUILD_ARGMIN": "ON",
+                "CARTAN_BUILD_URDF": "ON",
                 "CARTAN_CMAKE_FETCH_DEPS": "ON"
             }
         }
