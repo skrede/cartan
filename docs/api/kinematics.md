@@ -25,9 +25,31 @@ See [PoE Kinematics](../background/poe-kinematics.md) | [Jacobians](../backgroun
 | `cartan::end_effector_velocity` | `#include <cartan/serial/fk/velocity.h>` |
 | `cartan::fk_result` | `#include <cartan/serial/fk/fk_result.h>` |
 
-The umbrella `<cartan/serial_chain.h>` does **not** pull in the matrix-form headers
-`forward_kinematics_matrix.h` / `jacobian_matrix.h`; include those directly when you
-need `forward_kinematics_matrix` / `jacobian_matrix`.
+The umbrella `<cartan/serial_chain.h>` pulls in the matrix-form headers
+`forward_kinematics_matrix.h` / `jacobian_matrix.h` as well, so a consumer of the
+umbrella sees the whole checked surface and cannot reach an unchecked overload
+merely by including the one header it happened to know about.
+
+## Checked and unchecked entry points
+
+Every forward-kinematics, Jacobian and velocity entry point comes in a pair. The
+plainly-named one validates the structural precondition on its arguments and
+returns `cartan::expected<..., chain_failure>`. The `_unchecked` sibling carries
+the same body without the validation, for a caller that has already established
+the precondition — typically an IK iteration that validated the shape once at
+setup. Calling an `_unchecked` entry point with a violated precondition is
+undefined behavior: a short joint vector reads past its end, and an over-long one
+is silently truncated to the joint count.
+
+The suffix marks a structural precondition *between* arguments. It is a
+different claim from the `trusted` vocabulary elsewhere in cartan, which marks a
+mathematical invariant carried by a single value (`compose_trusted`,
+`trusted_unit`).
+
+The Jacobian family takes a cached `fk_result` rather than a joint vector, so the
+precondition it validates is that the result holds one intermediate product per
+joint of the chain. Length equality is **not** provenance: a result of the right
+length computed from a different chain of the same joint count is accepted.
 
 ## fk_result
 
@@ -64,7 +86,12 @@ Three overloads cover the supported chain types.
 
 ```cpp
 template <typename Scalar, int N>
-fk_result<Scalar, N> forward_kinematics(
+cartan::expected<fk_result<Scalar, N>, chain_failure> forward_kinematics(
+    const kinematic_chain<Scalar, N>& chain,
+    const typename joint_state<Scalar, N>::position_type& q);
+
+template <typename Scalar, int N>
+fk_result<Scalar, N> forward_kinematics_unchecked(
     const kinematic_chain<Scalar, N>& chain,
     const typename joint_state<Scalar, N>::position_type& q);
 ```
@@ -83,7 +110,12 @@ uses a runtime loop.
 
 ```cpp
 template <typename Scalar, joint_tag... Joints>
-fk_result<Scalar, sizeof...(Joints)> forward_kinematics(
+cartan::expected<fk_result<Scalar, sizeof...(Joints)>, chain_failure> forward_kinematics(
+    const static_chain<Scalar, Joints...>& chain,
+    const typename joint_state<Scalar, sizeof...(Joints)>::position_type& q);
+
+template <typename Scalar, joint_tag... Joints>
+fk_result<Scalar, sizeof...(Joints)> forward_kinematics_unchecked(
     const static_chain<Scalar, Joints...>& chain,
     const typename joint_state<Scalar, sizeof...(Joints)>::position_type& q);
 ```
@@ -98,7 +130,13 @@ overload via partial ordering on `static_chain<Scalar, Joints...>`.
 
 ```cpp
 template <chain Chain>
-fk_result<typename Chain::scalar_type, Chain::joints> forward_kinematics(
+cartan::expected<fk_result<typename Chain::scalar_type, Chain::joints>, chain_failure>
+forward_kinematics(
+    const Chain& chain,
+    const typename joint_state<typename Chain::scalar_type, Chain::joints>::position_type& q);
+
+template <chain Chain>
+fk_result<typename Chain::scalar_type, Chain::joints> forward_kinematics_unchecked(
     const Chain& chain,
     const typename joint_state<typename Chain::scalar_type, Chain::joints>::position_type& q);
 ```
@@ -119,9 +157,20 @@ computation would otherwise pay on every column.
 
 ```cpp
 template <typename Scalar, int N>
-fk_matrix_result<Scalar, N> forward_kinematics_matrix(
+cartan::expected<fk_matrix_result<Scalar, N>, chain_failure> forward_kinematics_matrix(
     const kinematic_chain<Scalar, N>& chain,
     const typename joint_state<Scalar, N>::position_type& q);
+
+template <typename Scalar, int N>
+fk_matrix_result<Scalar, N> forward_kinematics_matrix_unchecked(
+    const kinematic_chain<Scalar, N>& chain,
+    const typename joint_state<Scalar, N>::position_type& q);
+
+template <typename Scalar, joint_tag... Joints>
+cartan::expected<fk_matrix_result<Scalar, sizeof...(Joints)>, chain_failure>
+forward_kinematics_matrix(
+    const static_chain<Scalar, Joints...>& chain,
+    const typename joint_state<Scalar, sizeof...(Joints)>::position_type& q);
 ```
 
 Empirically faster than the quaternion-form `forward_kinematics` on chains
@@ -167,7 +216,12 @@ Space Jacobian mapping joint velocities to the end-effector spatial twist.
 
 ```cpp
 template <typename Scalar, int N>
-jacobian_matrix<Scalar, N> space_jacobian(
+cartan::expected<jacobian_matrix<Scalar, N>, chain_failure> space_jacobian(
+    const kinematic_chain<Scalar, N>& chain,
+    const fk_result<Scalar, N>& fk);
+
+template <typename Scalar, int N>
+jacobian_matrix<Scalar, N> space_jacobian_unchecked(
     const kinematic_chain<Scalar, N>& chain,
     const fk_result<Scalar, N>& fk);
 ```
@@ -182,8 +236,10 @@ with `T_0 = I` (identity). Maps joint velocities to the spatial twist:
 `V_s = J_s(q) * dq`. Reuses the cached intermediate products in `fk` to
 avoid redundant `exp()` calls.
 
-Returns a `jacobian_matrix<Scalar, N>` — a `6 x N` matrix (fixed) or
-`6 x Dynamic` matrix.
+The value on success is a `jacobian_matrix<Scalar, N>` — a `6 x N` matrix
+(fixed) or `6 x Dynamic` matrix. `static_chain` and generic `chain`-concept
+overloads exist with the same shape, as does an overload over
+`fk_matrix_result` in `jacobian_matrix.h`.
 
 Dispatch: same compile-time unrolling as `forward_kinematics` for `N=1-7`.
 
@@ -193,7 +249,12 @@ Body Jacobian mapping joint velocities to the end-effector body-frame twist.
 
 ```cpp
 template <typename Scalar, int N>
-jacobian_matrix<Scalar, N> body_jacobian(
+cartan::expected<jacobian_matrix<Scalar, N>, chain_failure> body_jacobian(
+    const kinematic_chain<Scalar, N>& chain,
+    const fk_result<Scalar, N>& fk);
+
+template <typename Scalar, int N>
+jacobian_matrix<Scalar, N> body_jacobian_unchecked(
     const kinematic_chain<Scalar, N>& chain,
     const fk_result<Scalar, N>& fk);
 ```
@@ -212,7 +273,8 @@ using jacobian_matrix = std::conditional_t<
     Eigen::Matrix<Scalar, 6, N>>;
 ```
 
-Type alias returned by `space_jacobian` and `body_jacobian`. Selects
+Type alias carried by the value of `space_jacobian` and `body_jacobian`, and
+returned directly by their `_unchecked` siblings. Selects
 fixed-column or dynamic-column storage based on `N`.
 
 ## end_effector_velocity

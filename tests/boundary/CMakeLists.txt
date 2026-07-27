@@ -1,3 +1,29 @@
+set(cartan_kinematics_headers "")
+foreach (header IN ITEMS forward_kinematics forward_kinematics_matrix jacobian
+        jacobian_matrix velocity)
+    list(APPEND cartan_kinematics_headers
+        "${CMAKE_SOURCE_DIR}/lib/cartan-serial-chain/include/cartan/serial/fk/${header}.h")
+endforeach ()
+
+set_property(DIRECTORY APPEND PROPERTY
+    CMAKE_CONFIGURE_DEPENDS ${cartan_kinematics_headers})
+
+execute_process(
+    COMMAND "${CMAKE_COMMAND}"
+            "-DHEADERS=${cartan_kinematics_headers}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/entry_point_gate.cmake"
+    OUTPUT_VARIABLE cartan_entry_point_gate_stdout
+    ERROR_VARIABLE cartan_entry_point_gate_stderr
+    RESULT_VARIABLE cartan_entry_point_gate_result)
+
+if (NOT cartan_entry_point_gate_result EQUAL 0)
+    message(FATAL_ERROR
+        "${cartan_entry_point_gate_stdout}${cartan_entry_point_gate_stderr}")
+endif ()
+string(REGEX REPLACE "^-- |[ \t\r\n]+$" ""
+    cartan_entry_point_gate_summary "${cartan_entry_point_gate_stdout}")
+message(STATUS "${cartan_entry_point_gate_summary}")
+
 function(cartan_add_boundary_test TEST_NAME TEST_SOURCE)
     add_executable(${TEST_NAME} ${TEST_SOURCE})
     target_link_libraries(${TEST_NAME}
@@ -12,10 +38,12 @@ function(cartan_add_boundary_test TEST_NAME TEST_SOURCE)
     add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
 endfunction()
 
-# These two exercise the checked entry point only, so they hold in every
+# These exercise the checked entry points only, so they hold in every
 # configuration.
 cartan_add_boundary_test(velocity_boundary_test velocity_boundary_test.cpp)
 cartan_add_boundary_test(velocity_shape_boundary_test velocity_shape_boundary_test.cpp)
+cartan_add_boundary_test(fk_boundary_test fk_boundary_test.cpp)
+cartan_add_boundary_test(jacobian_boundary_test jacobian_boundary_test.cpp)
 
 # Capability probes rather than a search of CMAKE_CXX_FLAGS: a flag can arrive
 # through CMAKE_CXX_FLAGS_<CONFIG>, a toolchain file, add_compile_options() or a
@@ -61,6 +89,10 @@ unset(CMAKE_REQUIRED_FLAGS)
 if (CARTAN_BOUNDARY_ASSERTIONS_OFF)
     cartan_add_boundary_test(velocity_unchecked_differential_test
         velocity_unchecked_differential_test.cpp)
+    cartan_add_boundary_test(fk_unchecked_differential_test
+        fk_unchecked_differential_test.cpp)
+    cartan_add_boundary_test(jacobian_unchecked_differential_test
+        jacobian_unchecked_differential_test.cpp)
 endif ()
 
 set(cartan_boundary_evidence_tests 0)
@@ -71,11 +103,20 @@ if (CARTAN_BOUNDARY_ADDRESS_SANITIZER)
     # than depending on the surrounding build type. That keeps the sanitizer
     # evidence runnable in an assertions-on sanitizer configuration, where Eigen
     # would otherwise abort on the dimension mismatch first.
+    #
+    # The standard library's own container checks need the same treatment and are
+    # a separate switch. libstdc++ turns them on for any unoptimized build
+    # (c++config.h: `! defined(__OPTIMIZE__) && ! defined(_GLIBCXX_NO_ASSERTIONS)`)
+    # regardless of NDEBUG, and a bounds assert inside vector::operator[] aborts
+    # before the sanitizer sees the over-read: measured in a Debug ASan/UBSan
+    # configure, where the cached-result over-read reported
+    # `Assertion '__n < this->size()' failed` from stl_vector.h and named no
+    # cartan file at all.
     function(cartan_add_sanitizer_probe PROBE_NAME PROBE_SOURCE)
         add_executable(${PROBE_NAME} ${PROBE_SOURCE})
         target_link_libraries(${PROBE_NAME} PRIVATE cartan::cartan)
         target_compile_options(${PROBE_NAME} PRIVATE ${CARTAN_WARNING_FLAGS})
-        target_compile_definitions(${PROBE_NAME} PRIVATE NDEBUG)
+        target_compile_definitions(${PROBE_NAME} PRIVATE NDEBUG _GLIBCXX_NO_ASSERTIONS)
     endfunction()
 
     cartan_add_sanitizer_probe(velocity_unchecked_empty_probe
@@ -84,6 +125,12 @@ if (CARTAN_BOUNDARY_ADDRESS_SANITIZER)
         velocity_unchecked_short_probe.cpp)
     cartan_add_sanitizer_probe(velocity_unchecked_dq_probe
         velocity_unchecked_dq_probe.cpp)
+    cartan_add_sanitizer_probe(fk_unchecked_empty_probe
+        fk_unchecked_empty_probe.cpp)
+    cartan_add_sanitizer_probe(fk_unchecked_short_probe
+        fk_unchecked_short_probe.cpp)
+    cartan_add_sanitizer_probe(jacobian_unchecked_short_fk_probe
+        jacobian_unchecked_short_fk_probe.cpp)
 
     function(cartan_add_sanitizer_tripwire TEST_NAME PROBE_NAME WANT_ERROR WANT_FILE)
         add_test(NAME ${TEST_NAME}
@@ -136,6 +183,34 @@ if (CARTAN_BOUNDARY_ADDRESS_SANITIZER)
         velocity_unchecked_dq_probe
         "heap-buffer-overflow" "velocity.h" 7 float)
 
+    # The same two joint-vector cells reached through the forward-kinematics
+    # entry point itself rather than through the velocity path above, so the
+    # report is attributable to that boundary and survives a later change to
+    # what the velocity path calls.
+    cartan_add_sanitizer_tripwire(fk_unchecked_empty_q_trips_sanitizer_in_double
+        fk_unchecked_empty_probe
+        "reference binding to null pointer" "forward_kinematics.h" double)
+    cartan_add_sanitizer_tripwire(fk_unchecked_empty_q_trips_sanitizer_in_float
+        fk_unchecked_empty_probe
+        "reference binding to null pointer" "forward_kinematics.h" float)
+
+    cartan_add_sanitizer_tripwire(fk_unchecked_short_q_trips_sanitizer_in_double
+        fk_unchecked_short_probe
+        "heap-buffer-overflow" "forward_kinematics.h" 5 double)
+    cartan_add_sanitizer_tripwire(fk_unchecked_short_q_trips_sanitizer_in_float
+        fk_unchecked_short_probe
+        "heap-buffer-overflow" "forward_kinematics.h" 5 float)
+
+    # The Jacobian family's own hole, which no joint-vector case reaches: a
+    # cached result holding fewer intermediates than the chain has joints is
+    # read past its end while building the columns.
+    cartan_add_sanitizer_tripwire(jacobian_unchecked_short_fk_trips_sanitizer_in_double
+        jacobian_unchecked_short_fk_probe
+        "heap-buffer-overflow" "jacobian.h" 3 double)
+    cartan_add_sanitizer_tripwire(jacobian_unchecked_short_fk_trips_sanitizer_in_float
+        jacobian_unchecked_short_fk_probe
+        "heap-buffer-overflow" "jacobian.h" 3 float)
+
     # An in-bounds invocation of the same binary must be clean and exit zero, and
     # the assertion above must reject that same run. The first is what makes a
     # tripwire attributable to the violated precondition; the second is what keeps
@@ -143,6 +218,20 @@ if (CARTAN_BOUNDARY_ADDRESS_SANITIZER)
     add_test(NAME velocity_unchecked_in_bounds_is_clean
         COMMAND "${CMAKE_COMMAND}"
             "-DPROBE=$<TARGET_FILE:velocity_unchecked_short_probe>"
+            "-DPROBE_ARGS=6;double"
+            -DEXPECT=clean
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/expect_sanitizer.cmake")
+
+    add_test(NAME fk_unchecked_in_bounds_is_clean
+        COMMAND "${CMAKE_COMMAND}"
+            "-DPROBE=$<TARGET_FILE:fk_unchecked_short_probe>"
+            "-DPROBE_ARGS=6;double"
+            -DEXPECT=clean
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/expect_sanitizer.cmake")
+
+    add_test(NAME jacobian_unchecked_matching_result_is_clean
+        COMMAND "${CMAKE_COMMAND}"
+            "-DPROBE=$<TARGET_FILE:jacobian_unchecked_short_fk_probe>"
             "-DPROBE_ARGS=6;double"
             -DEXPECT=clean
             -P "${CMAKE_CURRENT_SOURCE_DIR}/expect_sanitizer.cmake")
@@ -156,7 +245,7 @@ if (CARTAN_BOUNDARY_ADDRESS_SANITIZER)
             "-DWANT_FILE=forward_kinematics.h"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/expect_sanitizer_rejects.cmake")
 
-    set(cartan_boundary_evidence_tests 11)
+    set(cartan_boundary_evidence_tests 19)
 endif ()
 
 # Registering nothing must not be able to pass. The guard is compiled in this
@@ -166,5 +255,5 @@ add_executable(boundary_evidence_guard boundary_evidence_guard.cpp)
 target_compile_options(boundary_evidence_guard PRIVATE ${CARTAN_WARNING_FLAGS})
 target_compile_definitions(boundary_evidence_guard PRIVATE
     CARTAN_REGISTERED_EVIDENCE_TESTS=${cartan_boundary_evidence_tests}
-    CARTAN_EXPECTED_EVIDENCE_TESTS=11)
+    CARTAN_EXPECTED_EVIDENCE_TESTS=19)
 add_test(NAME boundary_evidence_registration COMMAND boundary_evidence_guard)

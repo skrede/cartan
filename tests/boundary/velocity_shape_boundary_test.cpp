@@ -45,8 +45,9 @@ TEMPLATE_TEST_CASE("check_fk_shape rejects a result holding the wrong number of 
     auto chain = make_six_joint_dynamic_chain<Scalar>();
     auto fk = spp::forward_kinematics(
         chain, joint_vector(chain.num_joints(), Scalar(0.1)));
+    REQUIRE(fk.has_value());
 
-    REQUIRE(spp::detail::check_fk_shape(chain, fk).has_value());
+    REQUIRE(spp::detail::check_fk_shape(chain, fk.value()).has_value());
 
     spp::fk_result<Scalar, spp::dynamic> empty;
     auto mismatched = spp::detail::check_fk_shape(chain, empty);

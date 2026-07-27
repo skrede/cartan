@@ -193,11 +193,16 @@ used. Both paths produce identical results.
 
 | Concept | Cartan API |
 |---------|-----------|
-| Space Jacobian $J_s(\theta)$ | `space_jacobian(chain, fk)` |
-| Body Jacobian $J_b(\theta)$ | `body_jacobian(chain, fk)` |
+| Space Jacobian $J_s(\theta)$ | `space_jacobian(chain, fk)` — returns `expected` |
+| Body Jacobian $J_b(\theta)$ | `body_jacobian(chain, fk)` — returns `expected` |
 | Spatial twist $\mathcal{V}_s = J_s \dot{\theta}$ | `end_effector_velocity(chain, q, dq)` — returns `expected` |
 | Jacobian matrix type | `jacobian_matrix<Scalar, N>` |
 | Cached intermediates for Jacobian | `fk_result::intermediates` |
+
+Both Jacobian entry points reject an `fk_result` whose joint count does not
+match the chain's; `space_jacobian_unchecked` and `body_jacobian_unchecked` are
+the same computations without that check, for a caller that has already
+established the pairing.
 
 The `end_effector_velocity` function is a convenience that computes FK and the
 space Jacobian internally, returning the 6-vector spatial twist wrapped in

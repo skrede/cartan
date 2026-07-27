@@ -213,7 +213,7 @@ The PoE concepts map directly to Cartan's API:
 | Screw axis $\mathcal{S}$ (prismatic) | `screw_axis::prismatic(direction)` |
 | Screw axis from 6-vector | `screw_axis::from_vector(vec)` |
 | Kinematic chain $(M, \mathcal{S}_1 \ldots \mathcal{S}_n)$ | `kinematic_chain(home, axes, limits)` |
-| Forward kinematics $T(\theta)$ | `forward_kinematics(chain, q)` |
+| Forward kinematics $T(\theta)$ | `forward_kinematics(chain, q)` — returns `expected` |
 | Intermediate products $T_i$ | `fk_result::intermediates` |
 | End-effector pose | `fk_result::end_effector` |
 

@@ -15,6 +15,7 @@
 
 #include "cartan/types.h"
 
+#include "cartan/serial/fk/detail/shape_validation.h"
 #include "cartan/serial/fk/detail/axis_specializations.h"
 
 #include "cartan/serial/chain/joint_state.h"
@@ -76,9 +77,12 @@ struct fk_matrix_result
     }
 };
 
-/// Matrix-form forward kinematics for a kinematic chain.
+/// Matrix-form forward kinematics for a caller that has already established
+/// that q holds exactly chain.num_joints() finite components. Neither
+/// precondition is checked here, and violating either is undefined behavior on
+/// the same terms as `forward_kinematics_unchecked`.
 template <typename Scalar, int N>
-fk_matrix_result<Scalar, N> forward_kinematics_matrix(
+fk_matrix_result<Scalar, N> forward_kinematics_matrix_unchecked(
     const kinematic_chain<Scalar, N>& chain,
     const typename joint_state<Scalar, N>::position_type& q)
 {
@@ -115,11 +119,26 @@ fk_matrix_result<Scalar, N> forward_kinematics_matrix(
     return result;
 }
 
-/// Matrix-form forward kinematics for a static_chain. Joint tags are
-/// known at compile time; dispatches into per-tag `exp_joint_matrix`.
+/// Matrix-form forward kinematics for a kinematic chain.
+template <typename Scalar, int N>
+cartan::expected<fk_matrix_result<Scalar, N>, chain_failure> forward_kinematics_matrix(
+    const kinematic_chain<Scalar, N>& chain,
+    const typename joint_state<Scalar, N>::position_type& q)
+{
+    auto positions = detail::check_joint_positions(chain, q);
+    if (!positions)
+    {
+        return cartan::unexpected(positions.error());
+    }
+    return forward_kinematics_matrix_unchecked(chain, q);
+}
+
+/// Matrix-form forward kinematics for a static_chain under the same unchecked
+/// precondition on q. Joint tags are known at compile time; dispatches into
+/// per-tag `exp_joint_matrix`.
 template <typename Scalar, joint_tag... Joints>
 fk_matrix_result<Scalar, static_cast<int>(sizeof...(Joints))>
-forward_kinematics_matrix(
+forward_kinematics_matrix_unchecked(
     const static_chain<Scalar, Joints...>& chain,
     const typename joint_state<Scalar, static_cast<int>(sizeof...(Joints))>::position_type& q)
 {
@@ -158,6 +177,21 @@ forward_kinematics_matrix(
     result.end_effector.p.noalias() = R * t_home + p;
     result.end_effector.R.noalias() = R * R_home;
     return result;
+}
+
+/// Matrix-form forward kinematics for a static_chain.
+template <typename Scalar, joint_tag... Joints>
+cartan::expected<fk_matrix_result<Scalar, static_cast<int>(sizeof...(Joints))>, chain_failure>
+forward_kinematics_matrix(
+    const static_chain<Scalar, Joints...>& chain,
+    const typename joint_state<Scalar, static_cast<int>(sizeof...(Joints))>::position_type& q)
+{
+    auto positions = detail::check_joint_positions(chain, q);
+    if (!positions)
+    {
+        return cartan::unexpected(positions.error());
+    }
+    return forward_kinematics_matrix_unchecked(chain, q);
 }
 
 }

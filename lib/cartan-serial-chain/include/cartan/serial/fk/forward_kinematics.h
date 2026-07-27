@@ -14,6 +14,7 @@
 /// Reference: Lynch & Park, Modern Robotics, Ch. 4, p. 119-158.
 
 #include "cartan/serial/fk/fk_result.h"
+#include "cartan/serial/fk/detail/shape_validation.h"
 #include "cartan/serial/fk/detail/axis_specializations.h"
 
 #include "cartan/serial/chain/joint_state.h"
@@ -116,10 +117,16 @@ fk_result<Scalar, N> fk_unrolled(
 
 }
 
-/// Compute forward kinematics for a kinematic chain at joint configuration q.
+/// Forward kinematics for a caller that has already established that q holds
+/// exactly chain.num_joints() finite components. Neither precondition is
+/// checked here, and violating either is undefined behavior: a vector shorter
+/// than the joint count reads past its end, and an over-long one is truncated
+/// to the joint count and yields a plausible pose for a configuration the
+/// caller never asked about.
 ///
-/// Returns the end-effector SE(3) pose and all intermediate products
-/// for Jacobian computation reuse.
+/// The suffix marks a structural precondition between arguments, and is a
+/// different claim from the `trusted` vocabulary, which marks a mathematical
+/// invariant carried by one value.
 ///
 /// For fixed-size chains with N=1-7 joints, dispatches to a compile-time
 /// unrolled fold expression. For dynamic or larger chains, uses a runtime loop.
@@ -127,7 +134,7 @@ fk_result<Scalar, N> fk_unrolled(
 /// Lynch & Park, Modern Robotics, Eq. 4.10, p. 138:
 ///   T(q) = exp([S1]q1) * ... * exp([Sn]qn) * M
 template <typename Scalar, int N>
-fk_result<Scalar, N> forward_kinematics(
+fk_result<Scalar, N> forward_kinematics_unchecked(
     const kinematic_chain<Scalar, N>& chain,
     const typename joint_state<Scalar, N>::position_type& q)
 {
@@ -141,16 +148,34 @@ fk_result<Scalar, N> forward_kinematics(
     }
 }
 
+/// Compute forward kinematics for a kinematic chain at joint configuration q.
+///
+/// Returns the end-effector SE(3) pose and all intermediate products
+/// for Jacobian computation reuse.
+template <typename Scalar, int N>
+cartan::expected<fk_result<Scalar, N>, chain_failure> forward_kinematics(
+    const kinematic_chain<Scalar, N>& chain,
+    const typename joint_state<Scalar, N>::position_type& q)
+{
+    auto positions = detail::check_joint_positions(chain, q);
+    if (!positions)
+    {
+        return cartan::unexpected(positions.error());
+    }
+    return forward_kinematics_unchecked(chain, q);
+}
+
 /// Specialized forward kinematics for static_chain exploiting compile-time
 /// joint tag knowledge. Each joint's SE3 exponential uses axis-specific
 /// quaternion construction and sparse left Jacobian entries instead of the
-/// generic Rodrigues exponential map.
+/// generic Rodrigues exponential map. q must satisfy the same unchecked
+/// precondition as the dynamic overload above.
 ///
 /// Wins over the generic chain overload via partial ordering on
 /// static_chain<Scalar, Joints...>.
 template <typename Scalar, joint_tag... Joints>
 fk_result<Scalar, static_cast<int>(sizeof...(Joints))>
-forward_kinematics(
+forward_kinematics_unchecked(
     const static_chain<Scalar, Joints...>& chain,
     const typename joint_state<Scalar, static_cast<int>(sizeof...(Joints))>::position_type& q)
 {
@@ -177,7 +202,29 @@ forward_kinematics(
     return result;
 }
 
-/// Generic forward kinematics for any chain type satisfying the chain concept.
+/// Forward kinematics for a static_chain, exploiting the compile-time joint
+/// tags of the unchecked overload above.
+///
+/// A fixed joint count makes a size mismatch reachable only through a
+/// dynamically-sized joint vector; the predicate call stays unconditional
+/// because the comparison folds away for a fixed-size vector while its
+/// finiteness half remains load-bearing at runtime.
+template <typename Scalar, joint_tag... Joints>
+cartan::expected<fk_result<Scalar, static_cast<int>(sizeof...(Joints))>, chain_failure>
+forward_kinematics(
+    const static_chain<Scalar, Joints...>& chain,
+    const typename joint_state<Scalar, static_cast<int>(sizeof...(Joints))>::position_type& q)
+{
+    auto positions = detail::check_joint_positions(chain, q);
+    if (!positions)
+    {
+        return cartan::unexpected(positions.error());
+    }
+    return forward_kinematics_unchecked(chain, q);
+}
+
+/// Generic forward kinematics for any chain type satisfying the chain concept,
+/// under the same unchecked precondition on q as the overloads above.
 ///
 /// Uses per-element axis(i) access and a runtime loop. The existing
 /// kinematic_chain overload is more constrained and wins for kinematic_chain
@@ -187,7 +234,7 @@ forward_kinematics(
 /// Lynch & Park, Modern Robotics, Eq. 4.10, p. 138.
 template <chain Chain>
 fk_result<typename Chain::scalar_type, Chain::joints>
-forward_kinematics(
+forward_kinematics_unchecked(
     const Chain& chain,
     const typename joint_state<typename Chain::scalar_type, Chain::joints>::position_type& q)
 {
@@ -215,6 +262,21 @@ forward_kinematics(
 
     result.end_effector = se3<Scalar>(accum.compose_trusted(chain.home()), trusted_unit);
     return result;
+}
+
+/// Generic forward kinematics for any chain type satisfying the chain concept.
+template <chain Chain>
+cartan::expected<fk_result<typename Chain::scalar_type, Chain::joints>, chain_failure>
+forward_kinematics(
+    const Chain& chain,
+    const typename joint_state<typename Chain::scalar_type, Chain::joints>::position_type& q)
+{
+    auto positions = detail::check_joint_positions(chain, q);
+    if (!positions)
+    {
+        return cartan::unexpected(positions.error());
+    }
+    return forward_kinematics_unchecked(chain, q);
 }
 
 }

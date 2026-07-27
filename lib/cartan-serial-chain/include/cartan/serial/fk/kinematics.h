@@ -8,6 +8,8 @@
 #include "cartan/serial/fk/jacobian.h"
 #include "cartan/serial/fk/velocity.h"
 #include "cartan/serial/fk/fk_result.h"
+#include "cartan/serial/fk/jacobian_matrix.h"
 #include "cartan/serial/fk/forward_kinematics.h"
+#include "cartan/serial/fk/forward_kinematics_matrix.h"
 
 #endif

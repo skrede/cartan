@@ -34,8 +34,8 @@ vector6<Scalar> end_effector_velocity_unchecked(
     const typename joint_state<Scalar, N>::position_type& q,
     const typename joint_state<Scalar, N>::velocity_type& dq)
 {
-    auto fk = forward_kinematics(chain, q);
-    auto J_s = space_jacobian(chain, fk);
+    auto fk = forward_kinematics_unchecked(chain, q);
+    auto J_s = space_jacobian_unchecked(chain, fk);
     return J_s * dq;
 }
 

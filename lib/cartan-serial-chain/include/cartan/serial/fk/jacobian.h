@@ -13,6 +13,7 @@
 #include "cartan/types.h"
 
 #include "cartan/serial/fk/fk_result.h"
+#include "cartan/serial/fk/detail/shape_validation.h"
 #include "cartan/serial/fk/detail/axis_specializations.h"
 
 #include "cartan/serial/chain/chain_concept.h"
@@ -118,17 +119,24 @@ jacobian_matrix<Scalar, N> space_jacobian_unrolled(
 
 }
 
-/// Space Jacobian: J_si(q) = Ad_{T_{i-1}}(S_i).
+/// Space Jacobian for a caller that has already established that fk holds one
+/// intermediate product per joint of chain. This family takes no joint vector,
+/// so its structural precondition is on the provenance of the cached result:
+/// a result with fewer intermediates than the chain has joints reads past the
+/// end of the cache, and one with more yields a matrix for a different chain.
+/// Neither is checked here, and violating either is undefined behavior.
 ///
-/// Maps joint velocities to end-effector spatial twist: V_s = J_s(q) * dq.
-/// Uses cached intermediate products from fk_result for efficiency.
+/// The suffix marks a structural precondition between arguments, and is a
+/// different claim from the `trusted` vocabulary, which marks a mathematical
+/// invariant carried by one value.
 ///
-/// For fixed-size chains with N=1-7 joints, dispatches to a compile-time
-/// unrolled fold expression. For dynamic or larger chains, uses a runtime loop.
+/// J_si(q) = Ad_{T_{i-1}}(S_i). For fixed-size chains with N=1-7 joints,
+/// dispatches to a compile-time unrolled fold expression. For dynamic or larger
+/// chains, uses a runtime loop.
 ///
 /// Reference: Lynch & Park, Modern Robotics, Eq. 5.11, p. 178.
 template <typename Scalar, int N>
-jacobian_matrix<Scalar, N> space_jacobian(
+jacobian_matrix<Scalar, N> space_jacobian_unchecked(
     const kinematic_chain<Scalar, N>& chain,
     const fk_result<Scalar, N>& fk)
 {
@@ -142,28 +150,60 @@ jacobian_matrix<Scalar, N> space_jacobian(
     }
 }
 
-/// Body Jacobian: J_b(q) = [Ad_{T^{-1}}] * J_s(q).
+/// Space Jacobian: J_si(q) = Ad_{T_{i-1}}(S_i).
 ///
-/// Maps joint velocities to end-effector body-frame twist: V_b = J_b(q) * dq.
-///
-/// Reference: Lynch & Park, Modern Robotics, Eq. 5.22, p. 185.
+/// Maps joint velocities to end-effector spatial twist: V_s = J_s(q) * dq.
+/// Uses cached intermediate products from fk_result for efficiency.
 template <typename Scalar, int N>
-jacobian_matrix<Scalar, N> body_jacobian(
+cartan::expected<jacobian_matrix<Scalar, N>, chain_failure> space_jacobian(
     const kinematic_chain<Scalar, N>& chain,
     const fk_result<Scalar, N>& fk)
 {
-    auto J_s = space_jacobian(chain, fk);
+    auto shape = detail::check_fk_shape(chain, fk);
+    if (!shape)
+    {
+        return cartan::unexpected(shape.error());
+    }
+    return space_jacobian_unchecked(chain, fk);
+}
+
+/// Body Jacobian under the same unchecked precondition on fk as the space
+/// Jacobian above.
+///
+/// Reference: Lynch & Park, Modern Robotics, Eq. 5.22, p. 185.
+template <typename Scalar, int N>
+jacobian_matrix<Scalar, N> body_jacobian_unchecked(
+    const kinematic_chain<Scalar, N>& chain,
+    const fk_result<Scalar, N>& fk)
+{
+    auto J_s = space_jacobian_unchecked(chain, fk);
     matrix6<Scalar> Ad_inv = fk.end_effector.inverse().adjoint();
     return Ad_inv * J_s;
 }
 
+/// Body Jacobian: J_b(q) = [Ad_{T^{-1}}] * J_s(q).
+///
+/// Maps joint velocities to end-effector body-frame twist: V_b = J_b(q) * dq.
+template <typename Scalar, int N>
+cartan::expected<jacobian_matrix<Scalar, N>, chain_failure> body_jacobian(
+    const kinematic_chain<Scalar, N>& chain,
+    const fk_result<Scalar, N>& fk)
+{
+    auto shape = detail::check_fk_shape(chain, fk);
+    if (!shape)
+    {
+        return cartan::unexpected(shape.error());
+    }
+    return body_jacobian_unchecked(chain, fk);
+}
+
 /// Specialized space Jacobian for static_chain exploiting compile-time
-/// joint tag knowledge. Computes each column via axis-specific adjoint-screw
-/// helpers that use column extraction and sparse multiply instead of the
-/// full 6x6 adjoint matrix.
+/// joint tag knowledge, under the same unchecked precondition on fk. Computes
+/// each column via axis-specific adjoint-screw helpers that use column
+/// extraction and sparse multiply instead of the full 6x6 adjoint matrix.
 template <typename Scalar, joint_tag... Joints>
 jacobian_matrix<Scalar, static_cast<int>(sizeof...(Joints))>
-space_jacobian(
+space_jacobian_unchecked(
     const static_chain<Scalar, Joints...>& chain,
     const fk_result<Scalar, static_cast<int>(sizeof...(Joints))>& fk)
 {
@@ -196,17 +236,48 @@ space_jacobian(
     return J;
 }
 
-/// Specialized body Jacobian for static_chain.
-/// Delegates to the specialized space_jacobian and applies Ad_{T^{-1}}.
+/// Specialized space Jacobian for static_chain.
+template <typename Scalar, joint_tag... Joints>
+cartan::expected<jacobian_matrix<Scalar, static_cast<int>(sizeof...(Joints))>, chain_failure>
+space_jacobian(
+    const static_chain<Scalar, Joints...>& chain,
+    const fk_result<Scalar, static_cast<int>(sizeof...(Joints))>& fk)
+{
+    auto shape = detail::check_fk_shape(chain, fk);
+    if (!shape)
+    {
+        return cartan::unexpected(shape.error());
+    }
+    return space_jacobian_unchecked(chain, fk);
+}
+
+/// Specialized body Jacobian for static_chain, under the same unchecked
+/// precondition on fk. Delegates to the specialized space Jacobian and applies
+/// Ad_{T^{-1}}.
 template <typename Scalar, joint_tag... Joints>
 jacobian_matrix<Scalar, static_cast<int>(sizeof...(Joints))>
+body_jacobian_unchecked(
+    const static_chain<Scalar, Joints...>& chain,
+    const fk_result<Scalar, static_cast<int>(sizeof...(Joints))>& fk)
+{
+    auto J_s = space_jacobian_unchecked(chain, fk);
+    matrix6<Scalar> Ad_inv = fk.end_effector.inverse().adjoint();
+    return Ad_inv * J_s;
+}
+
+/// Specialized body Jacobian for static_chain.
+template <typename Scalar, joint_tag... Joints>
+cartan::expected<jacobian_matrix<Scalar, static_cast<int>(sizeof...(Joints))>, chain_failure>
 body_jacobian(
     const static_chain<Scalar, Joints...>& chain,
     const fk_result<Scalar, static_cast<int>(sizeof...(Joints))>& fk)
 {
-    auto J_s = space_jacobian(chain, fk);
-    matrix6<Scalar> Ad_inv = fk.end_effector.inverse().adjoint();
-    return Ad_inv * J_s;
+    auto shape = detail::check_fk_shape(chain, fk);
+    if (!shape)
+    {
+        return cartan::unexpected(shape.error());
+    }
+    return body_jacobian_unchecked(chain, fk);
 }
 
 namespace detail
@@ -225,7 +296,8 @@ inline constexpr bool is_jacobian_specialized_v<static_chain<Scalar, Joints...>>
 
 }
 
-/// Generic space Jacobian for any chain type satisfying the chain concept.
+/// Generic space Jacobian for any chain type satisfying the chain concept,
+/// under the same unchecked precondition on fk as the overloads above.
 ///
 /// J_si(q) = Ad_{T_{i-1}}(S_i), where T_0 = I (identity).
 ///
@@ -233,7 +305,7 @@ inline constexpr bool is_jacobian_specialized_v<static_chain<Scalar, Joints...>>
 template <chain Chain>
     requires (!detail::is_jacobian_specialized_v<Chain>)
 jacobian_matrix<typename Chain::scalar_type, Chain::joints>
-space_jacobian(
+space_jacobian_unchecked(
     const Chain& chain,
     const fk_result<typename Chain::scalar_type, Chain::joints>& fk)
 {
@@ -263,7 +335,24 @@ space_jacobian(
     return J;
 }
 
-/// Generic body Jacobian for any chain type satisfying the chain concept.
+/// Generic space Jacobian for any chain type satisfying the chain concept.
+template <chain Chain>
+    requires (!detail::is_jacobian_specialized_v<Chain>)
+cartan::expected<jacobian_matrix<typename Chain::scalar_type, Chain::joints>, chain_failure>
+space_jacobian(
+    const Chain& chain,
+    const fk_result<typename Chain::scalar_type, Chain::joints>& fk)
+{
+    auto shape = detail::check_fk_shape(chain, fk);
+    if (!shape)
+    {
+        return cartan::unexpected(shape.error());
+    }
+    return space_jacobian_unchecked(chain, fk);
+}
+
+/// Generic body Jacobian for any chain type satisfying the chain concept,
+/// under the same unchecked precondition on fk.
 ///
 /// J_b(q) = [Ad_{T^{-1}}] * J_s(q).
 ///
@@ -271,13 +360,29 @@ space_jacobian(
 template <chain Chain>
     requires (!detail::is_jacobian_specialized_v<Chain>)
 jacobian_matrix<typename Chain::scalar_type, Chain::joints>
+body_jacobian_unchecked(
+    const Chain& chain,
+    const fk_result<typename Chain::scalar_type, Chain::joints>& fk)
+{
+    auto J_s = space_jacobian_unchecked(chain, fk);
+    matrix6<typename Chain::scalar_type> Ad_inv = fk.end_effector.inverse().adjoint();
+    return Ad_inv * J_s;
+}
+
+/// Generic body Jacobian for any chain type satisfying the chain concept.
+template <chain Chain>
+    requires (!detail::is_jacobian_specialized_v<Chain>)
+cartan::expected<jacobian_matrix<typename Chain::scalar_type, Chain::joints>, chain_failure>
 body_jacobian(
     const Chain& chain,
     const fk_result<typename Chain::scalar_type, Chain::joints>& fk)
 {
-    auto J_s = space_jacobian(chain, fk);
-    matrix6<typename Chain::scalar_type> Ad_inv = fk.end_effector.inverse().adjoint();
-    return Ad_inv * J_s;
+    auto shape = detail::check_fk_shape(chain, fk);
+    if (!shape)
+    {
+        return cartan::unexpected(shape.error());
+    }
+    return body_jacobian_unchecked(chain, fk);
 }
 
 }
