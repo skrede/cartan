@@ -520,9 +520,9 @@ struct clamp_limits;
 
 Hard clamping: clamps each `q(i)` to `[position_min, position_max]`.
 Simple and robust, but may cause discontinuities at boundaries. Default
-for the native `lbfgsb`, whose generalized Cauchy point already bounds
-the step, and for the argmin/NLopt policies that enforce box constraints
-internally (`argmin_slsqp`, `argmin_bobyqa`, `nlopt_*`).
+for the native `lbfgsb`, and for the argmin/NLopt policies that already
+enforce box constraints internally (`argmin_slsqp`, `argmin_bobyqa`,
+`nlopt_*`).
 
 ### null_space_limits
 

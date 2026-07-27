@@ -1,6 +1,21 @@
 #ifndef HPP_GUARD_CARTAN_TESTS_ODR_HOLDER_H
 #define HPP_GUARD_CARTAN_TESTS_ODR_HOLDER_H
 
+// A build option selects what gets compiled; only a component target's own
+// propagated definition may reach a translation unit. One arriving here means a
+// public name can vary by build option again, which is the state this fixture
+// exists to forbid, so refuse to compile rather than report agreement.
+#if defined(CARTAN_BUILD_ARGMIN) || defined(CARTAN_BUILD_NLOPT)
+#error "a backend build option reached a translation unit; only CARTAN_HAS_<BACKEND> may"
+#endif
+
+// Mirrors the registered backend list. A backend added there and forgotten here
+// leaves the two units below unable to tell their configurations apart, and
+// they refuse to compile rather than compare vacuously.
+#if defined(CARTAN_HAS_ARGMIN) || defined(CARTAN_HAS_NLOPT)
+#define CARTAN_ODR_BACKEND_LINKED 1
+#endif
+
 #include <cartan/serial/ik/ik.h>
 
 #include <cstddef>
