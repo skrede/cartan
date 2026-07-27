@@ -77,7 +77,13 @@ auto compute_bounding_box(
     {
         auto q = random_joint_config(chain, rng);
         auto fk = cartan::forward_kinematics(chain, q);
-        auto t = fk.end_effector.translation();
+        if (!fk)
+        {
+            // A sample the entry point refuses was never evaluated, so it
+            // widens no bound; the box stays an outer bound either way.
+            continue;
+        }
+        auto t = fk->end_effector.translation();
         bb.tmin = bb.tmin.cwiseMin(t);
         bb.tmax = bb.tmax.cwiseMax(t);
     }

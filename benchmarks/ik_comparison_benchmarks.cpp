@@ -2128,7 +2128,7 @@ static void bm_ur3e_per_call_forward_kinematics(benchmark::State& state)
     auto q = f.problem.to_position(f.x);
     for (auto _ : state)
     {
-        auto fk = cartan::forward_kinematics(f.chain, q);
+        auto fk = cartan::forward_kinematics_unchecked(f.chain, q);
         benchmark::DoNotOptimize(fk);
     }
 }

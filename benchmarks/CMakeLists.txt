@@ -1,3 +1,34 @@
+# Measured-region purity gate.
+#
+# A checked kinematics entry point inside a `for (auto _ : state)` block times
+# the guard along with the kinematics and moves a published number under an
+# unchanged benchmark name. Nothing downstream can see that: it compiles, it
+# runs, and it reports. The check therefore runs here, at configure time, and is
+# placed before the dependency detection below so a missing third-party library
+# cannot take the whole file's early return past it.
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
+execute_process(
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/check_measured_regions.py
+            --benchmarks-root ${CMAKE_CURRENT_SOURCE_DIR}
+    RESULT_VARIABLE _measured_region_result
+    OUTPUT_VARIABLE _measured_region_output
+    ERROR_VARIABLE _measured_region_error)
+
+if (NOT _measured_region_result EQUAL 0)
+    message(FATAL_ERROR
+        "cartan benchmarks: a measured block calls a checked kinematics entry "
+        "point. Call the _unchecked sibling there and establish the precondition "
+        "outside the block.\n${_measured_region_output}${_measured_region_error}")
+endif ()
+
+message(STATUS "cartan benchmarks: ${_measured_region_output}")
+
+file(GLOB _measured_region_sources CONFIGURE_DEPENDS
+    ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp ${CMAKE_CURRENT_SOURCE_DIR}/*.h)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    ${CMAKE_SOURCE_DIR}/tools/check_measured_regions.py ${_measured_region_sources})
+
 # Benchmark dependencies are detected here, not hard-required. Under
 # CARTAN_BUILD_BENCHMARKS each third-party dependency is looked for (and, when
 # CARTAN_FETCH_BENCHMARK_DEPS is ON, fetched via FetchContent if missing); any
