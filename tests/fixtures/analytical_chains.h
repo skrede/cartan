@@ -16,6 +16,9 @@
 /// These fixtures build (a) a PUMA whose joint-6 axis is (0, 0, -1) and (b) a
 /// PUMA with realistic [-pi, pi] joint limits.
 
+#include "../support/expected_helpers.h"
+#include "../support/joint_limits_helpers.h"
+
 #include <cartan/types.h>
 #include <cartan/lie/se3.h>
 #include <cartan/lie/so3.h>
@@ -42,7 +45,8 @@ auto make_anti_parallel_wrist_puma()
 {
     using vec3 = cartan::vector3<Scalar>;
 
-    const Scalar d1(0.5), a2(0.4), a3(0.3), d6(0.1);
+    const Scalar d1 = Scalar(0.5), a2 = Scalar(0.4), a3 = Scalar(0.3),
+        d6 = Scalar(0.1);
     vec3 wrist_point(a2 + a3, Scalar(0), d1);
     vec3 ee_point(a2 + a3 + d6, Scalar(0), d1);
 
@@ -61,15 +65,17 @@ auto make_anti_parallel_wrist_puma()
         vec3(Scalar(0), Scalar(0), Scalar(-1)), wrist_point);
 
     auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::identity(), ee_point);
-    cartan::joint_limits<Scalar> lim{
-        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
+    auto lim = cartan::testing::limits(
+        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>);
     std::array<cartan::joint_limits<Scalar>, 6> limits = {
         lim, lim, lim, lim, lim, lim};
 
-    return cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y,
-                                cartan::revolute_y, cartan::revolute_z,
-                                cartan::revolute_y, cartan::revolute_z>(
-        home, {s0, s1, s2, s3, s4, s5}, limits);
+    using chain_type = cartan::static_chain<Scalar,
+        cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
+        cartan::revolute_z, cartan::revolute_y, cartan::revolute_z>;
+    return cartan::testing::unwrap(
+        chain_type::make(home, {s0, s1, s2, s3, s4, s5}, limits),
+        "cartan::fixtures::make_anti_parallel_wrist_puma");
 }
 
 /// PUMA-type 6R chain (Z, Y, Y | Z, Y, Z) with an OFFSET SHOULDER: axis 2 is
@@ -86,7 +92,8 @@ auto make_offset_shoulder_puma()
 {
     using vec3 = cartan::vector3<Scalar>;
 
-    const Scalar d1(0.5), a1(0.15), a2(0.4), a3(0.3), d6(0.1);
+    const Scalar d1 = Scalar(0.5), a1 = Scalar(0.15), a2 = Scalar(0.4),
+        a3 = Scalar(0.3), d6 = Scalar(0.1);
     vec3 wrist_point(a1 + a2 + a3, Scalar(0), d1);
     vec3 ee_point(a1 + a2 + a3 + d6, Scalar(0), d1);
 
@@ -105,15 +112,17 @@ auto make_offset_shoulder_puma()
         vec3(Scalar(0), Scalar(0), Scalar(1)), wrist_point);
 
     auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::identity(), ee_point);
-    cartan::joint_limits<Scalar> lim{
-        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
+    auto lim = cartan::testing::limits(
+        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>);
     std::array<cartan::joint_limits<Scalar>, 6> limits = {
         lim, lim, lim, lim, lim, lim};
 
-    return cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y,
-                                cartan::revolute_y, cartan::revolute_z,
-                                cartan::revolute_y, cartan::revolute_z>(
-        home, {s0, s1, s2, s3, s4, s5}, limits);
+    using chain_type = cartan::static_chain<Scalar,
+        cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
+        cartan::revolute_z, cartan::revolute_y, cartan::revolute_z>;
+    return cartan::testing::unwrap(
+        chain_type::make(home, {s0, s1, s2, s3, s4, s5}, limits),
+        "cartan::fixtures::make_offset_shoulder_puma");
 }
 
 /// PUMA-type 6R chain (Z, Y, Y | Z, Y, Z) with a NEAR-SPHERICAL wrist: axis 4
@@ -131,7 +140,8 @@ auto make_near_spherical_wrist_puma(Scalar wrist_offset)
 {
     using vec3 = cartan::vector3<Scalar>;
 
-    const Scalar d1(0.5), a2(0.4), a3(0.3), d6(0.1);
+    const Scalar d1 = Scalar(0.5), a2 = Scalar(0.4), a3 = Scalar(0.3),
+        d6 = Scalar(0.1);
     vec3 wrist_point(a2 + a3, Scalar(0), d1);
     vec3 ee_point(a2 + a3 + d6, Scalar(0), d1);
 
@@ -151,15 +161,17 @@ auto make_near_spherical_wrist_puma(Scalar wrist_offset)
         vec3(Scalar(0), Scalar(0), Scalar(1)), wrist_point);
 
     auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::identity(), ee_point);
-    cartan::joint_limits<Scalar> lim{
-        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
+    auto lim = cartan::testing::limits(
+        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>);
     std::array<cartan::joint_limits<Scalar>, 6> limits = {
         lim, lim, lim, lim, lim, lim};
 
-    return cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y,
-                                cartan::revolute_y, cartan::revolute_z,
-                                cartan::revolute_y, cartan::revolute_z>(
-        home, {s0, s1, s2, s3, s4, s5}, limits);
+    using chain_type = cartan::static_chain<Scalar,
+        cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
+        cartan::revolute_z, cartan::revolute_y, cartan::revolute_z>;
+    return cartan::testing::unwrap(
+        chain_type::make(home, {s0, s1, s2, s3, s4, s5}, limits),
+        "cartan::fixtures::make_near_spherical_wrist_puma");
 }
 
 /// PUMA-type 6R chain (Z, Y, Y | Z, Y, Z) with realistic [-pi, pi] joint
@@ -173,7 +185,8 @@ auto make_puma_realistic_limits()
 {
     using vec3 = cartan::vector3<Scalar>;
 
-    const Scalar d1(0.5), a2(0.4), a3(0.3), d6(0.1);
+    const Scalar d1 = Scalar(0.5), a2 = Scalar(0.4), a3 = Scalar(0.3),
+        d6 = Scalar(0.1);
     vec3 wrist_point(a2 + a3, Scalar(0), d1);
     vec3 ee_point(a2 + a3 + d6, Scalar(0), d1);
 
@@ -191,15 +204,17 @@ auto make_puma_realistic_limits()
         vec3(Scalar(0), Scalar(0), Scalar(1)), wrist_point);
 
     auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::identity(), ee_point);
-    cartan::joint_limits<Scalar> lim{
-        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
+    auto lim = cartan::testing::limits(
+        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>);
     std::array<cartan::joint_limits<Scalar>, 6> limits = {
         lim, lim, lim, lim, lim, lim};
 
-    return cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y,
-                                cartan::revolute_y, cartan::revolute_z,
-                                cartan::revolute_y, cartan::revolute_z>(
-        home, {s0, s1, s2, s3, s4, s5}, limits);
+    using chain_type = cartan::static_chain<Scalar,
+        cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
+        cartan::revolute_z, cartan::revolute_y, cartan::revolute_z>;
+    return cartan::testing::unwrap(
+        chain_type::make(home, {s0, s1, s2, s3, s4, s5}, limits),
+        "cartan::fixtures::make_puma_realistic_limits");
 }
 
 }

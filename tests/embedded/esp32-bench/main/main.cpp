@@ -54,7 +54,13 @@ void tele(const char* line)
     uart_write_bytes(k_tele_uart, line, std::strlen(line));
 }
 
-cartan::kinematic_chain<float, 3> build_planar_3r()
+// Exceptions are off here, so a refusal is propagated rather than thrown and is
+// never read through expected's accessor.
+template <int N>
+using chain_or_failure =
+    cartan::expected<cartan::kinematic_chain<float, N>, cartan::chain_failure>;
+
+chain_or_failure<3> build_planar_3r()
 {
     using vec3f = cartan::vector3<float>;
     using screw = cartan::screw_axis<float>;
@@ -62,11 +68,15 @@ cartan::kinematic_chain<float, 3> build_planar_3r()
     auto s2 = screw::revolute(vec3f(0.f, 0.f, 1.f), vec3f(1.f, 0.f, 0.f));
     auto s3 = screw::revolute(vec3f(0.f, 0.f, 1.f), vec3f(2.f, 0.f, 0.f));
     auto home = cartan::se3<float>(cartan::so3<float>::identity(), vec3f(3.f, 0.f, 0.f));
-    cartan::joint_limits<float> lim{-3.14159265f, 3.14159265f};
-    return cartan::kinematic_chain<float, 3>{home, {s1, s2, s3}, {lim, lim, lim}};
+    auto lim = cartan::joint_limits<float>::make(-3.14159265f, 3.14159265f);
+    if (!lim.has_value())
+    {
+        return cartan::unexpected(lim.error());
+    }
+    return cartan::kinematic_chain<float, 3>{home, {s1, s2, s3}, {*lim, *lim, *lim}};
 }
 
-cartan::kinematic_chain<float, 6> build_kuka_kr6()
+chain_or_failure<6> build_kuka_kr6()
 {
     using vec3f = cartan::vector3<float>;
     using screw = cartan::screw_axis<float>;
@@ -77,8 +87,13 @@ cartan::kinematic_chain<float, 6> build_kuka_kr6()
     auto k5 = screw::revolute(vec3f(0.f, 1.f, 0.f), vec3f(0.875f, 0.f, 0.400f));
     auto k6 = screw::revolute(vec3f(1.f, 0.f, 0.f), vec3f(0.935f, 0.f, 0.400f));
     auto home = cartan::se3<float>(cartan::so3<float>::identity(), vec3f(0.935f, 0.f, 0.400f));
-    cartan::joint_limits<float> lim{-3.14159265f, 3.14159265f};
-    return cartan::kinematic_chain<float, 6>{home, {k1, k2, k3, k4, k5, k6}, {lim, lim, lim, lim, lim, lim}};
+    auto lim = cartan::joint_limits<float>::make(-3.14159265f, 3.14159265f);
+    if (!lim.has_value())
+    {
+        return cartan::unexpected(lim.error());
+    }
+    return cartan::kinematic_chain<float, 6>{
+        home, {k1, k2, k3, k4, k5, k6}, {*lim, *lim, *lim, *lim, *lim, *lim}};
 }
 
 // Deterministic reachable joint sets (kept clear of the +-pi limits).
@@ -115,7 +130,14 @@ void bench_ik(const char* robot, const char* solver, const Chain& chain,
 
     for (const auto& q_truth : truths)
     {
-        const auto target = cartan::forward_kinematics(chain, q_truth).end_effector;
+        auto target_fk = cartan::forward_kinematics(chain, q_truth);
+        if (!target_fk.has_value())
+        {
+            ESP_LOGE(TAG, "%s %s: target FK refused: %s", robot, solver,
+                cartan::message(target_fk.error()));
+            return;
+        }
+        const auto target = target_fk->end_effector;
         cartan::basic_ik_runner runner{Policy{}};
         Eigen::Vector<float, N> q0 = Eigen::Vector<float, N>::Zero();
         runner.setup(chain, target, q0, crit);
@@ -131,9 +153,15 @@ void bench_ik(const char* robot, const char* solver, const Chain& chain,
         if (result.has_value())
         {
             ++converged;
-            iters_sum += result.value().iterations;
-            const auto fk = cartan::forward_kinematics(chain, result.value().solution.position);
-            const float rv = (fk.end_effector.inverse() * target).log().norm();
+            iters_sum += result->iterations;
+            auto fk = cartan::forward_kinematics(chain, result->solution.position);
+            if (!fk.has_value())
+            {
+                ESP_LOGE(TAG, "%s %s: re-verify FK refused: %s", robot, solver,
+                    cartan::message(fk.error()));
+                return;
+            }
+            const float rv = (fk->end_effector.inverse() * target).log().norm();
             max_reverify = std::max(max_reverify, rv);
         }
     }
@@ -179,11 +207,17 @@ extern "C" void app_main()
 
     const auto c3 = build_planar_3r();
     const auto c6 = build_kuka_kr6();
+    if (!c3.has_value() || !c6.has_value())
+    {
+        ESP_LOGE(TAG, "chain refused: %s",
+            cartan::message(c3.has_value() ? c6.error() : c3.error()));
+        return;
+    }
     const auto t3 = make_truths<3>();
     const auto t6 = make_truths<6>();
 
-    bench_all_solvers<cartan::kinematic_chain<float, 3>, 3>("planar3R", c3, t3);
-    bench_all_solvers<cartan::kinematic_chain<float, 6>, 6>("kuka6R", c6, t6);
+    bench_all_solvers<cartan::kinematic_chain<float, 3>, 3>("planar3R", *c3, t3);
+    bench_all_solvers<cartan::kinematic_chain<float, 6>, 6>("kuka6R", *c6, t6);
 
     tele("END\n");
     ESP_LOGI(TAG, "sweep complete");

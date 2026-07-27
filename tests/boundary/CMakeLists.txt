@@ -66,6 +66,7 @@ cartan_add_boundary_test(velocity_shape_boundary_test velocity_shape_boundary_te
 cartan_add_boundary_test(fk_boundary_test fk_boundary_test.cpp)
 cartan_add_boundary_test(jacobian_boundary_test jacobian_boundary_test.cpp)
 cartan_add_boundary_test(solver_setup_boundary_test solver_setup_boundary_test.cpp)
+cartan_add_boundary_test(fixture_smoke_test fixture_smoke_test.cpp)
 
 # The tag/axis and classification cells are wrong-value cells with no sanitizer
 # signature, and their demonstrations construct no group element from nonfinite

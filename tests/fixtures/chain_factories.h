@@ -9,6 +9,9 @@
 /// and the standalone profiling tool can share the same robot definitions
 /// without pulling in external robot library dependencies.
 
+#include "../support/expected_helpers.h"
+#include "../support/joint_limits_helpers.h"
+
 #include <cartan/types.h>
 #include <cartan/lie/se3.h>
 #include <cartan/lie/so3.h>
@@ -54,8 +57,8 @@ auto make_3r_planar_chain() -> cartan::kinematic_chain<Scalar, 3>
     vec3 home_trans(Scalar(3), Scalar(0), Scalar(0));
     auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::identity(), home_trans);
 
-    cartan::joint_limits<Scalar> lim{
-        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
+    auto lim = cartan::testing::limits(
+        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>);
 
     return cartan::kinematic_chain<Scalar, 3>(
         home,
@@ -93,8 +96,8 @@ auto make_ur3e_chain() -> cartan::kinematic_chain<Scalar, 6>
     vec3 home_trans(Scalar(-0.45675), Scalar(0.22315), Scalar(0.0665));
     auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::identity(), home_trans);
 
-    cartan::joint_limits<Scalar> lim{
-        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
+    auto lim = cartan::testing::limits(
+        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>);
 
     return cartan::kinematic_chain<Scalar, 6>(
         home,
@@ -137,8 +140,8 @@ auto make_lbr_med14_chain() -> cartan::kinematic_chain<Scalar, 7>
     vec3 home_trans(Scalar(0), Scalar(0), Scalar(1.306));
     auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::identity(), home_trans);
 
-    cartan::joint_limits<Scalar> lim{
-        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
+    auto lim = cartan::testing::limits(
+        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>);
 
     return cartan::kinematic_chain<Scalar, 7>(
         home,
@@ -177,8 +180,8 @@ auto make_kr6_sixx_chain() -> cartan::kinematic_chain<Scalar, 6>
     vec3 home_trans(Scalar(0.935), Scalar(0), Scalar(0.400));
     auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::identity(), home_trans);
 
-    cartan::joint_limits<Scalar> lim{
-        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
+    auto lim = cartan::testing::limits(
+        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>);
 
     return cartan::kinematic_chain<Scalar, 6>(
         home,
@@ -230,8 +233,8 @@ auto make_panda_chain() -> cartan::kinematic_chain<Scalar, 7>
     vec3 home_trans(Scalar(0.088), Scalar(0), Scalar(1.140));
     auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::identity(), home_trans);
 
-    cartan::joint_limits<Scalar> lim{
-        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
+    auto lim = cartan::testing::limits(
+        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>);
 
     return cartan::kinematic_chain<Scalar, 7>(
         home,
@@ -278,8 +281,8 @@ auto make_abb_irb120_chain() -> cartan::kinematic_chain<Scalar, 6>
     vec3 home_trans(Scalar(0), Scalar(0), Scalar(0.934));
     auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::identity(), home_trans);
 
-    cartan::joint_limits<Scalar> lim{
-        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
+    auto lim = cartan::testing::limits(
+        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>);
 
     return cartan::kinematic_chain<Scalar, 6>(
         home,
@@ -327,8 +330,8 @@ auto make_jaco2_chain() -> cartan::kinematic_chain<Scalar, 6>
     vec3 home_trans(Scalar(0.410), Scalar(0.5246), Scalar(0.2755));
     auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::identity(), home_trans);
 
-    cartan::joint_limits<Scalar> lim{
-        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
+    auto lim = cartan::testing::limits(
+        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>);
 
     return cartan::kinematic_chain<Scalar, 6>(
         home,
@@ -379,8 +382,8 @@ auto make_fetch_chain() -> cartan::kinematic_chain<Scalar, 7>
     vec3 home_trans(Scalar(0.7805), Scalar(0), Scalar(0.400));
     auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::identity(), home_trans);
 
-    cartan::joint_limits<Scalar> lim{
-        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
+    auto lim = cartan::testing::limits(
+        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>);
 
     return cartan::kinematic_chain<Scalar, 7>(
         home,
@@ -432,8 +435,8 @@ auto make_baxter_chain() -> cartan::kinematic_chain<Scalar, 7>
     vec3 home_trans(Scalar(1.0372), Scalar(0), Scalar(0.2703));
     auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::identity(), home_trans);
 
-    cartan::joint_limits<Scalar> lim{
-        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
+    auto lim = cartan::testing::limits(
+        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>);
 
     return cartan::kinematic_chain<Scalar, 7>(
         home,
@@ -483,8 +486,8 @@ auto make_kuka_lwr4_chain() -> cartan::kinematic_chain<Scalar, 7>
     vec3 home_trans(Scalar(0), Scalar(0), Scalar(1.1785));
     auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::identity(), home_trans);
 
-    cartan::joint_limits<Scalar> lim{
-        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
+    auto lim = cartan::testing::limits(
+        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>);
 
     return cartan::kinematic_chain<Scalar, 7>(
         home,
@@ -535,8 +538,8 @@ struct planar_2r_geometry
 
     static std::array<cartan::joint_limits<Scalar>, 2> limits()
     {
-        cartan::joint_limits<Scalar> lim{
-            -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
+        auto lim = cartan::testing::limits(
+            -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>);
         return {lim, lim};
     }
 };
@@ -572,8 +575,8 @@ struct spatial_3r_geometry
 
     static std::array<cartan::joint_limits<Scalar>, 3> limits()
     {
-        cartan::joint_limits<Scalar> lim{
-            -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
+        auto lim = cartan::testing::limits(
+            -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>);
         return {lim, lim, lim};
     }
 };
@@ -621,8 +624,8 @@ struct abb_irb120_geometry
 
     static std::array<cartan::joint_limits<Scalar>, 6> limits()
     {
-        cartan::joint_limits<Scalar> lim{
-            -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
+        auto lim = cartan::testing::limits(
+            -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>);
         return {lim, lim, lim, lim, lim, lim};
     }
 };
@@ -664,8 +667,8 @@ struct kr6_sixx_geometry
 
     static std::array<cartan::joint_limits<Scalar>, 6> limits()
     {
-        cartan::joint_limits<Scalar> lim{
-            -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
+        auto lim = cartan::testing::limits(
+            -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>);
         return {lim, lim, lim, lim, lim, lim};
     }
 };
@@ -688,10 +691,14 @@ template <typename Scalar>
 auto make_planar_2r_static()
     -> cartan::static_chain<Scalar, cartan::revolute_y, cartan::revolute_y>
 {
-    return cartan::static_chain<Scalar, cartan::revolute_y, cartan::revolute_y>(
-        detail::planar_2r_geometry<Scalar>::home(),
-        detail::planar_2r_geometry<Scalar>::axes(),
-        detail::planar_2r_geometry<Scalar>::limits());
+    using chain_type =
+        cartan::static_chain<Scalar, cartan::revolute_y, cartan::revolute_y>;
+    return cartan::testing::unwrap(
+        chain_type::make(
+            detail::planar_2r_geometry<Scalar>::home(),
+            detail::planar_2r_geometry<Scalar>::axes(),
+            detail::planar_2r_geometry<Scalar>::limits()),
+        "cartan::fixtures::make_planar_2r_static");
 }
 
 // --- Synthetic spatial 3R factory pair ---
@@ -711,11 +718,14 @@ auto make_spatial_3r_static()
     -> cartan::static_chain<Scalar,
         cartan::revolute_z, cartan::revolute_y, cartan::revolute_z>
 {
-    return cartan::static_chain<Scalar,
-        cartan::revolute_z, cartan::revolute_y, cartan::revolute_z>(
-        detail::spatial_3r_geometry<Scalar>::home(),
-        detail::spatial_3r_geometry<Scalar>::axes(),
-        detail::spatial_3r_geometry<Scalar>::limits());
+    using chain_type = cartan::static_chain<Scalar,
+        cartan::revolute_z, cartan::revolute_y, cartan::revolute_z>;
+    return cartan::testing::unwrap(
+        chain_type::make(
+            detail::spatial_3r_geometry<Scalar>::home(),
+            detail::spatial_3r_geometry<Scalar>::axes(),
+            detail::spatial_3r_geometry<Scalar>::limits()),
+        "cartan::fixtures::make_spatial_3r_static");
 }
 
 // --- ABB IRB 120 static_chain factory (paired with make_abb_irb120_chain) ---
@@ -725,12 +735,15 @@ auto make_abb_irb120_static()
         cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
         cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>
 {
-    return cartan::static_chain<Scalar,
+    using chain_type = cartan::static_chain<Scalar,
         cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
-        cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>(
-        detail::abb_irb120_geometry<Scalar>::home(),
-        detail::abb_irb120_geometry<Scalar>::axes(),
-        detail::abb_irb120_geometry<Scalar>::limits());
+        cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>;
+    return cartan::testing::unwrap(
+        chain_type::make(
+            detail::abb_irb120_geometry<Scalar>::home(),
+            detail::abb_irb120_geometry<Scalar>::axes(),
+            detail::abb_irb120_geometry<Scalar>::limits()),
+        "cartan::fixtures::make_abb_irb120_static");
 }
 
 // --- KUKA KR 6 R900 SIXX static_chain factory (paired with make_kr6_sixx_chain) ---
@@ -740,12 +753,15 @@ auto make_kr6_sixx_static()
         cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
         cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>
 {
-    return cartan::static_chain<Scalar,
+    using chain_type = cartan::static_chain<Scalar,
         cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
-        cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>(
-        detail::kr6_sixx_geometry<Scalar>::home(),
-        detail::kr6_sixx_geometry<Scalar>::axes(),
-        detail::kr6_sixx_geometry<Scalar>::limits());
+        cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>;
+    return cartan::testing::unwrap(
+        chain_type::make(
+            detail::kr6_sixx_geometry<Scalar>::home(),
+            detail::kr6_sixx_geometry<Scalar>::axes(),
+            detail::kr6_sixx_geometry<Scalar>::limits()),
+        "cartan::fixtures::make_kr6_sixx_static");
 }
 
 // ===========================================================================
@@ -792,7 +808,7 @@ auto random_joint_config(
     {
         auto idx = static_cast<std::size_t>(i);
         dist = std::uniform_real_distribution<Scalar>(
-            limits[idx].position_min, limits[idx].position_max);
+            limits[idx].position_min(), limits[idx].position_max());
         q(i) = dist(rng);
     }
 
@@ -807,7 +823,9 @@ auto random_reachable_target(
     -> cartan::se3<Scalar>
 {
     auto q = random_joint_config(chain, rng);
-    auto fk = cartan::forward_kinematics(chain, q);
+    auto fk = cartan::testing::unwrap(
+        cartan::forward_kinematics(chain, q),
+        "cartan::fixtures::random_reachable_target");
     return fk.end_effector;
 }
 
@@ -825,7 +843,9 @@ auto compute_pose_errors(
     const cartan::se3<Scalar>& target)
     -> std::pair<Scalar, Scalar>
 {
-    auto fk = cartan::forward_kinematics(chain, q_solution);
+    auto fk = cartan::testing::unwrap(
+        cartan::forward_kinematics(chain, q_solution),
+        "cartan::fixtures::compute_pose_errors");
     auto error_twist = (fk.end_effector.inverse() * target).log();
 
     // omega-first convention: head<3> = angular, tail<3> = linear
@@ -883,12 +903,12 @@ auto make_cartanbot_chain() -> cartan::kinematic_chain<Scalar, cartan::dynamic>
     vec3 home_trans(Scalar(0), Scalar(0.05), Scalar(1.40));
     auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::identity(), home_trans);
 
-    cartan::joint_limits<Scalar> rev_lim{
-        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
-    cartan::joint_limits<Scalar> prismatic_lim{Scalar(0), Scalar(0.20)};
-    cartan::joint_limits<Scalar> continuous_lim{
+    auto rev_lim = cartan::testing::limits(
+        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>);
+    auto prismatic_lim = cartan::testing::limits(Scalar(0), Scalar(0.20));
+    auto continuous_lim = cartan::testing::limits(
         -std::numeric_limits<Scalar>::infinity(),
-        +std::numeric_limits<Scalar>::infinity()};
+        +std::numeric_limits<Scalar>::infinity());
 
     auto chain_static = cartan::kinematic_chain<Scalar, 6>(
         home,
@@ -903,16 +923,18 @@ auto make_cartanbot_chain() -> cartan::kinematic_chain<Scalar, cartan::dynamic>
 
 #ifdef CARTAN_URDF_EXTENDED_TESTS
 
-// The five extended factories below mirror the vendored real-world URDFs
+// The nine extended factories below mirror the vendored real-world URDFs
 // under tests/fixtures/urdf/extended/. Their screw axes were derived by
 // walking each URDF's joint tree from base_link to the unique tool leaf,
 // composing the per-joint <origin rpy/> rotations into the cumulative
 // base-frame and folding fixed joints into the surrounding accumulator
 // (the same procedure cartan::build_chain executes). They therefore
-// reproduce numerical noise inherited from the upstream xacro arithmetic
-// (e.g. the 2e-10 axis components on the UR variants that come from
-// xacro's exact half-pi handling). Keeping the noise in the factories
-// matches what the parser produces exactly so the 1e-12 parity gate holds.
+// reproduce numerical noise inherited from the upstream xacro arithmetic:
+// on each UR variant four axes deviate from their principal direction by
+// 2.05103e-10 and the fifth by 4.10207e-10, both from xacro's exact
+// half-pi handling. The larger of the two is the figure any axis-direction
+// tolerance has to admit. Keeping the noise in the factories matches what
+// the parser produces exactly so the 1e-12 parity gate holds.
 
 /// Hand-coded ground-truth chain matching the vendored
 /// tests/fixtures/urdf/extended/ur3e.urdf.
@@ -948,9 +970,9 @@ auto make_ur3e_chain_extended() -> cartan::kinematic_chain<Scalar, cartan::dynam
     vec3 p_home(Scalar(0.45675), Scalar(0.223149999964989), Scalar(0.066499999954231));
     auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::from_matrix(R_home).value(), p_home);
 
-    cartan::joint_limits<Scalar> lim{
+    auto lim = cartan::testing::limits(
         -Scalar(2) * std::numbers::pi_v<Scalar>,
-        +Scalar(2) * std::numbers::pi_v<Scalar>};
+        +Scalar(2) * std::numbers::pi_v<Scalar>);
 
     auto chain_static = cartan::kinematic_chain<Scalar, 6>(
         home,
@@ -993,9 +1015,9 @@ auto make_ur5e_chain_extended() -> cartan::kinematic_chain<Scalar, cartan::dynam
     vec3 p_home(Scalar(0.8172), Scalar(0.232899999959102), Scalar(0.062799999952231));
     auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::from_matrix(R_home).value(), p_home);
 
-    cartan::joint_limits<Scalar> lim{
+    auto lim = cartan::testing::limits(
         -Scalar(2) * std::numbers::pi_v<Scalar>,
-        +Scalar(2) * std::numbers::pi_v<Scalar>};
+        +Scalar(2) * std::numbers::pi_v<Scalar>);
 
     auto chain_static = cartan::kinematic_chain<Scalar, 6>(
         home,
@@ -1038,9 +1060,9 @@ auto make_ur10_chain_extended() -> cartan::kinematic_chain<Scalar, cartan::dynam
     vec3 p_home(Scalar(1.1843), Scalar(0.256140999952539), Scalar(0.011599999947465));
     auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::from_matrix(R_home).value(), p_home);
 
-    cartan::joint_limits<Scalar> lim{
+    auto lim = cartan::testing::limits(
         -Scalar(2) * std::numbers::pi_v<Scalar>,
-        +Scalar(2) * std::numbers::pi_v<Scalar>};
+        +Scalar(2) * std::numbers::pi_v<Scalar>);
 
     auto chain_static = cartan::kinematic_chain<Scalar, 6>(
         home,
@@ -1083,9 +1105,9 @@ auto make_ur16_chain_extended() -> cartan::kinematic_chain<Scalar, cartan::dynam
     vec3 p_home(Scalar(0.8384), Scalar(0.290699999950837), Scalar(0.060849999940376));
     auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::from_matrix(R_home).value(), p_home);
 
-    cartan::joint_limits<Scalar> lim{
+    auto lim = cartan::testing::limits(
         -Scalar(2) * std::numbers::pi_v<Scalar>,
-        +Scalar(2) * std::numbers::pi_v<Scalar>};
+        +Scalar(2) * std::numbers::pi_v<Scalar>);
 
     auto chain_static = cartan::kinematic_chain<Scalar, 6>(
         home,
@@ -1131,9 +1153,9 @@ auto make_iiwa14_chain_extended() -> cartan::kinematic_chain<Scalar, cartan::dyn
     vec3 p_home(Scalar(0), Scalar(0), Scalar(1.306));
     auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::from_matrix(R_home).value(), p_home);
 
-    cartan::joint_limits<Scalar> lim{
+    auto lim = cartan::testing::limits(
         -std::numbers::pi_v<Scalar>,
-        +std::numbers::pi_v<Scalar>};
+        +std::numbers::pi_v<Scalar>);
 
     auto chain_static = cartan::kinematic_chain<Scalar, 7>(
         home,
@@ -1190,13 +1212,13 @@ auto make_panda_chain_extended() -> cartan::kinematic_chain<Scalar, cartan::dyna
     auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::from_matrix(R_home).value(), p_home);
 
     // Per-joint limits as declared in the vendored URDF.
-    cartan::joint_limits<Scalar> lim1{Scalar(-2.8973), Scalar(2.8973)};
-    cartan::joint_limits<Scalar> lim2{Scalar(-1.7628), Scalar(1.7628)};
-    cartan::joint_limits<Scalar> lim3{Scalar(-2.8973), Scalar(2.8973)};
-    cartan::joint_limits<Scalar> lim4{Scalar(-3.0718), Scalar(-0.0698)};
-    cartan::joint_limits<Scalar> lim5{Scalar(-2.8973), Scalar(2.8973)};
-    cartan::joint_limits<Scalar> lim6{Scalar(-0.0175), Scalar(3.7525)};
-    cartan::joint_limits<Scalar> lim7{Scalar(-2.8973), Scalar(2.8973)};
+    auto lim1 = cartan::testing::limits(Scalar(-2.8973), Scalar(2.8973));
+    auto lim2 = cartan::testing::limits(Scalar(-1.7628), Scalar(1.7628));
+    auto lim3 = cartan::testing::limits(Scalar(-2.8973), Scalar(2.8973));
+    auto lim4 = cartan::testing::limits(Scalar(-3.0718), Scalar(-0.0698));
+    auto lim5 = cartan::testing::limits(Scalar(-2.8973), Scalar(2.8973));
+    auto lim6 = cartan::testing::limits(Scalar(-0.0175), Scalar(3.7525));
+    auto lim7 = cartan::testing::limits(Scalar(-2.8973), Scalar(2.8973));
 
     auto chain_static = cartan::kinematic_chain<Scalar, 7>(
         home,
@@ -1254,12 +1276,12 @@ auto make_lbr_iiwa7_chain_extended() -> cartan::kinematic_chain<Scalar, cartan::
     // Per-joint limits as declared in the vendored URDF (symmetric ranges,
     // joints 1/3/5 at +/-170 deg, joints 2/4/6 at +/-120 deg, joint 7 at
     // +/-175 deg, expressed in radians).
-    cartan::joint_limits<Scalar> lim_170{
-        Scalar(-2.9670597283903604), Scalar(+2.9670597283903604)};
-    cartan::joint_limits<Scalar> lim_120{
-        Scalar(-2.0943951023931953), Scalar(+2.0943951023931953)};
-    cartan::joint_limits<Scalar> lim_175{
-        Scalar(-3.0543261909900763), Scalar(+3.0543261909900763)};
+    auto lim_170 = cartan::testing::limits(
+        Scalar(-2.9670597283903604), Scalar(+2.9670597283903604));
+    auto lim_120 = cartan::testing::limits(
+        Scalar(-2.0943951023931953), Scalar(+2.0943951023931953));
+    auto lim_175 = cartan::testing::limits(
+        Scalar(-3.0543261909900763), Scalar(+3.0543261909900763));
 
     auto chain_static = cartan::kinematic_chain<Scalar, 7>(
         home,
@@ -1330,18 +1352,18 @@ auto make_kr6_sixx_chain_extended() -> cartan::kinematic_chain<Scalar, cartan::d
     auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::from_matrix(R_home).value(), p_home);
 
     // Per-joint limits as declared in the vendored URDF (joint_a1..a6).
-    cartan::joint_limits<Scalar> lim_a1{
-        Scalar(-2.9670597283903604), Scalar(+2.9670597283903604)};
-    cartan::joint_limits<Scalar> lim_a2{
-        Scalar(-3.3161255787892263), Scalar(+0.7853981633974483)};
-    cartan::joint_limits<Scalar> lim_a3{
-        Scalar(-2.0943951023931953), Scalar(+2.7227136331111540)};
-    cartan::joint_limits<Scalar> lim_a4{
-        Scalar(-3.2288591161895095), Scalar(+3.2288591161895095)};
-    cartan::joint_limits<Scalar> lim_a5{
-        Scalar(-2.0943951023931953), Scalar(+2.0943951023931953)};
-    cartan::joint_limits<Scalar> lim_a6{
-        Scalar(-6.1086523819801535), Scalar(+6.1086523819801535)};
+    auto lim_a1 = cartan::testing::limits(
+        Scalar(-2.9670597283903604), Scalar(+2.9670597283903604));
+    auto lim_a2 = cartan::testing::limits(
+        Scalar(-3.3161255787892263), Scalar(+0.7853981633974483));
+    auto lim_a3 = cartan::testing::limits(
+        Scalar(-2.0943951023931953), Scalar(+2.7227136331111540));
+    auto lim_a4 = cartan::testing::limits(
+        Scalar(-3.2288591161895095), Scalar(+3.2288591161895095));
+    auto lim_a5 = cartan::testing::limits(
+        Scalar(-2.0943951023931953), Scalar(+2.0943951023931953));
+    auto lim_a6 = cartan::testing::limits(
+        Scalar(-6.1086523819801535), Scalar(+6.1086523819801535));
 
     auto chain_static = cartan::kinematic_chain<Scalar, 6>(
         home,
@@ -1405,18 +1427,18 @@ auto make_abb_irb120_chain_extended() -> cartan::kinematic_chain<Scalar, cartan:
     auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::from_matrix(R_home).value(), p_home);
 
     // Per-joint limits as declared in the vendored URDF (joint_1..joint_6).
-    cartan::joint_limits<Scalar> lim_j1{
-        Scalar(-2.87979), Scalar(+2.87979)};
-    cartan::joint_limits<Scalar> lim_j2{
-        Scalar(-1.91986), Scalar(+1.91986)};
-    cartan::joint_limits<Scalar> lim_j3{
-        Scalar(-1.91986), Scalar(+1.22173)};
-    cartan::joint_limits<Scalar> lim_j4{
-        Scalar(-2.79253), Scalar(+2.79253)};
-    cartan::joint_limits<Scalar> lim_j5{
-        Scalar(-2.094395), Scalar(+2.094395)};
-    cartan::joint_limits<Scalar> lim_j6{
-        Scalar(-6.98132), Scalar(+6.98132)};
+    auto lim_j1 = cartan::testing::limits(
+        Scalar(-2.87979), Scalar(+2.87979));
+    auto lim_j2 = cartan::testing::limits(
+        Scalar(-1.91986), Scalar(+1.91986));
+    auto lim_j3 = cartan::testing::limits(
+        Scalar(-1.91986), Scalar(+1.22173));
+    auto lim_j4 = cartan::testing::limits(
+        Scalar(-2.79253), Scalar(+2.79253));
+    auto lim_j5 = cartan::testing::limits(
+        Scalar(-2.094395), Scalar(+2.094395));
+    auto lim_j6 = cartan::testing::limits(
+        Scalar(-6.98132), Scalar(+6.98132));
 
     auto chain_static = cartan::kinematic_chain<Scalar, 6>(
         home,

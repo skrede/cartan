@@ -12,6 +12,9 @@
 /// NEGATIVE z and x directions so a dropped sign produces an observable error
 /// against the generic se3::exp Product-of-Exponentials oracle.
 
+#include "../support/expected_helpers.h"
+#include "../support/joint_limits_helpers.h"
+
 #include <cartan/types.h>
 #include <cartan/lie/se3.h>
 #include <cartan/lie/so3.h>
@@ -59,9 +62,9 @@ auto make_rppr_signed_chain() -> cartan::kinematic_chain<Scalar, 4>
     vec3 home_trans(Scalar(1), Scalar(0), Scalar(0));
     auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::identity(), home_trans);
 
-    cartan::joint_limits<Scalar> rot{
-        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
-    cartan::joint_limits<Scalar> pris{Scalar(-1), Scalar(1)};
+    auto rot = cartan::testing::limits(
+        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>);
+    auto pris = cartan::testing::limits(Scalar(-1), Scalar(1));
 
     return cartan::kinematic_chain<Scalar, 4>(
         home, {s1, s2, s3, s4}, {rot, pris, pris, rot});
@@ -75,10 +78,13 @@ auto make_rppr_signed_static()
     -> cartan::static_chain<Scalar, cartan::revolute_z, cartan::prismatic_z,
                             cartan::prismatic_x, cartan::revolute_z>
 {
+    using chain_type = cartan::static_chain<Scalar,
+        cartan::revolute_z, cartan::prismatic_z,
+        cartan::prismatic_x, cartan::revolute_z>;
     auto kc = make_rppr_signed_chain<Scalar>();
-    return cartan::static_chain<Scalar, cartan::revolute_z, cartan::prismatic_z,
-                                cartan::prismatic_x, cartan::revolute_z>(
-        kc.home(), kc.axes(), kc.limits());
+    return cartan::testing::unwrap(
+        chain_type::make(kc.home(), kc.axes(), kc.limits()),
+        "cartan::fixtures::make_rppr_signed_static");
 }
 
 /// Dynamic-sized variant of the signed R-P-P-R chain, driving the runtime

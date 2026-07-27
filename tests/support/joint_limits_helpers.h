@@ -6,11 +6,11 @@
 // belongs here and not in the library: a helper that discards a typed error is
 // exactly what the library must not offer.
 
+#include "expected_helpers.h"
+
 #include <cartan/serial/chain/joint_limits.h>
 #include <cartan/serial/chain/chain_failure.h>
 
-#include <cstdio>
-#include <cstdlib>
 #include <optional>
 #include <type_traits>
 
@@ -32,14 +32,10 @@ cartan::joint_limits<Scalar> limits(
     std::optional<std::type_identity_t<Scalar>> effort_max = std::nullopt,
     std::optional<std::type_identity_t<Scalar>> acceleration_max = std::nullopt)
 {
-    auto made = cartan::joint_limits<Scalar>::make(
-        position_min, position_max, velocity_max, effort_max, acceleration_max);
-    if (!made.has_value())
-    {
-        std::fprintf(stderr, "cartan::testing::limits: %s\n", cartan::message(made.error()));
-        std::abort();
-    }
-    return *made;
+    return unwrap(
+        cartan::joint_limits<Scalar>::make(
+            position_min, position_max, velocity_max, effort_max, acceleration_max),
+        "cartan::testing::limits");
 }
 
 }

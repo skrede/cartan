@@ -31,8 +31,9 @@ namespace
 
 /// Build a planar 3R chain identical in spirit to the ESP-IDF smoke: three
 /// revolute joints about +z with unit link spacing and a home pose one unit
-/// past the last joint.
-cartan::kinematic_chain<float, 3> build_planar_3r()
+/// past the last joint. Exceptions are off here, so a refused limit is
+/// propagated rather than thrown and is never read through the accessor.
+cartan::expected<cartan::kinematic_chain<float, 3>, cartan::chain_failure> build_planar_3r()
 {
     using vec3f = cartan::vector3<float>;
     using screw = cartan::screw_axis<float>;
@@ -45,11 +46,12 @@ cartan::kinematic_chain<float, 3> build_planar_3r()
     using pose = cartan::se3<float>;
     pose home(rot::identity(), vec3f(3.f, 0.f, 0.f));
 
-    using limits = cartan::joint_limits<float>;
-    return cartan::kinematic_chain<float, 3>{
-        home,
-        {s1, s2, s3},
-        {limits{-3.14f, 3.14f}, limits{-3.14f, 3.14f}, limits{-3.14f, 3.14f}}};
+    auto lim = cartan::joint_limits<float>::make(-3.14f, 3.14f);
+    if (!lim.has_value())
+    {
+        return cartan::unexpected(lim.error());
+    }
+    return cartan::kinematic_chain<float, 3>{home, {s1, s2, s3}, {*lim, *lim, *lim}};
 }
 
 /// Exercise forward kinematics, the body Jacobian, one projected-LM IK step,
@@ -58,17 +60,29 @@ cartan::kinematic_chain<float, 3> build_planar_3r()
 float app_stub()
 {
     auto chain = build_planar_3r();
+    if (!chain.has_value())
+    {
+        return 0.f;
+    }
 
     Eigen::Matrix<float, 3, 1> q;
     q << 0.1f, 0.2f, 0.3f;
 
-    // Forward kinematics: reach the end-effector pose at this configuration.
-    auto fk = cartan::forward_kinematics(chain, q);
-    const float fk_x = fk.end_effector.translation().x();
+    // Forward kinematics and the body Jacobian: each is evaluated once, so each
+    // takes the checked entry point and branches on the result.
+    auto fk = cartan::forward_kinematics(*chain, q);
+    if (!fk.has_value())
+    {
+        return 0.f;
+    }
+    const float fk_x = fk->end_effector.translation().x();
 
-    // Body Jacobian: 6xN twist map at the same configuration.
-    auto J_b = cartan::body_jacobian(chain, fk);
-    const float jac_trace = J_b.cwiseAbs().sum();
+    auto J_b = cartan::body_jacobian(*chain, *fk);
+    if (!J_b.has_value())
+    {
+        return fk_x;
+    }
+    const float jac_trace = J_b->cwiseAbs().sum();
 
     // Projected Levenberg-Marquardt: aim the solver at the just-computed
     // reachable pose from a nearby seed and advance a single work unit. This
@@ -79,8 +93,8 @@ float app_stub()
     Eigen::Matrix<float, 3, 1> q_seed;
     q_seed << 0.05f, 0.15f, 0.25f;
 
-    solver.setup(chain, fk.end_effector, q_seed, criteria);
-    auto ik_step = solver.step(chain, 1);
+    solver.setup(*chain, fk->end_effector, q_seed, criteria);
+    auto ik_step = solver.step(*chain, 1);
     const float ik_error = ik_step.metrics.error_norm;
 
     // Paden-Kahan subproblem 1: recover the angle of a quarter-turn about +z.
@@ -91,7 +105,7 @@ float app_stub()
     cartan::vector3<float> p(1.f, 0.f, 0.f);
     cartan::vector3<float> p_prime(0.f, 1.f, 0.f);
     auto pk1 = cartan::paden_kahan_1<float>(omega, q_axis, p, p_prime);
-    const float pk1_theta = pk1.has_value() ? pk1.value() : 0.f;
+    const float pk1_theta = pk1.has_value() ? *pk1 : 0.f;
 
     return fk_x + jac_trace + ik_error + pk1_theta;
 }

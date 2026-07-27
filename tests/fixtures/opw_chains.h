@@ -17,6 +17,9 @@
 /// agree everywhere; the numbers below are trusted only because that gate holds,
 /// not because they were read from a datasheet.
 
+#include "../support/expected_helpers.h"
+#include "../support/joint_limits_helpers.h"
+
 #include <cartan/types.h>
 #include <cartan/analytical.h>
 #include <cartan/lie/se3.h>
@@ -87,8 +90,8 @@ auto make_kr6_r900_opw_chain()
 {
     using vec3 = cartan::vector3<Scalar>;
 
-    const Scalar a1(0.025), a2(-0.035), c1(0.400), c2(0.455), c3(0.420),
-        c4(0.080);
+    const Scalar a1 = Scalar(0.025), a2 = Scalar(-0.035), c1 = Scalar(0.400),
+        c2 = Scalar(0.455), c3 = Scalar(0.420), c4 = Scalar(0.080);
     const Scalar half_pi = std::numbers::pi_v<Scalar> / Scalar(2);
 
     // Physical joint lines at the user home (arm horizontal-forward).
@@ -120,15 +123,17 @@ auto make_kr6_r900_opw_chain()
     vec3 flange(a1 + c2 + c3 + c4, Scalar(0), c1 - a2);
     auto home = cartan::se3<Scalar>(home_rotation, flange);
 
-    cartan::joint_limits<Scalar> lim{
-        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
+    auto lim = cartan::testing::limits(
+        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>);
     std::array<cartan::joint_limits<Scalar>, 6> limits = {
         lim, lim, lim, lim, lim, lim};
 
-    return cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y,
-                                cartan::revolute_y, cartan::revolute_x,
-                                cartan::revolute_y, cartan::revolute_x>(
-        home, {s0, s1, s2, s3, s4, s5}, limits);
+    using chain_type = cartan::static_chain<Scalar,
+        cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
+        cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>;
+    return cartan::testing::unwrap(
+        chain_type::make(home, {s0, s1, s2, s3, s4, s5}, limits),
+        "cartan::fixtures::make_kr6_r900_opw_chain");
 }
 
 }
