@@ -81,18 +81,18 @@ public:
         {
             position_type seed_q = (restart == 0) ? seed : seed_gen(restart - 1);
 
-            Policy policy{};
-            policy.setup(chain, target, seed_q, criteria);
-
-            // A precondition failure is a property of the caller's arguments,
-            // not of the seed, so trying the next one cannot help and doing so
-            // would report "no solution" with the cause discarded.
+            // Checked before the policy is handed the seed: one that does not
+            // validate for itself would already have read past it. No fresh seed
+            // repairs a caller's bad argument, so the enumeration returns here.
             if (auto held = detail::validate_solve_inputs(chain, target, seed_q); !held)
             {
                 result.restarts_attempted = restart + 1;
                 result.failure = detail::setup_failure_reason(held.error());
                 return result;
             }
+
+            Policy policy{};
+            policy.setup(chain, target, seed_q, criteria);
 
             for (int i = 0; i < criteria.max_iterations_per_attempt; ++i)
             {

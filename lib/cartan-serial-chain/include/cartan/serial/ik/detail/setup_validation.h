@@ -39,6 +39,21 @@ cartan::expected<void, ik_status> validate_solve_inputs(
     return {};
 }
 
+/// The chain is a parameter of every solve policy's step(), not the object
+/// setup() validated, so the setup-time shape check does not by itself bind the
+/// chain the iteration reads. Comparing the joint count against the one setup
+/// recorded restores the binding for an integer compare, without the
+/// per-iteration shape scan the unchecked hot path exists to avoid.
+template <typename Chain>
+ik_status chain_bound_status(ik_status status, int setup_joints, const Chain& chain)
+{
+    if (status != ik_status::running)
+    {
+        return status;
+    }
+    return chain.num_joints() == setup_joints ? status : ik_status::dimension_mismatch;
+}
+
 /// The two statuses a failed precondition latches. A wrapper that restarts on a
 /// terminal inner status tests this to tell a caller's bad argument, which no
 /// fresh seed can repair, from a stalled or diverged attempt, which one can.

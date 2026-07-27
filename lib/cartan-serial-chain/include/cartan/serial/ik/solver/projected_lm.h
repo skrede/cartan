@@ -157,13 +157,17 @@ public:
         const convergence_criteria<scalar_type>& criteria,
         const error_weight<scalar_type>& weight)
     {
-        // The one check every attempt below is entitled to assume. Latching its
-        // failure into the status member is how a void setup() reports.
+        // Half of what every attempt below is entitled to assume; the joint
+        // count recorded here is the other half, re-checked against the chain
+        // step() is handed. Latching a failure into the status member is how a
+        // void setup() reports.
         if (auto held = cartan::detail::validate_solve_inputs(chain, target, q0); !held)
         {
             m_status = held.error();
             return;
         }
+
+        m_setup_joints = chain.num_joints();
 
         m_seed_gen.emplace(chain);
         m_restart_count = 0;
@@ -178,6 +182,8 @@ public:
 
     step_result<scalar_type> step(const Chain& chain, int N)
     {
+        m_status = cartan::detail::chain_bound_status(m_status, m_setup_joints, chain);
+
         // The loop below admits any status that is not converged, which a
         // terminal setup status would pass. The predicate is load-bearing for
         // restart-on-stall and is left alone; the failed setup returns here.
@@ -271,11 +277,6 @@ private:
         const convergence_criteria<scalar_type>& criteria,
         const error_weight<scalar_type>& weight)
     {
-        if (cartan::detail::is_precondition_failure(m_status))
-        {
-            return;
-        }
-
         m_target = target;
         m_q = q0;
         m_criteria = criteria;
@@ -641,6 +642,7 @@ private:
     int m_iterations{};
     int m_total_iterations{};
     int m_restart_count{};
+    int m_setup_joints{-1};
     ik_status m_status{ik_status::not_initialized};
     bool m_best_feasible{false};
     bool m_best_valid{false};

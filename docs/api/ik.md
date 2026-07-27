@@ -157,6 +157,10 @@ ik_status status() const;
 void abort();
 ```
 
+`abort()` returns the runner to `running` so a later `solve()` resumes, but it
+does not clear a `setup()` that was refused: the arguments are still the ones
+that were rejected, and there is no configured policy behind them.
+
 ### Thread safety
 
 Different runner instances may operate concurrently on the same
@@ -310,13 +314,23 @@ constexpr const char* message(ik_status status);
 
 Stepper-level control flow signal returned by `step()` calls.
 
-The last three are terminal before any iteration runs. A solver starts in
-`not_initialized`, so stepping one that was never set up performs no iteration
+The last three are terminal before any iteration runs. Every solve policy starts
+in `not_initialized`, so stepping one that was never set up performs no iteration
 and consumes no work units instead of reading a default-constructed joint
-vector. `setup()` returns `void` and reports a rejected seed or target by
-latching `dimension_mismatch` or `non_finite_input`; every solver's work loop
-refuses to run from a latched terminal status, and `basic_ik_runner` maps it
-onto the same-named `ik_failure` reason.
+vector, and every policy's work loop refuses to run from a latched terminal
+status.
+
+`setup()` returns `void`, so it reports a rejected seed or target by latching
+`dimension_mismatch` or `non_finite_input`. `basic_ik_runner`, `restart_wrapper`,
+`exhaustive_ik_runner` and the seven policies that ship without an optional
+backend -- `lm`, `dls`, `lbfgsb`, `newton_raphson`, `projected_lm`,
+`nlopt_bobyqa` and `nlopt_slsqp` -- validate their arguments this way. The
+thirteen backend-gated policies do not yet; a solve driven straight through one
+of them, rather than through a runner or the wrapper, is unchecked. Because the
+chain is a parameter of `step()` and not only of `setup()`, each validating
+policy also records the setup-time joint count and refuses a `step()` whose
+chain does not match it. `basic_ik_runner` maps a latched status onto the
+same-named `ik_failure` reason.
 
 `message()` returns a static diagnostic string; it allocates nothing.
 
@@ -792,7 +806,10 @@ both `setup()` overloads validate their arguments and latch the terminal status
 in the wrapper, so `step()` returns `dimension_mismatch` or `non_finite_input`
 unchanged without consuming a restart, and `restarts()` stays at zero. A later
 well-formed `setup()` clears the latch, so a wrapper that refused one call is
-still usable. The best damping parameter (lambda)
+still usable. `converged()`, `solution()` and `error_norm()` read through the
+same latch: a refused setup ran no attempt, so they report `false`, a zero
+configuration and `numeric_limits<scalar_type>::max()` rather than the previous
+solve's answer. The best damping parameter (lambda)
 from near-miss attempts is preserved across restarts for warm-starting
 (when the inner policy supports `set_lambda()`/`lambda()`). Budgets via
 the work-unit contract: the restart event itself charges zero additional

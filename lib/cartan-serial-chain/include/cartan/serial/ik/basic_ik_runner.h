@@ -116,39 +116,23 @@ public:
         m_target = target;
         m_criteria = criteria;
         m_objective = options.objective;
-        m_status = ik_status::running;
+        reset_state(chain, options);
 
-        // Latched before any policy is touched, so a rejected seed leaves every
-        // policy in its terminal default rather than half-configured.
+        // Reset first, validate second, and latch before any policy is touched:
+        // a rejected seed must leave neither a half-configured policy nor the
+        // previous solve's convergence flag, iterate and counters readable.
         if (auto held = cartan::detail::validate_solve_inputs(chain, target, q0); !held)
         {
             m_status = held.error();
             return;
         }
 
-        m_best_error = std::numeric_limits<scalar_type>::max();
-        m_best_manipulability = scalar_type(0);
-        m_best_isotropy = scalar_type(0);
-        m_total_iterations = 0;
-        m_found_convergence = false;
         m_best_q = q0;
+        std::get<0>(m_policies).setup(chain, target, q0, criteria);
 
-        if constexpr (sizeof...(Policies) == 1)
+        if constexpr (sizeof...(Policies) > 1)
         {
-            std::get<0>(m_policies).setup(chain, target, q0, criteria);
-        }
-        else
-        {
-            m_max_total_iterations = options.max_total_iterations;
-            m_early_stop = false;
-            m_parked = {};
-            m_results = {};
-            m_best_solver_index = -1;
-
             m_seed_gen.emplace(chain);
-
-            std::get<0>(m_policies).setup(chain, target, q0, criteria);
-
             setup_remaining_policies(chain, target, criteria, options.halton_seed,
                 std::make_index_sequence<sizeof...(Policies) - 1>{});
         }
@@ -167,13 +151,14 @@ public:
         const solver_options<scalar_type>& = {}) = delete;
 
     /// Precondition: setup() must be called before step(). Invoked beforehand,
-    /// step() has no chain to drive and returns a terminal status
-    /// (ik_status::iteration_limit) rather than dereferencing an empty borrow.
+    /// step() has no chain to drive and returns ik_status::not_initialized --
+    /// the same answer status() and solve() give -- rather than dereferencing
+    /// an empty borrow.
     ik_status step()
     {
         if (!m_chain)
         {
-            return ik_status::iteration_limit;
+            return ik_status::not_initialized;
         }
 
         if (m_status != ik_status::running)
@@ -277,8 +262,15 @@ public:
     const position_type& current_q() const { return m_best_q; }
     ik_status status() const { return m_status; }
 
+    /// A refused setup is not a state a caller can abort out of: the arguments
+    /// are still the ones setup() rejected, so clearing the latch here would
+    /// let the next solve() run against a policy that was never configured.
     void abort()
     {
+        if (cartan::detail::is_setup_failure(m_status))
+        {
+            return;
+        }
         abort_all(std::index_sequence_for<Policies...>{});
         m_status = ik_status::running;
     }
@@ -292,6 +284,22 @@ private:
         bool converged{false};
         ik_termination_reason termination_reason{ik_termination_reason::unknown};
     };
+
+    void reset_state(const chain_type& chain, const solver_options<scalar_type>& options)
+    {
+        m_status = ik_status::running;
+        m_best_error = std::numeric_limits<scalar_type>::max();
+        m_best_manipulability = scalar_type(0);
+        m_best_isotropy = scalar_type(0);
+        m_total_iterations = 0;
+        m_found_convergence = false;
+        m_best_q = position_type::Zero(chain.num_joints());
+        m_max_total_iterations = options.max_total_iterations;
+        m_early_stop = false;
+        m_parked = {};
+        m_results = {};
+        m_best_solver_index = -1;
+    }
 
     step_result<scalar_type> step_single_metrics(int N)
     {
@@ -601,6 +609,16 @@ private:
         err.condition_number = scalar_type(0);
         err.termination_reason = ik_termination_reason::unknown;
 
+        // A refused setup ran no iteration, so there is no last iterate to
+        // report; reading one off a policy would hand back the previous solve's.
+        if (cartan::detail::is_setup_failure(m_status))
+        {
+            err.last_q = m_best_q;
+            err.last_error_norm = std::numeric_limits<scalar_type>::max();
+            err.reason = cartan::detail::setup_failure_reason(m_status);
+            return cartan::unexpected(err);
+        }
+
         if constexpr (sizeof...(Policies) == 1)
         {
             err.last_q = std::get<0>(m_policies).solution();
@@ -646,11 +664,6 @@ private:
                 break;
             case ik_status::joint_limit_hit:
                 err.reason = ik_failure::joint_limit_violation;
-                break;
-            case ik_status::not_initialized:
-            case ik_status::dimension_mismatch:
-            case ik_status::non_finite_input:
-                err.reason = cartan::detail::setup_failure_reason(m_status);
                 break;
             default:
                 err.reason = ik_failure::iteration_limit;

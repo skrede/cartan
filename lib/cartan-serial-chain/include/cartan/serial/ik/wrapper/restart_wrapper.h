@@ -118,6 +118,8 @@ public:
         m_best_feasible = false;
         m_best_valid = false;
         m_aborted = false;
+        m_best_q = position_type::Zero(chain.num_joints());
+        m_setup_joints = chain.num_joints();
 
         // Assigned on both outcomes, not only on failure: a wrapper is reusable,
         // and a latch written only when the check fails would report the stale
@@ -152,6 +154,8 @@ public:
         m_best_feasible = false;
         m_best_valid = false;
         m_aborted = false;
+        m_best_q = position_type::Zero(chain.num_joints());
+        m_setup_joints = chain.num_joints();
 
         auto held = cartan::detail::validate_solve_inputs(chain, target, q0);
         m_precondition = held ? ik_status::running : held.error();
@@ -191,11 +195,17 @@ public:
 
     step_result<scalar_type> step(const Chain& chain, int N)
     {
+        // The restart path re-seeds from a generator built on the setup-time
+        // chain and hands the result to the step-time one, so the two must be
+        // the same chain before either is touched.
+        m_precondition = cartan::detail::chain_bound_status(
+            m_precondition, m_setup_joints, chain);
+
         // A wrapper-level rejection never reached the inner solver, so there is
         // nothing to step and nothing to restart from.
         if (cartan::detail::is_setup_failure(m_precondition))
         {
-            return {m_precondition, {0, m_inner.error_norm()}};
+            return {m_precondition, {0, error_norm()}};
         }
 
         if (m_aborted)
@@ -254,20 +264,38 @@ public:
         return {ik_status::running, {inner_result.metrics.units_consumed, m_inner.error_norm()}};
     }
 
-    bool converged() const { return m_inner.converged(); }
+    // All three read through the same gate: a refused setup ran no attempt, so
+    // the inner solver still holds the previous solve's answer and reporting it
+    // would present that solve as this one's. They are part of the solve_policy
+    // concept, so a caller reading them instead of step()'s status must not see
+    // a converged solve with an error norm of zero.
+    bool converged() const
+    {
+        return !cartan::detail::is_setup_failure(m_precondition) && m_inner.converged();
+    }
+
     // On a converged solve the live inner iterate is the answer; on a terminal
     // solve report the feasibility-first best-so-far captured across restarts
     // rather than the last (discarded) attempt.
     position_type solution() const
     {
+        if (cartan::detail::is_setup_failure(m_precondition))
+        {
+            return m_best_q;
+        }
         if (m_inner.converged() || !m_best_valid)
         {
             return m_inner.solution();
         }
         return m_best_q;
     }
+
     scalar_type error_norm() const
     {
+        if (cartan::detail::is_setup_failure(m_precondition))
+        {
+            return std::numeric_limits<scalar_type>::max();
+        }
         if (m_inner.converged() || !m_best_valid)
         {
             return m_inner.error_norm();
@@ -346,6 +374,7 @@ private:
     std::optional<halton_seed_generator<Chain>> m_seed_gen{};
     ik_status m_precondition{ik_status::not_initialized};
     int m_restart_count{};
+    int m_setup_joints{-1};
     int m_total_iterations{};
     scalar_type m_best_lambda{};
     scalar_type m_best_error{std::numeric_limits<scalar_type>::max()};

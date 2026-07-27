@@ -271,6 +271,129 @@ TEMPLATE_TEST_CASE("a restart-wrapped solver is reusable after a rejected setup"
     REQUIRE(accepted.metrics.units_consumed > 0);
 }
 
+// The corpus's only reuse case drove the projected solver *through* the restart
+// wrapper, which returns before the inner setup() ever sees the bad seed. The
+// bare solver is exercised here so the wrapper cannot mask an inner latch that
+// no later setup clears.
+template <typename Solver, typename Scalar>
+static void expect_reusable_after_rejected_setup()
+{
+    auto chain = make_six_joint_dynamic_chain<Scalar>();
+    auto target = reachable_target<Scalar>(chain);
+    const int n = chain.num_joints();
+
+    Solver solver;
+    auto rejected = setup_then_step(
+        solver, chain, target, joint_vector<Scalar>(n - 1, Scalar(0.1)));
+    REQUIRE(rejected.status == spp::ik_status::dimension_mismatch);
+
+    auto accepted = setup_then_step(
+        solver, chain, target, joint_vector<Scalar>(n, Scalar(0.15)));
+    REQUIRE(accepted.status != spp::ik_status::dimension_mismatch);
+    REQUIRE(accepted.status != spp::ik_status::non_finite_input);
+    REQUIRE(accepted.status != spp::ik_status::not_initialized);
+    REQUIRE(accepted.metrics.units_consumed > 0);
+}
+
+TEMPLATE_TEST_CASE("a solver used directly is reusable after a rejected setup",
+    "[ik][boundary]", double, float)
+{
+    using Scalar = TestType;
+    expect_reusable_after_rejected_setup<lm_solver<Scalar>, Scalar>();
+    expect_reusable_after_rejected_setup<projected_solver<Scalar>, Scalar>();
+    expect_reusable_after_rejected_setup<dls_solver<Scalar>, Scalar>();
+}
+
+// setup() validates the chain it is handed, but every policy takes the chain as
+// a parameter of step() as well, so nothing but this check binds the two.
+template <typename Solver, typename Scalar>
+static void expect_foreign_chain_refused()
+{
+    auto chain = make_six_joint_dynamic_chain<Scalar>();
+    auto wider = make_dynamic_chain<Scalar>(12);
+    auto target = reachable_target<Scalar>(chain);
+
+    Solver solver;
+    solver.setup(chain, target, joint_vector<Scalar>(chain.num_joints(), Scalar(0.15)),
+        spp::convergence_criteria<Scalar>{});
+
+    auto stepped = solver.step(wider, 4);
+    REQUIRE(stepped.status == spp::ik_status::dimension_mismatch);
+    REQUIRE(stepped.metrics.units_consumed == 0);
+}
+
+TEMPLATE_TEST_CASE("a solver refuses a step against a chain setup never saw",
+    "[ik][boundary]", double, float)
+{
+    using Scalar = TestType;
+    expect_foreign_chain_refused<lm_solver<Scalar>, Scalar>();
+    expect_foreign_chain_refused<projected_solver<Scalar>, Scalar>();
+    expect_foreign_chain_refused<dls_solver<Scalar>, Scalar>();
+    expect_foreign_chain_refused<
+        spp::restart_wrapper<dyn_chain<Scalar>, projected_solver<Scalar>>, Scalar>();
+}
+
+TEMPLATE_TEST_CASE("aborting a runner does not clear a refused setup",
+    "[ik][boundary]", double, float)
+{
+    using Scalar = TestType;
+    auto chain = make_six_joint_dynamic_chain<Scalar>();
+    auto target = reachable_target<Scalar>(chain);
+    const int n = chain.num_joints();
+
+    spp::basic_ik_runner<lm_solver<Scalar>> runner;
+    runner.setup(chain, target, joint_vector<Scalar>(n, Scalar(0.15)),
+        spp::convergence_criteria<Scalar>{});
+    REQUIRE(runner.solve().has_value());
+
+    runner.setup(chain, target, joint_vector<Scalar>(n - 1, Scalar(0.1)),
+        spp::convergence_criteria<Scalar>{});
+    REQUIRE(runner.status() == spp::ik_status::dimension_mismatch);
+
+    runner.abort();
+    REQUIRE(runner.status() == spp::ik_status::dimension_mismatch);
+
+    auto result = runner.solve();
+    REQUIRE_FALSE(result.has_value());
+    REQUIRE(result.error().reason == spp::ik_failure::dimension_mismatch);
+}
+
+TEMPLATE_TEST_CASE("a refused setup leaves nothing of the previous solve readable",
+    "[ik][boundary]", double, float)
+{
+    using Scalar = TestType;
+    using wrapper_type = spp::restart_wrapper<dyn_chain<Scalar>, projected_solver<Scalar>>;
+
+    auto chain = make_six_joint_dynamic_chain<Scalar>();
+    auto target = reachable_target<Scalar>(chain);
+    const int n = chain.num_joints();
+    const spp::convergence_criteria<Scalar> criteria{};
+
+    spp::basic_ik_runner<lm_solver<Scalar>> runner;
+    runner.setup(chain, target, joint_vector<Scalar>(n, Scalar(0.15)), criteria);
+    REQUIRE(runner.solve().has_value());
+
+    runner.setup(chain, target, joint_vector<Scalar>(n - 1, Scalar(0.1)), criteria);
+    REQUIRE_FALSE(runner.converged());
+    REQUIRE(runner.iterations() == 0);
+    auto result = runner.solve();
+    REQUIRE_FALSE(result.has_value());
+    REQUIRE(result.error().last_error_norm == std::numeric_limits<Scalar>::max());
+    REQUIRE(result.error().last_q.size() == n);
+    REQUIRE(result.error().last_q.isZero());
+
+    wrapper_type wrapper;
+    wrapper.setup(chain, target, joint_vector<Scalar>(n, Scalar(0.15)), criteria);
+    while (wrapper.step(chain, 8).status == spp::ik_status::running) {}
+    REQUIRE(wrapper.converged());
+
+    wrapper.setup(chain, target, joint_vector<Scalar>(n - 1, Scalar(0.1)), criteria);
+    REQUIRE_FALSE(wrapper.converged());
+    REQUIRE(wrapper.error_norm() == std::numeric_limits<Scalar>::max());
+    REQUIRE(wrapper.iterations() == 0);
+    REQUIRE(wrapper.solution().isZero());
+}
+
 TEMPLATE_TEST_CASE("the exhaustive runner evaluates one seed and returns the failure",
     "[ik][boundary]", double, float)
 {

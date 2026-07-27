@@ -83,14 +83,17 @@ public:
         const convergence_criteria<scalar_type>& criteria,
         const error_weight<scalar_type>& weight)
     {
-        // The one check the iteration loop below is entitled to assume. Latching
-        // its failure into the status member is how a void setup() reports:
-        // the loop's running guard then refuses to run.
+        // Half of what the iteration loop below is entitled to assume; the
+        // joint count recorded here is the other half, re-checked against the
+        // chain step() is handed. Latching a failure into the status member is
+        // how a void setup() reports: the loop's running guard refuses to run.
         if (auto held = cartan::detail::validate_solve_inputs(chain, target, q0); !held)
         {
             m_status = held.error();
             return;
         }
+
+        m_setup_joints = chain.num_joints();
 
         m_target = target;
         m_q = q0;
@@ -122,6 +125,8 @@ public:
 
     step_result<scalar_type> step(const Chain& chain, int N)
     {
+        m_status = cartan::detail::chain_bound_status(m_status, m_setup_joints, chain);
+
         int units = 0;
         while (units < N && m_status == ik_status::running)
         {
@@ -227,6 +232,7 @@ private:
     scalar_type m_error_norm{std::numeric_limits<scalar_type>::max()};
     int m_iterations{};
     int m_stall_count{};
+    int m_setup_joints{-1};
     ik_status m_status{ik_status::not_initialized};
 };
 
