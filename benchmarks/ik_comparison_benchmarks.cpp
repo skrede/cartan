@@ -26,7 +26,7 @@
 #include <cartan/serial/ik/basic_ik_runner.h>
 #include <cartan/serial/ik/solver/lm.h>
 #include <cartan/serial/ik/wrapper/restart_wrapper.h>
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 #include <cartan/serial/ik/solver/argmin_slsqp.h>
 #include <cartan/serial/ik/solver/argmin_bobyqa.h>
 #include <cartan/serial/ik/solver/nw_sqp.h>
@@ -932,7 +932,7 @@ static void bm_comparison_kuka_lwr4_cartan_racing(benchmark::State& state)
 }
 BENCHMARK(bm_comparison_kuka_lwr4_cartan_racing)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 // ============================================================================
 // argmin comparison benchmarks (three axes)
 // ============================================================================

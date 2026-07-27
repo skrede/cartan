@@ -32,7 +32,7 @@ See [IK Methods](../background/ik-methods.md) | [IK Composition Guide](../guides
 | `cartan::lm` (alias for `builtin_lm`) | `#include <cartan/serial/ik/solver/lm.h>` |
 | `cartan::lbfgsb` (alias for `builtin_lbfgsb`) | `#include <cartan/serial/ik/solver/lbfgsb.h>` |
 | `cartan::projected_lm`, `cartan::dls`, `cartan::newton_raphson` | `#include <cartan/serial/ik/solver/{projected_lm,dls,newton_raphson}.h>` |
-| argmin-backed: `cartan::argmin_lm`, `argmin_lbfgsb`, `argmin_slsqp`, `argmin_bobyqa`, `argmin_projected_gn`, `argmin_projected_gradient_gn` | `#include <cartan/serial/ik/solver/argmin_*.h>` |
+| argmin-backed: `cartan::argmin_lm`, `argmin_lbfgsb`, `argmin_slsqp`, `argmin_bobyqa`, `argmin_projected_gn`, `argmin_projected_gradient_gn` | `#include <cartan/serial/ik/solver/argmin_*.h>` (requires `CARTAN_HAS_ARGMIN`) |
 | NLopt-backed: `cartan::nlopt_slsqp`, `cartan::nlopt_bobyqa` | `#include <cartan/serial/ik/solver/nlopt_*.h>` (requires `CARTAN_HAS_NLOPT`) |
 | SQP family: `cartan::nw_sqp`, `filter_nw_sqp`, `filter_slsqp` | `#include <cartan/serial/ik/solver/{nw_sqp,filter_nw_sqp,filter_slsqp}.h>` |
 | MMA / GCMMA / CMA-ES / aug. Lagrangian: `cartan::mma`, `gcmma`, `cmaes`, `augmented_lagrangian` | `#include <cartan/serial/ik/solver/{mma,gcmma,cmaes,augmented_lagrangian}.h>` |

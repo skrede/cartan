@@ -254,7 +254,12 @@ auto solver = cartan::make_solver<Chain>()
 The argmin-backed policies (`argmin_slsqp`, `argmin_bobyqa`, and the rest of the
 argmin family) provide constrained optimization with joint limits as box bounds.
 They are compiled only when Cartan is built with argmin support
-(`CARTAN_BUILD_ARGMIN`).
+(`CARTAN_BUILD_ARGMIN`), and reach a consumer only through the `cartan::argmin`
+target, which carries both the backend headers and `CARTAN_HAS_ARGMIN`:
+
+```cmake
+target_link_libraries(app PRIVATE cartan::cartan cartan::argmin)
+```
 
 <!-- cartan:snippet name=argmin-slsqp needs=argmin -->
 ```cpp

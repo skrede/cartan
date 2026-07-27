@@ -12,16 +12,13 @@ if (NOT TARGET Eigen3::Eigen)
             SOURCE_SUBDIR this-directory-does-not-exist
         )
         FetchContent_MakeAvailable(Eigen3)
-        add_library(eigen_headers INTERFACE)
-        add_library(Eigen3::Eigen ALIAS eigen_headers)
-        target_include_directories(eigen_headers SYSTEM INTERFACE
+        add_library(cartan_eigen_headers INTERFACE)
+        add_library(Eigen3::Eigen ALIAS cartan_eigen_headers)
+        target_include_directories(cartan_eigen_headers SYSTEM INTERFACE
             "${eigen3_SOURCE_DIR}"
         )
     else ()
         find_package(Eigen3 CONFIG REQUIRED)
-        if (Eigen3_VERSION VERSION_LESS "3.4")
-            message(FATAL_ERROR "cartan requires Eigen >= 3.4, found ${Eigen3_VERSION}")
-        endif ()
 
         get_target_property(_eigen_aliased Eigen3::Eigen ALIASED_TARGET)
         if (_eigen_aliased)
@@ -34,6 +31,10 @@ if (NOT TARGET Eigen3::Eigen)
             INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_eigen_inc}"
         )
     endif ()
+endif ()
+
+if (DEFINED Eigen3_VERSION AND Eigen3_VERSION VERSION_LESS "3.4")
+    message(FATAL_ERROR "cartan requires Eigen >= 3.4, found ${Eigen3_VERSION}")
 endif ()
 
 configure_file(

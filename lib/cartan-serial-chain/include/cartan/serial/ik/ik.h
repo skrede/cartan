@@ -25,7 +25,7 @@
 #include "cartan/serial/ik/policy/limits_policy.h"
 #include "cartan/serial/ik/policy/error_weight.h"
 
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 #include "cartan/serial/ik/solver/cmaes.h"
 #include "cartan/serial/ik/solver/argmin_lm.h"
 #include "cartan/serial/ik/solver/argmin_lbfgsb.h"

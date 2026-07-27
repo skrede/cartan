@@ -24,7 +24,7 @@
 #include <cartan/serial/ik/solver/newton_raphson.h>
 #include <cartan/serial/ik/wrapper/restart_wrapper.h>
 
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 #include <cartan/serial/ik/solver/argmin_lm.h>
 #include <cartan/serial/ik/solver/argmin_slsqp.h>
 #include <cartan/serial/ik/solver/argmin_bobyqa.h>
@@ -527,7 +527,7 @@ void bm_cartan_solver(
         total_ori / std::max(successes, 1));
 }
 
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 // k-sweep driver: same shape as bm_cartan_solver but constructs the inner
 // argmin_slsqp solver with options.multiplier_reest_every_k = K so the
 // post-step active-set Lagrange multiplier re-estimation stride is forced
@@ -1027,7 +1027,7 @@ IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, builtin_lbfgsb, c
 IK_BENCH_SOLVER_VARIANTS(kuka_lwr4,  make_kuka_lwr4_chain,  7, newton_raphson, cartan::newton_raphson, cartan::bench::newton_family_total_units);
 IK_BENCH_DEFAULT_ONLY(kuka_lwr4,  make_kuka_lwr4_chain,  7, projected_lm,   cartan::projected_lm,   cartan::bench::projected_lm_total_units);
 
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, argmin_lm,                    cartan::argmin_lm,                    cartan::bench::lm_family_total_units);
 IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, argmin_slsqp,                 cartan::argmin_slsqp,                 cartan::bench::sqp_family_total_units);
 IK_BENCH_SOLVER_VARIANTS(ur3e,       make_ur3e_chain,       6, argmin_bobyqa,                cartan::argmin_bobyqa,                cartan::bench::bobyqa_family_total_units);

@@ -8,7 +8,7 @@
 #include <cartan/serial/ik/wrapper/restart_wrapper.h>
 #include <cartan/serial/ik/solver/detail/halton_seed_generator.h>
 
-#ifdef CARTAN_TEST_HAVE_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 #include <cartan/serial/ik/solver/filter_nw_sqp.h>
 #include <cartan/serial/ik/solver/filter_slsqp.h>
 #include <cartan/serial/ik/solver/argmin_slsqp.h>
@@ -100,7 +100,7 @@ using restart_lm = cartan::restart_wrapper<chain_t,
 using restart_lbfgsb = cartan::restart_wrapper<chain_t,
     cartan::builtin_lbfgsb<chain_t, cartan::no_limits>, cartan::no_limits>;
 
-#ifdef CARTAN_TEST_HAVE_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 using filter_nw_sqp_solver = cartan::filter_nw_sqp<chain_t>;
 using filter_slsqp_solver = cartan::filter_slsqp<chain_t>;
 using argmin_slsqp_solver = cartan::argmin_slsqp<chain_t>;
@@ -115,7 +115,7 @@ TEMPLATE_TEST_CASE("continuous joint: IK roundtrip via builtin restart paths",
     verify_continuous_wrist_roundtrip<TestType>(0);
 }
 
-#ifdef CARTAN_TEST_HAVE_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 TEMPLATE_TEST_CASE("continuous joint: IK roundtrip via argmin-backed solvers",
                    "[solver_continuous_joint]",
                    filter_nw_sqp_solver,

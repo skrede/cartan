@@ -164,15 +164,13 @@ if (CARTAN_HAVE_TRAC_IK)
         target_link_libraries(ik_comparison_benchmarks PRIVATE NLopt::nlopt)
     endif()
     if(CARTAN_BUILD_ARGMIN)
-        target_compile_definitions(ik_comparison_benchmarks PRIVATE CARTAN_BUILD_ARGMIN)
-        target_link_libraries(ik_comparison_benchmarks PRIVATE argmin::argmin)
+        target_link_libraries(ik_comparison_benchmarks PRIVATE cartan::argmin)
     endif()
 
     cartan_add_benchmark(basic_ik_full_benchmarks basic_ik_full_benchmarks.cpp)
     target_link_libraries(basic_ik_full_benchmarks PRIVATE trac_ik)
     if(CARTAN_BUILD_ARGMIN)
-        target_compile_definitions(basic_ik_full_benchmarks PRIVATE CARTAN_BUILD_ARGMIN)
-        target_link_libraries(basic_ik_full_benchmarks PRIVATE argmin::argmin)
+        target_link_libraries(basic_ik_full_benchmarks PRIVATE cartan::argmin)
     endif()
     if(CARTAN_BUILD_NLOPT)
         target_compile_definitions(basic_ik_full_benchmarks PRIVATE CARTAN_HAS_NLOPT)
@@ -184,14 +182,14 @@ if (CARTAN_HAVE_TRAC_IK)
         target_link_libraries(slsqp_per_pose_capture
             PRIVATE
             cartan::cartan
-            argmin::argmin)
+            cartan::argmin)
         target_compile_options(slsqp_per_pose_capture PRIVATE ${CARTAN_WARNING_FLAGS})
 
         add_executable(slsqp_per_pose_trace slsqp_per_pose_trace.cpp)
         target_link_libraries(slsqp_per_pose_trace
             PRIVATE
             cartan::cartan
-            argmin::argmin)
+            cartan::argmin)
         target_compile_options(slsqp_per_pose_trace PRIVATE ${CARTAN_WARNING_FLAGS})
     endif()
 
@@ -239,8 +237,7 @@ if (TARGET pinocchio::pinocchio)
         target_compile_definitions(ik_comparison_pinocchio_benchmarks PRIVATE CARTAN_HAS_TRAC_IK)
     endif ()
     if (CARTAN_BUILD_ARGMIN)
-        target_compile_definitions(ik_comparison_pinocchio_benchmarks PRIVATE CARTAN_BUILD_ARGMIN)
-        target_link_libraries(ik_comparison_pinocchio_benchmarks PRIVATE argmin::argmin)
+        target_link_libraries(ik_comparison_pinocchio_benchmarks PRIVATE cartan::argmin)
     endif ()
 
     cartan_add_benchmark(closed_form_ik_benchmarks closed_form_ik_benchmarks.cpp)
@@ -250,8 +247,7 @@ if (TARGET pinocchio::pinocchio)
         target_compile_definitions(closed_form_ik_benchmarks PRIVATE CARTAN_HAS_TRAC_IK)
     endif ()
     if (CARTAN_BUILD_ARGMIN)
-        target_compile_definitions(closed_form_ik_benchmarks PRIVATE CARTAN_BUILD_ARGMIN)
-        target_link_libraries(closed_form_ik_benchmarks PRIVATE argmin::argmin)
+        target_link_libraries(closed_form_ik_benchmarks PRIVATE cartan::argmin)
     endif ()
 else ()
     message(WARNING

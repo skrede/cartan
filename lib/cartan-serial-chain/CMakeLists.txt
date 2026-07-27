@@ -1,26 +1,3 @@
-if (CARTAN_BUILD_ARGMIN)
-    if (CARTAN_ARGMIN_SOURCE_DIR)
-        FetchContent_Declare(
-            argmin
-            SOURCE_DIR "${CARTAN_ARGMIN_SOURCE_DIR}"
-            EXCLUDE_FROM_ALL
-            SYSTEM
-        )
-    else ()
-        FetchContent_Declare(
-            argmin
-            GIT_REPOSITORY https://github.com/skrede/argmin.git
-            GIT_TAG 864d558c10d43337399d24f7c27cdfa0e5275475
-            EXCLUDE_FROM_ALL
-            SYSTEM
-        )
-    endif ()
-    set(ARGMIN_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-    set(ARGMIN_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-    set(ARGMIN_BUILD_BENCHMARKS OFF CACHE BOOL "" FORCE)
-    FetchContent_MakeAvailable(argmin)
-endif ()
-
 add_library(cartan_serial_chain INTERFACE)
 add_library(cartan::serial_chain ALIAS cartan_serial_chain)
 
@@ -34,13 +11,6 @@ target_link_libraries(cartan_serial_chain
     INTERFACE
     cartan::lie
 )
-
-if (CARTAN_BUILD_ARGMIN)
-    target_link_libraries(cartan_serial_chain
-        INTERFACE
-        argmin::argmin
-    )
-endif ()
 
 target_compile_features(cartan_serial_chain INTERFACE cxx_std_20)
 
@@ -69,18 +39,4 @@ if (CARTAN_BUILD_NLOPT)
     set(NLOPT_TESTS OFF CACHE BOOL "" FORCE)
     set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
     FetchContent_MakeAvailable(nlopt)
-
-    add_library(cartan_nlopt INTERFACE)
-    add_library(cartan::nlopt ALIAS cartan_nlopt)
-
-    target_link_libraries(cartan_nlopt
-        INTERFACE
-        cartan::serial_chain
-        nlopt
-    )
-
-    target_compile_definitions(cartan_nlopt
-        INTERFACE
-        CARTAN_HAS_NLOPT=1
-    )
 endif ()

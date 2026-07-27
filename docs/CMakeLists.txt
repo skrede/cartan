@@ -45,9 +45,9 @@ file(GLOB _doc_snippet_core CONFIGURE_DEPENDS ${_doc_snippet_gen_dir}/core/*.cpp
 
 # Backend-gated groups. The extractor emits every marked snippet regardless of the
 # build configuration; a ``needs=<cap>`` group is compiled only when the matching
-# backend option is on, and reported (skipped) otherwise. The backend macro is
-# scoped to that group's sources exactly as the rest of the project attaches it to
-# its argmin/nlopt-consuming targets -- so core snippets stay backend-independent.
+# backend option is on, and reported (skipped) otherwise. Compiling a group means
+# linking that backend's component, which is what carries its include roots and
+# its feature macro.
 file(GLOB _doc_snippet_argmin CONFIGURE_DEPENDS ${_doc_snippet_gen_dir}/argmin/*.cpp)
 file(GLOB _doc_snippet_nlopt CONFIGURE_DEPENDS ${_doc_snippet_gen_dir}/nlopt/*.cpp)
 file(GLOB _doc_snippet_urdf CONFIGURE_DEPENDS ${_doc_snippet_gen_dir}/urdf/*.cpp)
@@ -59,6 +59,7 @@ list(LENGTH _doc_snippet_argmin _doc_snippet_argmin_count)
 if (_doc_snippet_argmin_count GREATER 0)
     if (CARTAN_BUILD_ARGMIN)
         list(APPEND _doc_snippet_sources ${_doc_snippet_argmin})
+        list(APPEND _doc_snippet_link_libs cartan::argmin)
         message(STATUS
             "Documentation snippets: compiling ${_doc_snippet_argmin_count} 'argmin' snippet(s) (CARTAN_BUILD_ARGMIN=ON)")
     else ()
@@ -102,13 +103,3 @@ endif ()
 
 add_library(doc_snippets OBJECT ${_doc_snippet_sources})
 target_link_libraries(doc_snippets PRIVATE ${_doc_snippet_link_libs})
-
-# Scope the argmin backend macro to just the argmin-group sources. The argmin
-# include root already flows in through cartan::cartan (which links
-# argmin::argmin when CARTAN_BUILD_ARGMIN is on); this only flips the header
-# guard so the argmin solver policies become visible in those units, matching how
-# the tests and benchmarks enable them.
-if (CARTAN_BUILD_ARGMIN AND _doc_snippet_argmin_count GREATER 0)
-    set_source_files_properties(${_doc_snippet_argmin} PROPERTIES
-        COMPILE_DEFINITIONS CARTAN_BUILD_ARGMIN)
-endif ()

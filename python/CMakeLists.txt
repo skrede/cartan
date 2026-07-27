@@ -70,7 +70,7 @@ if (TARGET cartan::urdf)
 endif ()
 
 if (CARTAN_BUILD_ARGMIN)
-    target_compile_definitions(_core PRIVATE CARTAN_BUILD_ARGMIN=1)
+    target_link_libraries(_core PRIVATE cartan::argmin)
 endif ()
 
 install(TARGETS _core LIBRARY DESTINATION cartan)

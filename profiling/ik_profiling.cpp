@@ -12,7 +12,7 @@
 #include <cartan/serial/ik/solver/dls.h>
 #include <cartan/serial/ik/solver/lbfgsb.h>
 
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 #include <cartan/serial/ik/solver/argmin_slsqp.h>
 #endif
 #include <cartan/serial/ik/wrapper/restart_wrapper.h>
@@ -137,7 +137,7 @@ using restart_lm_ik_solver = cartan::basic_ik_runner<restart_lm<N>>;
 template <int N>
 using racing_solver = cartan::dual_ik_runner<chain_t<N>>;
 
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 // argmin family (available when argmin is built)
 template <int N>
 using argmin_slsqp_restart = cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::argmin_slsqp<chain_t<N>>>;
@@ -162,7 +162,7 @@ using nlopt_slsqp_solver = cartan::basic_ik_runner<nlopt_slsqp_restart<N>>;
 inline cartan::convergence_criteria<double> speed_criteria()                { return {1e-5, 1e-5, 200}; }
 inline cartan::convergence_criteria<double> convergence_criteria_tuned()    { return {1e-5, 1e-5, 500}; }
 inline cartan::convergence_criteria<double> restart_lm_criteria()           { return {1e-5, 1e-5, 200}; }
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 inline cartan::convergence_criteria<double> argmin_criteria()              { return {1e-5, 1e-5, 500}; }
 #endif
 inline cartan::convergence_criteria<double> nlopt_criteria()                { return {1e-5, 1e-5, 500}; }
@@ -206,7 +206,7 @@ static void bm_profiling_##ROBOT##_cartan_racing(benchmark::State& state)       
 }                                                                                                      \
 BENCHMARK(bm_profiling_##ROBOT##_cartan_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 #define REGISTER_6DOF_ARGMIN_PROFILING(ROBOT, CHAIN_FN)                                               \
                                                                                                        \
 static void bm_profiling_##ROBOT##_argmin_slsqp(benchmark::State& state)                              \
@@ -270,7 +270,7 @@ static void bm_profiling_##ROBOT##_cartan_racing(benchmark::State& state)       
 }                                                                                                      \
 BENCHMARK(bm_profiling_##ROBOT##_cartan_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 #define REGISTER_7DOF_ARGMIN_PROFILING(ROBOT, CHAIN_FN)                                               \
                                                                                                        \
 static void bm_profiling_##ROBOT##_argmin_slsqp(benchmark::State& state)                              \

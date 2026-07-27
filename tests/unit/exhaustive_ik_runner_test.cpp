@@ -6,7 +6,7 @@
 
 #include <cartan/serial/ik/ik_status.h>
 #include <cartan/serial/ik/solver/projected_lm.h>
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 #include <cartan/serial/ik/solver/argmin_slsqp.h>
 #endif
 
@@ -283,7 +283,7 @@ TEST_CASE("exhaustive_ik_runner ranking strategies", "[ik][exhaustive]")
     }
 }
 
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 
 using ur5_argmin_slsqp = spp::argmin_slsqp<ur5_chain>;
 

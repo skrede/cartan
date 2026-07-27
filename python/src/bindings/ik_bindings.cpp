@@ -7,7 +7,7 @@
 #include "cartan/serial/ik/wrapper/restart_wrapper.h"
 #include "cartan/serial/chain/kinematic_chain.h"
 
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 #include "cartan/serial/ik/solver/argmin_slsqp.h"
 #include "cartan/serial/ik/solver/argmin_lm.h"
 #include "cartan/serial/ik/solver/argmin_lbfgsb.h"
@@ -43,7 +43,7 @@ using py_speed_runner  = cartan::basic_ik_runner<cartan::speed_ik_runner<KC>>;
 using py_robust_runner = cartan::basic_ik_runner<cartan::robust_ik_runner<KC>>;
 using py_dual_runner   = cartan::dual_ik_runner<KC>;
 
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 // argmin-backed iterative IK runners. The LimitsPolicy per inner solver
 // follows the C++ default for each solver class -- LM cannot tolerate
 // post-step clamping because the trust-region step would no longer be the
@@ -336,7 +336,7 @@ void register_ik(nb::module_& m)
         nb::arg("config") = nb::none(),
         nb::call_guard<nb::gil_scoped_release>());
 
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
     // ------------------------------------------------------------------
     // argmin-backed iterative IK free functions. Only compiled when the
     // wheel is built with CARTAN_BUILD_ARGMIN=ON; cartan.has_argmin

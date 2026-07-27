@@ -94,18 +94,18 @@ if(CARTAN_BUILD_ARGMIN)
     cartan_add_test(argmin_projected_gradient_gn_test argmin_projected_gradient_gn_test.cpp)
     cartan_add_test(solver_unit_count_test solver_unit_count_test.cpp)
     cartan_add_test(argmin_solver_instantiation_test argmin_solver_instantiation_test.cpp)
-    target_link_libraries(argmin_solver_instantiation_test PRIVATE argmin::argmin)
-    target_compile_definitions(argmin_solver_instantiation_test PRIVATE CARTAN_BUILD_ARGMIN)
-    target_link_libraries(argmin_projected_gn_test PRIVATE argmin::argmin)
-    target_compile_definitions(argmin_projected_gn_test PRIVATE CARTAN_BUILD_ARGMIN)
-    target_link_libraries(argmin_projected_gradient_gn_test PRIVATE argmin::argmin)
-    target_compile_definitions(argmin_projected_gradient_gn_test PRIVATE CARTAN_BUILD_ARGMIN)
-    target_link_libraries(solver_unit_count_test PRIVATE argmin::argmin)
-    target_compile_definitions(solver_unit_count_test PRIVATE CARTAN_BUILD_ARGMIN)
-    target_link_libraries(exhaustive_ik_runner_test PRIVATE argmin::argmin)
-    target_compile_definitions(exhaustive_ik_runner_test PRIVATE CARTAN_BUILD_ARGMIN)
-    target_link_libraries(solver_semantics_test PRIVATE argmin::argmin)
-    target_compile_definitions(solver_semantics_test PRIVATE CARTAN_BUILD_ARGMIN)
+    foreach (backend_test IN ITEMS
+        argmin_adapters_compile_test
+        argmin_policies_test
+        argmin_slsqp_restart_test
+        argmin_projected_gn_test
+        argmin_projected_gradient_gn_test
+        argmin_solver_instantiation_test
+        solver_unit_count_test
+        exhaustive_ik_runner_test
+        solver_semantics_test)
+        target_link_libraries(${backend_test} PRIVATE cartan::argmin)
+    endforeach ()
 endif()
 
 cartan_add_test(fk_sweep_test fk_sweep_test.cpp)
@@ -145,13 +145,10 @@ if (CARTAN_BUILD_URDF)
     target_compile_definitions(solver_continuous_joint_test PRIVATE
         CARTAN_TESTS_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures")
     if (CARTAN_BUILD_ARGMIN)
-        target_link_libraries(solver_continuous_joint_test PRIVATE argmin::argmin)
-        target_compile_definitions(solver_continuous_joint_test PRIVATE CARTAN_TEST_HAVE_ARGMIN)
-    endif ()
+        target_link_libraries(solver_continuous_joint_test PRIVATE cartan::argmin)
 
-    if (CARTAN_BUILD_ARGMIN)
         cartan_add_test(continuous_joint_fallback_sweep continuous_joint_fallback_sweep.cpp)
-        target_link_libraries(continuous_joint_fallback_sweep PRIVATE cartan::urdf argmin::argmin)
+        target_link_libraries(continuous_joint_fallback_sweep PRIVATE cartan::urdf cartan::argmin)
         target_compile_definitions(continuous_joint_fallback_sweep PRIVATE
             CARTAN_TESTS_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures")
         # Exclude from the default ctest run; invoke directly via

@@ -21,8 +21,7 @@ target_link_libraries(ik_service_multi PRIVATE cartan::cartan)
 
 if (CARTAN_BUILD_ARGMIN)
     add_executable(argmin_solvers argmin_solvers.cpp)
-    target_compile_definitions(argmin_solvers PRIVATE CARTAN_BUILD_ARGMIN)
-    target_link_libraries(argmin_solvers PRIVATE cartan::cartan argmin::argmin)
+    target_link_libraries(argmin_solvers PRIVATE cartan::cartan cartan::argmin)
 endif ()
 
 add_subdirectory(tutorials)

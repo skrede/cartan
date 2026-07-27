@@ -25,7 +25,7 @@
 #include <cartan/serial/ik/solver/newton_raphson.h>
 #include <cartan/serial/ik/solvers.h>
 
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 #include <cartan/serial/ik/solver/argmin_slsqp.h>
 #include <cartan/serial/ik/solver/nw_sqp.h>
 #include <cartan/serial/ik/solver/argmin_lm.h>
@@ -598,7 +598,7 @@ template <int N>
 using slsqp_ik_solver = cartan::basic_ik_runner<slsqp_restart<N>>;
 #endif
 
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 // argmin solvers (available when argmin is built)
 template <int N>
 using argmin_slsqp_restart = cartan::restart_wrapper<chain_t<N>, cartan::argmin_slsqp<chain_t<N>>>;
@@ -687,7 +687,7 @@ inline cartan::convergence_criteria<double> bobyqa_criteria()
     { return {.position_tol = 1e-5, .orientation_tol = 1e-5, .max_iterations_per_attempt = 500, .max_total_work_units = 500}; }
 inline cartan::convergence_criteria<double> slsqp_criteria()
     { return {.position_tol = 1e-5, .orientation_tol = 1e-5, .max_iterations_per_attempt = 500, .max_total_work_units = 500}; }
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 inline cartan::convergence_criteria<double> argmin_slsqp_criteria()
     { return {.position_tol = 1e-5, .orientation_tol = 1e-5, .max_iterations_per_attempt = 500, .max_total_work_units = 500}; }
 inline cartan::convergence_criteria<double> argmin_lbfgsb_criteria()
@@ -843,7 +843,7 @@ BENCHMARK(bm_full_##ROBOT##_nlopt_slsqp)->Iterations(1000)->Unit(benchmark::kMic
 #define REGISTER_6DOF_NLOPT(ROBOT, CHAIN_FN)
 #endif
 
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 // Register argmin solver benchmarks for a 6-DOF robot.
 #define REGISTER_6DOF_ARGMIN(ROBOT, CHAIN_FN)                                                        \
                                                                                                       \
@@ -1052,7 +1052,7 @@ BENCHMARK(bm_full_##ROBOT##_nlopt_slsqp)->Iterations(1000)->Unit(benchmark::kMic
 #define REGISTER_7DOF_NLOPT(ROBOT, CHAIN_FN)
 #endif
 
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 // Register argmin solver benchmarks for a 7-DOF robot.
 #define REGISTER_7DOF_ARGMIN(ROBOT, CHAIN_FN)                                                        \
                                                                                                       \
@@ -1194,7 +1194,7 @@ REGISTER_7DOF_ARGMIN(kuka_lwr4,    make_kuka_lwr4_chain)
 // dynamic-dimension chain_t<cartan::dynamic> (runtime N) using the same argmin
 // policy. Quantifies the compile-time dimension benefit from argmin develop.
 
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 using dynamic_chain = cartan::kinematic_chain<double, cartan::dynamic>;
 
 using argmin_slsqp_dynamic_restart = cartan::restart_wrapper<dynamic_chain, cartan::argmin_slsqp<dynamic_chain>>;

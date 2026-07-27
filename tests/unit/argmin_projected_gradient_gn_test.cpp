@@ -1,4 +1,4 @@
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 
 #include "../support/kinematics_helpers.h"
 #include "../support/joint_limits_helpers.h"

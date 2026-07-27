@@ -22,8 +22,7 @@ target_compile_options(ik_profiling PRIVATE ${CARTAN_WARNING_FLAGS})
 
 # Argmin (argmin) solvers are optional
 if (CARTAN_BUILD_ARGMIN)
-    target_compile_definitions(ik_profiling PRIVATE CARTAN_BUILD_ARGMIN)
-    target_link_libraries(ik_profiling PRIVATE argmin::argmin)
+    target_link_libraries(ik_profiling PRIVATE cartan::argmin)
 endif()
 
 # NLopt solvers are optional

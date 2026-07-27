@@ -27,7 +27,7 @@
 #include <cartan/serial/ik/solver/projected_lm.h>
 #include <cartan/serial/chain/kinematic_chain.h>
 
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 #include <cartan/serial/ik/solver/argmin_slsqp.h>
 #endif
 
@@ -277,7 +277,7 @@ BENCHMARK(bm_kr6_sixx_coverage)->Iterations(2000)->Unit(benchmark::kMicrosecond)
 // --- argmin SLSQP matched-iterative-subset (gated, Pieper robots only) ---
 // ============================================================================
 
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 void bm_abb_irb120_argmin_slsqp(benchmark::State& state)
 {
     using chain_t  = cartan::kinematic_chain<double, 6>;
