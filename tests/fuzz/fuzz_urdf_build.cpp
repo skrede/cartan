@@ -48,14 +48,38 @@ cartan::parsed_joint<double> decode_joint(
     joint.child_link = link_name(fields.byte() % links);
     joint.axis = cartan::vector3<double>(
         fields.scalar(), fields.scalar(), fields.scalar());
-    joint.position_min = fields.scalar();
-    joint.position_max = fields.scalar();
     const std::uint8_t engaged = fields.byte();
+    const double position_min = fields.scalar();
+    const double position_max = fields.scalar();
     const double velocity = fields.scalar();
     const double effort = fields.scalar();
-    if ((engaged & 1) != 0) { joint.velocity_max = velocity; }
-    if ((engaged & 2) != 0) { joint.effort_max = effort; }
+    // Each bound is engaged separately, because a bound the document omits is
+    // what the builder refuses on a revolute or prismatic joint; a decoder that
+    // always engages both leaves that refusal unreachable.
+    if ((engaged & 1) != 0) { joint.position_min = position_min; }
+    if ((engaged & 2) != 0) { joint.position_max = position_max; }
+    if ((engaged & 4) != 0) { joint.velocity_max = velocity; }
+    if ((engaged & 8) != 0) { joint.effort_max = effort; }
     return joint;
+}
+
+/// An inertial is attached about half the time: the builder copies one into the
+/// metadata it returns, and a model that never carries one leaves that path
+/// unvisited.
+cartan::parsed_link<double> decode_link(field_reader& fields, std::size_t index)
+{
+    cartan::parsed_link<double> link;
+    link.name = link_name(index);
+    const std::uint8_t engaged = fields.byte();
+    const cartan::vector3<double> com(
+        fields.scalar(), fields.scalar(), fields.scalar());
+    const double mass = fields.scalar();
+    if ((engaged & 1) != 0)
+    {
+        link.inertial = cartan::parsed_inertial<double>{
+            mass, com, cartan::matrix3<double>::Zero()};
+    }
+    return link;
 }
 
 cartan::parsed_model<double> decode_model(field_reader& fields)
@@ -65,7 +89,7 @@ cartan::parsed_model<double> decode_model(field_reader& fields)
     const std::size_t links = 1 + fields.byte() % k_link_budget;
     for (std::size_t i = 0; i < links; ++i)
     {
-        model.links.push_back(cartan::parsed_link<double>{link_name(i), std::nullopt});
+        model.links.push_back(decode_link(fields, i));
     }
     const std::size_t joints = fields.byte() % (links + 2);
     for (std::size_t i = 0; i < joints; ++i)

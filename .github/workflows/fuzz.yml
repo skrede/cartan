@@ -30,13 +30,25 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang llvm
 
+      # The fuzz block hard-errors without the URDF module: its two document
+      # targets cover the only boundary where the library parses a byte stream
+      # from outside the process, and a fuzz build that silently omitted them
+      # would report success over the boundary that matters.
       - name: Configure
         run: >
           cmake -B build
           -DCMAKE_C_COMPILER=clang
           -DCMAKE_CXX_COMPILER=clang++
           -DCARTAN_BUILD_FUZZ_TESTS=ON
+          -DCARTAN_BUILD_URDF=ON
           -DCARTAN_CMAKE_FETCH_DEPS=ON
 
       - name: Build fuzz targets
         run: cmake --build build -j$(nproc)
+
+      # Replays the committed corpus through every target, once per input and
+      # with no mutation. This proves the targets execute; it is a regression
+      # check and cannot stand in for a budgeted fuzzing run. --no-tests=error
+      # so a filter that matches nothing fails instead of reporting success.
+      - name: Replay the corpus through every target
+        run: ctest --test-dir build --output-on-failure --no-tests=error

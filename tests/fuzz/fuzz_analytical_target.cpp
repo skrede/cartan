@@ -22,10 +22,10 @@ namespace
 
 using cartan::fuzzing::field_reader;
 
-/// Half-width of the in-workspace position band, in the fixture chains' linear unit.
-/// Measured over twenty thousand uniform inputs: a band of 0.5 puts 19% of them
-/// inside a solvable workspace, against 2% for a band of 2.0 and 3% when the
-/// position is a raw chunk triple and nothing else.
+/// Half-width of the in-workspace position band, in the fixture chains' linear
+/// unit. Chosen against the reach of the chains below, because a band much
+/// wider than that puts almost every target outside every workspace and almost
+/// nothing behind the reachability test ever runs.
 constexpr double k_reach = 0.5;
 
 /// The orientation is decoded from bytes onto a half-turn either side of the
@@ -37,11 +37,12 @@ double scaled(std::uint8_t selector, double span)
     return (static_cast<double>(selector) / 128.0 - 1.0) * span;
 }
 
-/// The position is either a raw chunk triple -- which is where a non-finite or
-/// astronomically distant target crosses into the solvers -- or a triple inside
-/// the fixture chains' working radius. Raw chunks alone put the target outside
-/// the workspace almost always, so almost nothing behind the reachability test
-/// would ever run.
+/// Three positions, because each reaches a different part of the solvers. A raw
+/// chunk triple is where a non-finite or astronomically distant target crosses
+/// in. A triple inside the working radius is where the closed form runs. A
+/// direction at a swept radius sits on a sphere, so it crosses each chain's
+/// reach boundary exactly -- which is where the unreachable, singular and
+/// degenerate answers live, and a box of interior points rarely lands there.
 cartan::se3<double> decode_target(field_reader& fields)
 {
     const std::uint8_t shape = fields.byte();
@@ -55,7 +56,10 @@ cartan::se3<double> decode_target(field_reader& fields)
         scaled(fields.byte(), k_reach),
         scaled(fields.byte(), k_reach),
         scaled(fields.byte(), k_reach));
-    const cartan::vector3<double> position = (shape & 1) != 0 ? inside : raw;
+    const cartan::vector3<double> shell
+        = inside.stableNormalized() * (scaled(fields.byte(), k_reach) + k_reach);
+    const cartan::vector3<double> position
+        = shape % 3 == 0 ? raw : (shape % 3 == 1 ? inside : shell);
     return cartan::se3<double>(cartan::so3<double>::exp(rotation), position);
 }
 

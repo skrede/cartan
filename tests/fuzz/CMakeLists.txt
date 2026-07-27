@@ -11,15 +11,18 @@ endif ()
 set(cartan_fuzz_binary_dir ${CMAKE_BINARY_DIR}/fuzz)
 set(cartan_fuzz_corpus_dir ${cartan_fuzz_binary_dir}/corpus)
 
-# The optimization and debug levels are pinned on the targets rather than left
-# to the build type, and both changes are load-bearing. Without -g a sanitizer
-# report names no cartan source file and a finding is unattributable. At the
-# -O0 a Debug configure would otherwise supply, throughput drops by more than an
-# order of magnitude -- measured on the closed-form target, 1.2k executions per
-# second against 27k at -O1 -- which is the difference between a bounded run
-# reaching a defect and running out of budget short of it.
+# Every flag here is pinned on the targets rather than left to the build type,
+# and each one is load-bearing. Without -fno-sanitize-recover an undefined-
+# behavior violation prints a diagnostic and execution continues: the fuzzer
+# sees a normal return, retains no artifact, and the process exits zero, so the
+# gate cannot go red on a real finding. Without -g a report names no cartan
+# source file and a finding is unattributable. At the -O0 a Debug configure
+# would otherwise supply, throughput drops by more than an order of magnitude,
+# which is the difference between a bounded run reaching a defect and running
+# out of budget short of it.
 set(cartan_fuzz_flags
     -fsanitize=fuzzer,address,undefined
+    -fno-sanitize-recover=undefined
     -fno-omit-frame-pointer
     -O1
     -g
@@ -34,12 +37,28 @@ function(cartan_add_fuzz_target target)
         RUNTIME_OUTPUT_DIRECTORY ${cartan_fuzz_binary_dir})
 endfunction()
 
+# A replay is registered so that something in the repository executes these
+# targets rather than only building them. Nothing here registers a fuzzing run:
+# that is a campaign, it needs a budget, and it belongs to a job rather than to
+# ctest.
+function(cartan_add_fuzz_replay target minimum)
+    add_test(NAME ${target}_replay COMMAND ${CMAKE_COMMAND}
+        -DTARGET=$<TARGET_FILE:${target}>
+        -DCORPUS=${cartan_fuzz_corpus_dir}/${target}
+        -DMINIMUM=${minimum}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/replay.cmake)
+    set_tests_properties(${target}_replay PROPERTIES
+        ENVIRONMENT "UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1")
+endfunction()
+
 # libFuzzer writes every coverage-increasing input back into the directory it is
 # given, so it is only ever given this build-tree copy: no run can add to or
-# alter the committed fixture set. Only the documents are copied; the licence
-# files beside the vendored models are not inputs.
+# alter the committed fixture set. Only the documents are copied; the license
+# files beside the vendored models are not inputs. The copy is additive and
+# nothing prunes it, so a directory a long run has grown keeps every input until
+# it is merged with -merge=1 or deleted.
 function(cartan_seed_document_corpus target)
-    file(GLOB documents
+    file(GLOB documents CONFIGURE_DEPENDS
         ${CMAKE_CURRENT_SOURCE_DIR}/../fixtures/urdf/*.urdf
         ${CMAKE_CURRENT_SOURCE_DIR}/../fixtures/urdf/extended/*.urdf)
     file(COPY ${documents} DESTINATION ${cartan_fuzz_corpus_dir}/${target})
@@ -78,3 +97,9 @@ cartan_seed_scalar_corpus(fuzz_urdf_build)
 cartan_seed_scalar_corpus(fuzz_screw_axis)
 cartan_seed_scalar_corpus(fuzz_joint_limits)
 cartan_seed_scalar_corpus(fuzz_analytical_target)
+
+cartan_add_fuzz_replay(fuzz_urdf_parse 20)
+cartan_add_fuzz_replay(fuzz_urdf_build 5)
+cartan_add_fuzz_replay(fuzz_screw_axis 5)
+cartan_add_fuzz_replay(fuzz_joint_limits 5)
+cartan_add_fuzz_replay(fuzz_analytical_target 5)

@@ -3,16 +3,19 @@
 
 /// The primitives the fuzz targets here share: a cursor that reinterprets
 /// fixed-width chunks of the fuzzer's byte stream as the values a factory
-/// takes, and the two sinks that keep a produced value from being optimized
-/// away before a sanitizer can inspect it.
+/// takes, the oracle a target states its contract through, and the sinks that
+/// keep a produced value from being optimized away.
 
-#include <cartan/serial/fk/forward_kinematics.h>
 #include <cartan/serial/chain/kinematic_chain.h>
 
+#include <cartan/serial/fk/forward_kinematics.h>
+
 #include <span>
-#include <cstring>
+#include <cstdio>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
+#include <cstring>
 
 namespace cartan::fuzzing
 {
@@ -55,6 +58,23 @@ private:
     std::span<const std::uint8_t> m_input;
     std::size_t m_offset;
 };
+
+/// A target's oracle: the contract a value the library admitted must satisfy.
+///
+/// Without one a target asks only "did it crash?", and a boundary whose whole
+/// job is arithmetic over doubles has nothing to crash with -- a weakened
+/// predicate there would pass silently. abort() rather than assert() so the
+/// check survives NDEBUG, and so the fuzzer retains the offending input as an
+/// artifact instead of printing a line nobody reads.
+inline void require(bool condition, const char* contract)
+{
+    if (condition)
+    {
+        return;
+    }
+    std::fprintf(stderr, "cartan fuzz oracle violated: %s\n", contract);
+    std::abort();
+}
 
 inline volatile double observation_sink = 0.0;
 
