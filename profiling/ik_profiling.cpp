@@ -129,7 +129,7 @@ template <int N>
 using convergence_ik_solver = cartan::basic_ik_runner<cartan::robust_ik_runner<chain_t<N>>>;
 
 template <int N>
-using restart_lm = cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::lm<chain_t<N>, cartan::no_limits>>;
+using restart_lm = cartan::restart_wrapper<chain_t<N>, cartan::lm<chain_t<N>, cartan::no_limits>>;
 
 template <int N>
 using restart_lm_ik_solver = cartan::basic_ik_runner<restart_lm<N>>;
@@ -140,7 +140,7 @@ using racing_solver = cartan::dual_ik_runner<chain_t<N>>;
 #ifdef CARTAN_HAS_ARGMIN
 // argmin family (available when argmin is built)
 template <int N>
-using argmin_slsqp_restart = cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::argmin_slsqp<chain_t<N>>>;
+using argmin_slsqp_restart = cartan::restart_wrapper<chain_t<N>, cartan::argmin_slsqp<chain_t<N>>>;
 
 template <int N>
 using argmin_slsqp_solver = cartan::basic_ik_runner<argmin_slsqp_restart<N>>;
@@ -149,7 +149,7 @@ using argmin_slsqp_solver = cartan::basic_ik_runner<argmin_slsqp_restart<N>>;
 // NLopt family (behind CARTAN_HAS_NLOPT)
 #ifdef CARTAN_HAS_NLOPT
 template <int N>
-using nlopt_slsqp_restart = cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::nlopt_slsqp<chain_t<N>>>;
+using nlopt_slsqp_restart = cartan::restart_wrapper<chain_t<N>, cartan::nlopt_slsqp<chain_t<N>>>;
 
 template <int N>
 using nlopt_slsqp_solver = cartan::basic_ik_runner<nlopt_slsqp_restart<N>>;

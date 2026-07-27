@@ -3,7 +3,7 @@ if (NOT TARGET benchmark::benchmark)
     FetchContent_Declare(
         benchmark
         GIT_REPOSITORY https://github.com/google/benchmark.git
-        GIT_TAG v1.9.5
+        GIT_TAG 192ef10025eb2c4cdd392bc502f0c852196baa48 # v1.9.5
         EXCLUDE_FROM_ALL
     )
     set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
