@@ -5,6 +5,7 @@
 // ungated throw has crept back into a path these factories reach.
 
 #include "no_exceptions_chain_slice.h"
+#include "no_exceptions_kinematics_slice.h"
 
 #include "cartan/expected.h"
 
@@ -80,7 +81,8 @@ int main()
     namespace gate = cartan::compile_gate;
 
     g_sink = lie_factories() + gate::checked_limits_factory()
-        + gate::checked_chain_factory() + gate::checked_entry_points()
+        + gate::checked_chain_factory() + gate::checked_forward_kinematics()
+        + gate::checked_jacobians() + gate::checked_velocity()
         + gate::chain_constructor_guard();
     return 0;
 }

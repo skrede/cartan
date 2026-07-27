@@ -24,6 +24,7 @@
 #include <cartan/serial/fk/forward_kinematics.h>
 
 #include <cmath>
+#include <cstdio>
 #include <random>
 #include <limits>
 #include <numbers>
@@ -802,13 +803,23 @@ auto random_joint_config(
         q.resize(n);
     }
 
+    // An unbounded continuous joint carries +/-infinity bounds, which this
+    // library supports and std::uniform_real_distribution does not: the
+    // standard requires a finite range, so handing it +/-infinity is undefined.
+    // Substituting the same fallback range the solvers use keeps the draw
+    // inside the interval the rest of the library treats as the joint's
+    // reachable span.
+    const Scalar half_fallback =
+        cartan::detail::k_unbounded_angular_range_v<Scalar> / Scalar(2);
+
     std::uniform_real_distribution<Scalar> dist;
     const auto& limits = chain.limits();
     for (int i = 0; i < n; ++i)
     {
         auto idx = static_cast<std::size_t>(i);
         dist = std::uniform_real_distribution<Scalar>(
-            limits[idx].position_min(), limits[idx].position_max());
+            cartan::detail::finite_lower_or(limits[idx].position_min(), half_fallback),
+            cartan::detail::finite_upper_or(limits[idx].position_max(), half_fallback));
         q(i) = dist(rng);
     }
 
@@ -816,6 +827,12 @@ auto random_joint_config(
 }
 
 /// Generate a guaranteed-reachable target by running FK on a random config.
+///
+/// The unchecked entry point is the right one here and the loud unwrap is not:
+/// the joint vector is drawn by the line above from this same chain, so its
+/// length is the chain's joint count by construction and its components are
+/// finite by the bound substitution in random_joint_config. The precondition is
+/// established in this function rather than assumed of a caller.
 template <int N, typename Scalar>
 auto random_reachable_target(
     const cartan::kinematic_chain<Scalar, N>& chain,
@@ -823,10 +840,7 @@ auto random_reachable_target(
     -> cartan::se3<Scalar>
 {
     auto q = random_joint_config(chain, rng);
-    auto fk = cartan::testing::unwrap(
-        cartan::forward_kinematics(chain, q),
-        "cartan::fixtures::random_reachable_target");
-    return fk.end_effector;
+    return cartan::forward_kinematics_unchecked(chain, q).end_effector;
 }
 
 // ===========================================================================
@@ -843,10 +857,21 @@ auto compute_pose_errors(
     const cartan::se3<Scalar>& target)
     -> std::pair<Scalar, Scalar>
 {
-    auto fk = cartan::testing::unwrap(
-        cartan::forward_kinematics(chain, q_solution),
-        "cartan::fixtures::compute_pose_errors");
-    auto error_twist = (fk.end_effector.inverse() * target).log();
+    auto fk = cartan::forward_kinematics(chain, q_solution);
+    if (!fk.has_value())
+    {
+        // q_solution is a solver's output, not a fixture literal, so a refusal
+        // is a property of the measurement rather than a bug in the caller.
+        // Aborting would take a whole benchmark binary down and discard every
+        // measurement already accumulated; a nonfinite pair is what the
+        // unchecked path yielded for the same input before this boundary
+        // existed, and every caller already compares it against a tolerance.
+        std::fprintf(stderr, "cartan::fixtures::compute_pose_errors: %s\n",
+            cartan::message(fk.error()));
+        const Scalar unanswerable = std::numeric_limits<Scalar>::quiet_NaN();
+        return {unanswerable, unanswerable};
+    }
+    auto error_twist = (fk->end_effector.inverse() * target).log();
 
     // omega-first convention: head<3> = angular, tail<3> = linear
     Scalar orientation_error = error_twist.template head<3>().norm();

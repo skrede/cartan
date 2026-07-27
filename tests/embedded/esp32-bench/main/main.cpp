@@ -54,6 +54,20 @@ void tele(const char* line)
     uart_write_bytes(k_tele_uart, line, std::strlen(line));
 }
 
+/// A cell the sweep could not measure, marked in the telemetry stream rather
+/// than dropped from it. The diagnostic goes to the console UART and the data
+/// to a physically different cable, so a row that simply vanished would be
+/// silent loss on the receiving end; conv = -1 is outside the 0..k_targets a
+/// measured cell can report, so a consumer cannot mistake it for one.
+void tele_unmeasured(const char* robot, const char* solver, cartan::chain_failure failure)
+{
+    ESP_LOGE(TAG, "%-9s %-13s UNMEASURED: %s", robot, solver, cartan::message(failure));
+
+    char csv[160];
+    std::snprintf(csv, sizeof csv, "%s,%s,-1,%d,0,0,0,0,nan\n", robot, solver, k_targets);
+    tele(csv);
+}
+
 // Exceptions are off here, so a refusal is propagated rather than thrown and is
 // never read through expected's accessor.
 template <int N>
@@ -133,8 +147,7 @@ void bench_ik(const char* robot, const char* solver, const Chain& chain,
         auto target_fk = cartan::forward_kinematics(chain, q_truth);
         if (!target_fk.has_value())
         {
-            ESP_LOGE(TAG, "%s %s: target FK refused: %s", robot, solver,
-                cartan::message(target_fk.error()));
+            tele_unmeasured(robot, solver, target_fk.error());
             return;
         }
         const auto target = target_fk->end_effector;
@@ -157,8 +170,7 @@ void bench_ik(const char* robot, const char* solver, const Chain& chain,
             auto fk = cartan::forward_kinematics(chain, result->solution.position);
             if (!fk.has_value())
             {
-                ESP_LOGE(TAG, "%s %s: re-verify FK refused: %s", robot, solver,
-                    cartan::message(fk.error()));
+                tele_unmeasured(robot, solver, fk.error());
                 return;
             }
             const float rv = (fk->end_effector.inverse() * target).log().norm();
@@ -207,17 +219,19 @@ extern "C" void app_main()
 
     const auto c3 = build_planar_3r();
     const auto c6 = build_kuka_kr6();
-    if (!c3.has_value() || !c6.has_value())
+    if (c3.has_value() && c6.has_value())
     {
-        ESP_LOGE(TAG, "chain refused: %s",
-            cartan::message(c3.has_value() ? c6.error() : c3.error()));
-        return;
+        const auto t3 = make_truths<3>();
+        const auto t6 = make_truths<6>();
+        bench_all_solvers<cartan::kinematic_chain<float, 3>, 3>("planar3R", *c3, t3);
+        bench_all_solvers<cartan::kinematic_chain<float, 6>, 6>("kuka6R", *c6, t6);
     }
-    const auto t3 = make_truths<3>();
-    const auto t6 = make_truths<6>();
-
-    bench_all_solvers<cartan::kinematic_chain<float, 3>, 3>("planar3R", *c3, t3);
-    bench_all_solvers<cartan::kinematic_chain<float, 6>, 6>("kuka6R", *c6, t6);
+    else
+    {
+        // Still inside the protocol: a header, then rows, then END. A return
+        // here would leave a host reading until END waiting forever.
+        tele_unmeasured("all", "build", c3.has_value() ? c6.error() : c3.error());
+    }
 
     tele("END\n");
     ESP_LOGI(TAG, "sweep complete");

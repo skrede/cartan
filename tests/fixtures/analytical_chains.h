@@ -27,6 +27,8 @@
 #include <cartan/serial/chain/static_chain.h>
 #include <cartan/serial/chain/joint_limits.h>
 
+#include <cartan/expected.h>
+
 #include <array>
 #include <numbers>
 
@@ -132,11 +134,17 @@ auto make_offset_shoulder_puma()
 /// tolerance, the chain passes the legacy sphericity check yet is not solvable
 /// to the acceptance tolerance -- a valid factory must reject it at
 /// construction.
+///
+/// Alone among the fixtures here this one takes a runtime parameter, so its
+/// construction can be refused for a reason that is the caller's rather than a
+/// bug in a literal. It returns the fallible result instead of unwrapping it.
 template <typename Scalar>
 auto make_near_spherical_wrist_puma(Scalar wrist_offset)
-    -> cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y,
-                            cartan::revolute_y, cartan::revolute_z,
-                            cartan::revolute_y, cartan::revolute_z>
+    -> cartan::expected<
+        cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y,
+                             cartan::revolute_y, cartan::revolute_z,
+                             cartan::revolute_y, cartan::revolute_z>,
+        cartan::chain_failure>
 {
     using vec3 = cartan::vector3<Scalar>;
 
@@ -169,9 +177,7 @@ auto make_near_spherical_wrist_puma(Scalar wrist_offset)
     using chain_type = cartan::static_chain<Scalar,
         cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
         cartan::revolute_z, cartan::revolute_y, cartan::revolute_z>;
-    return cartan::testing::unwrap(
-        chain_type::make(home, {s0, s1, s2, s3, s4, s5}, limits),
-        "cartan::fixtures::make_near_spherical_wrist_puma");
+    return chain_type::make(home, {s0, s1, s2, s3, s4, s5}, limits);
 }
 
 /// PUMA-type 6R chain (Z, Y, Y | Z, Y, Z) with realistic [-pi, pi] joint

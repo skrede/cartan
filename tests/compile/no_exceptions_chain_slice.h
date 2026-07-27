@@ -1,15 +1,16 @@
 #ifndef HPP_GUARD_CARTAN_TESTS_COMPILE_NO_EXCEPTIONS_CHAIN_SLICE_H
 #define HPP_GUARD_CARTAN_TESTS_COMPILE_NO_EXCEPTIONS_CHAIN_SLICE_H
 
-// The chain half of the exceptions-off compile gate: both validated chain
-// factories and two checked kinematics entry points, each exercised on its
-// success branch and on its failure branch. A gate that only took the success
-// path would say nothing about the code generated for the failure branch, and
-// the failure branch is where an ungated throw would sit.
+// The construction half of the exceptions-off compile gate: both validated
+// chain factories, on their success branch and on their failure branch, plus
+// the chain constructor's own fail-stop. The evaluation half is next door in
+// no_exceptions_kinematics_slice.h, which builds on the helpers here.
 //
-// Every refusal below is consumed by branching on the result rather than
-// through expected's accessor, which is the only channel a consumer without
-// exceptions has.
+// A gate that only took the success path would say nothing about the code
+// generated for the failure branch, and the failure branch is where an ungated
+// throw would sit. Every refusal below is consumed by branching on the result
+// rather than through expected's accessor, which is the only channel a consumer
+// without exceptions has.
 
 #include "cartan/types.h"
 #include "cartan/expected.h"
@@ -21,9 +22,6 @@
 #include "cartan/serial/chain/joint_limits.h"
 #include "cartan/serial/chain/static_chain.h"
 #include "cartan/serial/chain/kinematic_chain.h"
-
-#include "cartan/serial/fk/jacobian.h"
-#include "cartan/serial/fk/forward_kinematics.h"
 
 #include <array>
 
@@ -43,6 +41,13 @@ inline std::array<screw_axis<float>, 1> axis_along(const vector3<float>& directi
     return {screw_axis<float>::revolute(direction, vector3<float>(0.0F, 0.0F, 0.0F))};
 }
 
+inline Eigen::Vector<float, 1> unit_joint_vector(float value)
+{
+    Eigen::Vector<float, 1> q;
+    q << value;
+    return q;
+}
+
 inline expected<single_joint_limits, chain_failure> unit_limits()
 {
     auto bounded = joint_limits<float>::make(-1.0F, 1.0F);
@@ -51,6 +56,27 @@ inline expected<single_joint_limits, chain_failure> unit_limits()
         return unexpected(bounded.error());
     }
     return single_joint_limits{*bounded};
+}
+
+inline expected<single_joint_chain, chain_failure> unit_chain()
+{
+    auto limits = unit_limits();
+    if (!limits.has_value())
+    {
+        return unexpected(limits.error());
+    }
+    return single_joint_chain::make(unit_home(), axis_along({0.0F, 0.0F, 1.0F}), *limits);
+}
+
+inline expected<kinematic_chain<float, 1>, chain_failure> unit_runtime_chain()
+{
+    auto limits = unit_limits();
+    if (!limits.has_value())
+    {
+        return unexpected(limits.error());
+    }
+    return kinematic_chain<float, 1>(
+        unit_home(), axis_along({0.0F, 0.0F, 1.0F}), *limits);
 }
 
 inline float checked_limits_factory()
@@ -74,16 +100,14 @@ inline float checked_limits_factory()
 
 inline float checked_chain_factory()
 {
-    float acc = 0.0F;
-
     auto limits = unit_limits();
     if (!limits.has_value())
     {
-        return acc;
+        return 0.0F;
     }
 
-    auto tagged = single_joint_chain::make(
-        unit_home(), axis_along({0.0F, 0.0F, 1.0F}), *limits);
+    float acc = 0.0F;
+    auto tagged = unit_chain();
     if (tagged.has_value())
     {
         acc += tagged->home().translation().sum();
@@ -100,58 +124,13 @@ inline float checked_chain_factory()
     return acc;
 }
 
-inline float checked_entry_points()
-{
-    float acc = 0.0F;
-
-    auto limits = unit_limits();
-    if (!limits.has_value())
-    {
-        return acc;
-    }
-    auto chain = single_joint_chain::make(
-        unit_home(), axis_along({0.0F, 0.0F, 1.0F}), *limits);
-    if (!chain.has_value())
-    {
-        return acc;
-    }
-
-    Eigen::Vector<float, 1> q;
-    q << 0.25F;
-    auto fk = forward_kinematics(*chain, q);
-    if (fk.has_value())
-    {
-        acc += fk->end_effector.translation().sum();
-        auto jacobian = space_jacobian(*chain, *fk);
-        if (jacobian.has_value())
-        {
-            acc += jacobian->sum();
-        }
-    }
-
-    const Eigen::VectorXf ill_sized = Eigen::VectorXf::Zero(2);
-    auto refused = forward_kinematics(*chain, ill_sized);
-    if (!refused.has_value())
-    {
-        acc += static_cast<float>(static_cast<int>(refused.error()));
-    }
-
-    return acc;
-}
-
 /// kinematic_chain's constructor and its bounds-checked axis() reach a
 /// fail-stop rather than a throw when exceptions are unavailable, and that
 /// branch is behind a preprocessor condition no other build compiles.
 inline float chain_constructor_guard()
 {
-    auto limits = unit_limits();
-    if (!limits.has_value())
-    {
-        return 0.0F;
-    }
-    const kinematic_chain<float, 1> chain(
-        unit_home(), axis_along({0.0F, 0.0F, 1.0F}), *limits);
-    return chain.axis(0).to_vector().sum();
+    auto chain = unit_runtime_chain();
+    return chain.has_value() ? chain->axis(0).to_vector().sum() : 0.0F;
 }
 
 }

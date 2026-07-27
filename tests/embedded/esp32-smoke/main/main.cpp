@@ -14,6 +14,8 @@
 
 #include <Eigen/Core>
 
+#include <cstdint>
+
 namespace
 {
 
@@ -70,11 +72,9 @@ chain_or_failure<6> build_kuka_kr6()
         home, {k1, k2, k3, k4, k5, k6}, {*lim, *lim, *lim, *lim, *lim, *lim}};
 }
 
-}
-
-extern "C" void app_main()
+/// Planar 3R: forward kinematics and one closed-form subproblem.
+void run_planar_3r_slice()
 {
-    // --- Planar 3R: FK + a closed-form subproblem -------------------------
     auto chain = build_planar_3r();
     if (!chain.has_value())
     {
@@ -104,8 +104,71 @@ extern "C" void app_main()
         ESP_LOGI(TAG, "paden_kahan_1 theta = %.4f (host = 1.5708)",
             static_cast<double>(*pk1));
     }
+}
 
-    // --- 6R KUKA: FK timing + iterative IK solve + FK re-verify -----------
+/// Forward-kinematics throughput. The probe configuration is fixed for the
+/// whole sweep, so its shape and finiteness are established once by the caller
+/// and the loops here call the unchecked sibling -- the shape a real-time
+/// consumer wants, and the reason the number below measures forward kinematics
+/// rather than the guard in front of it. The sink is reported here rather than
+/// at the end of the run so that nothing downstream can suppress it.
+void report_fk_throughput(const cartan::kinematic_chain<float, 6>& chain,
+    const Eigen::Vector<float, 6>& q_probe)
+{
+    volatile float sink = 0.f;
+    for (int i = 0; i < 16; ++i)
+    {
+        sink += cartan::forward_kinematics_unchecked(chain, q_probe)
+                    .end_effector.translation().x();
+    }
+    constexpr int fk_iters = 1000;
+    const uint32_t fk_c0 = esp_cpu_get_cycle_count();
+    const int64_t fk_t0 = esp_timer_get_time();
+    for (int i = 0; i < fk_iters; ++i)
+    {
+        sink += cartan::forward_kinematics_unchecked(chain, q_probe)
+                    .end_effector.translation().x();
+    }
+    const int64_t fk_t1 = esp_timer_get_time();
+    const uint32_t fk_c1 = esp_cpu_get_cycle_count();
+
+    ESP_LOGI(TAG, "6R FK: %.3f us/call, %lu cycles/call (avg of %d)",
+        static_cast<double>(fk_t1 - fk_t0) / fk_iters,
+        static_cast<unsigned long>((fk_c1 - fk_c0) / fk_iters), fk_iters);
+    ESP_LOGI(TAG, "fk-timing sink = %.4f", static_cast<double>(sink));
+}
+
+void report_ik_solution(const cartan::kinematic_chain<float, 6>& chain,
+    const cartan::se3<float>& target, const cartan::ik_result<float, 6>& r,
+    std::int64_t solve_us, std::uint32_t solve_cycles)
+{
+    // FK re-verify: independent body-twist error, never trust self-report.
+    auto fk_check = cartan::forward_kinematics(chain, r.solution.position);
+    if (!fk_check.has_value())
+    {
+        ESP_LOGE(TAG, "6R IK re-verify refused: %s", cartan::message(fk_check.error()));
+        return;
+    }
+    const float reverify = (fk_check->end_effector.inverse() * target).log().norm();
+
+    ESP_LOGI(TAG, "6R IK: CONVERGED  iters=%d  self_err=%.7f  reverify_err=%.7f",
+        r.iterations, static_cast<double>(r.final_error_norm),
+        static_cast<double>(reverify));
+    ESP_LOGI(TAG, "6R IK: solve %.1f us, %lu cycles",
+        static_cast<double>(solve_us), static_cast<unsigned long>(solve_cycles));
+    ESP_LOGI(TAG, "6R IK: q[0..2] = %.4f %.4f %.4f",
+        static_cast<double>(r.solution.position[0]),
+        static_cast<double>(r.solution.position[1]),
+        static_cast<double>(r.solution.position[2]));
+    ESP_LOGI(TAG, "6R IK: q[3..5] = %.4f %.4f %.4f",
+        static_cast<double>(r.solution.position[3]),
+        static_cast<double>(r.solution.position[4]),
+        static_cast<double>(r.solution.position[5]));
+}
+
+/// 6R KUKA: forward-kinematics timing, one iterative solve, and a re-verify.
+void run_kuka_6r_slice()
+{
     using Chain6 = cartan::kinematic_chain<float, 6>;
     auto chain6_held = build_kuka_kr6();
     if (!chain6_held.has_value())
@@ -117,46 +180,20 @@ extern "C" void app_main()
 
     Eigen::Vector<float, 6> q_truth;
     q_truth << 0.2f, -0.4f, 0.3f, -0.5f, 0.6f, -0.2f;
+    Eigen::Vector<float, 6> q_probe;
+    q_probe << 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f;
+
     auto target_fk = cartan::forward_kinematics(chain6, q_truth);
-    if (!target_fk.has_value())
+    auto probe_fk = cartan::forward_kinematics(chain6, q_probe);
+    if (!target_fk.has_value() || !probe_fk.has_value())
     {
-        ESP_LOGE(TAG, "6R target FK refused: %s", cartan::message(target_fk.error()));
+        ESP_LOGE(TAG, "6R setup FK refused: %s", cartan::message(
+            target_fk.has_value() ? probe_fk.error() : target_fk.error()));
         return;
     }
     const auto target = target_fk->end_effector;
 
-    // FK throughput: average over N calls (warm the caches first). The probe
-    // configuration is fixed for the whole sweep, so its shape and finiteness
-    // are established once here and the loops below call the unchecked sibling
-    // -- the shape a real-time consumer wants, and the reason the measurement
-    // is of forward kinematics rather than of the guard in front of it.
-    Eigen::Vector<float, 6> q_probe;
-    q_probe << 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f;
-    auto probe_fk = cartan::forward_kinematics(chain6, q_probe);
-    if (!probe_fk.has_value())
-    {
-        ESP_LOGE(TAG, "6R probe FK refused: %s", cartan::message(probe_fk.error()));
-        return;
-    }
-    volatile float sink = 0.f;
-    for (int i = 0; i < 16; ++i)
-    {
-        sink += cartan::forward_kinematics_unchecked(chain6, q_probe)
-                    .end_effector.translation().x();
-    }
-    constexpr int fk_iters = 1000;
-    const uint32_t fk_c0 = esp_cpu_get_cycle_count();
-    const int64_t fk_t0 = esp_timer_get_time();
-    for (int i = 0; i < fk_iters; ++i)
-    {
-        sink += cartan::forward_kinematics_unchecked(chain6, q_probe)
-                    .end_effector.translation().x();
-    }
-    const int64_t fk_t1 = esp_timer_get_time();
-    const uint32_t fk_c1 = esp_cpu_get_cycle_count();
-    ESP_LOGI(TAG, "6R FK: %.3f us/call, %lu cycles/call (avg of %d)",
-        static_cast<double>(fk_t1 - fk_t0) / fk_iters,
-        static_cast<unsigned long>((fk_c1 - fk_c0) / fk_iters), fk_iters);
+    report_fk_throughput(chain6, q_probe);
 
     // IK solve with the allocation-free projected_lm stepper (self-restarting),
     // from a zero seed to the FK-walked target.
@@ -173,40 +210,20 @@ extern "C" void app_main()
     const int64_t ik_t1 = esp_timer_get_time();
     const uint32_t ik_c1 = esp_cpu_get_cycle_count();
 
-    if (result.has_value())
-    {
-        const auto& r = *result;
-        // FK re-verify: independent body-twist error, never trust self-report.
-        auto fk_check = cartan::forward_kinematics(chain6, r.solution.position);
-        if (!fk_check.has_value())
-        {
-            ESP_LOGE(TAG, "6R IK re-verify refused: %s", cartan::message(fk_check.error()));
-            return;
-        }
-        const float reverify = (fk_check->end_effector.inverse() * target).log().norm();
-
-        ESP_LOGI(TAG, "6R IK: CONVERGED  iters=%d  self_err=%.7f  reverify_err=%.7f",
-            r.iterations, static_cast<double>(r.final_error_norm),
-            static_cast<double>(reverify));
-        ESP_LOGI(TAG, "6R IK: solve %.1f us, %lu cycles",
-            static_cast<double>(ik_t1 - ik_t0),
-            static_cast<unsigned long>(ik_c1 - ik_c0));
-        float qs[6];
-        for (int i = 0; i < 6; ++i)
-        {
-            qs[i] = r.solution.position[i];
-        }
-        ESP_LOGI(TAG, "6R IK: q[0..2] = %.4f %.4f %.4f",
-            static_cast<double>(qs[0]), static_cast<double>(qs[1]), static_cast<double>(qs[2]));
-        ESP_LOGI(TAG, "6R IK: q[3..5] = %.4f %.4f %.4f",
-            static_cast<double>(qs[3]), static_cast<double>(qs[4]), static_cast<double>(qs[5]));
-    }
-    else
+    if (!result.has_value())
     {
         ESP_LOGI(TAG, "6R IK: FAILED  reason=%d  last_err=%.7f",
             static_cast<int>(result.error().reason),
             static_cast<double>(result.error().last_error_norm));
+        return;
     }
+    report_ik_solution(chain6, target, *result, ik_t1 - ik_t0, ik_c1 - ik_c0);
+}
 
-    ESP_LOGI(TAG, "fk-timing sink = %.4f", static_cast<double>(sink));
+}
+
+extern "C" void app_main()
+{
+    run_planar_3r_slice();
+    run_kuka_6r_slice();
 }
