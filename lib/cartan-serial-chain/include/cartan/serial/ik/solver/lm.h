@@ -274,21 +274,9 @@ private:
     ik_status m_status{ik_status::not_initialized};
 };
 
-#ifndef CARTAN_BUILD_ARGMIN
 template <chain Chain, typename LimitsPolicy = no_limits>
-using lm =builtin_lm<Chain, LimitsPolicy>;
-#endif
+using lm = builtin_lm<Chain, LimitsPolicy>;
 
 }
-
-#ifdef CARTAN_BUILD_ARGMIN
-#include "cartan/serial/ik/solver/argmin_lm.h"
-
-namespace cartan
-{
-template <chain Chain, typename LimitsPolicy = no_limits>
-using lm =argmin_lm<Chain, LimitsPolicy>;
-}
-#endif
 
 #endif
