@@ -27,9 +27,5 @@ endif()
 
 # NLopt solvers are optional
 if (CARTAN_BUILD_NLOPT)
-    if (NOT TARGET NLopt::nlopt)
-        find_package(NLopt CONFIG REQUIRED)
-    endif()
-    target_compile_definitions(ik_profiling PRIVATE CARTAN_HAS_NLOPT)
-    target_link_libraries(ik_profiling PRIVATE NLopt::nlopt)
+    target_link_libraries(ik_profiling PRIVATE cartan::nlopt)
 endif()

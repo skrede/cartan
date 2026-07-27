@@ -7,7 +7,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 option(CONSUMER_EXPECTS_ARGMIN "Link the argmin component of the installed cartan package" OFF)
 
-find_package(cartan CONFIG REQUIRED)
+if (CONSUMER_EXPECTS_ARGMIN)
+    find_package(cartan CONFIG REQUIRED COMPONENTS argmin)
+else ()
+    find_package(cartan CONFIG REQUIRED)
+endif ()
 
 add_executable(installed_consumer main.cpp)
 target_link_libraries(installed_consumer PRIVATE cartan::cartan)

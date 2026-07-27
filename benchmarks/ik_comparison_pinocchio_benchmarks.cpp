@@ -44,7 +44,7 @@
 #include <pinocchio/spatial/se3.hpp>
 #include <pinocchio/spatial/explog.hpp>
 
-#ifdef CARTAN_HAS_TRAC_IK
+#ifdef CARTAN_BENCH_HAS_TRAC_IK
 #include <trac_ik/trac_ik.hpp>
 #include <kdl/chain.hpp>
 #include <kdl/jntarray.hpp>
@@ -687,7 +687,7 @@ void bm_pinocchio_lm(
         v_ori / std::max(verified_ok, 1));
 }
 
-#ifdef CARTAN_HAS_TRAC_IK
+#ifdef CARTAN_BENCH_HAS_TRAC_IK
 // TRAC-IK with external verification of returned q against the SAME tolerance
 // gate cartan and pinocchio use. The CartToJnt return code alone is unreliable
 // — it can return rc>=0 for solutions outside tolerance.
@@ -779,7 +779,7 @@ void bm_trac_ik_verified(
 // Per-robot drivers (registered at static init)
 // ============================================================================
 
-#ifdef CARTAN_HAS_TRAC_IK
+#ifdef CARTAN_BENCH_HAS_TRAC_IK
 #define IK_BENCH_ROBOT_TRAC_IK(ROBOT, FACTORY, KDL_FACTORY, KDL_LIMITS_FACTORY, N_DOF)  \
 static void bm_ik_##ROBOT##_trac_ik(benchmark::State& state)                            \
 {                                                                                       \

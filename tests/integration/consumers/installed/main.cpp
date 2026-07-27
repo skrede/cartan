@@ -12,6 +12,9 @@ static_assert(
 
 #ifdef CONSUMER_EXPECTS_ARGMIN
 static_assert(CARTAN_HAS_ARGMIN == 1, "linking the component must supply the feature macro");
+#if !__has_include(<argmin/solver/step_budget_solver.h>)
+#error "the backend include root did not reach a consumer that linked the component"
+#endif
 using backend_solver = cartan::argmin_lm<chain6>;
 #else
 #ifdef CARTAN_HAS_ARGMIN

@@ -63,57 +63,39 @@ include(FetchContent)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/CartanOptionalBackends.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/CartanInstallSurface.cmake)
 
 cmake_language(DEFER CALL cartan_assert_no_unregistered_backend)
 
-# Acquisition must precede add_subdirectory(lib): in fetch mode the backend
-# creates Eigen3::Eigen first, and cartan-lie's NOT TARGET guard then defers to
-# it rather than racing it for the eigen_headers name.
+# Acquisition must precede add_subdirectory(lib): in fetch mode the backend is
+# the one told to fetch Eigen, and it agrees only while Eigen3::Eigen does not
+# exist. Populating cartan's Eigen first sends the backend down its
+# find_package(Eigen3 CONFIG REQUIRED) branch, which then has nothing to find.
 cartan_acquire_optional_backends()
 
-set(CARTAN_FETCHED_BACKENDS "")
-foreach (backend IN LISTS CARTAN_OPTIONAL_BACKENDS)
-    string(TOUPPER "${backend}" backend_upper)
-    if (CARTAN_BUILD_${backend_upper} AND CARTAN_${backend_upper}_PROVIDER STREQUAL "fetched")
-        list(APPEND CARTAN_FETCHED_BACKENDS ${backend})
+set(_cartan_fetched_backends "")
+foreach (_cartan_backend IN LISTS CARTAN_OPTIONAL_BACKENDS)
+    string(TOUPPER "${_cartan_backend}" _cartan_upper)
+    if (CARTAN_BUILD_${_cartan_upper} AND CARTAN_${_cartan_upper}_PROVIDER STREQUAL "fetched")
+        list(APPEND _cartan_fetched_backends ${_cartan_backend})
     endif ()
 endforeach ()
 
 # The install/export layer is only coherent when every exported target links
-# imported dependencies that the generated package config can re-resolve. A
-# FetchContent-provided target is a member of no export set, so under fetched
-# Eigen/pugixml or a fetched backend install(EXPORT) would emit an unresolvable
-# link edge. The surface therefore defaults off wherever that is the case, and
-# refuses loudly when it was nevertheless requested.
-if (PROJECT_IS_TOP_LEVEL AND NOT CARTAN_CMAKE_FETCH_DEPS AND NOT CARTAN_FETCHED_BACKENDS)
-    set(CARTAN_INSTALL_DEFAULT ON)
+# imported dependencies that the generated package config can re-resolve. This
+# is only a prediction of that -- the dependency targets do not exist yet -- so
+# it decides the default and cartan_assert_install_surface() below decides the
+# refusal, once the targets can be inspected.
+if (PROJECT_IS_TOP_LEVEL AND NOT CARTAN_CMAKE_FETCH_DEPS AND NOT _cartan_fetched_backends)
+    set(_cartan_install_default ON)
 else ()
-    set(CARTAN_INSTALL_DEFAULT OFF)
+    set(_cartan_install_default OFF)
 endif ()
-set(CARTAN_ENABLE_INSTALL ${CARTAN_INSTALL_DEFAULT} CACHE BOOL "Generate install and export rules")
-
-set(CARTAN_INSTALL_BLOCKERS "")
-if (CARTAN_CMAKE_FETCH_DEPS)
-    list(APPEND CARTAN_INSTALL_BLOCKERS "Eigen3 (CARTAN_CMAKE_FETCH_DEPS=ON)")
-endif ()
-foreach (backend IN LISTS CARTAN_FETCHED_BACKENDS)
-    list(APPEND CARTAN_INSTALL_BLOCKERS "${backend} (fetched rather than found)")
-endforeach ()
-
-if (CARTAN_ENABLE_INSTALL AND CARTAN_INSTALL_BLOCKERS)
-    list(JOIN CARTAN_INSTALL_BLOCKERS ", " CARTAN_INSTALL_BLOCKER_TEXT)
-    message(FATAL_ERROR
-        "cartan cannot generate install and export rules: ${CARTAN_INSTALL_BLOCKER_TEXT}. "
-        "install(EXPORT cartanTargets) would name a target that is not a member of any export "
-        "set. Configure with -DCARTAN_ENABLE_INSTALL=OFF to build without an install surface, "
-        "or provide those dependencies as findable packages via CMAKE_PREFIX_PATH.")
-endif ()
-
-if (NOT CARTAN_ENABLE_INSTALL)
-    message(STATUS "cartan: no install or export rules generated (CARTAN_ENABLE_INSTALL=OFF)")
-endif ()
+set(CARTAN_ENABLE_INSTALL ${_cartan_install_default} CACHE BOOL "Generate install and export rules")
 
 add_subdirectory(lib)
+
+cartan_assert_install_surface()
 
 # The doc-snippet compile gate reuses the cartan targets defined by lib/, so it
 # must be added after them. It is a compile-only target with no CTest entries,

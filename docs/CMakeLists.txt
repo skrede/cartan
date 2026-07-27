@@ -45,21 +45,19 @@ file(GLOB _doc_snippet_core CONFIGURE_DEPENDS ${_doc_snippet_gen_dir}/core/*.cpp
 
 # Backend-gated groups. The extractor emits every marked snippet regardless of the
 # build configuration; a ``needs=<cap>`` group is compiled only when the matching
-# backend option is on, and reported (skipped) otherwise. Compiling a group means
-# linking that backend's component, which is what carries its include roots and
-# its feature macro.
+# backend option is on, and reported (skipped) otherwise.
 file(GLOB _doc_snippet_argmin CONFIGURE_DEPENDS ${_doc_snippet_gen_dir}/argmin/*.cpp)
 file(GLOB _doc_snippet_nlopt CONFIGURE_DEPENDS ${_doc_snippet_gen_dir}/nlopt/*.cpp)
 file(GLOB _doc_snippet_urdf CONFIGURE_DEPENDS ${_doc_snippet_gen_dir}/urdf/*.cpp)
 
 set(_doc_snippet_sources ${_doc_snippet_core})
 set(_doc_snippet_link_libs cartan::cartan)
+set(_doc_snippet_argmin_group "")
 
 list(LENGTH _doc_snippet_argmin _doc_snippet_argmin_count)
 if (_doc_snippet_argmin_count GREATER 0)
     if (CARTAN_BUILD_ARGMIN)
-        list(APPEND _doc_snippet_sources ${_doc_snippet_argmin})
-        list(APPEND _doc_snippet_link_libs cartan::argmin)
+        set(_doc_snippet_argmin_group ${_doc_snippet_argmin})
         message(STATUS
             "Documentation snippets: compiling ${_doc_snippet_argmin_count} 'argmin' snippet(s) (CARTAN_BUILD_ARGMIN=ON)")
     else ()
@@ -97,9 +95,18 @@ if (_doc_snippet_urdf_count GREATER 0)
 endif ()
 
 list(LENGTH _doc_snippet_sources _doc_snippet_source_count)
+list(LENGTH _doc_snippet_argmin_group _doc_snippet_group_count)
+math(EXPR _doc_snippet_source_count "${_doc_snippet_source_count} + ${_doc_snippet_group_count}")
 if (_doc_snippet_source_count EQUAL 0)
     message(FATAL_ERROR "Documentation snippet gate is enabled but no snippets were extracted.")
 endif ()
 
 add_library(doc_snippets OBJECT ${_doc_snippet_sources})
 target_link_libraries(doc_snippets PRIVATE ${_doc_snippet_link_libs})
+
+# The argmin group compiles in its own object library so the core group keeps
+# proving that the documented core API needs no backend.
+if (_doc_snippet_argmin_group)
+    add_library(doc_snippets_argmin OBJECT ${_doc_snippet_argmin_group})
+    target_link_libraries(doc_snippets_argmin PRIVATE ${_doc_snippet_link_libs} cartan::argmin)
+endif ()

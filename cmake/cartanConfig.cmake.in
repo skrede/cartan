@@ -12,10 +12,30 @@ if (CARTAN_WITH_URDF)
 endif ()
 
 set(CARTAN_WITH_ARGMIN @CARTAN_BUILD_ARGMIN@)
-if (CARTAN_WITH_ARGMIN)
+set(CARTAN_WITH_NLOPT @CARTAN_BUILD_NLOPT@)
+
+# A backend's own package is resolved only for a consumer that asks for that
+# component. Resolving it unconditionally would make an install built with a
+# backend unusable to every consumer that never links it.
+set(cartan_argmin_FOUND ${CARTAN_WITH_ARGMIN})
+set(cartan_nlopt_FOUND ${CARTAN_WITH_NLOPT})
+
+if (cartan_argmin_FOUND AND "argmin" IN_LIST cartan_FIND_COMPONENTS)
     find_dependency(argmin)
 endif ()
 
 include("${CMAKE_CURRENT_LIST_DIR}/cartanTargets.cmake")
+
+set(_cartan_missing_components "")
+foreach (_cartan_component IN LISTS cartan_FIND_COMPONENTS)
+    if (NOT cartan_${_cartan_component}_FOUND)
+        list(APPEND _cartan_missing_components ${_cartan_component})
+    endif ()
+endforeach ()
+if (_cartan_missing_components)
+    list(JOIN _cartan_missing_components ", " _cartan_missing_text)
+    set(cartan_NOT_FOUND_MESSAGE
+        "this cartan was installed without the requested optional component(s): ${_cartan_missing_text}")
+endif ()
 
 check_required_components(cartan)
