@@ -4,48 +4,46 @@
 /// Shape and finiteness predicates shared by the checked kinematics entry
 /// points.
 
-#include "cartan/serial/chain/chain_failure.h"
-
 #include "cartan/expected.h"
+
+#include "cartan/serial/chain/chain_failure.h"
 
 namespace cartan::detail
 {
 
-/// Joint-position precondition of the forward-kinematics family.
-///
-/// Finiteness is tested on the raw input, before any arithmetic touches it: an
-/// infinity multiplied by a zero becomes a NaN, so a guard placed after the
-/// accumulation sees a NaN where it expected an infinity and lets it through.
+/// Length first, then finiteness on the raw input, before any arithmetic can
+/// touch it: an infinity multiplied by a zero becomes a NaN, so a guard placed
+/// after the accumulation sees a NaN where it expected an infinity and lets it
+/// through.
 template <typename Chain, typename Vector>
 cartan::expected<void, chain_failure>
-check_joint_positions(const Chain& chain, const Vector& q)
+check_joint_vector(const Chain& chain, const Vector& values)
 {
-    if (q.size() != chain.num_joints())
+    if (values.size() != chain.num_joints())
     {
         return cartan::unexpected(chain_failure::dimension_mismatch);
     }
-    if (!q.allFinite())
+    if (!values.allFinite())
     {
         return cartan::unexpected(chain_failure::non_finite_input);
     }
     return {};
 }
 
-/// Joint-velocity precondition, with the same ordering rationale as
-/// check_joint_positions above.
+/// The two joint vectors carry the same contract; the pair of names exists so a
+/// call site says which of them it is validating.
+template <typename Chain, typename Vector>
+cartan::expected<void, chain_failure>
+check_joint_positions(const Chain& chain, const Vector& q)
+{
+    return check_joint_vector(chain, q);
+}
+
 template <typename Chain, typename Vector>
 cartan::expected<void, chain_failure>
 check_joint_velocities(const Chain& chain, const Vector& dq)
 {
-    if (dq.size() != chain.num_joints())
-    {
-        return cartan::unexpected(chain_failure::dimension_mismatch);
-    }
-    if (!dq.allFinite())
-    {
-        return cartan::unexpected(chain_failure::non_finite_input);
-    }
-    return {};
+    return check_joint_vector(chain, dq);
 }
 
 /// Structural precondition of the Jacobian family, which takes a cached

@@ -195,12 +195,15 @@ used. Both paths produce identical results.
 |---------|-----------|
 | Space Jacobian $J_s(\theta)$ | `space_jacobian(chain, fk)` |
 | Body Jacobian $J_b(\theta)$ | `body_jacobian(chain, fk)` |
-| Spatial twist $\mathcal{V}_s = J_s \dot{\theta}$ | `end_effector_velocity(chain, q, dq)` |
+| Spatial twist $\mathcal{V}_s = J_s \dot{\theta}$ | `end_effector_velocity(chain, q, dq)` — returns `expected` |
 | Jacobian matrix type | `jacobian_matrix<Scalar, N>` |
 | Cached intermediates for Jacobian | `fk_result::intermediates` |
 
 The `end_effector_velocity` function is a convenience that computes FK and the
-space Jacobian internally, returning the 6-vector spatial twist directly.
+space Jacobian internally, returning the 6-vector spatial twist wrapped in
+`cartan::expected` — it rejects a joint vector of the wrong length or holding a
+nonfinite component. `end_effector_velocity_unchecked` is the same computation
+without the checks, for a caller that has already established both.
 
 See [API Reference](../api/kinematics.md) for full function signatures.
 See [PoE Kinematics](poe-kinematics.md) for the underlying forward kinematics.

@@ -19,14 +19,15 @@ namespace cartan
 
 /// End-effector spatial twist for a caller that has already established that
 /// q and dq both hold exactly chain.num_joints() finite components. Neither
-/// precondition is checked here: a short vector reads past its end and a
-/// longer one is silently truncated to the chain's joint count.
+/// precondition is checked here, and violating either is undefined behavior:
+/// a vector shorter than the joint count reads past its end; an over-long q is
+/// truncated to the joint count; an over-long dq is truncated in double but
+/// reads past the last Jacobian column in float, because the product's
+/// vectorized evaluator traverses the operand rather than the matrix.
 ///
 /// The suffix marks a structural precondition between arguments, and is a
 /// different claim from the `trusted` vocabulary, which marks a mathematical
 /// invariant carried by one value.
-///
-/// Reference: Lynch & Park, Modern Robotics, Eq. 5.10, p. 178.
 template <typename Scalar, int N>
 vector6<Scalar> end_effector_velocity_unchecked(
     const kinematic_chain<Scalar, N>& chain,
@@ -42,8 +43,6 @@ vector6<Scalar> end_effector_velocity_unchecked(
 ///
 /// Computes forward kinematics internally to obtain the space Jacobian,
 /// then multiplies by joint velocities.
-///
-/// Reference: Lynch & Park, Modern Robotics, Eq. 5.10, p. 178.
 template <typename Scalar, int N>
 cartan::expected<vector6<Scalar>, chain_failure> end_effector_velocity(
     const kinematic_chain<Scalar, N>& chain,

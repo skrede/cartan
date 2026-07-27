@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_CARTAN_TESTS_BOUNDARY_SIX_JOINT_CHAIN_H
-#define HPP_GUARD_CARTAN_TESTS_BOUNDARY_SIX_JOINT_CHAIN_H
+#ifndef HPP_GUARD_CARTAN_TESTS_BOUNDARY_BOUNDARY_FIXTURES_H
+#define HPP_GUARD_CARTAN_TESTS_BOUNDARY_BOUNDARY_FIXTURES_H
 
 #include "cartan/serial_chain.h"
 
@@ -7,7 +7,7 @@
 #include <numbers>
 #include <utility>
 
-namespace cartan::testing
+namespace cartan::fixtures
 {
 
 /// Six revolute z-axis joints spaced along x, sized at runtime so a joint
@@ -38,8 +38,10 @@ kinematic_chain<Scalar, dynamic> make_six_joint_dynamic_chain()
         std::move(limits));
 }
 
+/// A uniform joint vector of a caller-chosen length. The length is a parameter
+/// because the cases under test are the lengths that do not match the chain.
 template <typename Scalar>
-Eigen::VectorX<Scalar> filled(int size, Scalar value)
+Eigen::VectorX<Scalar> joint_vector(int size, Scalar value)
 {
     return Eigen::VectorX<Scalar>::Constant(size, value);
 }

@@ -1,24 +1,23 @@
-#include "six_joint_chain.h"
+#include "boundary_fixtures.h"
 
 #include <cstdio>
-#include <cstring>
 #include <cstdlib>
+#include <cstring>
 
 // One case, one executable: AddressSanitizer terminates the process, so a case
 // sharing a binary with other assertions takes every later case down with it.
 //
 // The joint-velocity vector is consumed by the Jacobian product rather than by
 // the accumulation loop, so its length cases are a memory-error surface distinct
-// from the joint-position ones. The scalar is selectable because the product's
-// evaluator differs between the two: measured, an over-long vector faults in
-// float and is silently truncated in double.
+// from the joint-position ones, and the scalar matters: the product's evaluator
+// reads past the last column for an over-long operand in float but not in double.
 template <typename Scalar>
 static int run_probe(int size)
 {
-    auto chain = cartan::testing::make_six_joint_dynamic_chain<Scalar>();
+    auto chain = cartan::fixtures::make_six_joint_dynamic_chain<Scalar>();
     const Eigen::VectorX<Scalar> q =
-        Eigen::VectorX<Scalar>::Constant(chain.num_joints(), Scalar(0.1));
-    const Eigen::VectorX<Scalar> dq = Eigen::VectorX<Scalar>::Constant(size, Scalar(0.2));
+        cartan::fixtures::joint_vector(chain.num_joints(), Scalar(0.1));
+    const Eigen::VectorX<Scalar> dq = cartan::fixtures::joint_vector(size, Scalar(0.2));
 
     const cartan::vector6<Scalar> twist =
         cartan::end_effector_velocity_unchecked(chain, q, dq);

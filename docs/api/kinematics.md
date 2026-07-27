@@ -221,7 +221,7 @@ Compute the end-effector spatial twist from joint positions and velocities.
 
 ```cpp
 template <typename Scalar, int N>
-vector6<Scalar> end_effector_velocity(
+cartan::expected<vector6<Scalar>, chain_failure> end_effector_velocity(
     const kinematic_chain<Scalar, N>& chain,
     const typename joint_state<Scalar, N>::position_type& q,
     const typename joint_state<Scalar, N>::velocity_type& dq);
@@ -231,6 +231,26 @@ Convenience function that computes FK internally, builds the space
 Jacobian, then returns `V_s = J_s(q) * dq`. Less efficient than
 calling `forward_kinematics` + `space_jacobian` separately when the
 Jacobian is also needed downstream.
+
+Both joint vectors must hold exactly `chain.num_joints()` finite
+components. Otherwise the call returns
+`chain_failure::dimension_mismatch` or `chain_failure::non_finite_input`,
+with the joint positions validated before the joint velocities.
+
+```cpp
+template <typename Scalar, int N>
+vector6<Scalar> end_effector_velocity_unchecked(
+    const kinematic_chain<Scalar, N>& chain,
+    const typename joint_state<Scalar, N>::position_type& q,
+    const typename joint_state<Scalar, N>::velocity_type& dq);
+```
+
+The same computation for a caller that has already established both
+preconditions and says so at the call site. Nothing is checked, and
+violating either precondition is undefined behavior: a vector shorter
+than the joint count reads past its end, an over-long `q` is truncated
+to the joint count, and an over-long `dq` is truncated in `double` but
+reads past the last Jacobian column in `float`.
 
 Reference: Lynch & Park, Modern Robotics, Eq. 5.10, p. 178.
 

@@ -1,15 +1,15 @@
-# Asserts that a probe process trips a sanitizer: the report must name the
-# expected error class and the expected source file, and the process must exit
-# nonzero. A CMake script rather than a shell wrapper so the mechanism runs on
-# macOS and Windows as well as Linux.
+# Runs a probe and asserts what its output must be. With EXPECT=report the output
+# must name the expected error class and the expected source file and the process
+# must exit nonzero; with EXPECT=clean the output must carry no sanitizer
+# diagnostic at all and the process must exit zero. A CMake script rather than a
+# shell wrapper so the mechanism runs on macOS and Windows as well as Linux.
 #
 # print_stacktrace is not optional. Without it an UndefinedBehaviorSanitizer
 # report is a single line naming the third-party header where the bad access
 # lands, and no frame names the cartan source file the assertion is about.
 
-if (NOT DEFINED PROBE OR NOT DEFINED WANT_ERROR OR NOT DEFINED WANT_FILE)
-    message(FATAL_ERROR
-        "expect_sanitizer.cmake requires -DPROBE, -DWANT_ERROR and -DWANT_FILE")
+if (NOT DEFINED PROBE OR NOT DEFINED EXPECT)
+    message(FATAL_ERROR "expect_sanitizer.cmake requires -DPROBE and -DEXPECT")
 endif ()
 
 execute_process(
@@ -20,6 +20,24 @@ execute_process(
     RESULT_VARIABLE probe_result)
 
 set(report "${probe_stdout}${probe_stderr}")
+
+if (EXPECT STREQUAL "clean")
+    foreach (marker "AddressSanitizer" "runtime error" "UndefinedBehaviorSanitizer")
+        string(FIND "${report}" "${marker}" marker_position)
+        if (NOT marker_position EQUAL -1)
+            message(FATAL_ERROR
+                "an in-bounds run produced '${marker}'; exit ${probe_result}\n${report}")
+        endif ()
+    endforeach ()
+    if (NOT probe_result EQUAL 0)
+        message(FATAL_ERROR "an in-bounds run exited ${probe_result}\n${report}")
+    endif ()
+    return ()
+endif ()
+
+if (NOT DEFINED WANT_ERROR OR NOT DEFINED WANT_FILE)
+    message(FATAL_ERROR "EXPECT=report requires -DWANT_ERROR and -DWANT_FILE")
+endif ()
 
 string(FIND "${report}" "${WANT_ERROR}" error_position)
 if (error_position EQUAL -1)
