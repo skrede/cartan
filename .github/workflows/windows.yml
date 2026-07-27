@@ -40,30 +40,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Eigen
-        run: vcpkg install eigen3:x64-windows
+      # Every cell the matrix drives configures a tree of its own, so the
+      # toolchain file reaches them through the environment, which CMake reads as
+      # the initial value of CMAKE_TOOLCHAIN_FILE, rather than through a command
+      # line the harness deliberately does not have.
+      - name: Install Eigen and NLopt
+        run: |
+          vcpkg install eigen3:x64-windows nlopt:x64-windows
+          "CMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" |
+            Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
-      - name: Configure
+      # The matrix installs, relocates and consumes cartan in every configuration
+      # it covers, including the backend cells, so the job needs nothing built
+      # here: each cell drives its own trees from the checkout.
+      - name: Configure the install matrix
         run: |
           cmake . -B build -A x64 `
-            -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/install" `
+            -DCARTAN_BUILD_TESTS=ON `
             -DCARTAN_CMAKE_FETCH_DEPS=OFF `
-            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
             '-DCMAKE_CXX_FLAGS=/std:c++latest /EHsc'
 
-      - name: Build and install
-        run: |
-          cmake --build build --config Release
-          cmake --install build --config Release
-
-      - name: Build consumer
-        run: |
-          cmake tests/integration/consumer -B build-consumer -A x64 `
-            -DCMAKE_PREFIX_PATH="${{ github.workspace }}/install" `
-            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
-            '-DCMAKE_CXX_FLAGS=/std:c++latest /EHsc'
-          cmake --build build-consumer --config Release
-
-      - name: Run consumer test
-        run: |
-          build-consumer/Release/integration_test.exe
+      - name: Install, relocate and consume
+        run: ctest --test-dir build -C Release -R install_matrix --output-on-failure

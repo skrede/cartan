@@ -47,10 +47,6 @@ jobs:
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
         run: |
-          # argmin is an optional additive backend; it is not yet consumable as
-          # an embedded FetchContent target (its CMake requires an installed
-          # Eigen3 config), so CI builds the default native-only configuration.
-          # Restore -DCARTAN_BUILD_ARGMIN=ON once argmin builds embeddably.
           if [ "${{ matrix.coverage }}" = "true" ]; then
             cmake . -B build -DCMAKE_BUILD_TYPE=Debug \
               -DCMAKE_CXX_FLAGS="-Werror --coverage" \
@@ -128,6 +124,31 @@ jobs:
             -DCMAKE_CXX_FLAGS="${{ matrix.flags }}" \
             -DCMAKE_EXE_LINKER_FLAGS="${{ matrix.link_flags }}" \
             -DCARTAN_BUILD_TESTS=ON \
+            -DCARTAN_BUILD_URDF=ON \
+            -DCARTAN_CMAKE_FETCH_DEPS=ON
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        run: cd build && ctest --output-on-failure
+
+  # The backend is acquired by cartan's own registry, so the revision this job
+  # builds against has exactly one spelling in the tree and none here.
+  optional-backends:
+    runs-on: ubuntu-24.04
+    name: optional backends
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: |
+          cmake . -B build -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_FLAGS="-Werror" \
+            -DCARTAN_BUILD_TESTS=ON \
+            -DCARTAN_BUILD_ARGMIN=ON \
+            -DCARTAN_BUILD_URDF=ON \
             -DCARTAN_CMAKE_FETCH_DEPS=ON
 
       - name: Build
@@ -142,24 +163,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Eigen
-        run: sudo apt-get update && sudo apt-get install -y libeigen3-dev
+      - name: Install Eigen and NLopt
+        run: sudo apt-get update && sudo apt-get install -y libeigen3-dev libnlopt-cxx-dev
 
-      - name: Build and install
+      # The matrix installs, relocates and consumes cartan in every configuration
+      # it covers, including the backend cells, so the job needs nothing built
+      # here: each cell drives its own trees from the checkout.
+      - name: Configure the install matrix
         run: |
           cmake . -B build -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install \
+            -DCARTAN_BUILD_TESTS=ON \
             -DCARTAN_CMAKE_FETCH_DEPS=OFF
-          cmake --build build
-          cmake --install build
 
-      - name: Build consumer project
-        run: |
-          cmake tests/integration/consumer -B build-consumer \
-            -DCMAKE_PREFIX_PATH=${{ github.workspace }}/install \
-            -DCMAKE_BUILD_TYPE=Release
-          cmake --build build-consumer
-
-      - name: Run consumer test
-        run: |
-          ./build-consumer/integration_test
+      - name: Install, relocate and consume
+        run: ctest --test-dir build -R install_matrix --output-on-failure

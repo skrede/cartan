@@ -68,6 +68,7 @@ cartan owns kinematics and stays out of everything else.
 
 ```cmake
 include(FetchContent)
+set(CARTAN_CMAKE_FETCH_DEPS ON)
 FetchContent_Declare(
     cartan
     GIT_REPOSITORY https://github.com/skrede/cartan.git
@@ -78,7 +79,10 @@ FetchContent_MakeAvailable(cartan)
 target_link_libraries(my_app PRIVATE cartan::cartan)
 ```
 
-This pulls Cartan and its Eigen dependency automatically. No manual installation required.
+`CARTAN_CMAKE_FETCH_DEPS` is what pulls Eigen too; without it Cartan expects to
+find an installed Eigen. This configuration builds but does not install: a
+dependency fetched into your build tree belongs to no export set, so Cartan
+generates no install rules under it.
 
 ### find_package
 
@@ -86,6 +90,10 @@ This pulls Cartan and its Eigen dependency automatically. No manual installation
 find_package(cartan CONFIG REQUIRED)
 target_link_libraries(my_app PRIVATE cartan::cartan)
 ```
+
+Installing Cartan is the other way round: build it with Eigen, and any backend
+you enabled, available as findable packages rather than fetched, or the configure
+step refuses to generate an install surface it cannot make resolvable.
 
 ### ESP-IDF Component Manager
 

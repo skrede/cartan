@@ -31,9 +31,6 @@ jobs:
 
       - name: Configure
         run: |
-          # argmin is an optional additive backend not yet embeddable via
-          # FetchContent (its CMake requires an installed Eigen3 config), so CI
-          # builds native-only. Restore -DCARTAN_BUILD_ARGMIN=ON when embeddable.
           cmake . -B build -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_FLAGS="-Werror" \
             -DCARTAN_BUILD_TESTS=ON \
@@ -51,24 +48,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Eigen
-        run: brew install eigen
+      - name: Install Eigen and NLopt
+        run: brew install eigen nlopt
 
-      - name: Build and install
+      # The matrix installs, relocates and consumes cartan in every configuration
+      # it covers, including the backend cells, so the job needs nothing built
+      # here: each cell drives its own trees from the checkout.
+      - name: Configure the install matrix
         run: |
           cmake . -B build -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install \
+            -DCARTAN_BUILD_TESTS=ON \
             -DCARTAN_CMAKE_FETCH_DEPS=OFF
-          cmake --build build
-          cmake --install build
 
-      - name: Build consumer
-        run: |
-          cmake tests/integration/consumer -B build-consumer \
-            -DCMAKE_PREFIX_PATH=${{ github.workspace }}/install \
-            -DCMAKE_BUILD_TYPE=Release
-          cmake --build build-consumer
-
-      - name: Run consumer test
-        run: |
-          ./build-consumer/integration_test
+      - name: Install, relocate and consume
+        run: ctest --test-dir build -R install_matrix --output-on-failure

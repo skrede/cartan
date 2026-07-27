@@ -51,14 +51,33 @@ macro(cartan_assert_no_unregistered_backend)
             list(APPEND _cartan_reached ${_cartan_dir_targets})
         endwhile ()
         foreach (_cartan_target IN LISTS _cartan_reached)
-            get_target_property(_cartan_own_defs ${_cartan_target} COMPILE_DEFINITIONS)
-            get_target_property(_cartan_iface_defs ${_cartan_target} INTERFACE_COMPILE_DEFINITIONS)
-            set(_cartan_defs "")
-            list(APPEND _cartan_defs ${_cartan_own_defs} ${_cartan_iface_defs})
-            cartan_assert_registered_definitions(${_cartan_target} "${_cartan_defs}")
+            cartan_assert_target_definitions(${_cartan_target})
         endforeach ()
     endif ()
 endmacro()
+
+# A per-source COMPILE_DEFINITIONS never reaches the target property, so walking
+# target properties alone is blind to the form that puts translation units built
+# under different backend configurations into one target.
+function(cartan_assert_source_definitions target)
+    get_target_property(sources ${target} SOURCES)
+    foreach (source IN LISTS sources)
+        get_source_file_property(defs "${source}"
+            TARGET_DIRECTORY ${target} COMPILE_DEFINITIONS)
+        if (defs)
+            cartan_assert_registered_definitions(${target} "${defs}")
+        endif ()
+    endforeach ()
+endfunction()
+
+function(cartan_assert_target_definitions target)
+    get_target_property(own_defs ${target} COMPILE_DEFINITIONS)
+    get_target_property(iface_defs ${target} INTERFACE_COMPILE_DEFINITIONS)
+    set(defs "")
+    list(APPEND defs ${own_defs} ${iface_defs})
+    cartan_assert_registered_definitions(${target} "${defs}")
+    cartan_assert_source_definitions(${target})
+endfunction()
 
 function(cartan_assert_registered_definitions target definitions)
     foreach (definition IN LISTS definitions)

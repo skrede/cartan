@@ -3,11 +3,11 @@
 # The guides carry HTML-comment sentinels marking which fenced ``cpp`` blocks are
 # real, buildable code. tools/extract_doc_snippets.py turns each marked block into
 # a standalone translation unit; those units are compiled here against the actual
-# public headers via the cartan::cartan target. A renamed symbol or a wrong
-# signature in the prose therefore breaks the build instead of rotting silently.
+# public headers. A renamed symbol or a wrong signature in the prose therefore
+# breaks the build instead of rotting silently.
 #
-# This target is compile-only: it is never linked into an executable and never
-# run. Its sole purpose is to force the compiler across the documented API.
+# These targets are compile-only: they are never linked into an executable and
+# never run. Their sole purpose is to force the compiler across the documented API.
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
@@ -38,75 +38,48 @@ file(GLOB_RECURSE _doc_snippet_markdown CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     ${_doc_snippet_extractor} ${_doc_snippet_markdown})
 
-# The always-compiled core group: snippets with no backend requirement. Include
-# roots and the cxx_std_20 feature come entirely from the linked cartan::cartan
-# target -- there is no hand-rolled -I list anywhere in this file.
-file(GLOB _doc_snippet_core CONFIGURE_DEPENDS ${_doc_snippet_gen_dir}/core/*.cpp)
+# Each extractor group compiles in its own object library against the target that
+# owns that group's API, and takes its include roots, language level and feature
+# macro from that target's interface. Nothing here defines a macro by hand, and no
+# object library mixes translation units built under different configurations.
+set(_doc_snippet_groups core argmin nlopt urdf)
+set(_doc_snippet_core_target cartan::cartan)
+set(_doc_snippet_argmin_target cartan::argmin)
+set(_doc_snippet_nlopt_target cartan::nlopt)
+set(_doc_snippet_urdf_target cartan::urdf)
 
-# Backend-gated groups. The extractor emits every marked snippet regardless of the
-# build configuration; a ``needs=<cap>`` group is compiled only when the matching
-# backend option is on, and reported (skipped) otherwise.
-file(GLOB _doc_snippet_argmin CONFIGURE_DEPENDS ${_doc_snippet_gen_dir}/argmin/*.cpp)
-file(GLOB _doc_snippet_nlopt CONFIGURE_DEPENDS ${_doc_snippet_gen_dir}/nlopt/*.cpp)
-file(GLOB _doc_snippet_urdf CONFIGURE_DEPENDS ${_doc_snippet_gen_dir}/urdf/*.cpp)
+# The name the rest of the tree builds. It aggregates whichever group libraries
+# this configuration created, so a group that compiles is a group that is built.
+add_custom_target(doc_snippets)
 
-set(_doc_snippet_sources ${_doc_snippet_core})
-set(_doc_snippet_link_libs cartan::cartan)
-set(_doc_snippet_argmin_group "")
+set(_doc_snippet_compiled 0)
 
-list(LENGTH _doc_snippet_argmin _doc_snippet_argmin_count)
-if (_doc_snippet_argmin_count GREATER 0)
-    if (CARTAN_BUILD_ARGMIN)
-        set(_doc_snippet_argmin_group ${_doc_snippet_argmin})
-        message(STATUS
-            "Documentation snippets: compiling ${_doc_snippet_argmin_count} 'argmin' snippet(s) (CARTAN_BUILD_ARGMIN=ON)")
-    else ()
-        message(STATUS
-            "Documentation snippets: skipping ${_doc_snippet_argmin_count} 'argmin' snippet(s) (CARTAN_BUILD_ARGMIN=OFF)")
+foreach (_group IN LISTS _doc_snippet_groups)
+    file(GLOB _group_sources CONFIGURE_DEPENDS ${_doc_snippet_gen_dir}/${_group}/*.cpp)
+    list(LENGTH _group_sources _group_count)
+    if (_group_count EQUAL 0)
+        continue ()
     endif ()
-endif ()
 
-list(LENGTH _doc_snippet_nlopt _doc_snippet_nlopt_count)
-if (_doc_snippet_nlopt_count GREATER 0)
-    if (CARTAN_BUILD_NLOPT)
-        list(APPEND _doc_snippet_sources ${_doc_snippet_nlopt})
-        # The NLopt backend carries its include roots and the CARTAN_HAS_NLOPT
-        # guard on the separate cartan::nlopt target; link it for that group.
-        list(APPEND _doc_snippet_link_libs cartan::nlopt)
-        message(STATUS
-            "Documentation snippets: compiling ${_doc_snippet_nlopt_count} 'nlopt' snippet(s) (CARTAN_BUILD_NLOPT=ON)")
-    else ()
-        message(STATUS
-            "Documentation snippets: skipping ${_doc_snippet_nlopt_count} 'nlopt' snippet(s) (CARTAN_BUILD_NLOPT=OFF)")
+    string(TOUPPER ${_group} _group_upper)
+    if (NOT _group STREQUAL core)
+        # The extractor emits every marked snippet regardless of the build
+        # configuration; a gated group is compiled only when its option is on.
+        if (NOT CARTAN_BUILD_${_group_upper})
+            message(STATUS "Documentation snippets: skipping ${_group_count} "
+                "'${_group}' snippet(s) (CARTAN_BUILD_${_group_upper}=OFF)")
+            continue ()
+        endif ()
+        message(STATUS "Documentation snippets: compiling ${_group_count} "
+            "'${_group}' snippet(s) (CARTAN_BUILD_${_group_upper}=ON)")
     endif ()
-endif ()
 
-list(LENGTH _doc_snippet_urdf _doc_snippet_urdf_count)
-if (_doc_snippet_urdf_count GREATER 0)
-    if (CARTAN_BUILD_URDF)
-        list(APPEND _doc_snippet_sources ${_doc_snippet_urdf})
-        list(APPEND _doc_snippet_link_libs cartan::urdf)
-        message(STATUS
-            "Documentation snippets: compiling ${_doc_snippet_urdf_count} 'urdf' snippet(s) (CARTAN_BUILD_URDF=ON)")
-    else ()
-        message(STATUS
-            "Documentation snippets: skipping ${_doc_snippet_urdf_count} 'urdf' snippet(s) (CARTAN_BUILD_URDF=OFF)")
-    endif ()
-endif ()
+    add_library(doc_snippets_${_group} OBJECT ${_group_sources})
+    target_link_libraries(doc_snippets_${_group} PRIVATE ${_doc_snippet_${_group}_target})
+    add_dependencies(doc_snippets doc_snippets_${_group})
+    math(EXPR _doc_snippet_compiled "${_doc_snippet_compiled} + ${_group_count}")
+endforeach ()
 
-list(LENGTH _doc_snippet_sources _doc_snippet_source_count)
-list(LENGTH _doc_snippet_argmin_group _doc_snippet_group_count)
-math(EXPR _doc_snippet_source_count "${_doc_snippet_source_count} + ${_doc_snippet_group_count}")
-if (_doc_snippet_source_count EQUAL 0)
+if (_doc_snippet_compiled EQUAL 0)
     message(FATAL_ERROR "Documentation snippet gate is enabled but no snippets were extracted.")
-endif ()
-
-add_library(doc_snippets OBJECT ${_doc_snippet_sources})
-target_link_libraries(doc_snippets PRIVATE ${_doc_snippet_link_libs})
-
-# The argmin group compiles in its own object library so the core group keeps
-# proving that the documented core API needs no backend.
-if (_doc_snippet_argmin_group)
-    add_library(doc_snippets_argmin OBJECT ${_doc_snippet_argmin_group})
-    target_link_libraries(doc_snippets_argmin PRIVATE ${_doc_snippet_link_libs} cartan::argmin)
 endif ()

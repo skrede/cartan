@@ -54,6 +54,13 @@ The `lm<Chain>`, `dls<Chain>`, `projected_lm<Chain, no_limits>`, and
 steppers. Each takes the chain type as its first template argument and a limit
 policy (`no_limits` or `clamp_limits`) as its second.
 
+These names are configuration-invariant. `lm` and `lbfgsb` alias `builtin_lm`
+and `builtin_lbfgsb` unconditionally, so they denote the native implementations
+in every build; a backend's steppers are reachable only under their own prefixed
+names (`argmin_lm`, `argmin_slsqp`, `nlopt_bobyqa`, and the rest). A policy name
+therefore means the same type in every translation unit, whichever backends the
+build enabled.
+
 ## Restart Wrapping
 
 The `restart_wrapper` wraps any inner policy with multi-start capability. When
@@ -253,9 +260,11 @@ auto solver = cartan::make_solver<Chain>()
 
 The argmin-backed policies (`argmin_slsqp`, `argmin_bobyqa`, and the rest of the
 argmin family) provide constrained optimization with joint limits as box bounds.
-They are compiled only when Cartan is built with argmin support
-(`CARTAN_BUILD_ARGMIN`), and reach a consumer only through the `cartan::argmin`
-target, which carries both the backend headers and `CARTAN_HAS_ARGMIN`:
+`CARTAN_BUILD_ARGMIN` decides whether the `cartan::argmin` component is built at
+all; linking that component is what makes the policies visible, because it
+carries the backend headers and `CARTAN_HAS_ARGMIN` on its interface. Linking
+`cartan::cartan` alone never defines that macro, and no consumer ever defines it
+by hand:
 
 ```cmake
 find_package(cartan CONFIG REQUIRED COMPONENTS argmin)
@@ -281,10 +290,10 @@ cartan::basic_ik_runner solver{cartan::argmin_bobyqa<Chain>{}};
 
 ## NLopt Solvers
 
-The NLopt-backed policies (`nlopt_slsqp`, `nlopt_bobyqa`) are compiled only when
-Cartan is built with NLopt support (`CARTAN_BUILD_NLOPT`), and reach a consumer
-only through the `cartan::nlopt` target, which carries both the backend headers
-and `CARTAN_HAS_NLOPT`:
+`CARTAN_BUILD_NLOPT` decides whether the `cartan::nlopt` component is built; as
+with argmin, linking that component is what makes the `nlopt_slsqp` and
+`nlopt_bobyqa` policies visible, because it carries the backend headers and
+`CARTAN_HAS_NLOPT` on its interface:
 
 ```cmake
 find_package(cartan CONFIG REQUIRED COMPONENTS nlopt)
