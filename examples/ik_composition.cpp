@@ -81,6 +81,10 @@ int main()
         {
             std::cout << "Factory (default): converged in " << result->iterations << " iterations\n";
         }
+        else
+        {
+            std::cout << "Factory (default): failed\n";
+        }
     }
 
     // --- Single-policy presets with .build() ---
@@ -92,6 +96,10 @@ int main()
         {
             std::cout << "Factory (speed): converged in " << result->iterations << " iterations\n";
         }
+        else
+        {
+            std::cout << "Factory (speed): failed\n";
+        }
     }
     {
         auto solver = cartan::make_robust_ik_runner<cartan::kinematic_chain<double, 7>>().build();
@@ -100,6 +108,10 @@ int main()
         if (result.has_value())
         {
             std::cout << "Factory (convergence): converged in " << result->iterations << " iterations\n";
+        }
+        else
+        {
+            std::cout << "Factory (convergence): failed\n";
         }
     }
 
@@ -114,6 +126,10 @@ int main()
         if (result.has_value())
         {
             std::cout << "Builder: converged in " << result->iterations << " iterations\n";
+        }
+        else
+        {
+            std::cout << "Builder: failed\n";
         }
     }
 

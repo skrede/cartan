@@ -122,19 +122,38 @@ public:
 };
 ```
 
-Construction examples:
+Construction, with both outcomes handled. This block is compiled by the build's
+documentation-snippet gate, so a signature change here breaks the build rather
+than rotting:
 
+<!-- cartan:snippet name=limits-construction tu -->
 ```cpp
-auto lim = cartan::joint_limits<double>::make(-3.14, 3.14);                 // Position only
-auto all = cartan::joint_limits<double>::make(-3.14, 3.14, 2.0, 50.0, 10.0);
+#include <cartan/serial_chain.h>
 
-if (!lim.has_value())
+#include <iostream>
+
+int main()
 {
-    std::cerr << "joint limits rejected: " << cartan::message(lim.error()) << "\n";
-    return 1;
-}
+    auto lim = cartan::joint_limits<double>::make(-3.14, 3.14);
+    if (!lim.has_value())
+    {
+        std::cerr << "position bounds rejected: "
+                  << cartan::message(lim.error()) << "\n";
+        return 1;
+    }
 
-cartan::kinematic_chain<double, 1> chain(home, {axis}, {*lim});
+    auto all = cartan::joint_limits<double>::make(-3.14, 3.14, 2.0, 50.0, 10.0);
+    if (!all.has_value())
+    {
+        std::cerr << "full limits rejected: "
+                  << cartan::message(all.error()) << "\n";
+        return 1;
+    }
+
+    std::cout << "range " << lim->position_min() << " .. " << lim->position_max()
+              << ", velocity cap " << *all->velocity_max() << "\n";
+    return 0;
+}
 ```
 
 `make` rejects a NaN in any bound, position bounds that do not describe a
@@ -283,43 +302,64 @@ in `double` but `3.4e-4` in `float`, which would silently discard a
 misalignment of about a hundredth of a degree in single precision — the
 same code safe in one scalar and unsafe in another.
 
-`1e-9` is an engineering judgement about physical meaninglessness, not a
+`1e-9` is an engineering judgment about physical meaninglessness, not a
 statement about the arithmetic. One nanoradian is about `5.7e-8` degrees;
 where a robot axis actually sits is fixed by machining and assembly, which
 are coarser than that by orders of magnitude. A deviation below `1e-9`
 therefore cannot describe a real misalignment — it is residue from
 composing the rotations that produced the axis.
 
-Snapping such an axis is an approximation, and its cost is bounded. Across
-the fixture set the induced end-effector error measures
+Snapping such an axis is an approximation, and its cost is small. Measured
+on the fixture set, the induced end-effector error follows
 
-    |Δp| ≤ 1.4 · n · L · δ      |Δθ| ≤ 1.7 · n · δ
+    |Δp| ≈ 1.4 · n · L · δ      |Δθ| ≈ 1.7 · n · δ
 
 for a joint count `n`, the largest moment arm `L` in the chain, and the
 tolerance `δ`. **Both constants are measured, not derived** — they are
 empirical fits over the fixture chains, not bounds proved from the PoE
-product. Worked once at the largest chain in that set, a 7-joint arm of
-about 1.3 m reach: `1.4 · 7 · 1.3 m · 1e-9 = 1.3e-8 m`, about **13 nm**.
+product, which is why these are written as approximations and not as
+inequalities. Worked once at the largest chain in that set, a 7-joint arm
+of about 1.3 m reach: `1.4 · 7 · 1.3 m · 1e-9 ≈ 1.3e-8 m`, about **13 nm**.
 
 One consequence is worth stating plainly, because it is visible in
-practice. Composing a description's `<origin rpy>` rotations in `float`
-produces axis components up to about `1.75e-7`, well above this tolerance.
-The source is single-precision arithmetic, not noise inherited from the
-description: `sin(pi)` in `float` is `-8.74e-8`, and composing two such
-rotations doubles it. That makes it **irreducible for any single-precision
-parse of any description carrying quarter-turn orientations** — no parser
-change removes it. A `double` parse is unaffected; its worst measured
-deviation is `4.1e-10`. So chains from `load_urdf<float>` are classified `general`
-and take the generic evaluation path rather than a specialization. That
-is a performance cost and not a correctness one: the generic path
-evaluates the true axis and is strictly the more faithful of the two.
+practice. Composing a description's `<origin rpy>` rotations leaves residue
+in the axis components, and its size is set by **the scalar the parse runs
+in**. In `float`, a quarter turn contributes about `4.4e-8` per rotation
+(`cos` of the single-precision `pi/2`) and a half turn about `8.7e-8`
+(`sin` of the single-precision `pi`); composing rotations accumulates them,
+and the worst deviation measured across the fixture set is about `1.75e-7`.
+All of those are far above this tolerance, so a joint whose origin composes
+such rotations is classified `general` and takes the generic evaluation
+path rather than a specialization. Not every joint of a single-precision
+parse is affected — whether one is depends on the rotations its own origin
+composes. A `double` parse of the same file is unaffected; its worst
+measured deviation is `4.1e-10`.
 
-**If you need the specialized path for a model loaded from a description,
-parse it at double precision** — `load_urdf<double>` — and convert
-afterwards if your downstream code is single-precision. Parsing at `float`
-to save memory costs you the specialization, and there is no tolerance
-setting that buys it back without also admitting misalignments a
-single-precision parse cannot distinguish from real ones.
+Because the residue is a property of the arithmetic's precision rather than
+of the description, it is **removable, and cartan does not remove it
+today**. `parse_origin` builds the rotation through `rotation_from_rpy`,
+which evaluates the trigonometry in the parse scalar; evaluating it in
+`double` and narrowing the result takes the same axis from `-1.19e-7` to
+`-2.2e-16`, which snaps. That change is not made here because it moves
+chains from the generic path onto the specialized one, which is a decision
+about the robot model and not a cleanup. Treat the current behavior as the
+behavior, not as a floor.
+
+Losing the specialization is a performance cost and not a correctness one:
+the generic path evaluates the true axis and is strictly the more faithful
+of the two.
+
+**If you need the specialized path for a description-derived model, load
+the chain at double precision** — `load_urdf<double>` — **and keep it
+there**, narrowing only the quantities you hand downstream, such as a
+computed pose or Jacobian. There is no scalar conversion on a chain:
+`kinematic_chain::to_dynamic()` preserves `Scalar`, and none of
+`static_chain`, `screw_axis`, `se3`, `so3` or `joint_limits` offers a
+`cast<>` or a converting constructor, so a `double` chain cannot be turned
+into a `float` one short of rebuilding every axis, the home pose and every
+limit by hand. Note also that no tolerance setting buys the specialization
+back at `float` without also admitting misalignments a single-precision
+parse cannot distinguish from real ones.
 
 ## kinematic_chain
 

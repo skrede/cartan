@@ -101,10 +101,11 @@ configuration using the PoE formula:
     T(q) = exp([S1]q1) * exp([S2]q2) * ... * exp([Sn]qn) * M
 
 `forward_kinematics` validates that `q` holds one finite component per joint and
-returns `cartan::expected<fk_result, chain_failure>`. The fragments in this
-section and the next unwrap with `.value()`, which **throws** on a failure, only
-because a fragment has nowhere to return an error to; the complete example in
-section 6 shows the form to copy.
+returns `cartan::expected<fk_result, chain_failure>`. The fragments on this page
+unwrap with `.value()` only because a fragment has nowhere to return an error
+to. That accessor throws `bad_expected_access` carrying the
+failure, or fail-stops on the exceptions-off targets cartan supports; the
+complete example in section 6 shows the form to copy.
 
 ```cpp
 Eigen::Vector3d q{0.5, -0.3, 0.8};   // joint angles in radians

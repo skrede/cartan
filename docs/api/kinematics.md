@@ -64,9 +64,14 @@ mathematical invariant carried by *one* value, such as a quaternion already
 being unit-norm; that claim has somewhere to live, and it lives on a tag
 (`trusted_unit`) or in the operation's name (`compose_trusted`).
 
-They are different claims, so they keep different words. Every `_unchecked`
-entry point in cartan refers back to this section rather than restating the
-distinction, and the existing `trusted` surface is not renamed.
+They are different claims, so they keep different words, and the existing
+`trusted` surface is not renamed.
+
+The rule is stated here and nowhere else. Documentation that names an
+`_unchecked` entry point on another page should link to this section rather than
+restate the distinction — [Jacobians](../background/jacobians.md) does. The
+`_unchecked` signatures below sit on this page and are not individually
+cross-referenced back to a section three screens above them.
 
 ## fk_result
 

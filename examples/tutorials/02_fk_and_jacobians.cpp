@@ -70,9 +70,15 @@ int main()
     // chain_failure rather than reading past the end of the vector. Every
     // fallible call below is written the same way: name the result, branch on
     // it, report the failure through cartan::message, and only then use the
-    // value. The terser spellings -- unwrapping inline, or streaming the call
-    // straight into std::cout -- either discard the diagnostic or do not
-    // compile, and neither is a habit worth copying.
+    // value.
+    //
+    // Three terser spellings exist and none is worth copying. `.value()`
+    // compiles and throws bad_expected_access on a failure, which does carry
+    // the typed error -- but it fail-stops instead on the exceptions-off
+    // targets cartan supports, so a caller cannot rely on catching it.
+    // Dereferencing with `*` compiles too and is undefined behavior on a
+    // failure, with no diagnostic of any kind. Only streaming the
+    // un-dereferenced call fails to compile.
     Eigen::Vector3d q_3r{0.4, -0.3, 0.5};
     auto fk_3r = cartan::forward_kinematics(chain_3r, q_3r);
     if (!fk_3r.has_value())

@@ -43,10 +43,13 @@ See [IK Methods](../background/ik-methods.md) | [IK Composition Guide](../guides
 
 ## Quick Start
 
-Minimal working example on a 3-DOF planar arm using the LM policy. The fragment
-unwraps `joint_limits::make` and `forward_kinematics` with `.value()`, which
-**throws** on a failure, to keep the setup short; branch on the result and
-report through `cartan::message` instead, as the complete example in the
+Minimal working example on a 3-DOF planar arm using the LM policy. This is a
+fragment, not a program, so it has nowhere to return a failure to and unwraps
+`joint_limits::make` and `forward_kinematics` with `.value()`. That accessor
+throws `bad_expected_access` carrying the failure, or fail-stops on the
+exceptions-off targets cartan supports — either way it is not the form to copy.
+Branch on the result and report through `cartan::message` instead, as the
+complete example in the
 [IK composition guide](../guides/ik-composition.md#complete-example) does.
 
 ```cpp

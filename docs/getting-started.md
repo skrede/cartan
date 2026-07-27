@@ -134,13 +134,26 @@ int main()
     auto s2 = cartan::screw_axis<double>::revolute(vec3(0, 0, 1), vec3(1, 0, 0));
     auto home = SE3(SO3::identity(), vec3(2, 0, 0));
 
-    auto lim = cartan::joint_limits<double>::make(-std::numbers::pi, std::numbers::pi).value();
-    cartan::kinematic_chain<double, 2> chain(home, {s1, s2}, {lim, lim});
+    auto lim = cartan::joint_limits<double>::make(-std::numbers::pi, std::numbers::pi);
+    if (!lim.has_value())
+    {
+        std::cerr << "joint limits rejected: " << cartan::message(lim.error()) << "\n";
+        return 1;
+    }
+
+    cartan::kinematic_chain<double, 2> chain(home, {s1, s2}, {*lim, *lim});
 
     Eigen::Vector2d q(0.5, -0.3);
-    auto fk = cartan::forward_kinematics(chain, q).value();
+    auto fk = cartan::forward_kinematics(chain, q);
+    if (!fk.has_value())
+    {
+        std::cerr << "forward kinematics rejected q: "
+                  << cartan::message(fk.error()) << "\n";
+        return 1;
+    }
 
-    std::cout << "End-effector:\n" << fk.end_effector.matrix() << "\n";
+    std::cout << "End-effector:\n" << fk->end_effector.matrix() << "\n";
+    return 0;
 }
 ```
 
@@ -150,12 +163,11 @@ the 4x4 homogeneous transformation matrix of the end-effector at joint
 angles `q = (0.5, -0.3)` radians.
 
 `joint_limits::make` and `forward_kinematics` both validate their arguments and
-return `cartan::expected<..., chain_failure>`. The snippets on this page unwrap
-with `.value()`, which **throws** on a failure, to keep a first example short.
-That is not the form to copy: branch on the result and report the failure
-through `cartan::message`, as the complete example in the
-[PoE walkthrough](guides/poe-walkthrough.md#6-complete-example-3-dof-planar-arm)
-and the tutorials under `examples/tutorials/` do.
+return `cartan::expected<..., chain_failure>`. The four extra lines that shape
+carries are the point, not overhead: name the result, branch on it, report the
+failure through `cartan::message`, and only then read the value. The same shape
+is used in every program under `examples/` and in the
+[PoE walkthrough](guides/poe-walkthrough.md#6-complete-example-3-dof-planar-arm).
 
 ## Inverse kinematics
 
@@ -175,11 +187,26 @@ int main()
     auto s1 = cartan::screw_axis<double>::revolute(vec3(0, 0, 1), vec3(0, 0, 0));
     auto s2 = cartan::screw_axis<double>::revolute(vec3(0, 0, 1), vec3(1, 0, 0));
     auto home = cartan::se3<double>(cartan::so3<double>::identity(), vec3(2, 0, 0));
-    auto lim = cartan::joint_limits<double>::make(-std::numbers::pi, std::numbers::pi).value();
-    cartan::kinematic_chain<double, 2> chain(home, {s1, s2}, {lim, lim});
+
+    auto lim = cartan::joint_limits<double>::make(-std::numbers::pi, std::numbers::pi);
+    if (!lim.has_value())
+    {
+        std::cerr << "joint limits rejected: " << cartan::message(lim.error()) << "\n";
+        return 1;
+    }
+
+    cartan::kinematic_chain<double, 2> chain(home, {s1, s2}, {*lim, *lim});
 
     Eigen::Vector2d q_known{0.3, -0.5};
-    auto target = cartan::forward_kinematics(chain, q_known).value().end_effector;
+    auto fk_known = cartan::forward_kinematics(chain, q_known);
+    if (!fk_known.has_value())
+    {
+        std::cerr << "forward kinematics rejected q_known: "
+                  << cartan::message(fk_known.error()) << "\n";
+        return 1;
+    }
+
+    auto target = fk_known->end_effector;
 
     Eigen::Vector2d q0{0.0, 0.0};
     cartan::convergence_criteria<double> criteria{1e-6, 1e-6, 100, 200};
@@ -188,8 +215,14 @@ int main()
     solver.setup(chain, target, q0, criteria);
     auto result = solver.solve();
 
-    if (result.has_value())
-        std::cout << "Solution: " << result.value().solution.position.transpose() << "\n";
+    if (!result.has_value())
+    {
+        std::cout << "IK did not converge\n";
+        return 1;
+    }
+
+    std::cout << "Solution: " << result->solution.position.transpose() << "\n";
+    return 0;
 }
 ```
 
