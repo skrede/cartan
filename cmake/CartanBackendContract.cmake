@@ -61,6 +61,9 @@ endmacro()
 # under different backend configurations into one target.
 function(cartan_assert_source_definitions target)
     get_target_property(sources ${target} SOURCES)
+    if (NOT sources)
+        return()
+    endif ()
     foreach (source IN LISTS sources)
         get_source_file_property(defs "${source}"
             TARGET_DIRECTORY ${target} COMPILE_DEFINITIONS)

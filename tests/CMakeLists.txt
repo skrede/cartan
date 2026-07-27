@@ -40,10 +40,17 @@ if (CARTAN_BUILD_TESTS)
     add_subdirectory(compile)
     add_subdirectory(boundary)
     add_subdirectory(odr)
+endif ()
 
-    if (NOT CARTAN_CMAKE_FETCH_DEPS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/integration/CMakeLists.txt")
-        add_subdirectory(integration)
-    endif ()
+if (CARTAN_BUILD_PACKAGING_TESTS AND CARTAN_CMAKE_FETCH_DEPS)
+    message(FATAL_ERROR
+        "CARTAN_BUILD_PACKAGING_TESTS needs findable dependencies: every cell asserts "
+        "an install surface, and fetch mode defaults that off. Reconfigure with "
+        "-DCARTAN_CMAKE_FETCH_DEPS=OFF and the dependencies on CMAKE_PREFIX_PATH.")
+endif ()
+
+if (CARTAN_BUILD_PACKAGING_TESTS OR (CARTAN_BUILD_TESTS AND NOT CARTAN_CMAKE_FETCH_DEPS))
+    add_subdirectory(integration)
 endif ()
 
 if (CARTAN_BUILD_FUZZ_TESTS)

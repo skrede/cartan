@@ -143,6 +143,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Configure
+        env:
+          CC: clang-18
+          CXX: clang++-18
         run: |
           cmake . -B build -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_FLAGS="-Werror" \
@@ -172,8 +175,9 @@ jobs:
       - name: Configure the install matrix
         run: |
           cmake . -B build -DCMAKE_BUILD_TYPE=Release \
-            -DCARTAN_BUILD_TESTS=ON \
+            -DCARTAN_BUILD_PACKAGING_TESTS=ON \
+            -DCARTAN_BUILD_NETWORK_TESTS=ON \
             -DCARTAN_CMAKE_FETCH_DEPS=OFF
 
       - name: Install, relocate and consume
-        run: ctest --test-dir build -R install_matrix --output-on-failure
+        run: ctest --test-dir build -R install_matrix --output-on-failure --no-tests=error

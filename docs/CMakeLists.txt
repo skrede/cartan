@@ -74,12 +74,18 @@ foreach (_group IN LISTS _doc_snippet_groups)
             "'${_group}' snippet(s) (CARTAN_BUILD_${_group_upper}=ON)")
     endif ()
 
+    # The umbrella comes first in every group: a component links only its own
+    # subsystem and its backend, while the extractor's default preamble includes
+    # the whole public API. It carries no backend macro, so it cannot contaminate.
     add_library(doc_snippets_${_group} OBJECT ${_group_sources})
-    target_link_libraries(doc_snippets_${_group} PRIVATE ${_doc_snippet_${_group}_target})
+    target_link_libraries(doc_snippets_${_group}
+        PRIVATE cartan::cartan ${_doc_snippet_${_group}_target})
     add_dependencies(doc_snippets doc_snippets_${_group})
     math(EXPR _doc_snippet_compiled "${_doc_snippet_compiled} + ${_group_count}")
 endforeach ()
 
 if (_doc_snippet_compiled EQUAL 0)
-    message(FATAL_ERROR "Documentation snippet gate is enabled but no snippets were extracted.")
+    message(FATAL_ERROR
+        "Documentation snippet gate is enabled but this configuration compiles no "
+        "snippet: every extracted snippet belongs to a group whose option is off.")
 endif ()

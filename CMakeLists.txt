@@ -55,6 +55,10 @@ option(CARTAN_FETCH_BENCHMARK_DEPS "Fetch missing benchmark dependencies via Fet
 option(CARTAN_BUILD_PROFILING "Build profiling benchmarks (no external robot library dependencies)" OFF)
 option(CARTAN_BUILD_PYTHON "Build Python bindings via nanobind" OFF)
 option(CARTAN_BUILD_DOC_TESTS "Compile documentation C++ snippets against the headers" OFF)
+# The matrix drives configure, build and install trees of its own from the checkout
+# and compiles nothing in this one, so it needs no unit-test framework. Keeping it
+# off CARTAN_BUILD_TESTS lets a packaging lane run it without acquiring one.
+option(CARTAN_BUILD_PACKAGING_TESTS "Register the install-relocate-consume matrix" OFF)
 option(CARTAN_CMAKE_FETCH_DEPS "Use CMake FetchContent to download and install dependencies" OFF)
 
 set(CARTAN_ARGMIN_SOURCE_DIR "" CACHE PATH "Path to local argmin source checkout")
@@ -141,7 +145,8 @@ endif ()
 # registered under examples/tutorials/ are discoverable without also turning on
 # CARTAN_BUILD_TESTS. The tests/ subdirectory itself stays gated on the test
 # flags only.
-if (CARTAN_BUILD_TESTS OR CARTAN_BUILD_FUZZ_TESTS OR CARTAN_BUILD_PROPERTY_TESTS OR CARTAN_BUILD_EXAMPLES)
+if (CARTAN_BUILD_TESTS OR CARTAN_BUILD_FUZZ_TESTS OR CARTAN_BUILD_PROPERTY_TESTS
+        OR CARTAN_BUILD_PACKAGING_TESTS OR CARTAN_BUILD_EXAMPLES)
     enable_testing()
 endif ()
 
@@ -149,7 +154,8 @@ if (CARTAN_BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif ()
 
-if (CARTAN_BUILD_TESTS OR CARTAN_BUILD_FUZZ_TESTS OR CARTAN_BUILD_PROPERTY_TESTS)
+if (CARTAN_BUILD_TESTS OR CARTAN_BUILD_FUZZ_TESTS OR CARTAN_BUILD_PROPERTY_TESTS
+        OR CARTAN_BUILD_PACKAGING_TESTS)
     add_subdirectory(tests)
 endif ()
 
