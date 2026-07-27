@@ -82,26 +82,26 @@ public:
     };
 
     restart_wrapper()
-        : m_best_q(joint_state<scalar_type, joints>::zero_position())
+        : m_best_q(detail::poison_joint_position<scalar_type, joints>())
     {
     }
 
     explicit restart_wrapper(InnerPolicy inner)
         : m_inner(std::move(inner))
-        , m_best_q(joint_state<scalar_type, joints>::zero_position())
+        , m_best_q(detail::poison_joint_position<scalar_type, joints>())
     {
     }
 
     explicit restart_wrapper(const options& opts)
         : m_options(opts)
-        , m_best_q(joint_state<scalar_type, joints>::zero_position())
+        , m_best_q(detail::poison_joint_position<scalar_type, joints>())
     {
     }
 
     restart_wrapper(const options& opts, InnerPolicy inner)
         : m_inner(std::move(inner))
         , m_options(opts)
-        , m_best_q(joint_state<scalar_type, joints>::zero_position())
+        , m_best_q(detail::poison_joint_position<scalar_type, joints>())
     {
     }
 

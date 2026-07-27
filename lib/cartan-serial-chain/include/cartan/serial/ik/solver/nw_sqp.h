@@ -70,7 +70,7 @@ public:
 
     explicit nw_sqp(const options& opts)
         : m_options{opts}
-        , m_q(joint_state<scalar_type, joints>::zero_position())
+        , m_q(detail::poison_joint_position<scalar_type, joints>())
     {}
 
     void setup(

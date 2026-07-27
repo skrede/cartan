@@ -28,31 +28,6 @@ struct ik_result
     int solver_index{};
 };
 
-namespace detail
-{
-
-/// Poison default for an ik_error's diagnostic joint vector: NaN-filled for a
-/// fixed-size chain, empty for a dynamic one. A field left at this default was
-/// never populated by the solver; a NaN sentinel makes an accidental read fail
-/// loudly -- it propagates through arithmetic and, unlike a large finite value,
-/// survives angle wrapping -- instead of masquerading as the plausible all-zero
-/// home configuration.
-template <typename Scalar, int N>
-typename joint_state<Scalar, N>::position_type poison_joint_position()
-{
-    using position_type = typename joint_state<Scalar, N>::position_type;
-    if constexpr (N == dynamic)
-    {
-        return position_type{};
-    }
-    else
-    {
-        return position_type::Constant(std::numeric_limits<Scalar>::quiet_NaN());
-    }
-}
-
-}
-
 /// IK error containing failure diagnostics. Every payload field defaults to a
 /// NaN poison so an unpopulated diagnostic surfaces as an obvious failure rather
 /// than a plausible value (a zero last_q reads as the home pose; a zero

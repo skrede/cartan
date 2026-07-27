@@ -71,7 +71,7 @@ public:
     }
 
     explicit builtin_lm(const options& opts)
-        : m_q(joint_state<scalar_type, joints>::zero_position())
+        : m_q(detail::poison_joint_position<scalar_type, joints>())
         , m_options(opts)
     {
     }

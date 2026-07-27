@@ -151,8 +151,8 @@ public:
 
     explicit argmin_slsqp(const options& opts)
         : m_options{opts}
-        , m_q(joint_state<scalar_type, joints>::zero_position())
-        , m_best_q(joint_state<scalar_type, joints>::zero_position())
+        , m_q(detail::poison_joint_position<scalar_type, joints>())
+        , m_best_q(detail::poison_joint_position<scalar_type, joints>())
     {}
 
     void setup(

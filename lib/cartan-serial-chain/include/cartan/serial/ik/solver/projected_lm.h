@@ -140,10 +140,10 @@ public:
     }
 
     explicit projected_lm(const options& opts)
-        : m_q(joint_state<scalar_type, joints>::zero_position())
-        , m_best_q(joint_state<scalar_type, joints>::zero_position())
-        , m_q_min(joint_state<scalar_type, joints>::zero_position())
-        , m_q_max(joint_state<scalar_type, joints>::zero_position())
+        : m_q(detail::poison_joint_position<scalar_type, joints>())
+        , m_best_q(detail::poison_joint_position<scalar_type, joints>())
+        , m_q_min(detail::poison_joint_position<scalar_type, joints>())
+        , m_q_max(detail::poison_joint_position<scalar_type, joints>())
         , m_options(opts)
     {
     }
@@ -444,7 +444,7 @@ private:
         }
         else
         {
-            dq = joint_state<scalar_type, joints>::zero_position();
+            dq = position_type::Zero();
         }
 
         if (n_free == 0)
@@ -617,13 +617,14 @@ private:
         free_vec b = delta_gn;
         free_vec d = b - a;
 
-        // Eigen picks its vectorized reduction traversal from the dynamic-size
-        // branch and handles the sub-packet remainder at run time. These vectors
-        // carry a compile-time maximum of three, so the packet loop body executes
-        // zero times, but GCC cannot prove that and models a speculative full-width
-        // load past the end of the object. Clang is clean on the same source and the
+        // These vectors are max-size-fixed, so Eigen picks its vectorized reduction
+        // traversal from the dynamic-size branch and computes the packet count at
+        // run time. Whenever the run-time free-joint count is below the packet
+        // width that count is zero and the loop body never executes, but GCC cannot
+        // prove it and models a speculative full-width load bounded by the
+        // compile-time maximum instead. Clang is clean on the same source and the
         // reported access width follows the vector register width, which is what
-        // marks this as a modelling artifact rather than a live over-read.
+        // marks this as a modeling artifact rather than a live over-read.
 #if defined(__GNUC__) && !defined(__clang__) && __GNUC__ >= 15
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Warray-bounds"

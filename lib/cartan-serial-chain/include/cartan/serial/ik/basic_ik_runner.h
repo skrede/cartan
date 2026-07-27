@@ -99,13 +99,13 @@ public:
     using position_type = typename joint_state<scalar_type, joints>::position_type;
 
     basic_ik_runner()
-        : m_best_q(joint_state<scalar_type, joints>::zero_position())
+        : m_best_q(detail::poison_joint_position<scalar_type, joints>())
     {
     }
 
     explicit basic_ik_runner(Policies... policies)
         : m_policies(std::move(policies)...)
-        , m_best_q(joint_state<scalar_type, joints>::zero_position())
+        , m_best_q(detail::poison_joint_position<scalar_type, joints>())
     {
     }
 

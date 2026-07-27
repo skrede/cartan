@@ -81,10 +81,14 @@ public:
         int stall_window{5};
     };
 
-    dls() = default;
+    dls()
+        : dls(options{})
+    {
+    }
 
     explicit dls(const options& opts)
-        : m_options(opts)
+        : m_q(detail::poison_joint_position<scalar_type, joints>())
+        , m_options(opts)
     {
     }
 
@@ -252,18 +256,7 @@ public:
 
 private:
     se3<scalar_type> m_target{se3<scalar_type>::identity()};
-    // Zero-initialize the fixed-size storage so a size-optimized build cannot
-    // flag the working iterate as maybe-uninitialized before setup() sets it.
-    position_type m_q{[] {
-        if constexpr (joints == dynamic)
-        {
-            return position_type{};
-        }
-        else
-        {
-            return position_type::Zero();
-        }
-    }()};
+    position_type m_q;
     convergence_criteria<scalar_type> m_criteria{};
     options m_options{};
     cartan::detail::error_ring<scalar_type> m_error_history;

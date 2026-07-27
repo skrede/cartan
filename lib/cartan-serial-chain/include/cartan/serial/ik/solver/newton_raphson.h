@@ -66,9 +66,9 @@ public:
     }
 
     explicit newton_raphson(const options& opts)
-        : m_q(joint_state<scalar_type, joints>::zero_position())
-        , m_lower(joint_state<scalar_type, joints>::zero_position())
-        , m_upper(joint_state<scalar_type, joints>::zero_position())
+        : m_q(detail::poison_joint_position<scalar_type, joints>())
+        , m_lower(detail::poison_joint_position<scalar_type, joints>())
+        , m_upper(detail::poison_joint_position<scalar_type, joints>())
         , m_options(opts)
     {
     }
