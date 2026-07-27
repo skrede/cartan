@@ -113,25 +113,10 @@ static spp::kinematic_chain<double, 3> make_3r_chain()
         {lim, lim, lim});
 }
 
-// ============================================================================
-// jacobian_matrix type alias resolves correctly
-// ============================================================================
-
-TEST_CASE("jacobian_matrix fixed is 6xN", "[jacobian]")
-{
-    using jm = spp::jacobian_matrix<double, 3>;
-    static_assert(jm::RowsAtCompileTime == 6);
-    static_assert(jm::ColsAtCompileTime == 3);
-    SUCCEED();
-}
-
-TEST_CASE("jacobian_matrix dynamic is 6xDynamic", "[jacobian]")
-{
-    using jm = spp::jacobian_matrix<double, spp::dynamic>;
-    static_assert(jm::RowsAtCompileTime == 6);
-    static_assert(jm::ColsAtCompileTime == Eigen::Dynamic);
-    SUCCEED();
-}
+static_assert(spp::jacobian_matrix<double, 3>::RowsAtCompileTime == 6);
+static_assert(spp::jacobian_matrix<double, 3>::ColsAtCompileTime == 3);
+static_assert(spp::jacobian_matrix<double, spp::dynamic>::RowsAtCompileTime == 6);
+static_assert(spp::jacobian_matrix<double, spp::dynamic>::ColsAtCompileTime == Eigen::Dynamic);
 
 // ============================================================================
 // space_jacobian basic API

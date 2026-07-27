@@ -1,22 +1,23 @@
-// Every backend-gated solve policy and problem adapter, instantiated for a
-// fixed-size and a dynamic chain.
+// Every backend-gated solve policy and problem adapter, driven for a fixed-size
+// and a dynamic chain, and for a non-default convergence policy wherever the
+// policy exposes one.
 //
 // A class template that is only included has its dependent expressions parsed
-// and not type-checked, so a header no translation unit instantiates is a
-// header no compiler has checked. Two of these policies reached no translation
-// unit at all and six more were only ever instantiated for one of the two chain
-// forms; this target exists so that neither can happen silently again.
+// and not type-checked, so an entry point nothing instantiates is one no
+// compiler has checked. That includes a published alias: an alias binds
+// template arguments no other instantiation supplies, so it can be ill-formed
+// while every default-argument instantiation of the same template compiles.
 //
-// It drives each policy through one setup() and one step() rather than to
-// convergence: instantiation is what is being asserted, not solution quality,
+// Each policy is driven through one setup() and one step() rather than to
+// convergence: instantiation is what is asserted here, not solution quality,
 // which the per-solver targets cover.
 
 #include "../support/kinematics_helpers.h"
-#include "../support/joint_limits_helpers.h"
 
-// Named one by one rather than through the ik.h umbrella: the umbrella carries
-// eleven of the thirteen, and the two it omits are exactly the two no
-// translation unit reached.
+#include "../fixtures/chain_factories.h"
+
+// Named one by one rather than through the ik.h umbrella, which does not carry
+// all thirteen.
 #include <cartan/serial/ik/solver/mma.h>
 #include <cartan/serial/ik/solver/cmaes.h>
 #include <cartan/serial/ik/solver/gcmma.h>
@@ -38,14 +39,14 @@
 #include <cartan/serial/ik/detail/argmin_unconstrained_problem.h>
 
 #include <cartan/lie/se3.h>
-#include <cartan/lie/so3.h>
-#include <cartan/serial/chain/screw_axis.h>
+
+#include <cartan/serial/chain/joint_state.h>
 #include <cartan/serial/chain/kinematic_chain.h>
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
-#include <numbers>
+#include <type_traits>
 
 namespace spp = cartan;
 
@@ -53,24 +54,6 @@ namespace
 {
 
 using chain6 = spp::kinematic_chain<double, 6>;
-using chain_dyn = spp::kinematic_chain<double, spp::dynamic>;
-
-chain6 make_ur5_like()
-{
-    auto s1 = spp::screw_axis<double>::revolute({0, 0, 1}, {0, 0, 0});
-    auto s2 = spp::screw_axis<double>::revolute({0, 1, 0}, {0, 0, 0.089});
-    auto s3 = spp::screw_axis<double>::revolute({0, 1, 0}, {0.425, 0, 0.089});
-    auto s4 = spp::screw_axis<double>::revolute({0, 1, 0}, {0.817, 0, 0.089});
-    auto s5 = spp::screw_axis<double>::revolute({0, 0, -1}, {0.817, 0.109, 0});
-    auto s6 = spp::screw_axis<double>::revolute({0, 1, 0}, {0.817, 0, -0.006});
-
-    spp::vector3<double> home_trans;
-    home_trans << 0.817, 0.191, -0.006;
-    auto home = spp::se3<double>(spp::so3<double>::identity(), home_trans);
-
-    auto lim = spp::testing::limits(-2 * std::numbers::pi, 2 * std::numbers::pi);
-    return chain6(home, {s1, s2, s3, s4, s5, s6}, {lim, lim, lim, lim, lim, lim});
-}
 
 template <typename Policy, typename Chain>
 void drive(const Chain& chain, const spp::se3<double>& target)
@@ -109,6 +92,24 @@ void drive_every_policy(const Chain& chain, const spp::se3<double>& target)
     drive<spp::nw_sqp<Chain>>(chain, target);
 }
 
+/// The five policies below take a Convergence parameter, and the inner solver
+/// they build has to be typed on it rather than on its own default. That is a
+/// distinct instantiation from the one above and the only one a published alias
+/// like argmin_slsqp_nlopt_compat ever produces.
+template <typename Chain>
+void drive_every_convergence_parameterized(const Chain& chain, const spp::se3<double>& target)
+{
+    using nlopt_like = argmin::slsqp_compatible_convergence;
+
+    drive<spp::argmin_slsqp<Chain, spp::clamp_limits, nlopt_like>>(chain, target);
+    drive<spp::filter_slsqp<Chain, spp::clamp_limits, nlopt_like>>(chain, target);
+    drive<spp::filter_nw_sqp<Chain, spp::clamp_limits, nlopt_like>>(chain, target);
+    drive<spp::argmin_projected_gn<Chain, spp::clamp_limits, nlopt_like>>(chain, target);
+    drive<spp::argmin_projected_gradient_gn<Chain, spp::clamp_limits, nlopt_like>>(chain, target);
+
+    drive<spp::argmin_slsqp_nlopt_compat<Chain>>(chain, target);
+}
+
 template <typename Adapter>
 void exercise(const Adapter& problem, int expected_dimension)
 {
@@ -145,7 +146,7 @@ void drive_every_adapter(const Chain& chain, const spp::se3<double>& target)
 TEST_CASE("every backend-gated policy instantiates for both chain forms",
     "[argmin][instantiation]")
 {
-    auto fixed = make_ur5_like();
+    auto fixed = spp::fixtures::make_ur3e_chain<double>();
     auto dynamic = fixed.to_dynamic();
 
     Eigen::Vector<double, 6> q_known;
@@ -156,10 +157,29 @@ TEST_CASE("every backend-gated policy instantiates for both chain forms",
     drive_every_policy(dynamic, target);
 }
 
+/// argmin_slsqp_fast is documented as a synonym that survives only so existing
+/// call sites resolve; asserting the identity resolves the alias without
+/// building a second copy of a type already driven above.
+static_assert(std::is_same_v<spp::argmin_slsqp_fast<chain6>, spp::argmin_slsqp<chain6>>);
+
+TEST_CASE("every convergence-parameterized policy and published alias instantiates",
+    "[argmin][instantiation]")
+{
+    auto fixed = spp::fixtures::make_ur3e_chain<double>();
+    auto dynamic = fixed.to_dynamic();
+
+    Eigen::Vector<double, 6> q_known;
+    q_known << 0.2, -0.3, 0.4, 0.1, -0.2, 0.3;
+    auto target = spp::testing::fk_at(fixed, q_known).end_effector;
+
+    drive_every_convergence_parameterized(fixed, target);
+    drive_every_convergence_parameterized(dynamic, target);
+}
+
 TEST_CASE("every backend-gated adapter instantiates for both chain forms",
     "[argmin][instantiation]")
 {
-    auto fixed = make_ur5_like();
+    auto fixed = spp::fixtures::make_ur3e_chain<double>();
     auto dynamic = fixed.to_dynamic();
 
     Eigen::Vector<double, 6> q_known;

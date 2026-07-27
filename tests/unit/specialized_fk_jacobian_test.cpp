@@ -4,6 +4,7 @@
 ///        plus near-zero and zero-angle edge cases.
 
 #include "../support/kinematics_helpers.h"
+#include "../support/static_chain_factories.h"
 
 #include "../fixtures/chain_factories.h"
 #include "../fixtures/prismatic_chains.h"
@@ -21,134 +22,6 @@
 #include <random>
 
 namespace spp = cartan;
-
-// ============================================================================
-// Static chain factory helpers (mirrors chain_factories.h runtime geometry)
-// ============================================================================
-
-template <typename Scalar>
-using static_3r_planar_chain = spp::static_chain<Scalar, spp::revolute_z, spp::revolute_z, spp::revolute_z>;
-
-template <typename Scalar>
-static_3r_planar_chain<Scalar> make_3r_planar_static()
-{
-    auto kc = spp::fixtures::make_3r_planar_chain<Scalar>();
-    return spp::testing::unwrap(
-        static_3r_planar_chain<Scalar>::make(kc.home(), kc.axes(), kc.limits()),
-        "make_3r_planar_static");
-}
-
-template <typename Scalar>
-using static_ur3e_chain = spp::static_chain<Scalar,
-    spp::revolute_z, spp::revolute_y, spp::revolute_y,
-    spp::revolute_y, spp::revolute_z, spp::revolute_y>;
-
-template <typename Scalar>
-static_ur3e_chain<Scalar> make_ur3e_static()
-{
-    auto kc = spp::fixtures::make_ur3e_chain<Scalar>();
-    return spp::testing::unwrap(
-        static_ur3e_chain<Scalar>::make(kc.home(), kc.axes(), kc.limits()),
-        "make_ur3e_static");
-}
-
-template <typename Scalar>
-using static_lbr_med14_chain = spp::static_chain<Scalar,
-    spp::revolute_z, spp::revolute_y, spp::revolute_z, spp::revolute_y,
-    spp::revolute_z, spp::revolute_y, spp::revolute_z>;
-
-template <typename Scalar>
-static_lbr_med14_chain<Scalar> make_lbr_med14_static()
-{
-    auto kc = spp::fixtures::make_lbr_med14_chain<Scalar>();
-    return spp::testing::unwrap(
-        static_lbr_med14_chain<Scalar>::make(kc.home(), kc.axes(), kc.limits()),
-        "make_lbr_med14_static");
-}
-
-template <typename Scalar>
-using static_kr6_sixx_chain = spp::static_chain<Scalar,
-    spp::revolute_z, spp::revolute_y, spp::revolute_y,
-    spp::revolute_x, spp::revolute_y, spp::revolute_x>;
-
-template <typename Scalar>
-static_kr6_sixx_chain<Scalar> make_kr6_sixx_static()
-{
-    auto kc = spp::fixtures::make_kr6_sixx_chain<Scalar>();
-    return spp::testing::unwrap(
-        static_kr6_sixx_chain<Scalar>::make(kc.home(), kc.axes(), kc.limits()),
-        "make_kr6_sixx_static");
-}
-
-template <typename Scalar>
-using static_panda_chain = spp::static_chain<Scalar,
-    spp::revolute_z, spp::revolute_y, spp::revolute_z, spp::revolute_y,
-    spp::revolute_z, spp::revolute_y, spp::revolute_z>;
-
-template <typename Scalar>
-static_panda_chain<Scalar> make_panda_static()
-{
-    auto kc = spp::fixtures::make_panda_chain<Scalar>();
-    return spp::testing::unwrap(
-        static_panda_chain<Scalar>::make(kc.home(), kc.axes(), kc.limits()),
-        "make_panda_static");
-}
-
-template <typename Scalar>
-using static_abb_irb120_chain = spp::static_chain<Scalar,
-    spp::revolute_z, spp::revolute_y, spp::revolute_y,
-    spp::revolute_x, spp::revolute_y, spp::revolute_x>;
-
-template <typename Scalar>
-static_abb_irb120_chain<Scalar> make_abb_irb120_static()
-{
-    auto kc = spp::fixtures::make_abb_irb120_chain<Scalar>();
-    return spp::testing::unwrap(
-        static_abb_irb120_chain<Scalar>::make(kc.home(), kc.axes(), kc.limits()),
-        "make_abb_irb120_static");
-}
-
-template <typename Scalar>
-using static_jaco2_chain = spp::static_chain<Scalar,
-    spp::revolute_z, spp::revolute_y, spp::revolute_y,
-    spp::revolute_x, spp::revolute_y, spp::revolute_x>;
-
-template <typename Scalar>
-static_jaco2_chain<Scalar> make_jaco2_static()
-{
-    auto kc = spp::fixtures::make_jaco2_chain<Scalar>();
-    return spp::testing::unwrap(
-        static_jaco2_chain<Scalar>::make(kc.home(), kc.axes(), kc.limits()),
-        "make_jaco2_static");
-}
-
-template <typename Scalar>
-using static_fetch_chain = spp::static_chain<Scalar,
-    spp::revolute_z, spp::revolute_y, spp::revolute_x, spp::revolute_y,
-    spp::revolute_x, spp::revolute_y, spp::revolute_x>;
-
-template <typename Scalar>
-static_fetch_chain<Scalar> make_fetch_static()
-{
-    auto kc = spp::fixtures::make_fetch_chain<Scalar>();
-    return spp::testing::unwrap(
-        static_fetch_chain<Scalar>::make(kc.home(), kc.axes(), kc.limits()),
-        "make_fetch_static");
-}
-
-template <typename Scalar>
-using static_baxter_chain = spp::static_chain<Scalar,
-    spp::revolute_z, spp::revolute_y, spp::revolute_x, spp::revolute_y,
-    spp::revolute_x, spp::revolute_y, spp::revolute_x>;
-
-template <typename Scalar>
-static_baxter_chain<Scalar> make_baxter_static()
-{
-    auto kc = spp::fixtures::make_baxter_chain<Scalar>();
-    return spp::testing::unwrap(
-        static_baxter_chain<Scalar>::make(kc.home(), kc.axes(), kc.limits()),
-        "make_baxter_static");
-}
 
 // ============================================================================
 // Helpers
@@ -238,55 +111,55 @@ TEST_CASE("Specialized FK parity", "[specialized][fk]")
 
     SECTION("3R planar")
     {
-        auto sc = make_3r_planar_static<double>();
+        auto sc = spp::testing::make_3r_planar_static<double>();
         verify_fk_parity_specialized<decltype(sc), 3>(sc, num_configs, seed);
     }
 
     SECTION("UR3e")
     {
-        auto sc = make_ur3e_static<double>();
+        auto sc = spp::testing::make_ur3e_static<double>();
         verify_fk_parity_specialized<decltype(sc), 6>(sc, num_configs, seed);
     }
 
     SECTION("LBR Med14")
     {
-        auto sc = make_lbr_med14_static<double>();
+        auto sc = spp::testing::make_lbr_med14_static<double>();
         verify_fk_parity_specialized<decltype(sc), 7>(sc, num_configs, seed);
     }
 
     SECTION("KR6 SIXX")
     {
-        auto sc = make_kr6_sixx_static<double>();
+        auto sc = spp::testing::make_kr6_sixx_static<double>();
         verify_fk_parity_specialized<decltype(sc), 6>(sc, num_configs, seed);
     }
 
     SECTION("Franka Panda")
     {
-        auto sc = make_panda_static<double>();
+        auto sc = spp::testing::make_panda_static<double>();
         verify_fk_parity_specialized<decltype(sc), 7>(sc, num_configs, seed);
     }
 
     SECTION("ABB IRB120")
     {
-        auto sc = make_abb_irb120_static<double>();
+        auto sc = spp::testing::make_abb_irb120_static<double>();
         verify_fk_parity_specialized<decltype(sc), 6>(sc, num_configs, seed);
     }
 
     SECTION("Kinova Jaco2")
     {
-        auto sc = make_jaco2_static<double>();
+        auto sc = spp::testing::make_jaco2_static<double>();
         verify_fk_parity_specialized<decltype(sc), 6>(sc, num_configs, seed);
     }
 
     SECTION("Fetch")
     {
-        auto sc = make_fetch_static<double>();
+        auto sc = spp::testing::make_fetch_static<double>();
         verify_fk_parity_specialized<decltype(sc), 7>(sc, num_configs, seed);
     }
 
     SECTION("Rethink Baxter")
     {
-        auto sc = make_baxter_static<double>();
+        auto sc = spp::testing::make_baxter_static<double>();
         verify_fk_parity_specialized<decltype(sc), 7>(sc, num_configs, seed);
     }
 }
@@ -302,55 +175,55 @@ TEST_CASE("Specialized Jacobian parity", "[specialized][jacobian]")
 
     SECTION("3R planar")
     {
-        auto sc = make_3r_planar_static<double>();
+        auto sc = spp::testing::make_3r_planar_static<double>();
         verify_jacobian_parity_specialized<decltype(sc), 3>(sc, num_configs, seed);
     }
 
     SECTION("UR3e")
     {
-        auto sc = make_ur3e_static<double>();
+        auto sc = spp::testing::make_ur3e_static<double>();
         verify_jacobian_parity_specialized<decltype(sc), 6>(sc, num_configs, seed);
     }
 
     SECTION("LBR Med14")
     {
-        auto sc = make_lbr_med14_static<double>();
+        auto sc = spp::testing::make_lbr_med14_static<double>();
         verify_jacobian_parity_specialized<decltype(sc), 7>(sc, num_configs, seed);
     }
 
     SECTION("KR6 SIXX")
     {
-        auto sc = make_kr6_sixx_static<double>();
+        auto sc = spp::testing::make_kr6_sixx_static<double>();
         verify_jacobian_parity_specialized<decltype(sc), 6>(sc, num_configs, seed);
     }
 
     SECTION("Franka Panda")
     {
-        auto sc = make_panda_static<double>();
+        auto sc = spp::testing::make_panda_static<double>();
         verify_jacobian_parity_specialized<decltype(sc), 7>(sc, num_configs, seed);
     }
 
     SECTION("ABB IRB120")
     {
-        auto sc = make_abb_irb120_static<double>();
+        auto sc = spp::testing::make_abb_irb120_static<double>();
         verify_jacobian_parity_specialized<decltype(sc), 6>(sc, num_configs, seed);
     }
 
     SECTION("Kinova Jaco2")
     {
-        auto sc = make_jaco2_static<double>();
+        auto sc = spp::testing::make_jaco2_static<double>();
         verify_jacobian_parity_specialized<decltype(sc), 6>(sc, num_configs, seed);
     }
 
     SECTION("Fetch")
     {
-        auto sc = make_fetch_static<double>();
+        auto sc = spp::testing::make_fetch_static<double>();
         verify_jacobian_parity_specialized<decltype(sc), 7>(sc, num_configs, seed);
     }
 
     SECTION("Rethink Baxter")
     {
-        auto sc = make_baxter_static<double>();
+        auto sc = spp::testing::make_baxter_static<double>();
         verify_jacobian_parity_specialized<decltype(sc), 7>(sc, num_configs, seed);
     }
 }
@@ -361,7 +234,7 @@ TEST_CASE("Specialized Jacobian parity", "[specialized][jacobian]")
 
 TEST_CASE("Specialized FK near-zero stability", "[specialized][edge]")
 {
-    auto sc = make_ur3e_static<double>();
+    auto sc = spp::testing::make_ur3e_static<double>();
 
     Eigen::Vector<double, 6> q;
     q.setConstant(1e-15);
@@ -390,7 +263,7 @@ TEST_CASE("Specialized FK at zero config", "[specialized][edge]")
 {
     SECTION("UR3e")
     {
-        auto sc = make_ur3e_static<double>();
+        auto sc = spp::testing::make_ur3e_static<double>();
         Eigen::Vector<double, 6> q = Eigen::Vector<double, 6>::Zero();
 
         auto fk = spp::testing::fk_at(sc, q);
@@ -406,7 +279,7 @@ TEST_CASE("Specialized FK at zero config", "[specialized][edge]")
 
     SECTION("3R planar")
     {
-        auto sc = make_3r_planar_static<double>();
+        auto sc = spp::testing::make_3r_planar_static<double>();
         Eigen::Vector<double, 3> q = Eigen::Vector<double, 3>::Zero();
 
         auto fk = spp::testing::fk_at(sc, q);
@@ -418,7 +291,7 @@ TEST_CASE("Specialized FK at zero config", "[specialized][edge]")
 
     SECTION("Panda")
     {
-        auto sc = make_panda_static<double>();
+        auto sc = spp::testing::make_panda_static<double>();
         Eigen::Vector<double, 7> q = Eigen::Vector<double, 7>::Zero();
 
         auto fk = spp::testing::fk_at(sc, q);
