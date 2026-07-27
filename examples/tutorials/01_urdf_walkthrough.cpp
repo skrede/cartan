@@ -33,8 +33,8 @@ auto random_within_limits(
     for (int i = 0; i < n; ++i)
     {
         const auto& lim = chain.limits()[static_cast<std::size_t>(i)];
-        Scalar lo = lim.position_min;
-        Scalar hi = lim.position_max;
+        Scalar lo = lim.position_min();
+        Scalar hi = lim.position_max();
         if (!std::isfinite(lo)) lo = -Scalar(3.14159265358979);
         if (!std::isfinite(hi)) hi = +Scalar(3.14159265358979);
         std::uniform_real_distribution<Scalar> dist(lo, hi);
@@ -93,8 +93,19 @@ int main(int argc, char** argv)
     std::mt19937 rng{42};
     auto q_truth = random_within_limits(chain, rng);
 
+    // forward_kinematics validates that q_truth holds one finite component per
+    // joint and returns cartan::expected<fk_result, chain_failure>. The same
+    // branch-and-report shape the URDF load above uses applies here, and
+    // cartan::message turns the typed failure into a diagnostic string.
     auto fk_target = cartan::forward_kinematics(chain, q_truth);
-    auto target = fk_target.end_effector;
+    if (!fk_target.has_value())
+    {
+        std::cerr << "forward_kinematics rejected q_truth: "
+                  << cartan::message(fk_target.error()) << "\n";
+        return 1;
+    }
+
+    auto target = fk_target->end_effector;
 
     std::cout << "Ground-truth q: " << q_truth.transpose() << "\n";
     std::cout << "FK-walked target pose:\n" << target.matrix() << "\n\n";
@@ -134,7 +145,7 @@ int main(int argc, char** argv)
         return 0;
     }
 
-    auto& sol = result.value();
+    auto& sol = *result;
 
     // --- Step 3: back-verify the solution by FK-walking the recovered q ---
     //
@@ -145,7 +156,14 @@ int main(int argc, char** argv)
     // solver converged to a configuration that genuinely reproduces the
     // target pose, not merely a numerically close joint vector.
     auto fk_verify = cartan::forward_kinematics(chain, sol.solution.position);
-    auto pose_err = (fk_verify.end_effector.inverse() * target).log().norm();
+    if (!fk_verify.has_value())
+    {
+        std::cerr << "forward_kinematics rejected the recovered configuration: "
+                  << cartan::message(fk_verify.error()) << "\n";
+        return 1;
+    }
+
+    auto pose_err = (fk_verify->end_effector.inverse() * target).log().norm();
 
     std::cout << "IK converged in " << sol.iterations << " iterations\n";
     std::cout << "Recovered q:   " << sol.solution.position.transpose() << "\n";

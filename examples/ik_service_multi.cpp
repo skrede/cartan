@@ -25,7 +25,7 @@
 
 // --- LBR iiwa 7-DOF chain geometry (hardcoded PoE parameters) ---
 
-cartan::kinematic_chain<double, 7> make_lbr_iiwa()
+cartan::expected<cartan::kinematic_chain<double, 7>, cartan::chain_failure> make_lbr_iiwa()
 {
     using vec3 = cartan::vector3<double>;
 
@@ -40,10 +40,15 @@ cartan::kinematic_chain<double, 7> make_lbr_iiwa()
     vec3 home_trans(0, 0, 1.306);
     auto home = cartan::se3<double>(cartan::so3<double>::identity(), home_trans);
 
-    cartan::joint_limits<double> lim{-std::numbers::pi, std::numbers::pi};
+    auto lim = cartan::joint_limits<double>::make(-std::numbers::pi, std::numbers::pi);
+    if (!lim.has_value())
+    {
+        return cartan::unexpected(lim.error());
+    }
+
     return cartan::kinematic_chain<double, 7>(
         home, {s1, s2, s3, s4, s5, s6, s7},
-        {lim, lim, lim, lim, lim, lim, lim});
+        {*lim, *lim, *lim, *lim, *lim, *lim, *lim});
 }
 
 // --- IK service types ---
@@ -144,8 +149,8 @@ private:
             Eigen::Vector<double, 7> q0;
             for (int j = 0; j < 7; ++j)
             {
-                auto lo = m_chain.limits()[static_cast<std::size_t>(j)].position_min;
-                auto hi = m_chain.limits()[static_cast<std::size_t>(j)].position_max;
+                auto lo = m_chain.limits()[static_cast<std::size_t>(j)].position_min();
+                auto hi = m_chain.limits()[static_cast<std::size_t>(j)].position_max();
                 std::uniform_real_distribution<double> dist(lo, hi);
                 q0(j) = dist(rng);
             }
@@ -169,10 +174,17 @@ private:
 int main()
 {
     auto chain = make_lbr_iiwa();
+    if (!chain.has_value())
+    {
+        std::cerr << "chain construction failed: "
+                  << cartan::message(chain.error()) << "\n";
+        return 1;
+    }
+
     constexpr int num_workers = 4;
     constexpr int num_requests = 10;
 
-    ik_service_pool pool(chain, num_workers);
+    ik_service_pool pool(*chain, num_workers);
 
     // Generate targets via FK at known configurations
     std::vector<Eigen::Vector<double, 7>> configs = {
@@ -194,8 +206,16 @@ int main()
 
     for (int i = 0; i < num_requests; ++i)
     {
-        auto target = cartan::forward_kinematics(chain, configs[static_cast<std::size_t>(i)]).end_effector;
-        futures.push_back(pool.submit({target}));
+        auto fk = cartan::forward_kinematics(
+            *chain, configs[static_cast<std::size_t>(i)]);
+        if (!fk.has_value())
+        {
+            std::cerr << "forward kinematics rejected configuration " << i << ": "
+                      << cartan::message(fk.error()) << "\n";
+            return 1;
+        }
+
+        futures.push_back(pool.submit({fk->end_effector}));
     }
 
     // Collect and print results
@@ -208,7 +228,7 @@ int main()
 
         if (response.result.has_value())
         {
-            auto& r = response.result.value();
+            auto& r = *response.result;
             std::cout << "Request " << i << ": converged in "
                       << r.iterations << " steps (policy "
                       << r.solver_index << "), "
@@ -220,4 +240,6 @@ int main()
                       << response.solve_time.count() << " us\n";
         }
     }
+
+    return 0;
 }

@@ -22,7 +22,19 @@ int main()
     // exercised here have full revolute range; bounded ranges are demonstrated
     // in the URDF walkthrough tutorial where they are parsed from the robot
     // description.
-    cartan::joint_limits<double> lim{-std::numbers::pi, std::numbers::pi};
+    //
+    // joint_limits::make is the only way a joint_limits comes into existence:
+    // it returns cartan::expected<joint_limits, chain_failure> and refuses
+    // reversed bounds, a NaN, and a negative or infinite dynamic bound. This
+    // pair of bounds cannot fail, but writing the branch anyway is the shape
+    // to copy -- a pair read from a file or a user interface can fail, and
+    // cartan::message turns the typed failure into a diagnostic.
+    auto lim = cartan::joint_limits<double>::make(-std::numbers::pi, std::numbers::pi);
+    if (!lim.has_value())
+    {
+        std::cerr << "joint limits rejected: " << cartan::message(lim.error()) << "\n";
+        return 1;
+    }
 
     // --- Section 1: planar 3R -----------------------------------------------
     //
@@ -49,30 +61,59 @@ int main()
     vec3 home_trans_3r(0.75, 0, 0);
     auto home_3r = cartan::se3<double>(cartan::so3<double>::identity(), home_trans_3r);
     cartan::kinematic_chain<double, 3> chain_3r(
-        home_3r, {s1, s2, s3}, {lim, lim, lim});
+        home_3r, {s1, s2, s3}, {*lim, *lim, *lim});
 
     // Evaluate at a small but non-degenerate joint configuration.
+    //
+    // forward_kinematics checks that q holds exactly one finite component per
+    // joint before it evaluates anything, and reports a violation as a typed
+    // chain_failure rather than reading past the end of the vector. Every
+    // fallible call below is written the same way: name the result, branch on
+    // it, report the failure through cartan::message, and only then use the
+    // value. The terser spellings -- unwrapping inline, or streaming the call
+    // straight into std::cout -- either discard the diagnostic or do not
+    // compile, and neither is a habit worth copying.
     Eigen::Vector3d q_3r{0.4, -0.3, 0.5};
     auto fk_3r = cartan::forward_kinematics(chain_3r, q_3r);
+    if (!fk_3r.has_value())
+    {
+        std::cerr << "forward kinematics rejected q_3r: "
+                  << cartan::message(fk_3r.error()) << "\n";
+        return 1;
+    }
 
     std::cout << "Joint configuration q (rad): " << q_3r.transpose() << "\n\n";
     std::cout << "End-effector pose T(q):\n"
-              << fk_3r.end_effector.matrix() << "\n\n";
+              << fk_3r->end_effector.matrix() << "\n\n";
 
     // The space Jacobian J_s relates joint rates to the end-effector twist
     // expressed in the space frame: V_s = J_s(q) * q_dot. Its i-th column is
     // the screw axis S_i adjoint-transported through the partial product of
     // exponentials from joint 1..i-1. See Lynch & Park Ch. 5.1.
-    std::cout << "Space Jacobian J_s (6x3):\n"
-              << cartan::space_jacobian(chain_3r, fk_3r) << "\n\n";
+    auto Js_3r = cartan::space_jacobian(chain_3r, *fk_3r);
+    if (!Js_3r.has_value())
+    {
+        std::cerr << "space Jacobian rejected the FK result: "
+                  << cartan::message(Js_3r.error()) << "\n";
+        return 1;
+    }
+
+    std::cout << "Space Jacobian J_s (6x3):\n" << *Js_3r << "\n\n";
 
     // The body Jacobian J_b relates joint rates to the end-effector twist
     // expressed in the body (end-effector) frame: V_b = J_b(q) * q_dot. It is
     // the natural quantity for IK -- the error twist log(T_curr^-1 * T_target)
     // already lives in the body frame, so J_b is what the LM iteration
     // factorizes. See Lynch & Park Ch. 5.1.
-    std::cout << "Body  Jacobian J_b (6x3):\n"
-              << cartan::body_jacobian(chain_3r, fk_3r) << "\n\n";
+    auto Jb_3r = cartan::body_jacobian(chain_3r, *fk_3r);
+    if (!Jb_3r.has_value())
+    {
+        std::cerr << "body Jacobian rejected the FK result: "
+                  << cartan::message(Jb_3r.error()) << "\n";
+        return 1;
+    }
+
+    std::cout << "Body  Jacobian J_b (6x3):\n" << *Jb_3r << "\n\n";
 
     // --- Section 2: spatial 6R (KUKA KR 6 R900 SIXX kinematics) -------------
     //
@@ -100,23 +141,43 @@ int main()
     vec3 home_trans_6r(0.935, 0, 0.400);
     auto home_6r = cartan::se3<double>(cartan::so3<double>::identity(), home_trans_6r);
     cartan::kinematic_chain<double, 6> chain_6r(
-        home_6r, {k1, k2, k3, k4, k5, k6}, {lim, lim, lim, lim, lim, lim});
+        home_6r, {k1, k2, k3, k4, k5, k6}, {*lim, *lim, *lim, *lim, *lim, *lim});
 
     Eigen::Vector<double, 6> q_6r{0.2, -0.4, 0.3, -0.5, 0.6, -0.2};
     auto fk_6r = cartan::forward_kinematics(chain_6r, q_6r);
+    if (!fk_6r.has_value())
+    {
+        std::cerr << "forward kinematics rejected q_6r: "
+                  << cartan::message(fk_6r.error()) << "\n";
+        return 1;
+    }
 
     std::cout << "Joint configuration q (rad): " << q_6r.transpose() << "\n\n";
     std::cout << "End-effector pose T(q):\n"
-              << fk_6r.end_effector.matrix() << "\n\n";
+              << fk_6r->end_effector.matrix() << "\n\n";
 
     // Both Jacobians are 6x6 for a six-DOF chain. The rank of either matrix
     // at a given q reports the local mobility of the end-effector; a rank
     // deficiency signals a kinematic singularity. The condition number of
     // J_b is the natural conditioning measure for the local IK problem.
-    std::cout << "Space Jacobian J_s (6x6):\n"
-              << cartan::space_jacobian(chain_6r, fk_6r) << "\n\n";
-    std::cout << "Body  Jacobian J_b (6x6):\n"
-              << cartan::body_jacobian(chain_6r, fk_6r) << "\n";
+    auto Js_6r = cartan::space_jacobian(chain_6r, *fk_6r);
+    if (!Js_6r.has_value())
+    {
+        std::cerr << "space Jacobian rejected the FK result: "
+                  << cartan::message(Js_6r.error()) << "\n";
+        return 1;
+    }
+
+    auto Jb_6r = cartan::body_jacobian(chain_6r, *fk_6r);
+    if (!Jb_6r.has_value())
+    {
+        std::cerr << "body Jacobian rejected the FK result: "
+                  << cartan::message(Jb_6r.error()) << "\n";
+        return 1;
+    }
+
+    std::cout << "Space Jacobian J_s (6x6):\n" << *Js_6r << "\n\n";
+    std::cout << "Body  Jacobian J_b (6x6):\n" << *Jb_6r << "\n";
 
     return 0;
 }

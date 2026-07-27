@@ -17,7 +17,7 @@
 
 // --- UR3e 6-DOF chain geometry (hardcoded PoE parameters) ---
 
-cartan::kinematic_chain<double, 6> make_ur3e()
+cartan::expected<cartan::kinematic_chain<double, 6>, cartan::chain_failure> make_ur3e()
 {
     using vec3 = cartan::vector3<double>;
 
@@ -31,10 +31,15 @@ cartan::kinematic_chain<double, 6> make_ur3e()
     vec3 home_trans(-0.45675, 0.22315, 0.0665);
     auto home = cartan::se3<double>(cartan::so3<double>::identity(), home_trans);
 
-    cartan::joint_limits<double> lim{-std::numbers::pi, std::numbers::pi};
+    auto lim = cartan::joint_limits<double>::make(-std::numbers::pi, std::numbers::pi);
+    if (!lim.has_value())
+    {
+        return cartan::unexpected(lim.error());
+    }
+
     return cartan::kinematic_chain<double, 6>(
         home, {s1, s2, s3, s4, s5, s6},
-        {lim, lim, lim, lim, lim, lim});
+        {*lim, *lim, *lim, *lim, *lim, *lim});
 }
 
 // --- IK service types ---
@@ -130,7 +135,14 @@ private:
 int main()
 {
     auto chain = make_ur3e();
-    ik_service service(chain);
+    if (!chain.has_value())
+    {
+        std::cerr << "chain construction failed: "
+                  << cartan::message(chain.error()) << "\n";
+        return 1;
+    }
+
+    ik_service service(*chain);
 
     // Generate targets via FK at known configurations
     std::array<Eigen::Vector<double, 6>, 4> configs = {{
@@ -144,12 +156,19 @@ int main()
 
     for (std::size_t i = 0; i < configs.size(); ++i)
     {
-        auto target = cartan::forward_kinematics(chain, configs[i]).end_effector;
-        auto response = service.solve({target, q0});
+        auto fk = cartan::forward_kinematics(*chain, configs[i]);
+        if (!fk.has_value())
+        {
+            std::cerr << "forward kinematics rejected configuration " << i << ": "
+                      << cartan::message(fk.error()) << "\n";
+            return 1;
+        }
+
+        auto response = service.solve({fk->end_effector, q0});
 
         if (response.result.has_value())
         {
-            auto& r = response.result.value();
+            auto& r = *response.result;
             std::cout << "Request " << i << ": converged in "
                       << r.iterations << " iterations, error = "
                       << r.final_error_norm << "\n";
@@ -159,4 +178,6 @@ int main()
             std::cout << "Request " << i << ": failed\n";
         }
     }
+
+    return 0;
 }

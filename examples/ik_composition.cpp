@@ -25,14 +25,28 @@ int main()
     vec3 home_trans(0, 0, 1.306);
     auto home = cartan::se3<double>(cartan::so3<double>::identity(), home_trans);
 
-    cartan::joint_limits<double> lim{-std::numbers::pi, std::numbers::pi};
+    auto lim = cartan::joint_limits<double>::make(-std::numbers::pi, std::numbers::pi);
+    if (!lim.has_value())
+    {
+        std::cerr << "joint limits rejected: " << cartan::message(lim.error()) << "\n";
+        return 1;
+    }
+
     cartan::kinematic_chain<double, 7> chain(
         home, {s1, s2, s3, s4, s5, s6, s7},
-        {lim, lim, lim, lim, lim, lim, lim});
+        {*lim, *lim, *lim, *lim, *lim, *lim, *lim});
 
     // Target via FK at known configuration
     Eigen::Vector<double, 7> q_known{0.2, -0.3, 0.1, -0.5, 0.4, -0.2, 0.3};
-    auto target = cartan::forward_kinematics(chain, q_known).end_effector;
+    auto fk_known = cartan::forward_kinematics(chain, q_known);
+    if (!fk_known.has_value())
+    {
+        std::cerr << "forward kinematics rejected q_known: "
+                  << cartan::message(fk_known.error()) << "\n";
+        return 1;
+    }
+
+    auto target = fk_known->end_effector;
 
     cartan::convergence_criteria<double> criteria{1e-6, 1e-6, 200};
     Eigen::Vector<double, 7> q0 = Eigen::Vector<double, 7>::Zero();
@@ -102,4 +116,6 @@ int main()
             std::cout << "Builder: converged in " << result->iterations << " iterations\n";
         }
     }
+
+    return 0;
 }

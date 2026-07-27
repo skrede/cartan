@@ -134,14 +134,27 @@ int main()
 
     auto home = cartan::se3<double>(
         cartan::so3<double>::identity(), vec3(0.935, 0, 0.400));
-    auto lim = cartan::joint_limits<double>::make(-std::numbers::pi, std::numbers::pi).value();
+    auto lim = cartan::joint_limits<double>::make(-std::numbers::pi, std::numbers::pi);
+    if (!lim.has_value())
+    {
+        std::cerr << "joint limits rejected: " << cartan::message(lim.error()) << "\n";
+        return 1;
+    }
 
     Chain chain(home, {k1, k2, k3, k4, k5, k6},
-                {lim, lim, lim, lim, lim, lim});
+                {*lim, *lim, *lim, *lim, *lim, *lim});
 
     // Target: forward kinematics of a known configuration -- guaranteed reachable.
     Eigen::Vector<double, 6> q_truth{0.2, -0.4, 0.3, -0.5, 0.6, -0.2};
-    auto target = cartan::forward_kinematics(chain, q_truth).value().end_effector;
+    auto fk_truth = cartan::forward_kinematics(chain, q_truth);
+    if (!fk_truth.has_value())
+    {
+        std::cerr << "forward kinematics rejected q_truth: "
+                  << cartan::message(fk_truth.error()) << "\n";
+        return 1;
+    }
+
+    auto target = fk_truth->end_effector;
 
     // Race the speed and robust presets cooperatively in the calling thread.
     cartan::dual_ik_runner<Chain> solver;
@@ -154,7 +167,7 @@ int main()
 
     if (result.has_value())
     {
-        const auto& r = result.value();
+        const auto& r = *result;
         std::cout << "Policy " << r.solver_index << " won in "
                   << r.iterations << " iterations\n";
         std::cout << "Solution: " << r.solution.position.transpose() << "\n";

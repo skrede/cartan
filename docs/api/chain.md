@@ -125,8 +125,16 @@ public:
 Construction examples:
 
 ```cpp
-auto lim = cartan::joint_limits<double>::make(-3.14, 3.14).value();              // Position only
-auto all = cartan::joint_limits<double>::make(-3.14, 3.14, 2.0, 50.0, 10.0).value();
+auto lim = cartan::joint_limits<double>::make(-3.14, 3.14);                 // Position only
+auto all = cartan::joint_limits<double>::make(-3.14, 3.14, 2.0, 50.0, 10.0);
+
+if (!lim.has_value())
+{
+    std::cerr << "joint limits rejected: " << cartan::message(lim.error()) << "\n";
+    return 1;
+}
+
+cartan::kinematic_chain<double, 1> chain(home, {axis}, {*lim});
 ```
 
 `make` rejects a NaN in any bound, position bounds that do not describe a
@@ -273,21 +281,45 @@ The tolerance is absolute and the same in every scalar type, rather than
 derived from machine precision. A precision-derived threshold is `1.5e-8`
 in `double` but `3.4e-4` in `float`, which would silently discard a
 misalignment of about a hundredth of a degree in single precision — the
-same code safe in one scalar and unsafe in another. At `1e-9` the snap
-licenses at most `1.4 · n · L · δ` of position error and `1.7 · n · δ` of
-orientation error, for a joint count `n` and a maximum moment arm `L`;
-about 13 nm on a 7-joint, 1.3 m arm.
+same code safe in one scalar and unsafe in another.
+
+`1e-9` is an engineering judgement about physical meaninglessness, not a
+statement about the arithmetic. One nanoradian is about `5.7e-8` degrees;
+where a robot axis actually sits is fixed by machining and assembly, which
+are coarser than that by orders of magnitude. A deviation below `1e-9`
+therefore cannot describe a real misalignment — it is residue from
+composing the rotations that produced the axis.
+
+Snapping such an axis is an approximation, and its cost is bounded. Across
+the fixture set the induced end-effector error measures
+
+    |Δp| ≤ 1.4 · n · L · δ      |Δθ| ≤ 1.7 · n · δ
+
+for a joint count `n`, the largest moment arm `L` in the chain, and the
+tolerance `δ`. **Both constants are measured, not derived** — they are
+empirical fits over the fixture chains, not bounds proved from the PoE
+product. Worked once at the largest chain in that set, a 7-joint arm of
+about 1.3 m reach: `1.4 · 7 · 1.3 m · 1e-9 = 1.3e-8 m`, about **13 nm**.
 
 One consequence is worth stating plainly, because it is visible in
 practice. Composing a description's `<origin rpy>` rotations in `float`
 produces axis components up to about `1.75e-7`, well above this tolerance.
 The source is single-precision arithmetic, not noise inherited from the
 description: `sin(pi)` in `float` is `-8.74e-8`, and composing two such
-rotations doubles it. A `double` parse is unaffected; its worst measured
+rotations doubles it. That makes it **irreducible for any single-precision
+parse of any description carrying quarter-turn orientations** — no parser
+change removes it. A `double` parse is unaffected; its worst measured
 deviation is `4.1e-10`. So chains from `load_urdf<float>` are classified `general`
 and take the generic evaluation path rather than a specialization. That
 is a performance cost and not a correctness one: the generic path
 evaluates the true axis and is strictly the more faithful of the two.
+
+**If you need the specialized path for a model loaded from a description,
+parse it at double precision** — `load_urdf<double>` — and convert
+afterwards if your downstream code is single-precision. Parsing at `float`
+to save memory costs you the specialization, and there is no tolerance
+setting that buys it back without also admitting misalignments a
+single-precision parse cannot distinguish from real ones.
 
 ## kinematic_chain
 

@@ -24,14 +24,28 @@ int main()
     vec3 home_trans(-0.45675, 0.22315, 0.0665);
     auto home = cartan::se3<double>(cartan::so3<double>::identity(), home_trans);
 
-    cartan::joint_limits<double> lim{-std::numbers::pi, std::numbers::pi};
+    auto lim = cartan::joint_limits<double>::make(-std::numbers::pi, std::numbers::pi);
+    if (!lim.has_value())
+    {
+        std::cerr << "joint limits rejected: " << cartan::message(lim.error()) << "\n";
+        return 1;
+    }
+
     cartan::kinematic_chain<double, 6> chain(
         home, {s1, s2, s3, s4, s5, s6},
-        {lim, lim, lim, lim, lim, lim});
+        {*lim, *lim, *lim, *lim, *lim, *lim});
 
     // Compute a target by FK at a known configuration
     Eigen::Vector<double, 6> q_known{0.3, -0.5, 0.2, -0.4, 0.1, 0.3};
-    auto target = cartan::forward_kinematics(chain, q_known).end_effector;
+    auto fk_known = cartan::forward_kinematics(chain, q_known);
+    if (!fk_known.has_value())
+    {
+        std::cerr << "forward kinematics rejected q_known: "
+                  << cartan::message(fk_known.error()) << "\n";
+        return 1;
+    }
+
+    auto target = fk_known->end_effector;
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     cartan::convergence_criteria<double> criteria{
@@ -53,7 +67,7 @@ int main()
     std::cout << "=== argmin SLSQP + restart ===\n";
     if (slsqp_result.has_value())
     {
-        auto& r = slsqp_result.value();
+        auto& r = *slsqp_result;
         std::cout << "  Converged in " << r.iterations << " iterations\n";
         std::cout << "  Error: " << r.final_error_norm << "\n";
     }
@@ -74,7 +88,7 @@ int main()
     std::cout << "\n=== argmin BOBYQA + restart ===\n";
     if (bobyqa_result.has_value())
     {
-        auto& r = bobyqa_result.value();
+        auto& r = *bobyqa_result;
         std::cout << "  Converged in " << r.iterations << " iterations\n";
         std::cout << "  Error: " << r.final_error_norm << "\n";
     }
@@ -95,7 +109,7 @@ int main()
     std::cout << "\n=== SLSQP vs projected LM (racing) ===\n";
     if (racing_result.has_value())
     {
-        auto& r = racing_result.value();
+        auto& r = *racing_result;
         std::cout << "  Converged in " << r.iterations << " iterations\n";
         std::cout << "  Winner: policy " << r.solver_index << "\n";
         std::cout << "  Error: " << r.final_error_norm << "\n";
@@ -104,4 +118,6 @@ int main()
     {
         std::cout << "  Failed\n";
     }
+
+    return 0;
 }

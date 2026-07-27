@@ -43,7 +43,11 @@ See [IK Methods](../background/ik-methods.md) | [IK Composition Guide](../guides
 
 ## Quick Start
 
-Minimal working example on a 3-DOF planar arm using the LM policy:
+Minimal working example on a 3-DOF planar arm using the LM policy. The fragment
+unwraps `joint_limits::make` and `forward_kinematics` with `.value()`, which
+**throws** on a failure, to keep the setup short; branch on the result and
+report through `cartan::message` instead, as the complete example in the
+[IK composition guide](../guides/ik-composition.md#complete-example) does.
 
 ```cpp
 #include <cartan/serial_chain.h>

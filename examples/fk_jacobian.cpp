@@ -24,20 +24,46 @@ int main()
     vec3 home_trans(-0.45675, 0.22315, 0.0665);
     auto home = cartan::se3<double>(cartan::so3<double>::identity(), home_trans);
 
-    cartan::joint_limits<double> lim{-std::numbers::pi, std::numbers::pi};
+    auto lim = cartan::joint_limits<double>::make(-std::numbers::pi, std::numbers::pi);
+    if (!lim.has_value())
+    {
+        std::cerr << "joint limits rejected: " << cartan::message(lim.error()) << "\n";
+        return 1;
+    }
+
     cartan::kinematic_chain<double, 6> chain(
-        home, {s1, s2, s3, s4, s5, s6}, {lim, lim, lim, lim, lim, lim});
+        home, {s1, s2, s3, s4, s5, s6}, {*lim, *lim, *lim, *lim, *lim, *lim});
 
     // FK at a sample configuration
     Eigen::Vector<double, 6> q{0.1, -0.2, 0.3, -0.4, 0.5, -0.6};
     auto fk = cartan::forward_kinematics(chain, q);
+    if (!fk.has_value())
+    {
+        std::cerr << "forward kinematics rejected q: "
+                  << cartan::message(fk.error()) << "\n";
+        return 1;
+    }
 
-    std::cout << "End-effector pose:\n" << fk.end_effector.matrix() << "\n\n";
+    std::cout << "End-effector pose:\n" << fk->end_effector.matrix() << "\n\n";
 
     // Space and body Jacobians
-    auto Js = cartan::space_jacobian(chain, fk);
-    auto Jb = cartan::body_jacobian(chain, fk);
+    auto Js = cartan::space_jacobian(chain, *fk);
+    if (!Js.has_value())
+    {
+        std::cerr << "space Jacobian rejected the FK result: "
+                  << cartan::message(Js.error()) << "\n";
+        return 1;
+    }
 
-    std::cout << "Space Jacobian:\n" << Js << "\n\n";
-    std::cout << "Body Jacobian:\n" << Jb << "\n";
+    auto Jb = cartan::body_jacobian(chain, *fk);
+    if (!Jb.has_value())
+    {
+        std::cerr << "body Jacobian rejected the FK result: "
+                  << cartan::message(Jb.error()) << "\n";
+        return 1;
+    }
+
+    std::cout << "Space Jacobian:\n" << *Js << "\n\n";
+    std::cout << "Body Jacobian:\n" << *Jb << "\n";
+    return 0;
 }

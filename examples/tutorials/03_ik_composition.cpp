@@ -189,8 +189,14 @@ int main(int argc, char** argv)
     vec3 home_trans(0.935, 0, 0.400);
     auto home = cartan::se3<double>(cartan::so3<double>::identity(), home_trans);
 
-    cartan::joint_limits<double> lim{
-        -std::numbers::pi, std::numbers::pi};
+    auto lim = cartan::joint_limits<double>::make(
+        -std::numbers::pi, std::numbers::pi);
+    if (!lim.has_value())
+    {
+        std::cerr << "joint limits rejected: "
+                  << cartan::message(lim.error()) << '\n';
+        return 1;
+    }
 
     using chain_t = cartan::static_chain<double,
         cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
@@ -199,10 +205,11 @@ int main(int argc, char** argv)
     auto built = chain_t::make(
         home,
         {k1, k2, k3, k4, k5, k6},
-        {lim, lim, lim, lim, lim, lim});
+        {*lim, *lim, *lim, *lim, *lim, *lim});
     if (!built.has_value())
     {
-        std::cerr << "chain construction failed: " << message(built.error()) << '\n';
+        std::cerr << "chain construction failed: "
+                  << cartan::message(built.error()) << '\n';
         return 1;
     }
     const chain_t& chain = *built;
@@ -252,9 +259,16 @@ int main(int argc, char** argv)
         {
             q_truth(j) = rng.uniform(-std::numbers::pi, std::numbers::pi);
         }
+        auto fk_truth = cartan::forward_kinematics(chain, q_truth);
+        if (!fk_truth.has_value())
+        {
+            std::cerr << "forward kinematics rejected a drawn configuration: "
+                      << cartan::message(fk_truth.error()) << '\n';
+            return 1;
+        }
+
         targets_q.push_back(q_truth);
-        targets.push_back(
-            cartan::forward_kinematics(chain, q_truth).end_effector);
+        targets.push_back(fk_truth->end_effector);
     }
 
     // --- Per-seed race -----------------------------------------------------
@@ -294,8 +308,16 @@ int main(int argc, char** argv)
             {
                 auto best = cartan::closest_to_seed(*result, q_seed);
                 auto fk_verify = cartan::forward_kinematics(chain, *best);
+                if (!fk_verify.has_value())
+                {
+                    std::cerr << "forward kinematics rejected a closed-form "
+                                 "branch: "
+                              << cartan::message(fk_verify.error()) << '\n';
+                    return 1;
+                }
+
                 rec.success = true;
-                rec.pos_err = (fk_verify.end_effector.inverse() * target)
+                rec.pos_err = (fk_verify->end_effector.inverse() * target)
                     .log().norm();
                 rec.multi_solutions = result->count;
             }
@@ -325,7 +347,15 @@ int main(int argc, char** argv)
             {
                 auto fk_verify = cartan::forward_kinematics(
                     chain, result->solution.position);
-                rec.pos_err = (fk_verify.end_effector.inverse() * target)
+                if (!fk_verify.has_value())
+                {
+                    std::cerr << "forward kinematics rejected the iterative "
+                                 "solution: "
+                              << cartan::message(fk_verify.error()) << '\n';
+                    return 1;
+                }
+
+                rec.pos_err = (fk_verify->end_effector.inverse() * target)
                     .log().norm();
                 rec.success = rec.pos_err < 1e-4;
             }

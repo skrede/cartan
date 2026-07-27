@@ -215,6 +215,12 @@ space Jacobian internally, returning the 6-vector spatial twist wrapped in
 nonfinite component. `end_effector_velocity_unchecked` is the same computation
 without the checks, for a caller that has already established both.
 
+The `_unchecked` suffix is the library's mark for a structural precondition
+between arguments, and it is deliberately a different word from the `trusted`
+vocabulary used for a single value's mathematical invariant. See
+[Why two words](../api/kinematics.md#why-two-words-unchecked-and-trusted) for
+the rule.
+
 See [API Reference](../api/kinematics.md) for full function signatures.
 See [PoE Kinematics](poe-kinematics.md) for the underlying forward kinematics.
 

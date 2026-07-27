@@ -49,15 +49,24 @@ predicate can see it, because Eigen's converting constructor checks the size onl
 through `eigen_assert`, which `NDEBUG` removes. The `_unchecked` siblings keep
 the concrete parameter and inherit that hazard, which is part of their contract.
 
-The suffix marks a structural precondition *between* arguments. It is a
-different claim from the `trusted` vocabulary elsewhere in cartan, which marks a
-mathematical invariant carried by a single value (`compose_trusted`,
-`trusted_unit`).
-
 The Jacobian family takes a cached `fk_result` rather than a joint vector, so the
 precondition it validates is that the result holds one intermediate product per
 joint of the chain. Length equality is **not** provenance: a result of the right
 length computed from a different chain of the same joint count is accepted.
+
+### Why two words, `unchecked` and `trusted`
+
+Cartan uses both, and the choice is not free. **`unchecked`** marks a structural
+precondition *between* two or more arguments — a length, a joint count, a shape.
+There is no single value to attach a tag to, so the claim goes in the function's
+name and the caller makes it by choosing that name. **`trusted`** marks a
+mathematical invariant carried by *one* value, such as a quaternion already
+being unit-norm; that claim has somewhere to live, and it lives on a tag
+(`trusted_unit`) or in the operation's name (`compose_trusted`).
+
+They are different claims, so they keep different words. Every `_unchecked`
+entry point in cartan refers back to this section rather than restating the
+distinction, and the existing `trusted` surface is not renamed.
 
 ## fk_result
 

@@ -100,6 +100,12 @@ configuration using the PoE formula:
 
     T(q) = exp([S1]q1) * exp([S2]q2) * ... * exp([Sn]qn) * M
 
+`forward_kinematics` validates that `q` holds one finite component per joint and
+returns `cartan::expected<fk_result, chain_failure>`. The fragments in this
+section and the next unwrap with `.value()`, which **throws** on a failure, only
+because a fragment has nowhere to return an error to; the complete example in
+section 6 shows the form to copy.
+
 ```cpp
 Eigen::Vector3d q{0.5, -0.3, 0.8};   // joint angles in radians
 auto fk = cartan::forward_kinematics(chain, q).value();
@@ -160,23 +166,50 @@ int main()
     // Home: end-effector at (3, 0, 0) when all joints are zero.
     auto home = cartan::se3<double>(cartan::so3<double>::identity(), vec3(3, 0, 0));
 
-    auto lim = cartan::joint_limits<double>::make(-std::numbers::pi, std::numbers::pi).value();
-    cartan::kinematic_chain<double, 3> chain(
-        home, {s1, s2, s3}, {lim, lim, lim});
+    auto lim = cartan::joint_limits<double>::make(-std::numbers::pi, std::numbers::pi);
+    if (!lim.has_value())
+    {
+        std::cerr << "joint limits rejected: " << cartan::message(lim.error()) << "\n";
+        return 1;
+    }
 
-    // Compute FK at q = (0.5, -0.3, 0.8). Every entry point returns an
-    // expected; .value() is fine here because the sizes are known to match.
+    cartan::kinematic_chain<double, 3> chain(
+        home, {s1, s2, s3}, {*lim, *lim, *lim});
+
+    // Compute FK at q = (0.5, -0.3, 0.8). Every checked entry point returns a
+    // cartan::expected: name the result, branch on it, report the failure
+    // through cartan::message, and only then read the value.
     Eigen::Vector3d q{0.5, -0.3, 0.8};
-    auto fk = cartan::forward_kinematics(chain, q).value();
+    auto fk = cartan::forward_kinematics(chain, q);
+    if (!fk.has_value())
+    {
+        std::cerr << "forward kinematics rejected q: "
+                  << cartan::message(fk.error()) << "\n";
+        return 1;
+    }
 
     std::cout << "End-effector position: "
-              << fk.end_effector.translation().transpose() << "\n";
+              << fk->end_effector.translation().transpose() << "\n";
 
     // Compute Jacobians from the cached FK result.
-    auto Js = cartan::space_jacobian(chain, fk).value();
-    auto Jb = cartan::body_jacobian(chain, fk).value();
-    std::cout << "Space Jacobian:\n" << Js << "\n";
-    std::cout << "Body Jacobian:\n" << Jb << "\n";
+    auto Js = cartan::space_jacobian(chain, *fk);
+    if (!Js.has_value())
+    {
+        std::cerr << "space Jacobian rejected the FK result: "
+                  << cartan::message(Js.error()) << "\n";
+        return 1;
+    }
+
+    auto Jb = cartan::body_jacobian(chain, *fk);
+    if (!Jb.has_value())
+    {
+        std::cerr << "body Jacobian rejected the FK result: "
+                  << cartan::message(Jb.error()) << "\n";
+        return 1;
+    }
+
+    std::cout << "Space Jacobian:\n" << *Js << "\n";
+    std::cout << "Body Jacobian:\n" << *Jb << "\n";
 
     return 0;
 }

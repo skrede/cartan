@@ -149,6 +149,14 @@ an end-effector at (2, 0, 0) at the zero configuration. The output is
 the 4x4 homogeneous transformation matrix of the end-effector at joint
 angles `q = (0.5, -0.3)` radians.
 
+`joint_limits::make` and `forward_kinematics` both validate their arguments and
+return `cartan::expected<..., chain_failure>`. The snippets on this page unwrap
+with `.value()`, which **throws** on a failure, to keep a first example short.
+That is not the form to copy: branch on the result and report the failure
+through `cartan::message`, as the complete example in the
+[PoE walkthrough](guides/poe-walkthrough.md#6-complete-example-3-dof-planar-arm)
+and the tutorials under `examples/tutorials/` do.
+
 ## Inverse kinematics
 
 Now run inverse kinematics on the same arm. We pick a known joint
