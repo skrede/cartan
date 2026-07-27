@@ -76,6 +76,9 @@ constexpr std::string_view to_string(cartan::ik_failure r) noexcept
         case F::iteration_limit:       return "iteration_limit";
         case F::joint_limit_violation: return "joint_limit_violation";
         case F::aborted:               return "aborted";
+        case F::not_initialized:       return "not_initialized";
+        case F::dimension_mismatch:    return "dimension_mismatch";
+        case F::non_finite_input:      return "non_finite_input";
     }
     return "unknown_failure";
 }
@@ -144,7 +147,8 @@ void run_per_pose(
         {
             iters = result->iterations;
             const auto& q = result->solution.position;
-            if (auto fk = cartan::forward_kinematics(chain, q))
+            auto fk = cartan::forward_kinematics(chain, q);
+            if (fk)
             {
                 auto Vb = (target.inverse() * fk->end_effector).log();
                 ori_err = static_cast<double>(Vb.template head<3>().norm());
@@ -153,7 +157,12 @@ void run_per_pose(
                 pose_hit = pos_err <= criteria.position_tol
                         && ori_err <= criteria.orientation_tol;
             }
-            status_str = pose_hit ? "runner_success_pose_hit" : "runner_success_pose_miss";
+            // A refused re-evaluation leaves the error columns empty for a
+            // reason a reader cannot infer from them, so it gets its own
+            // status rather than reading as a genuine geometric miss.
+            status_str = !fk ? "runner_success_fk_refused"
+                       : pose_hit ? "runner_success_pose_hit"
+                                  : "runner_success_pose_miss";
             termination_str = "converged";
         }
         else

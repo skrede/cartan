@@ -17,6 +17,8 @@ namespace
 // loop. Each cell draws from a table of fk results built from varied configs,
 // indexed by the iteration counter, and DoNotOptimize's the chosen fk before
 // the call. Power-of-two size wraps the index with a mask.
+// The tables are filled through the checked entry point and read by timed loops
+// that call the unchecked sibling, so no cell times the guard in front of it.
 constexpr std::size_t kInputs = 1024;
 
 }
@@ -25,11 +27,6 @@ constexpr std::size_t kInputs = 1024;
 // Space Jacobian benchmarks
 // ===========================================================================
 
-// The timed loop calls the unchecked entry point. The checked one validates the
-// cached result's joint count on every call, which inside a timed region
-// measures the guard rather than the Jacobian and would shift a published
-// number under an unchanged benchmark name. The cache above it is built outside
-// the timed region and takes the checked entry point.
 static void bm_space_jacobian_3r_planar(benchmark::State& state)
 {
     auto chain = cartan::fixtures::make_3r_planar_chain<double>();

@@ -5,27 +5,43 @@
 # unchanged benchmark name. Nothing downstream can see that: it compiles, it
 # runs, and it reports. The check therefore runs here, at configure time, and is
 # placed before the dependency detection below so a missing third-party library
-# cannot take the whole file's early return past it.
+# cannot take the whole file's early return past it. The fixture and support
+# headers are scanned as well, because the leak can be indirect: a helper that
+# calls a checked entry point puts the same guard inside every measured block
+# that calls the helper, and no benchmark source names an entry point at all.
+#
+# Turning the benchmark suite on therefore now requires a Python 3 interpreter.
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
 execute_process(
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/check_measured_regions.py
             --benchmarks-root ${CMAKE_CURRENT_SOURCE_DIR}
+            --reach-root ${CMAKE_SOURCE_DIR}/tests/fixtures
+            --reach-root ${CMAKE_SOURCE_DIR}/tests/support
+            --min-sources 20
     RESULT_VARIABLE _measured_region_result
     OUTPUT_VARIABLE _measured_region_output
     ERROR_VARIABLE _measured_region_error)
 
-if (NOT _measured_region_result EQUAL 0)
+# Exit 1 is the tool's finding about the sources; anything else nonzero means the
+# tool did not run, which must not be reported as if it had found a violation.
+if (_measured_region_result EQUAL 1)
     message(FATAL_ERROR
-        "cartan benchmarks: a measured block calls a checked kinematics entry "
+        "cartan benchmarks: a measured block reaches a checked kinematics entry "
         "point. Call the _unchecked sibling there and establish the precondition "
         "outside the block.\n${_measured_region_output}${_measured_region_error}")
+elseif (NOT _measured_region_result EQUAL 0)
+    message(FATAL_ERROR
+        "cartan benchmarks: the measured-region check did not run to completion "
+        "(exit ${_measured_region_result}). This is a failure of the check, not a "
+        "finding about the sources.\n${_measured_region_output}${_measured_region_error}")
 endif ()
 
 message(STATUS "cartan benchmarks: ${_measured_region_output}")
 
 file(GLOB _measured_region_sources CONFIGURE_DEPENDS
-    ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp ${CMAKE_CURRENT_SOURCE_DIR}/*.h)
+    ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp ${CMAKE_CURRENT_SOURCE_DIR}/*.h
+    ${CMAKE_SOURCE_DIR}/tests/fixtures/*.h ${CMAKE_SOURCE_DIR}/tests/support/*.h)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     ${CMAKE_SOURCE_DIR}/tools/check_measured_regions.py ${_measured_region_sources})
 

@@ -30,6 +30,8 @@
 #include <random>
 #include <vector>
 #include <limits>
+#include <cstdio>
+#include <cstdlib>
 #include "cartan/expected.h"
 #include <algorithm>
 
@@ -72,6 +74,7 @@ auto compute_bounding_box(
         std::numeric_limits<Scalar>::infinity());
     bb.tmax = -bb.tmin;
 
+    int refused = 0;
     std::mt19937 rng(seed);
     for (int i = 0; i < sample_count; ++i)
     {
@@ -79,13 +82,23 @@ auto compute_bounding_box(
         auto fk = cartan::forward_kinematics(chain, q);
         if (!fk)
         {
-            // A sample the entry point refuses was never evaluated, so it
-            // widens no bound; the box stays an outer bound either way.
+            ++refused;
             continue;
         }
         auto t = fk->end_effector.translation();
         bb.tmin = bb.tmin.cwiseMin(t);
         bb.tmax = bb.tmax.cwiseMax(t);
+    }
+
+    // The extremes start at +/-infinity, so a box no sample ever widened is
+    // still infinite and reversed. Handing that to uniform_real_distribution
+    // is undefined, so the emptiness is reported here rather than downstream.
+    if (!(bb.tmax - bb.tmin).allFinite())
+    {
+        std::fprintf(stderr,
+            "cartan::fixtures::compute_bounding_box: no usable sample in %d draws "
+            "(%d refused); the workspace box is empty\n", sample_count, refused);
+        std::abort();
     }
     return bb;
 }

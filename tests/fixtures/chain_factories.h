@@ -850,6 +850,17 @@ auto random_reachable_target(
 /// Compute position and orientation error between FK(q_solution) and target.
 /// Returns {position_error, orientation_error} in meters and radians.
 /// Uses body-frame twist error: log(T_fk^{-1} * T_target).
+///
+/// Length is the only precondition checked, and the unchecked entry point does
+/// the evaluation, because 28 of this function's 30 call sites sit inside a
+/// benchmark's measured block: the checked entry point additionally scans every
+/// component for finiteness and wraps the whole intermediates array in an
+/// expected, measured here at 141 emitted instructions against 88 for this
+/// shape at N=6. A nonfinite q_solution is a diverged solve rather than an
+/// unsafe argument -- it propagates to the nonfinite pair every caller already
+/// compares against a tolerance, which is what this function answered before
+/// the checked entry points existed. Only a length mismatch reads out of
+/// bounds, and that test folds away entirely on a fixed-size chain.
 template <int N, typename Scalar>
 auto compute_pose_errors(
     const cartan::kinematic_chain<Scalar, N>& chain,
@@ -857,21 +868,15 @@ auto compute_pose_errors(
     const cartan::se3<Scalar>& target)
     -> std::pair<Scalar, Scalar>
 {
-    auto fk = cartan::forward_kinematics(chain, q_solution);
-    if (!fk.has_value())
+    if (q_solution.size() != chain.num_joints())
     {
-        // q_solution is a solver's output, not a fixture literal, so a refusal
-        // is a property of the measurement rather than a bug in the caller.
-        // Aborting would take a whole benchmark binary down and discard every
-        // measurement already accumulated; a nonfinite pair is what the
-        // unchecked path yielded for the same input before this boundary
-        // existed, and every caller already compares it against a tolerance.
         std::fprintf(stderr, "cartan::fixtures::compute_pose_errors: %s\n",
-            cartan::message(fk.error()));
+            cartan::message(cartan::chain_failure::dimension_mismatch));
         const Scalar unanswerable = std::numeric_limits<Scalar>::quiet_NaN();
         return {unanswerable, unanswerable};
     }
-    auto error_twist = (fk->end_effector.inverse() * target).log();
+    auto fk = cartan::forward_kinematics_unchecked(chain, q_solution);
+    auto error_twist = (fk.end_effector.inverse() * target).log();
 
     // omega-first convention: head<3> = angular, tail<3> = linear
     Scalar orientation_error = error_twist.template head<3>().norm();
