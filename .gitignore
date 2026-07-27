@@ -1,5 +1,7 @@
 coverage/
 coverage.*
+/coverage-*.xml
+/coverage-*.txt
 *_UnitTest
 .DS_Store
 cmake-build-*/

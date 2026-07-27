@@ -1,0 +1,88 @@
+# Tracked headers GCC's gcov does not reach, and why.
+#
+# gcov emits data only for translation units the build compiled, so a header no
+# build touches is not scored zero -- it leaves the denominator entirely, and the
+# published rate improves. check_coverage_report.py therefore compares the headers
+# named in the report against every tracked header under the module include trees
+# and refuses a difference that is not recorded here. An absent header with no row
+# fails the check; so does a row naming a header git no longer tracks, and so does
+# a row for a header the report names, whatever the row claims. This record cannot
+# accumulate.
+#
+# There is one record per coverage instrument, and this one is GCC's. The flavors
+# disagree about which headers produce records at all: Clang's emits entries for
+# implicitly-defined special members and attributes them to the declaring line,
+# GCC's emits none, and five headers differ. Sharing one record would force the
+# check to stop refuting a whole class of row, which is how a wrong row survives.
+#
+# One row per header: the path, then the reason. A reason is legitimate only when
+# a reader holding nothing but this repository can check it. Three reasons say
+# that, and no other spelling is accepted:
+#
+#   declaration-only        The header declares types, concepts, constants or
+#                           aliases and defines no executable line, so gcov has
+#                           nothing to emit for it. Open the file to check.
+#   backend-not-built <OPT> Nothing the build compiles includes this header unless
+#                           the named option is on, so gcov emits no record for it.
+#                           Check the option's effect in CMake together with the
+#                           includes of the header or of whatever includes it: for
+#                           five of the six adapters under detail/, the option gates
+#                           the includers rather than the header itself, and
+#                           argmin_unconstrained_problem.h is reached from no
+#                           library header at all, only from two gated test files.
+#   no-instantiating-test   The build compiles the header, but nothing in it calls
+#                           or instantiates what the header defines, so gcov emits
+#                           no record. This is a real coverage gap, not an
+#                           exemption, and the two rows carrying it are inputs to
+#                           the work that raises the number.
+#
+# This is not a place to excuse a header that ought to be measured. If a header
+# belongs in the denominator, the repair is the build configuration, not a row.
+#
+# Recorded against the measured configuration: tests and the URDF module built,
+# no optional solver backend.
+
+lib/cartan-analytical/include/cartan/analytical.h                                       declaration-only
+lib/cartan-analytical/include/cartan/analytical/analytical_solver.h                     declaration-only
+lib/cartan-analytical/include/cartan/analytical/range_status.h                          declaration-only
+lib/cartan-analytical/include/cartan/analytical/unwrapped_result.h                      no-instantiating-test
+lib/cartan-lie/include/cartan/detail/epsilon.h                                          declaration-only
+lib/cartan-lie/include/cartan/frames/frames.h                                           declaration-only
+lib/cartan-lie/include/cartan/lie.h                                                     declaration-only
+lib/cartan-lie/include/cartan/lie/fwd.h                                                 declaration-only
+lib/cartan-lie/include/cartan/lie/policy.h                                              declaration-only
+lib/cartan-lie/include/cartan/types.h                                                   declaration-only
+lib/cartan-serial-chain/include/cartan/serial/chain/chain.h                             declaration-only
+lib/cartan-serial-chain/include/cartan/serial/chain/chain_concept.h                     declaration-only
+lib/cartan-serial-chain/include/cartan/serial/chain/storage_trait.h                     declaration-only
+lib/cartan-serial-chain/include/cartan/serial/fk.h                                      declaration-only
+lib/cartan-serial-chain/include/cartan/serial/fk/kinematics.h                           declaration-only
+lib/cartan-serial-chain/include/cartan/serial/ik.h                                      declaration-only
+lib/cartan-serial-chain/include/cartan/serial/ik/detail/argmin_bounded_ik_problem.h     backend-not-built CARTAN_BUILD_ARGMIN
+lib/cartan-serial-chain/include/cartan/serial/ik/detail/argmin_constrained_problem.h    backend-not-built CARTAN_BUILD_ARGMIN
+lib/cartan-serial-chain/include/cartan/serial/ik/detail/argmin_convergence.h            backend-not-built CARTAN_BUILD_ARGMIN
+lib/cartan-serial-chain/include/cartan/serial/ik/detail/argmin_least_squares_problem.h  backend-not-built CARTAN_BUILD_ARGMIN
+lib/cartan-serial-chain/include/cartan/serial/ik/detail/argmin_problem.h                backend-not-built CARTAN_BUILD_ARGMIN
+lib/cartan-serial-chain/include/cartan/serial/ik/detail/argmin_unconstrained_problem.h  backend-not-built CARTAN_BUILD_ARGMIN
+lib/cartan-serial-chain/include/cartan/serial/ik/detail/nlopt_common.h                  backend-not-built CARTAN_BUILD_NLOPT
+lib/cartan-serial-chain/include/cartan/serial/ik/ik.h                                   declaration-only
+lib/cartan-serial-chain/include/cartan/serial/ik/ik_status.h                            no-instantiating-test
+lib/cartan-serial-chain/include/cartan/serial/ik/solver/argmin_bobyqa.h                 backend-not-built CARTAN_BUILD_ARGMIN
+lib/cartan-serial-chain/include/cartan/serial/ik/solver/argmin_lbfgsb.h                 backend-not-built CARTAN_BUILD_ARGMIN
+lib/cartan-serial-chain/include/cartan/serial/ik/solver/argmin_lm.h                     backend-not-built CARTAN_BUILD_ARGMIN
+lib/cartan-serial-chain/include/cartan/serial/ik/solver/argmin_projected_gn.h           backend-not-built CARTAN_BUILD_ARGMIN
+lib/cartan-serial-chain/include/cartan/serial/ik/solver/argmin_projected_gradient_gn.h  backend-not-built CARTAN_BUILD_ARGMIN
+lib/cartan-serial-chain/include/cartan/serial/ik/solver/argmin_slsqp.h                  backend-not-built CARTAN_BUILD_ARGMIN
+lib/cartan-serial-chain/include/cartan/serial/ik/solver/augmented_lagrangian.h          backend-not-built CARTAN_BUILD_ARGMIN
+lib/cartan-serial-chain/include/cartan/serial/ik/solver/cmaes.h                         backend-not-built CARTAN_BUILD_ARGMIN
+lib/cartan-serial-chain/include/cartan/serial/ik/solver/filter_nw_sqp.h                 backend-not-built CARTAN_BUILD_ARGMIN
+lib/cartan-serial-chain/include/cartan/serial/ik/solver/filter_slsqp.h                  backend-not-built CARTAN_BUILD_ARGMIN
+lib/cartan-serial-chain/include/cartan/serial/ik/solver/gcmma.h                         backend-not-built CARTAN_BUILD_ARGMIN
+lib/cartan-serial-chain/include/cartan/serial/ik/solver/mma.h                           backend-not-built CARTAN_BUILD_ARGMIN
+lib/cartan-serial-chain/include/cartan/serial/ik/solver/nlopt_bobyqa.h                  backend-not-built CARTAN_BUILD_NLOPT
+lib/cartan-serial-chain/include/cartan/serial/ik/solver/nlopt_slsqp.h                   backend-not-built CARTAN_BUILD_NLOPT
+lib/cartan-serial-chain/include/cartan/serial/ik/solver/nw_sqp.h                        backend-not-built CARTAN_BUILD_ARGMIN
+lib/cartan-serial-chain/include/cartan/serial_chain.h                                   declaration-only
+lib/cartan-urdf/include/cartan/urdf/error.h                                             declaration-only
+lib/cartan-urdf/include/cartan/urdf/metadata.h                                          declaration-only
+lib/cartan-urdf/include/cartan/urdf/schema.h                                            declaration-only

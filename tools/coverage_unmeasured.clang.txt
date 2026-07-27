@@ -1,21 +1,26 @@
-# Tracked headers the coverage report does not reach, and why.
+# Tracked headers Clang's coverage instrument does not reach, and why.
 #
 # gcov emits data only for translation units the build compiled, so a header no
 # build touches is not scored zero -- it leaves the denominator entirely, and the
 # published rate improves. check_coverage_report.py therefore compares the headers
 # named in the report against every tracked header under the module include trees
 # and refuses a difference that is not recorded here. An absent header with no row
-# fails the check; so does a row naming a header git no longer tracks, or a row
-# whose reason the report contradicts, so this record cannot accumulate.
+# fails the check; so does a row naming a header git no longer tracks, and so does
+# a row for a header the report names, whatever the row claims. This record cannot
+# accumulate.
 #
-# A report contradicts backend-not-built and no-instantiating-test by naming the
-# header at all: both claim the header produced no records because nothing
-# compiled or instantiated it. It cannot contradict declaration-only, which is a
-# claim about the source. Clang's instrument synthesizes records for
-# implicitly-defined special members and attributes them to the declaring line,
-# so the five type-only headers below appear in its report -- schema.h with ten
-# branch lines from an implicit destructor -- while GCC's names none of them. A
-# reader settles declaration-only by opening the file.
+# There is one record per coverage instrument, and this one is Clang's. It is five
+# rows shorter than GCC's because Clang emits records for implicitly-defined
+# special members and attributes them to the declaring line, so urdf/error.h,
+# urdf/metadata.h, urdf/schema.h, analytical/unwrapped_result.h and ik/ik_status.h
+# are named by this instrument and not by GCC's. Sharing one record would force the
+# check to stop refuting a whole class of row, which is how a wrong row survives.
+#
+# Two headers therefore carry no-instantiating-test in GCC's record and no row at
+# all here, and that is a limit of comparing whole headers: this instrument names
+# ik_status.h for its struct declarations while its two message() switches stay
+# uncovered. Whether a named header's lines run is what the percentage answers;
+# this record only answers whether the header reaches the denominator.
 #
 # One row per header: the path, then the reason. A reason is legitimate only when
 # a reader holding nothing but this repository can check it. Three reasons say
@@ -24,13 +29,18 @@
 #   declaration-only        The header declares types, concepts, constants or
 #                           aliases and defines no executable line, so gcov has
 #                           nothing to emit for it. Open the file to check.
-#   backend-not-built <OPT> The header is compiled only when the named build
-#                           option is on, and the measured configuration leaves it
-#                           off. Check by reading the option's effect in CMake and
-#                           the header's includes.
-#   no-instantiating-test   The build compiles the header, but no test translation
-#                           unit instantiates it, so gcov emits no record for it.
-#                           This is a real coverage gap, not an exemption.
+#   backend-not-built <OPT> Nothing the build compiles includes this header unless
+#                           the named option is on, so gcov emits no record for it.
+#                           Check the option's effect in CMake together with the
+#                           includes of the header or of whatever includes it: for
+#                           five of the six adapters under detail/, the option gates
+#                           the includers rather than the header itself, and
+#                           argmin_unconstrained_problem.h is reached from no
+#                           library header at all, only from two gated test files.
+#   no-instantiating-test   The build compiles the header, but nothing in it calls
+#                           or instantiates what the header defines, so gcov emits
+#                           no record. This is a real coverage gap, not an
+#                           exemption.
 #
 # This is not a place to excuse a header that ought to be measured. If a header
 # belongs in the denominator, the repair is the build configuration, not a row.
@@ -41,7 +51,6 @@
 lib/cartan-analytical/include/cartan/analytical.h                                       declaration-only
 lib/cartan-analytical/include/cartan/analytical/analytical_solver.h                     declaration-only
 lib/cartan-analytical/include/cartan/analytical/range_status.h                          declaration-only
-lib/cartan-analytical/include/cartan/analytical/unwrapped_result.h                      declaration-only
 lib/cartan-lie/include/cartan/detail/epsilon.h                                          declaration-only
 lib/cartan-lie/include/cartan/frames/frames.h                                           declaration-only
 lib/cartan-lie/include/cartan/lie.h                                                     declaration-only
@@ -62,7 +71,6 @@ lib/cartan-serial-chain/include/cartan/serial/ik/detail/argmin_problem.h        
 lib/cartan-serial-chain/include/cartan/serial/ik/detail/argmin_unconstrained_problem.h  backend-not-built CARTAN_BUILD_ARGMIN
 lib/cartan-serial-chain/include/cartan/serial/ik/detail/nlopt_common.h                  backend-not-built CARTAN_BUILD_NLOPT
 lib/cartan-serial-chain/include/cartan/serial/ik/ik.h                                   declaration-only
-lib/cartan-serial-chain/include/cartan/serial/ik/ik_status.h                            declaration-only
 lib/cartan-serial-chain/include/cartan/serial/ik/solver/argmin_bobyqa.h                 backend-not-built CARTAN_BUILD_ARGMIN
 lib/cartan-serial-chain/include/cartan/serial/ik/solver/argmin_lbfgsb.h                 backend-not-built CARTAN_BUILD_ARGMIN
 lib/cartan-serial-chain/include/cartan/serial/ik/solver/argmin_lm.h                     backend-not-built CARTAN_BUILD_ARGMIN
@@ -79,6 +87,3 @@ lib/cartan-serial-chain/include/cartan/serial/ik/solver/nlopt_bobyqa.h          
 lib/cartan-serial-chain/include/cartan/serial/ik/solver/nlopt_slsqp.h                   backend-not-built CARTAN_BUILD_NLOPT
 lib/cartan-serial-chain/include/cartan/serial/ik/solver/nw_sqp.h                        backend-not-built CARTAN_BUILD_ARGMIN
 lib/cartan-serial-chain/include/cartan/serial_chain.h                                   declaration-only
-lib/cartan-urdf/include/cartan/urdf/error.h                                             declaration-only
-lib/cartan-urdf/include/cartan/urdf/metadata.h                                          declaration-only
-lib/cartan-urdf/include/cartan/urdf/schema.h                                            declaration-only

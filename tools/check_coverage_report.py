@@ -1,35 +1,28 @@
 #!/usr/bin/env python3
 """Refuse a coverage report that measured nothing, and name every header it did not reach.
 
-A rate is a ratio, and a ratio over an empty denominator is 1.0. gcovr publishes
-that ratio and exits 0, so a filter that matches no source reads downstream as
-total coverage. That failure is checked first and reported on its own exit code,
-because "the filter is broken" and "coverage moved" send a reader to different
-places.
+A rate over an empty denominator is 1.0, and gcovr publishes it and exits 0, so a
+filter matching no source reads downstream as total coverage. That is checked
+first and on its own exit code: a broken filter is not a coverage drop.
 
-Two Cobertura documents are read, produced by the same build. The unmerged one
-sums gcov's per-instantiation records; the merged one collapses them. Both are
-printed, each labelled with the question it answers. No percentage is compared
+Two Cobertura documents are read, produced by the same build: the unmerged one
+sums gcov's per-instantiation records, the merged one collapses them. Both are
+printed, labelled with the question each answers. No percentage is compared
 against anything here.
 
-The denominator can also shrink silently: gcov emits data only for translation
-units the build compiled, so a configuration change that stops compiling a module
-removes its headers from the report instead of scoring them zero, and the
-published rate improves. Every tracked header absent from the report must
-therefore carry a recorded reason, and a row that the report contradicts is
-refused as stale, so the record cannot grow unchecked.
+The denominator can also shrink silently, because gcov emits data only for
+translation units the build compiled: a change that stops compiling a module
+removes its headers rather than scoring them zero, and the rate improves. Every
+absent tracked header must carry a recorded reason, and a report naming one
+refutes its row.
 
-Which rows a report can contradict is not uniform, and the difference is measured
-rather than assumed. A row claiming the header is not compiled is contradicted
-the moment the report names it. A row claiming the header declares only types is
-not: an instrument may synthesize records for implicitly-defined special members
-and attribute them to a declaring line, and against these sources Clang's does
-while GCC's does not. That claim is about the source, so a reader settles it by
-opening the file and a report cannot.
+The record is per instrument. gcov flavors disagree about which headers produce
+records at all -- Clang's emits entries for implicitly-defined special members,
+attributed to the declaring line, where GCC's emits none -- and one record per
+flavor is what keeps every reason strictly refutable.
 
-Exit codes are distinct so a caller can tell which failure occurred:
-0 clean, 1 an absent header has no recorded reason, 2 the check could not be
-trusted, 3 a report measured nothing, 4 a recorded row is stale.
+Exit codes are distinct so a caller can tell which failure occurred: 0 clean, 1 an
+absent header has no reason, 2 untrusted check, 3 nothing measured, 4 stale row.
 """
 
 import argparse
@@ -39,9 +32,7 @@ import sys
 import xml.etree.ElementTree as ET
 
 REASONS = ("declaration-only", "backend-not-built", "no-instantiating-test")
-
-# Reasons a coverage report can contradict by naming the header at all.
-REFUTABLE = ("backend-not-built", "no-instantiating-test")
+HEADER_SUFFIXES = (".h", ".hpp", ".hxx", ".inl", ".ipp")
 
 UNMERGED_NOTE = ("one entry per source line per template instantiation: a line instantiated "
                  "five times contributes five to this denominator")
@@ -63,21 +54,25 @@ def document(path):
 
 def totals(root):
     """(lines covered, lines valid, branches covered, branches valid) for a whole document."""
-    try:
-        return tuple(int(root.get(key)) for key in
-                     ("lines-covered", "lines-valid", "branches-covered", "branches-valid"))
-    except (TypeError, ValueError) as exc:
-        raise CheckError(f"coverage report carries no line and branch counts: {exc}") from exc
+    counts = []
+    for key in ("lines-covered", "lines-valid", "branches-covered", "branches-valid"):
+        value = root.get(key)
+        if value is None or not value.isdigit():
+            raise CheckError(f"coverage report carries no usable {key} attribute: {value!r}")
+        counts.append(int(value))
+    return tuple(counts)
 
 
 def emptiness(name, counts):
-    """The message for a report whose denominator is empty, or None when it measured something."""
+    """The message for a denominator that is empty, or None when neither denominator is."""
     _, lines, _, branches = counts
-    if lines > 0 and branches > 0:
-        return None
-    return (f"{name}: lines-valid={lines}, branches-valid={branches}. The filters matched no "
-            "source. The rate in this document is a ratio over an empty denominator and is not "
-            "a measurement; gcovr publishes it as 1.0 and exits 0.")
+    if lines == 0:
+        return (f"{name}: lines-valid=0. The filters matched no source, so neither rate here is a "
+                "measurement; gcovr publishes both as 1.0 and exits 0.")
+    if branches == 0:
+        return (f"{name}: lines-valid={lines} but branches-valid=0. The filters did match source, "
+                "so this is not a filter fault; the build carried no branch data.")
+    return None
 
 
 def report(name, counts, note):
@@ -88,16 +83,26 @@ def report(name, counts, note):
     print(f"{name:8} {note}")
 
 
+def publish(unmerged_counts, merged_counts):
+    report("unmerged", unmerged_counts, UNMERGED_NOTE)
+    report("merged", merged_counts, MERGED_NOTE)
+    print("headline: the unmerged line figure, because the merged one flatters by collapsing "
+          "multi-line statements; the merged one answers reachability by some instantiation.")
+
+
 def tracked_headers(root):
     """Every tracked header under the module include trees, taken from git, not the filesystem."""
     trees = sorted(str(tree.relative_to(root)) for tree in root.glob("lib/*/include"))
     if not trees:
         raise CheckError(f"no module include tree under {root}; nothing would be compared")
-    result = subprocess.run(["git", "-C", str(root), "ls-files", "--", *trees],
-                            capture_output=True, text=True)
-    if result.returncode != 0:
-        raise CheckError(f"git ls-files under {root} failed: {result.stderr.strip()}")
-    headers = {line for line in result.stdout.split() if line.endswith(".h")}
+    try:
+        listing = subprocess.run(["git", "-C", str(root), "ls-files", "-z", "--", *trees],
+                                 capture_output=True, text=True)
+    except OSError as exc:
+        raise CheckError(f"could not run git under {root}: {exc}") from exc
+    if listing.returncode != 0:
+        raise CheckError(f"git ls-files under {root} failed: {listing.stderr.strip()}")
+    headers = {name for name in listing.stdout.split("\0") if name.endswith(HEADER_SUFFIXES)}
     if not headers:
         raise CheckError(f"git tracks no header under {trees}; nothing would be compared")
     return headers
@@ -117,36 +122,34 @@ def row(where, line):
 
 
 def recorded(path):
-    """header -> reason, from the two-column record of what the report does not reach."""
+    """header -> reason, from the two-column record of what this instrument does not reach."""
     try:
         text = path.read_text()
     except OSError as exc:
         raise CheckError(f"{path} is not a readable record: {exc}") from exc
-    lines = enumerate(text.splitlines(), start=1)
-    return dict(row(f"{path}:{number}", line) for number, line in lines
-                if line.strip() and not line.lstrip().startswith("#"))
+    rows = {}
+    for number, line in enumerate(text.splitlines(), start=1):
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        header, reason = row(f"{path}:{number}", line)
+        if header in rows:
+            raise CheckError(f"{path}:{number}: {header} is recorded twice")
+        rows[header] = reason
+    return rows
 
 
 def absence_findings(absent, rows, tracked):
     """(unrecorded headers, stale rows) — the two directions the record can be wrong in."""
     stale = [f"{header}: {reason} — but the header is measured again"
              for header, reason in sorted(rows.items())
-             if header in tracked and header not in absent and reason.startswith(REFUTABLE)]
+             if header in tracked and header not in absent]
     stale += [f"{header}: {reason} — but git tracks no such header"
               for header, reason in sorted(rows.items()) if header not in tracked]
     return sorted(absent - set(rows)), stale
 
 
-def publish(unmerged_counts, merged_counts):
-    report("unmerged", unmerged_counts, UNMERGED_NOTE)
-    report("merged", merged_counts, MERGED_NOTE)
-    print("headline: the unmerged line figure, because the merged one flatters by collapsing "
-          "multi-line statements; the merged figure answers whether a line is reachable by "
-          "some instantiation, which is a different question.")
-
-
 def check_absences(source_root, record, merged):
-    """Refuse an absent header with no recorded reason, and a recorded row that is no longer true."""
+    """Refuse an absent header with no recorded reason, and a row the report contradicts."""
     tracked = tracked_headers(source_root)
     rows = recorded(record)
     absent = tracked - {node.get("filename") for node in merged.iter("class")}
@@ -164,11 +167,16 @@ def check_absences(source_root, record, merged):
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--unmerged", required=True, type=pathlib.Path)
-    parser.add_argument("--merged", required=True, type=pathlib.Path)
-    parser.add_argument("--unmeasured", required=True, type=pathlib.Path)
-    parser.add_argument("--source-root", required=True, type=pathlib.Path)
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--unmerged", required=True, type=pathlib.Path,
+                        help="Cobertura report from the run that sums instantiations")
+    parser.add_argument("--merged", required=True, type=pathlib.Path,
+                        help="Cobertura report from the run that collapses instantiations")
+    parser.add_argument("--unmeasured", required=True, type=pathlib.Path,
+                        help="record of the headers this instrument's report does not reach")
+    parser.add_argument("--source-root", required=True, type=pathlib.Path,
+                        help="repository root the reports' paths are relative to")
     return parser.parse_args()
 
 

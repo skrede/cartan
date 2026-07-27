@@ -21,16 +21,22 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Which headers produce gcov records at all differs between the two
+          # flavors, so each carries the record of what its own reports do not
+          # reach; one shared record would make a difference between instruments
+          # read as a defect.
           - compiler: gcc-14
             cc: gcc-14
             cxx: g++-14
             coverage: true
             gcov_executable: gcov-14
+            unmeasured: tools/coverage_unmeasured.gcc.txt
           - compiler: clang-18
             cc: clang-18
             cxx: clang++-18
             coverage: true
             gcov_executable: "llvm-cov-18 gcov"
+            unmeasured: tools/coverage_unmeasured.clang.txt
 
     runs-on: ubuntu-24.04
     name: ${{ matrix.compiler }}
@@ -76,8 +82,10 @@ jobs:
       # collapses them, so a line counts once and is covered if any instantiation
       # ran it. The two answer different questions and both are published.
       - name: Generate coverage
+        id: coverage
         if: matrix.coverage
         run: |
+          set -o pipefail
           gcovr build \
             --root . \
             --gcov-executable "${{ matrix.gcov_executable }}" \
@@ -100,24 +108,34 @@ jobs:
           python3 tools/check_coverage_report.py \
             --unmerged coverage-unmerged.xml \
             --merged coverage-merged.xml \
-            --unmeasured tools/coverage_unmeasured.txt \
-            --source-root .
+            --unmeasured ${{ matrix.unmeasured }} \
+            --source-root . | tee -a "$GITHUB_STEP_SUMMARY"
 
+      # Cobertura keys on (file, line) and defines no reduction for repeats, and the
+      # unmerged document repeats a line once per instantiation: 25548 entries over
+      # 4382 keys, 942 of which disagree about whether the line ran. Reducing it
+      # last-wins gives 79.96% and max-wins 91.67% where its own header says 73.46%,
+      # so a consumer's badge would contradict the log by up to eighteen points. The
+      # merged document has exactly one entry per key and no such freedom, so that is
+      # what is published; the unmerged figure goes out as text, which nothing reduces.
       - name: Upload to Codecov
-        if: matrix.coverage
+        if: matrix.coverage && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
         with:
-          files: coverage-unmerged.xml
+          files: coverage-merged.xml
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
 
+      # Retained when the checker rejects the reports, which is when they are worth
+      # reading; skipped when an earlier step failed and there is nothing to keep.
       - name: Upload coverage reports
-        if: matrix.coverage
+        if: always() && matrix.coverage && steps.coverage.conclusion != 'skipped'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: coverage-${{ matrix.compiler }}
+          if-no-files-found: error
           path: |
-            coverage-merged.xml
+            coverage-unmerged.xml
             coverage-unmerged.txt
             coverage-merged.txt
 
