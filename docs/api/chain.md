@@ -260,7 +260,14 @@ Inspect a `screw_axis` and return its `joint_kind`. Recognizes axes whose
 `omega` (revolute) or `v` (prismatic) is `±e_x`, `±e_y`, or `±e_z` to
 within a per-component deviation of `1e-9`. The sign is irrelevant:
 downstream specializations read the magnitude from the axis itself. All
-other axes, and every nonfinite one, return `joint_kind::general`.
+other axes return `joint_kind::general`.
+
+**This is not a finiteness gate and must not be used as one.** Only the
+component the branch tests is examined. A nonfinite `omega` classifies as
+`general`, because no comparison against a NaN holds; but a revolute axis
+with an exactly principal `omega` and a nonfinite `v` is reported as that
+principal kind. `static_chain::make` and the `kinematic_chain` constructor
+test the whole six-vector — this function answers a different question.
 
 The tolerance is absolute and the same in every scalar type, rather than
 derived from machine precision. A precision-derived threshold is `1.5e-8`
@@ -273,13 +280,14 @@ about 13 nm on a 7-joint, 1.3 m arm.
 
 One consequence is worth stating plainly, because it is visible in
 practice. Composing a description's `<origin rpy>` rotations in `float`
-produces axis components around `1.7e-7` — `sin(pi)` evaluated in single
-precision, not noise inherited from the description — which is well above
-this tolerance. So chains from `load_urdf<float>` are classified `general`
+produces axis components up to about `1.75e-7`, well above this tolerance.
+The source is single-precision arithmetic, not noise inherited from the
+description: `sin(pi)` in `float` is `-8.74e-8`, and composing two such
+rotations doubles it. A `double` parse is unaffected; its worst measured
+deviation is `4.1e-10`. So chains from `load_urdf<float>` are classified `general`
 and take the generic evaluation path rather than a specialization. That
 is a performance cost and not a correctness one: the generic path
-evaluates the true axis and is strictly the more faithful of the two. A
-`double` parse is unaffected; its worst measured deviation is `4.1e-10`.
+evaluates the true axis and is strictly the more faithful of the two.
 
 ## kinematic_chain
 
@@ -420,6 +428,24 @@ its tag names as the signed magnitude. A screw about `y` stored under
 `revolute_z` would read a zero there, and the joint would contribute
 nothing at any joint value — a plausible pose for a robot with one
 immovable joint.
+
+#### Building a static chain from a parsed description
+
+Exactness has a consequence worth planning for: **an axis that came out of a
+URDF may not be exactly principal, and `make` will refuse it.** Composing a
+description's `<origin rpy>` rotations leaves residue in the axis
+components — the vendored UR descriptions yield `(0, 1, -2.05103e-10)` for a
+joint that is nominally about `+y`, and single-precision parses are three
+orders worse. `detect_joint_kind` snaps such an axis and `kinematic_chain`
+takes the specialized path for it; `static_chain::make` returns
+`tag_axis_contradiction` for the same value.
+
+The two are meant to disagree. A tag is a claim the caller makes and can
+therefore be held to exactly; a parsed axis is measured data, where a
+tolerance is the only workable rule. If you want a `static_chain` from a
+description, round the axis onto its principal direction yourself — which
+makes the approximation explicit and yours — or use
+`kinematic_chain`, which classifies at construction and needs no tag.
 
 ### Accessors
 

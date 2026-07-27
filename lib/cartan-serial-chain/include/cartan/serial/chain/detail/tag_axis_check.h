@@ -14,9 +14,10 @@
 
 #include "cartan/types.h"
 
-#include <array>
 #include <tuple>
+#include <array>
 #include <cstddef>
+#include <concepts>
 #include <utility>
 
 namespace cartan
@@ -35,16 +36,24 @@ namespace detail
 template <joint_tag Tag, typename Scalar>
 bool axis_matches_tag(const screw_axis<Scalar>& axis)
 {
-    if constexpr (Tag::is_revolute)
+    if constexpr (std::same_as<Tag, revolute_x> || std::same_as<Tag, revolute_y>
+                  || std::same_as<Tag, revolute_z>)
     {
         const vector3<Scalar> reference = Tag::template omega<Scalar>();
         return axis.omega() == reference || axis.omega() == -reference;
     }
-    else
+    else if constexpr (std::same_as<Tag, prismatic_x>
+                       || std::same_as<Tag, prismatic_y>
+                       || std::same_as<Tag, prismatic_z>)
     {
         const vector3<Scalar> reference = Tag::template direction<Scalar>();
         return axis.omega() == vector3<Scalar>::Zero()
                && (axis.v() == reference || axis.v() == -reference);
+    }
+    else
+    {
+        static_assert(joint_tag_exhausted_v<Tag>,
+            "axis_matches_tag has no comparison for this joint tag");
     }
 }
 
@@ -59,19 +68,6 @@ bool axes_match_tags_exactly(
         return (... && axis_matches_tag<std::tuple_element_t<Is, joint_tuple>>(
                            axes[Is]));
     }(std::make_index_sequence<sizeof...(Joints)>{});
-}
-
-template <typename Scalar, std::size_t N>
-bool axes_are_finite(const std::array<screw_axis<Scalar>, N>& axes)
-{
-    for (const auto& axis : axes)
-    {
-        if (!axis.to_vector().allFinite())
-        {
-            return false;
-        }
-    }
-    return true;
 }
 
 }

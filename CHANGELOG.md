@@ -30,6 +30,31 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 - `screw_axis::from_vector` no longer classifies an axis whose angular part holds
   a NaN as a prismatic joint. `screw_axis::revolute` and `screw_axis::prismatic`
   are unchanged and still normalize without validating.
+- **Breaking.** `static_chain` is now constructed through
+  `static_chain<Scalar, Joints...>::make(home, axes, limits)`, which returns
+  `cartan::expected<static_chain, chain_failure>`; the constructor is private.
+  `make` reports `non_finite_input` for a nonfinite home pose or screw axis, and
+  `tag_axis_contradiction` for an axis that is not the principal axis its
+  compile-time tag names. Both were previously a debug-only assert, which meant
+  a release build constructed such a chain silently and evaluated a robot with
+  one immovable joint. The static predicate `axes_match_tags` is removed.
+- **Behavior change.** The tag-versus-axis comparison is **exact**, with no
+  tolerance, so an axis taken from a parsed description may be refused where it
+  was previously accepted: composing a URDF's `<origin rpy>` rotations leaves
+  residue in the axis components — the vendored UR descriptions give
+  `(0, 1, -2.05103e-10)` for a nominally `+y` joint. `detect_joint_kind` still
+  snaps such an axis and `kinematic_chain` is unaffected; only `static_chain`
+  construction is stricter. Round the axis onto its principal direction before
+  building a `static_chain` from a description, or use `kinematic_chain`. Either
+  sign of a principal axis is accepted, so a joint given as `axis="0 0 -1"`
+  remains expressible under `revolute_z`.
+- `detect_joint_kind` compares against an absolute per-component tolerance of
+  `1e-9` rather than one derived from machine precision. The previous threshold
+  was `sqrt(epsilon)`: `1.5e-8` in `double` but `3.4e-4` in `float`, so the same
+  code silently discarded a misalignment of about a hundredth of a degree in
+  single precision. Chains from `load_urdf<float>` now classify as `general` and
+  take the generic evaluation path, which evaluates the true axis and is the
+  more faithful of the two; a `double` parse is unaffected.
 
 ## [0.4.1] - 2026-07-06
 

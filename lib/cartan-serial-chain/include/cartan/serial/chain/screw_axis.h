@@ -47,6 +47,14 @@ public:
     /// Construct from a 6-vector (omega, v) with unit constraint validation.
     /// Revolute (||omega|| > 0): requires ||omega|| = 1.
     /// Prismatic (omega = 0): requires ||v|| = 1.
+    ///
+    /// "Prismatic" here means ||omega|| within sqrt-epsilon of zero, and the
+    /// residual angular part is stored unchanged. That is deliberately looser
+    /// than static_chain::make, which requires a prismatic tag's axis to have
+    /// omega exactly zero, so a value this factory accepts as prismatic can
+    /// still be refused there. Nothing built through the revolute/prismatic
+    /// factories below is affected -- they write an exact zero -- so the gap is
+    /// reachable only by handing a near-zero angular part to this function.
     static cartan::expected<screw_axis, lie_failure> from_vector(
         const vector6<Scalar>& vec)
     {

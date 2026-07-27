@@ -23,10 +23,10 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_template_test_macros.hpp>
 
-#include <cmath>
 #include <array>
-#include <vector>
+#include <cmath>
 #include <limits>
+#include <vector>
 
 namespace
 {
@@ -34,10 +34,10 @@ namespace
 using cartan::joint_kind;
 
 /// The largest per-component deviation any fixture in the tree requires to be
-/// snapped, measured across every factory in both scalars. It is bit-identical
-/// in float because the fixture literals are narrowed doubles. The comment in
-/// the fixture header quotes half this figure; a test written against that
-/// figure would pass with half the intended margin.
+/// snapped, measured across every factory. It classifies the same way in both
+/// scalars; the stored values are not bit-identical, since the float is the
+/// narrowed double. The comment in the fixture header quotes half this figure,
+/// and a test written against that figure would pass with half the margin.
 template <typename Scalar>
 constexpr Scalar k_worst_fixture_deviation = Scalar(4.102071e-10);
 
@@ -116,10 +116,6 @@ cartan::kinematic_chain<Scalar, 3> chain_with_deviation(Scalar deviation)
 }
 
 }
-
-// ============================================================================
-// The two-sided classification target
-// ============================================================================
 
 TEMPLATE_TEST_CASE("the worst fixture deviation still classifies to its principal kind",
     "[axis_classification]", double, float)
@@ -219,8 +215,10 @@ TEMPLATE_TEST_CASE("a nonfinite linear component leaves the classification princ
 TEST_CASE("the classification agrees in single and double precision",
     "[axis_classification]")
 {
+    const double tolerance = cartan::detail::k_axis_snap_tolerance_v<double>;
     const std::vector<double> deviations{
-        0.0, 4.102071e-10, 1e-9, 1e-8, 1e-6, 3e-4, 1e-2};
+        0.0, k_worst_fixture_deviation<double>, tolerance, tolerance * 10.0,
+        1e-6, k_must_not_snap_deviation<double>, 1e-2};
 
     for (double deviation : deviations)
     {
@@ -230,10 +228,6 @@ TEST_CASE("the classification agrees in single and double precision",
         REQUIRE(in_double == in_float);
     }
 }
-
-// ============================================================================
-// What the over-loose threshold was doing, demonstrated
-// ============================================================================
 
 // Single precision only: sqrt(epsilon) is 3.45e-4 in float and 1.49e-8 in
 // double, so this deviation was snapped in float and refused in double. The
@@ -253,7 +247,7 @@ TEST_CASE("the precision-derived threshold snapped an axis the tolerance refuses
     REQUIRE(true_model.kind(1) == joint_kind::general);
     REQUIRE(snapped_model.kind(1) == joint_kind::revolute_z);
 
-    Eigen::Vector3f q(1.1f, 0.9f, -0.6f);
+    cartan::vector3<float> q(1.1f, 0.9f, -0.6f);
     auto fk_true = cartan::forward_kinematics(true_model, q);
     auto fk_snapped = cartan::forward_kinematics(snapped_model, q);
     REQUIRE(fk_true.has_value());
@@ -266,6 +260,33 @@ TEST_CASE("the precision-derived threshold snapped an axis the tolerance refuses
     const float licensed
         = 1.4f * 3.0f * 1.5f * cartan::detail::k_axis_snap_tolerance_v<float>;
     REQUIRE(divergence > licensed);
+}
+
+// The two paths disagree about a description-derived axis, by design, and the
+// disagreement is load-bearing rather than incidental: the runtime classifier
+// snaps the residue that composing a description's rpy rotations leaves behind,
+// and the tag check refuses it, because a tag is a claim its caller can be held
+// to exactly while a parsed axis is measured data. The value below is the UR
+// fixtures' own joint-2 axis, in the repository today. If this case ever fails,
+// one of the two rules moved and a caller building a static chain from a parsed
+// description is the one who finds out.
+TEMPLATE_TEST_CASE("a description-derived axis snaps at runtime and is refused by the tag check",
+    "[axis_classification][differential]", double, float)
+{
+    using namespace cartan;
+    using Scalar = TestType;
+
+    auto parsed = screw_axis<Scalar>::revolute(
+        vector3<Scalar>(Scalar(0), Scalar(1), Scalar(-2.05103e-10)),
+        vector3<Scalar>::Zero());
+
+    REQUIRE(parsed.omega()(2) != Scalar(0));
+    REQUIRE(detect_joint_kind(parsed) == joint_kind::revolute_y);
+
+    auto refused = static_chain<Scalar, revolute_y>::make(
+        se3<Scalar>::identity(), {parsed}, {wide_limits<Scalar>()});
+    REQUIRE_FALSE(refused.has_value());
+    REQUIRE(refused.error() == chain_failure::tag_axis_contradiction);
 }
 
 // The replica above is only evidence while it still describes the classifier's
@@ -294,10 +315,6 @@ TEMPLATE_TEST_CASE("the replaced threshold agrees with the classifier away from 
         REQUIRE(snapped_under_precision_derived_tolerance(axis) == classifier_snaps);
     }
 }
-
-// ============================================================================
-// What a contradicting tag was doing, demonstrated
-// ============================================================================
 
 // exp_joint is the shipped tag-dispatched kernel, so this is the wrong model
 // itself rather than a description of it: under a revolute_z tag it reads

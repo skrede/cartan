@@ -196,10 +196,16 @@ int main(int argc, char** argv)
         cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
         cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>;
 
-    chain_t chain(
+    auto built = chain_t::make(
         home,
         {k1, k2, k3, k4, k5, k6},
         {lim, lim, lim, lim, lim, lim});
+    if (!built.has_value())
+    {
+        std::cerr << "chain construction failed: " << message(built.error()) << '\n';
+        return 1;
+    }
+    const chain_t& chain = *built;
 
     // --- Solver instances --------------------------------------------------
     //

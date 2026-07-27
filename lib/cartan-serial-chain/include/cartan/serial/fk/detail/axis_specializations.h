@@ -141,6 +141,11 @@ se3<Scalar> exp_joint(Scalar q, const screw_axis<Scalar>& axis)
         vector3<Scalar> t = axis.v() * q;
         return se3<Scalar>(so3<Scalar>::identity(), t);
     }
+    else
+    {
+        static_assert(detail::joint_tag_exhausted_v<JointTag>,
+            "exp_joint has no specialization for this joint tag");
+    }
 }
 
 /// Jacobian column at identity transform (i.e., for joint index 0).
@@ -223,6 +228,11 @@ void jacobian_column(
         matrix3<Scalar> R = T_prev.rotation().matrix();
         col.template head<3>().setZero();
         col.template tail<3>() = R * axis.v();
+    }
+    else
+    {
+        static_assert(detail::joint_tag_exhausted_v<JointTag>,
+            "jacobian_column has no specialization for this joint tag");
     }
 }
 
@@ -359,6 +369,11 @@ inline void exp_joint_matrix(
     {
         R.setIdentity();
         t = axis.v() * q;
+    }
+    else
+    {
+        static_assert(detail::joint_tag_exhausted_v<JointTag>,
+            "exp_joint_matrix has no specialization for this joint tag");
     }
 }
 

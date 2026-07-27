@@ -11,9 +11,10 @@
 
 #include "cartan/serial/chain/joint_tags.h"
 #include "cartan/serial/chain/screw_axis.h"
-#include "cartan/serial/chain/joint_limits.h"
-#include "cartan/serial/chain/chain_failure.h"
 #include "cartan/serial/chain/chain_concept.h"
+#include "cartan/serial/chain/chain_failure.h"
+#include "cartan/serial/chain/joint_limits.h"
+
 #include "cartan/serial/chain/detail/tag_axis_check.h"
 
 #include "cartan/lie/se3.h"
@@ -58,12 +59,20 @@ public:
     /// because the normalizing screw-axis factories are deliberately
     /// unvalidated and a chain is the first place that sees all of its axes;
     /// this is the same reason kinematic_chain validates at construction.
+    ///
+    /// A prismatic tag requires its axis's angular part to be exactly zero,
+    /// which is stricter than screw_axis::from_vector's sqrt-epsilon test for
+    /// the same question: a six-vector with a tiny but nonzero omega is
+    /// accepted there as prismatic and refused here. Deliberate -- the
+    /// prismatic specialization returns a pure translation, so a residual
+    /// rotation it silently drops is the same class of wrong model the tag
+    /// check exists to refuse.
     static cartan::expected<static_chain, chain_failure> make(
         const se3<Scalar>& home,
         axes_storage axes,
         limits_storage limits)
     {
-        if (!home.matrix().allFinite() || !detail::axes_are_finite(axes))
+        if (!home.matrix().allFinite() || !axes_are_finite(axes))
         {
             return cartan::unexpected(chain_failure::non_finite_input);
         }
@@ -105,6 +114,18 @@ private:
         , m_axes(std::move(axes))
         , m_limits(std::move(limits))
     {
+    }
+
+    static bool axes_are_finite(const axes_storage& axes)
+    {
+        for (const auto& axis : axes)
+        {
+            if (!axis.to_vector().allFinite())
+            {
+                return false;
+            }
+        }
+        return true;
     }
 };
 

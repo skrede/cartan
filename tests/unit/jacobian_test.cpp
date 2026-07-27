@@ -364,26 +364,3 @@ TEST_CASE("Zero-joint dynamic chain space Jacobian is 6x0", "[jacobian][dynamic]
     REQUIRE(J.cols() == 0);
 }
 
-// ============================================================================
-// static_chain rejects a screw axis that contradicts its compile-time tag
-//
-// The constructor asserts on axes_match_tags in debug builds; the predicate is
-// exercised directly here so the check is observable without aborting the test
-// process.
-// ============================================================================
-
-TEST_CASE("static_chain rejects axis contradicting its joint tag", "[static_chain][validation]")
-{
-    using chain_t = spp::static_chain<double, spp::revolute_z>;
-
-    // A revolute screw about +y classifies as revolute_y, contradicting the
-    // revolute_z tag.
-    std::array<spp::screw_axis<double>, 1> bad_axes{
-        spp::screw_axis<double>::revolute({0.0, 1.0, 0.0}, {0.0, 0.0, 0.0})};
-    // A revolute screw about +z (or -z) agrees with the revolute_z tag.
-    std::array<spp::screw_axis<double>, 1> good_axes{
-        spp::screw_axis<double>::revolute({0.0, 0.0, 1.0}, {0.0, 0.0, 0.0})};
-
-    REQUIRE_FALSE(chain_t::axes_match_tags(bad_axes));
-    REQUIRE(chain_t::axes_match_tags(good_axes));
-}

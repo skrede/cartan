@@ -48,7 +48,8 @@ namespace detail
 /// first order, so the value below is read directly as an angle.
 ///
 /// It sits 2.44x above the largest deviation the fixture set requires to be
-/// snapped (4.102071e-10, bit-identical in both scalars) and 3.0e5 times below
+/// snapped -- 4.102071e-10, which classifies the same way in both scalars,
+/// though the stored values differ in their low bits -- and 3.0e5 times below
 /// the smallest deviation that must not be. The error a snap induces was
 /// measured over 400 random configurations on three description-derived chains
 /// (6R/0.50 m, 7R/0.85 m, 7R/1.30 m):
@@ -61,10 +62,12 @@ namespace detail
 /// no robot axis can be specified to.
 ///
 /// One surprising property, because it will bite whoever relaxes the unit
-/// assumption: below about 6e-8 the unit test is exact in single precision, as
-/// no representable float lies between 1 and 1 + 1.19e-7. That is harmless
-/// only while every axis reaching here is normalized, which makes the on-axis
-/// component exactly one; the off-axis test keeps real tolerance either way.
+/// assumption: below about 6e-8 the unit test is exact in single precision. The
+/// binding gap is the one below one, where the neighbouring float is 5.96e-8
+/// away (above one it is 1.19e-7), so no representable value can satisfy the
+/// test except one exactly. That is harmless only while every axis reaching
+/// here is normalized, which makes the on-axis component exactly one; the
+/// off-axis test keeps real tolerance either way.
 ///
 /// Both margins are properties of the fixture set and of the description
 /// parser's arithmetic, so re-measure them if either changes and lock the
@@ -82,8 +85,15 @@ inline constexpr Scalar k_axis_snap_tolerance_v = Scalar(1e-9);
 /// or +/-e_z to within the axis-snap tolerance. A +/-e_k axis and its negation
 /// map to the same joint_kind; the downstream specializations recover the sign
 /// from the axis itself -- the signed component for revolute joints, and the
-/// signed screw_axis::v() direction for prismatic joints.
-/// All other axes, and every nonfinite one, return joint_kind::general.
+/// signed screw_axis::v() direction for prismatic joints. All other axes return
+/// joint_kind::general.
+///
+/// This is not a finiteness gate and must not be used as one. Only the
+/// component the branch tests is examined: a nonfinite omega classifies as
+/// general because no comparison against a NaN holds, but a revolute axis with
+/// an exactly principal omega and a nonfinite v is reported as that principal
+/// kind. static_chain::make and the kinematic_chain constructor test the whole
+/// six-vector; this function answers a different question.
 template <typename Scalar>
 inline joint_kind detect_joint_kind(const screw_axis<Scalar>& axis)
 {
