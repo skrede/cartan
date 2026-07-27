@@ -284,7 +284,8 @@ public:
 
 private:
     using argmin_solver = argmin::step_budget_solver<
-        argmin::projected_gn_policy<joints>, joints, cartan::detail::argmin_ik_least_squares_problem<Chain>>;
+        argmin::projected_gn_policy<joints>, joints, cartan::detail::argmin_ik_least_squares_problem<Chain>,
+        Convergence>;
     using argmin_opts_type = argmin::solver_options<Convergence>;
 
     position_type perturb_solution(const position_type& q, const Chain& chain)

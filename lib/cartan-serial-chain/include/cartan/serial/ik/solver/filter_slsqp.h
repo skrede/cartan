@@ -17,6 +17,7 @@
 #include "cartan/serial/ik/detail/stall_detection.h"
 #include "cartan/serial/ik/detail/setup_validation.h"
 #include "cartan/serial/ik/detail/limit_enforcement.h"
+#include "cartan/serial/ik/detail/argmin_convergence.h"
 
 #include "cartan/lie/se3.h"
 #include "cartan/serial/chain/joint_state.h"
@@ -34,7 +35,6 @@
 #include <limits>
 #include <memory>
 #include <vector>
-#include <array>
 #include <optional>
 #include <random>
 #include <type_traits>
@@ -247,12 +247,12 @@ public:
             return 0;
     }
 
-    auto last_check_results() const
+    cartan::detail::convergence_check_results<Convergence> last_check_results() const
     {
         if constexpr (requires { m_nab_opts.convergence.last_check_results(); })
             return m_nab_opts.convergence.last_check_results();
         else
-            return std::array<std::optional<argmin::solver_status>, 4>{};
+            return {};
     }
 
     void abort()
@@ -263,7 +263,8 @@ public:
 
 private:
     using argmin_solver = argmin::step_budget_solver<
-        argmin::filter_slsqp_policy<joints>, joints, cartan::detail::argmin_ik_problem<Chain>>;
+        argmin::filter_slsqp_policy<joints>, joints, cartan::detail::argmin_ik_problem<Chain>,
+        Convergence>;
     using argmin_opts_type = argmin::solver_options<Convergence>;
 
     position_type perturb_solution(const position_type& q, const Chain& chain)
