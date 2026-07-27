@@ -5,6 +5,7 @@
 
 #include <cmath>
 #include <numbers>
+#include <type_traits>
 
 namespace spp = cartan;
 using Catch::Approx;
@@ -88,14 +89,20 @@ TEST_CASE("body_jacobian returns 6x3 for 3R chain", "[jacobian]")
 // end_effector_velocity basic API
 // ============================================================================
 
-TEST_CASE("end_effector_velocity returns vector6", "[velocity]")
+TEST_CASE("end_effector_velocity returns expected vector6", "[velocity]")
 {
     auto chain = make_3r_chain();
     Eigen::Vector3d q = Eigen::Vector3d::Zero();
     Eigen::Vector3d dq = Eigen::Vector3d::Zero();
 
-    auto vel = spp::end_effector_velocity(chain, q, dq);
+    auto result = spp::end_effector_velocity(chain, q, dq);
+    static_assert(std::is_same_v<decltype(result),
+        spp::expected<spp::vector6<double>, spp::chain_failure>>);
 
+    auto vel = spp::end_effector_velocity_unchecked(chain, q, dq);
+    static_assert(std::is_same_v<decltype(vel), spp::vector6<double>>);
+
+    REQUIRE(result.has_value());
     REQUIRE(vel.size() == 6);
     REQUIRE(vel.norm() < 1e-15);
 }

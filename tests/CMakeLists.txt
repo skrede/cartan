@@ -38,6 +38,7 @@ if (CARTAN_BUILD_TESTS)
 
     add_subdirectory(unit)
     add_subdirectory(compile)
+    add_subdirectory(boundary)
 
     if (NOT CARTAN_CMAKE_FETCH_DEPS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/integration/CMakeLists.txt")
         add_subdirectory(integration)

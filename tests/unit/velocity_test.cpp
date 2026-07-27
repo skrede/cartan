@@ -43,7 +43,9 @@ TEST_CASE("Velocity at dq=0 is zero", "[velocity]")
     q << 0.3, -0.5, 0.7;
     Eigen::Vector3d dq = Eigen::Vector3d::Zero();
 
-    auto vel = spp::end_effector_velocity(chain, q, dq);
+    auto result = spp::end_effector_velocity(chain, q, dq);
+    REQUIRE(result.has_value());
+    const spp::vector6<double>& vel = *result;
 
     REQUIRE(vel.norm() < 1e-15);
 }
@@ -65,7 +67,9 @@ TEST_CASE("Single-joint velocity equals screw axis", "[velocity]")
     Eigen::Vector<double, 1> dq;
     dq << 1.0;
 
-    auto vel = spp::end_effector_velocity(chain, q, dq);
+    auto result = spp::end_effector_velocity(chain, q, dq);
+    REQUIRE(result.has_value());
+    const spp::vector6<double>& vel = *result;
 
     auto s1_vec = s1.to_vector();
     for (int i = 0; i < 6; ++i)
@@ -88,7 +92,9 @@ TEST_CASE("Velocity matches finite-difference FK", "[velocity]")
     Eigen::Vector3d dq;
     dq << 1.0, -0.5, 0.3;
 
-    auto vel = spp::end_effector_velocity(chain, q, dq);
+    auto result = spp::end_effector_velocity(chain, q, dq);
+    REQUIRE(result.has_value());
+    const spp::vector6<double>& vel = *result;
 
     // Finite-difference: log(FK(q + dt*dq) * FK(q)^{-1}) / dt
     double dt = 1e-8;

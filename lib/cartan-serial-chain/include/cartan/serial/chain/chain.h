@@ -7,6 +7,7 @@
 #include "cartan/serial/chain/joint_tags.h"
 #include "cartan/serial/chain/joint_state.h"
 #include "cartan/serial/chain/joint_limits.h"
+#include "cartan/serial/chain/chain_failure.h"
 #include "cartan/serial/chain/storage_trait.h"
 #include "cartan/serial/chain/chain_concept.h"
 #include "cartan/serial/chain/kinematic_chain.h"
