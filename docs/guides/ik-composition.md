@@ -274,6 +274,22 @@ BOBYQA is derivative-free, useful when the gradient is expensive or unreliable:
 cartan::basic_ik_runner solver{cartan::argmin_bobyqa<Chain>{}};
 ```
 
+## NLopt Solvers
+
+The NLopt-backed policies (`nlopt_slsqp`, `nlopt_bobyqa`) are compiled only when
+Cartan is built with NLopt support (`CARTAN_BUILD_NLOPT`), and reach a consumer
+only through the `cartan::nlopt` target, which carries both the backend headers
+and `CARTAN_HAS_NLOPT`:
+
+```cmake
+find_package(cartan CONFIG REQUIRED COMPONENTS nlopt)
+target_link_libraries(app PRIVATE cartan::cartan cartan::nlopt)
+```
+
+An installed NLopt is used when one is available; otherwise the build falls back
+to a pinned upstream revision, and an install of Cartan is then refused, because
+a dependency built inside the build tree belongs to no export set.
+
 ## Mixing Families
 
 Any combination of native, argmin, and NLopt policies can race together in a

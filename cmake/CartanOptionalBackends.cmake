@@ -5,51 +5,84 @@ set(CARTAN_ARGMIN_TARGET argmin::argmin)
 set(CARTAN_ARGMIN_REPOSITORY https://github.com/skrede/argmin.git)
 set(CARTAN_ARGMIN_REVISION 864d558c10d43337399d24f7c27cdfa0e5275475)
 
-set(CARTAN_NLOPT_TARGET nlopt)
+set(CARTAN_NLOPT_PACKAGE NLopt)
+set(CARTAN_NLOPT_TARGET NLopt::nlopt)
+set(CARTAN_NLOPT_REPOSITORY https://github.com/stevengj/nlopt.git)
+set(CARTAN_NLOPT_REVISION v2.10.1)
+
+macro(cartan_acquire_argmin)
+    if (CARTAN_ARGMIN_SOURCE_DIR)
+        FetchContent_Declare(argmin
+            SOURCE_DIR "${CARTAN_ARGMIN_SOURCE_DIR}"
+            EXCLUDE_FROM_ALL
+            SYSTEM
+        )
+        # A local checkout produces an in-tree target belonging to no export
+        # set, exactly as a fetch does; reporting it as found would carry an
+        # install-mode configure past the feasibility gate and into a raw
+        # generate-time failure.
+        set(CARTAN_ARGMIN_PROVIDER fetched)
+    else ()
+        find_package(${CARTAN_ARGMIN_PACKAGE} CONFIG QUIET)
+        if (TARGET ${CARTAN_ARGMIN_TARGET})
+            set(CARTAN_ARGMIN_PROVIDER found)
+        else ()
+            FetchContent_Declare(argmin
+                GIT_REPOSITORY ${CARTAN_ARGMIN_REPOSITORY}
+                GIT_TAG ${CARTAN_ARGMIN_REVISION}
+                EXCLUDE_FROM_ALL
+                SYSTEM
+            )
+            set(CARTAN_ARGMIN_PROVIDER fetched)
+        endif ()
+    endif ()
+    if (CARTAN_ARGMIN_PROVIDER STREQUAL "fetched")
+        block()
+            set(ARGMIN_BUILD_TESTS OFF)
+            set(ARGMIN_BUILD_EXAMPLES OFF)
+            set(ARGMIN_BUILD_BENCHMARKS OFF)
+            if (CARTAN_CMAKE_FETCH_DEPS AND NOT TARGET Eigen3::Eigen)
+                set(ARGMIN_CMAKE_FETCH_DEPS ON)
+            endif ()
+            FetchContent_MakeAvailable(argmin)
+        endblock()
+    endif ()
+endmacro()
+
+macro(cartan_acquire_nlopt)
+    find_package(${CARTAN_NLOPT_PACKAGE} CONFIG QUIET)
+    if (TARGET ${CARTAN_NLOPT_TARGET})
+        set(CARTAN_NLOPT_PROVIDER found)
+    else ()
+        FetchContent_Declare(nlopt
+            GIT_REPOSITORY ${CARTAN_NLOPT_REPOSITORY}
+            GIT_TAG ${CARTAN_NLOPT_REVISION}
+            EXCLUDE_FROM_ALL
+            SYSTEM
+        )
+        block()
+            set(NLOPT_PYTHON OFF)
+            set(NLOPT_OCTAVE OFF)
+            set(NLOPT_GUILE OFF)
+            set(NLOPT_TESTS OFF)
+            set(BUILD_SHARED_LIBS OFF)
+            FetchContent_MakeAvailable(nlopt)
+        endblock()
+        if (NOT TARGET ${CARTAN_NLOPT_TARGET})
+            add_library(${CARTAN_NLOPT_TARGET} ALIAS nlopt)
+        endif ()
+        set(CARTAN_NLOPT_PROVIDER fetched)
+    endif ()
+endmacro()
 
 macro(cartan_acquire_optional_backends)
     set(CARTAN_ARGMIN_PROVIDER absent)
     set(CARTAN_NLOPT_PROVIDER absent)
-    if (CARTAN_BUILD_NLOPT)
-        set(CARTAN_NLOPT_PROVIDER fetched)
-    endif ()
     if (CARTAN_BUILD_ARGMIN)
-        if (CARTAN_ARGMIN_SOURCE_DIR)
-            FetchContent_Declare(argmin
-                SOURCE_DIR "${CARTAN_ARGMIN_SOURCE_DIR}"
-                EXCLUDE_FROM_ALL
-                SYSTEM
-            )
-            # A local checkout produces an in-tree target belonging to no export
-            # set, exactly as a fetch does; reporting it as found would carry an
-            # install-mode configure past the feasibility gate and into a raw
-            # generate-time failure.
-            set(CARTAN_ARGMIN_PROVIDER fetched)
-        else ()
-            find_package(${CARTAN_ARGMIN_PACKAGE} CONFIG QUIET)
-            if (argmin_FOUND)
-                set(CARTAN_ARGMIN_PROVIDER found)
-            else ()
-                FetchContent_Declare(argmin
-                    GIT_REPOSITORY ${CARTAN_ARGMIN_REPOSITORY}
-                    GIT_TAG ${CARTAN_ARGMIN_REVISION}
-                    EXCLUDE_FROM_ALL
-                    SYSTEM
-                )
-                set(CARTAN_ARGMIN_PROVIDER fetched)
-            endif ()
-        endif ()
-        if (CARTAN_ARGMIN_PROVIDER STREQUAL "fetched")
-            block()
-                set(ARGMIN_BUILD_TESTS OFF)
-                set(ARGMIN_BUILD_EXAMPLES OFF)
-                set(ARGMIN_BUILD_BENCHMARKS OFF)
-                if (CARTAN_CMAKE_FETCH_DEPS AND NOT TARGET Eigen3::Eigen)
-                    set(ARGMIN_CMAKE_FETCH_DEPS ON)
-                endif ()
-                FetchContent_MakeAvailable(argmin)
-            endblock()
-        endif ()
+        cartan_acquire_argmin()
+    endif ()
+    if (CARTAN_BUILD_NLOPT)
+        cartan_acquire_nlopt()
     endif ()
 endmacro()
 

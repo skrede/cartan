@@ -23,20 +23,3 @@ if (CARTAN_ENABLE_INSTALL)
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     )
 endif ()
-
-# --- NLopt solver backend (optional) ---
-if (CARTAN_BUILD_NLOPT)
-    FetchContent_Declare(
-        nlopt
-        GIT_REPOSITORY https://github.com/stevengj/nlopt.git
-        GIT_TAG v2.10.1
-        EXCLUDE_FROM_ALL
-        SYSTEM
-    )
-    set(NLOPT_PYTHON OFF CACHE BOOL "" FORCE)
-    set(NLOPT_OCTAVE OFF CACHE BOOL "" FORCE)
-    set(NLOPT_GUILE OFF CACHE BOOL "" FORCE)
-    set(NLOPT_TESTS OFF CACHE BOOL "" FORCE)
-    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-    FetchContent_MakeAvailable(nlopt)
-endif ()
