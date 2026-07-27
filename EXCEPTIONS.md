@@ -2,16 +2,29 @@
 
 `CONVENTIONS.md` sets a hard ceiling of two hundred lines per file, counting every line. This is
 the complete list of the files that are over it and are sanctioned to stay that way, each with the
-reason. `tools/check_file_size.py` reads this file: an overage that is not listed here fails, and a
-row listed here whose file has dropped under the ceiling fails too. There is no in-code marker and
-there are no silent exceptions.
+reason. `tools/check_file_size.py` reads this file and fails four ways: on an overage nobody listed,
+on a row whose file has dropped under the ceiling or disappeared, on a listed file that has grown
+past the allowance its row records, and on a row claiming more lines than its file has. Each has its
+own exit code and message because each has a different fix. There is no in-code marker and there are
+no silent exceptions.
 
 If your new file is over the ceiling, the first answer is to decompose it. A row belongs here only
 when the file is a single cohesive whole that splitting would *harm* -- by scattering shared state
 across files, or by forcing an artificial-purity layer that adds indirection without separating a
-responsibility. A reason that restates the line count says nothing and is rejected by the checker.
-A reason that promises a future split does not belong either: this is a register of decisions
-taken, not a list of work outstanding.
+responsibility.
+
+The checker enforces the shape of that sentence rather than trusting it. A reason must **name what
+splitting this file would harm**; one that only asserts the file is large, or cohesive, or over the
+ceiling, is rejected. A reason that restates the file's own line count is rejected, because the
+count already has a column. A reason that promises a future split is rejected too: this registers
+decisions taken, not work outstanding. None of that can tell a true justification from a
+well-shaped false one -- only a reader can -- but it does refuse the reasons that say nothing, and
+those are the ones a register accumulates when nobody is looking.
+
+A malformed row is a **failure, not a skip**. Any table line the checker cannot read as a row stops
+the run and names the line, so a registration that would otherwise be silently ignored -- a path
+with a space in it, a path in backticks, a row missing its count -- cannot leave a contributor
+staring at an unregistered-overage error for a file they did register.
 
 ## Scope
 
@@ -45,6 +58,13 @@ to that recorded count plus ten per cent, rounded up, before the checker fails a
 column a grandfathered file could grow without limit while the gate stayed green, and the ceiling
 would be enforced only against files nobody had ever registered.
 
+The count is checked in both directions, because a column the gate trusts absolutely is a column
+anyone can widen. **A row may not record more lines than its file has.** Inflating the number would
+otherwise buy a file unlimited headroom in one character, inside a table where the eye has nothing
+to catch on; and refusing it means the recorded count follows a file *down* as it shrinks, so the
+allowance is always measured from the file's real length rather than from its high-water mark.
+A row whose count is too high is a distinct failure with its own message: re-record it downward.
+
 Ten per cent rather than nothing: a zero tolerance turns every incidental edit into a gate failure
 and teaches people to bump the number without reading it. When a legitimate change does exceed the
 allowance, re-record the count deliberately -- it is a one-line diff a reviewer can see -- or take
@@ -55,14 +75,14 @@ that as the signal to decompose the file.
 | Path | Lines at registration | Why splitting would harm |
 | --- | --- | --- |
 | lib/cartan-lie/include/cartan/expected.h | 1144 | a vocabulary type standing in for the standard one: storage, observers, monadic operations and the special member functions that keep them consistent; splitting a single type's interface from its storage is what the type exists to prevent |
-| lib/cartan-analytical/include/cartan/analytical/solver_6r.h | 763 | one closed-form derivation carried from the geometric decomposition through branch enumeration to the assembled solution set; each step is licensed by the geometric assumption the step above established, and a split would separate a step from its justification |
+| lib/cartan-analytical/include/cartan/analytical/solver_6r.h | 762 | one closed-form derivation carried from the geometric decomposition through branch enumeration to the assembled solution set; each step is licensed by the geometric assumption the step above established, and a split would separate a step from its justification |
 | lib/cartan-serial-chain/include/cartan/serial/ik/basic_ik_runner.h | 743 | the runner and its variadic multi-policy overloads are one class template; the policy pack is threaded through every member, so a split would repeat the pack expansion in each half |
-| lib/cartan-analytical/include/cartan/analytical/solver_opw.h | 736 | one closed-form derivation for the offset-wrist geometry, from the shoulder and elbow solution through the wrist branches and the sign conventions that pair them; the branch pairing is only correct read against the conventions established above it |
-| lib/cartan-serial-chain/include/cartan/serial/ik/solver/projected_lm.h | 675 | one solver class whose state, step and termination bookkeeping are read together; splitting it puts the invariant tying a step to its convergence test in one header and the state it reads in another |
+| lib/cartan-analytical/include/cartan/analytical/solver_opw.h | 736 | one closed-form derivation for the offset-wrist geometry, from the shoulder and elbow solution through the wrist branches and the sign conventions that pair them; splitting it would separate a branch from the conventions that make its pairing correct |
+| lib/cartan-serial-chain/include/cartan/serial/ik/solver/projected_lm.h | 676 | one solver class whose state, step and termination bookkeeping are read together; splitting it puts the invariant tying a step to its convergence test in one header and the state it reads in another |
 | lib/cartan-urdf/include/cartan/urdf/parser.h | 577 | one traversal over the document: the element handlers share the error accumulation and the name table they resolve against, and a split would hand both to every handler through an interface built for one caller |
 | lib/cartan-serial-chain/include/cartan/serial/ik/solver/argmin_slsqp.h | 570 | one solver class whose state, step and termination bookkeeping are read together; splitting it puts the invariant tying a step to its convergence test in one header and the state it reads in another |
 | lib/cartan-serial-chain/include/cartan/serial/fk/detail/axis_specializations.h | 475 | the per-axis specializations are one dispatch table; a split would scatter the joint tags across headers and make an unspecialized tag a link error rather than a compile error |
-| lib/cartan-urdf/include/cartan/urdf/build.h | 443 | one construction pass from a parsed model to a chain: the adjacency, the root search and the ordered walk are three views of the same index maps, built once and consumed in sequence |
+| lib/cartan-urdf/include/cartan/urdf/build.h | 443 | one construction pass from a parsed model to a chain: the adjacency, the root search and the ordered walk are three views of the same index maps, built once and consumed in sequence; splitting would rebuild those maps per fragment or export them |
 | lib/cartan-serial-chain/include/cartan/serial/ik/solver/argmin_projected_gn.h | 435 | one solver class whose state, step and termination bookkeeping are read together; splitting it puts the invariant tying a step to its convergence test in one header and the state it reads in another |
 | lib/cartan-serial-chain/include/cartan/serial/ik/solver/lbfgsb.h | 420 | one solver class whose state, step and termination bookkeeping are read together; splitting it puts the invariant tying a step to its convergence test in one header and the state it reads in another |
 | lib/cartan-serial-chain/include/cartan/serial/ik/solver/filter_slsqp.h | 415 | one solver class whose state, step and termination bookkeeping are read together; splitting it puts the invariant tying a step to its convergence test in one header and the state it reads in another |
@@ -74,10 +94,10 @@ that as the signal to decompose the file.
 | lib/cartan-analytical/include/cartan/analytical/solver_2r.h | 289 | one closed-form derivation for its chain class, from the geometric decomposition through the branch enumeration; a split would separate a solution branch from the geometric assumption that licenses it |
 | lib/cartan-serial-chain/include/cartan/serial/ik/solver/lm.h | 286 | one solver class whose state, step and termination bookkeeping are read together; splitting it puts the invariant tying a step to its convergence test in one header and the state it reads in another |
 | lib/cartan-serial-chain/include/cartan/serial/ik/solver/nlopt_slsqp.h | 285 | one solver class whose state, step and termination bookkeeping are read together; splitting it puts the invariant tying a step to its convergence test in one header and the state it reads in another |
-| lib/cartan-serial-chain/include/cartan/serial/ik/detail/nlopt_common.h | 282 | one adapter across a C optimizer boundary: the conversions in, the conversions out and the result mapping are a single round trip and only make sense read together |
-| lib/cartan-serial-chain/include/cartan/serial/ik/solver/dls.h | 281 | one solver class whose state, step and termination bookkeeping are read together; splitting it puts the invariant tying a step to its convergence test in one header and the state it reads in another |
+| lib/cartan-serial-chain/include/cartan/serial/ik/detail/nlopt_common.h | 282 | one adapter across a C optimizer boundary -- the conversions in, the conversions out and the result mapping are a single round trip; splitting it would separate a conversion from the inverse that has to agree with it |
+| lib/cartan-serial-chain/include/cartan/serial/ik/solver/dls.h | 274 | one solver class whose state, step and termination bookkeeping are read together; splitting it puts the invariant tying a step to its convergence test in one header and the state it reads in another |
 | lib/cartan-lie/include/cartan/lie/se2.h | 278 | one group type carrying its exponential, logarithm, adjoint and composition; these share the chart conventions and the small-angle cutoffs, which a split would either duplicate or expose |
-| lib/cartan-serial-chain/include/cartan/serial/fk/forward_kinematics.h | 274 | the product-of-exponentials walk with its static and dynamic chain overloads; the overloads share the accumulation order that fixes the frame convention |
+| lib/cartan-serial-chain/include/cartan/serial/fk/forward_kinematics.h | 274 | the product-of-exponentials walk with its static and dynamic chain overloads, which share the accumulation order that fixes the frame convention; splitting them would give the two overloads separate copies of that order to disagree over |
 | lib/cartan-serial-chain/include/cartan/serial/ik/detail/limit_enforcement.h | 267 | the joint-limit predicates and the canonicalization that repairs a solution share one definition of feasibility; splitting the test from the repair lets the two disagree about the same joint |
 | lib/cartan-serial-chain/include/cartan/serial/ik/ik_status.h | 263 | the status, objective, failure and termination enumerations with the message functions that render them; a reader adding a value has to touch the enumeration and its renderer together, and separating them is how the two drift apart |
 | lib/cartan-serial-chain/include/cartan/serial/ik/solver/mma.h | 261 | one solver class whose state, step and termination bookkeeping are read together; splitting it puts the invariant tying a step to its convergence test in one header and the state it reads in another |
@@ -93,64 +113,64 @@ that as the signal to decompose the file.
 | lib/cartan-serial-chain/include/cartan/serial/ik/solver/argmin_lbfgsb.h | 234 | one solver class whose state, step and termination bookkeeping are read together; splitting it puts the invariant tying a step to its convergence test in one header and the state it reads in another |
 | lib/cartan-serial-chain/include/cartan/serial/ik/solver/nw_sqp.h | 230 | one solver class whose state, step and termination bookkeeping are read together; splitting it puts the invariant tying a step to its convergence test in one header and the state it reads in another |
 | lib/cartan-lie/include/cartan/lie/se3.h | 228 | one group type carrying its exponential, logarithm, adjoint and composition; these share the chart conventions and the small-angle cutoffs, which a split would either duplicate or expose |
-| lib/cartan-analytical/include/cartan/analytical/solver_3r.h | 218 | one closed-form derivation for its chain class, from the geometric decomposition through the branch enumeration; a split would separate a solution branch from the geometric assumption that licenses it |
+| lib/cartan-analytical/include/cartan/analytical/solver_3r.h | 217 | one closed-form derivation for its chain class, from the geometric decomposition through the branch enumeration; a split would separate a solution branch from the geometric assumption that licenses it |
 
 ### Tests
 
 | Path | Lines at registration | Why splitting would harm |
 | --- | --- | --- |
 | tests/fixtures/chain_factories.h | 1484 | a table of robot definitions reached by name; the entries are independent, but a split would make every test track which robot lives in which header, and the tests are the audience |
-| tests/unit/analytical_solver_6r_test.cpp | 880 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/property/lie_group_axioms_test.cpp | 769 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/unit/so3_test.cpp | 615 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/unit/se2_test.cpp | 562 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/unit/se3_test.cpp | 513 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/unit/paden_kahan_test.cpp | 512 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/unit/variadic_solver_test.cpp | 483 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/boundary/solver_setup_boundary_test.cpp | 479 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/unit/static_chain_test.cpp | 469 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/unit/solver_semantics_test.cpp | 448 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/unit/restart_wrapper_test.cpp | 446 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/unit/ik_integration_test.cpp | 435 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/unit/solver_unit_count_test.cpp | 415 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/unit/ik_float_tolerance_sweep_test.cpp | 408 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/unit/jacobian_sweep_test.cpp | 402 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/boundary/axis_classification_test.cpp | 394 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/unit/specialized_fk_jacobian_test.cpp | 393 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/unit/static_chain_ik_parity_test.cpp | 372 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/unit/jacobian_test.cpp | 369 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/unit/analytical_solver_opw_test.cpp | 364 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/unit/so2_test.cpp | 364 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/unit/basic_ik_solver_test.cpp | 362 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/unit/projected_lm_test.cpp | 362 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
+| tests/unit/analytical_solver_6r_test.cpp | 880 | a case list over one subject whose fixtures, helpers and tolerance constants are declared once above the cases and used by all of them; splitting it duplicates that setup into each fragment, where the copies drift and two files then test against different fixtures |
+| tests/property/lie_group_axioms_test.cpp | 769 | a case list over one subject whose fixtures, helpers and tolerance constants are declared once above the cases and used by all of them; splitting it duplicates that setup into each fragment, where the copies drift and two files then test against different fixtures |
+| tests/unit/so3_test.cpp | 615 | a case list over one subject with no shared setup to scatter; the harm in splitting is to the reader, who would then have to know which fragment holds a behavior before being able to tell whether it is covered at all |
+| tests/unit/se2_test.cpp | 562 | a case list over one subject with no shared setup to scatter; the harm in splitting is to the reader, who would then have to know which fragment holds a behavior before being able to tell whether it is covered at all |
+| tests/unit/se3_test.cpp | 513 | a case list over one subject with no shared setup to scatter; the harm in splitting is to the reader, who would then have to know which fragment holds a behavior before being able to tell whether it is covered at all |
+| tests/unit/paden_kahan_test.cpp | 512 | a case list over one subject with no shared setup to scatter; the harm in splitting is to the reader, who would then have to know which fragment holds a behavior before being able to tell whether it is covered at all |
+| tests/unit/variadic_solver_test.cpp | 483 | a case list over one subject whose fixtures, helpers and tolerance constants are declared once above the cases and used by all of them; splitting it duplicates that setup into each fragment, where the copies drift and two files then test against different fixtures |
+| tests/boundary/solver_setup_boundary_test.cpp | 479 | a case list over one subject whose fixtures, helpers and tolerance constants are declared once above the cases and used by all of them; splitting it duplicates that setup into each fragment, where the copies drift and two files then test against different fixtures |
+| tests/unit/static_chain_test.cpp | 469 | a case list over one subject with no shared setup to scatter; the harm in splitting is to the reader, who would then have to know which fragment holds a behavior before being able to tell whether it is covered at all |
+| tests/unit/solver_semantics_test.cpp | 448 | a case list over one subject with no shared setup to scatter; the harm in splitting is to the reader, who would then have to know which fragment holds a behavior before being able to tell whether it is covered at all |
+| tests/unit/restart_wrapper_test.cpp | 446 | a case list over one subject whose fixtures, helpers and tolerance constants are declared once above the cases and used by all of them; splitting it duplicates that setup into each fragment, where the copies drift and two files then test against different fixtures |
+| tests/unit/ik_integration_test.cpp | 435 | a case list over one subject whose fixtures, helpers and tolerance constants are declared once above the cases and used by all of them; splitting it duplicates that setup into each fragment, where the copies drift and two files then test against different fixtures |
+| tests/unit/solver_unit_count_test.cpp | 415 | a case list over one subject whose fixtures, helpers and tolerance constants are declared once above the cases and used by all of them; splitting it duplicates that setup into each fragment, where the copies drift and two files then test against different fixtures |
+| tests/unit/ik_float_tolerance_sweep_test.cpp | 408 | a case list over one subject with no shared setup to scatter; the harm in splitting is to the reader, who would then have to know which fragment holds a behavior before being able to tell whether it is covered at all |
+| tests/unit/jacobian_sweep_test.cpp | 402 | a case list over one subject whose fixtures, helpers and tolerance constants are declared once above the cases and used by all of them; splitting it duplicates that setup into each fragment, where the copies drift and two files then test against different fixtures |
+| tests/boundary/axis_classification_test.cpp | 394 | a case list over one subject whose fixtures, helpers and tolerance constants are declared once above the cases and used by all of them; splitting it duplicates that setup into each fragment, where the copies drift and two files then test against different fixtures |
+| tests/unit/specialized_fk_jacobian_test.cpp | 393 | a case list over one subject whose fixtures, helpers and tolerance constants are declared once above the cases and used by all of them; splitting it duplicates that setup into each fragment, where the copies drift and two files then test against different fixtures |
+| tests/unit/static_chain_ik_parity_test.cpp | 372 | a case list over one subject whose fixtures, helpers and tolerance constants are declared once above the cases and used by all of them; splitting it duplicates that setup into each fragment, where the copies drift and two files then test against different fixtures |
+| tests/unit/jacobian_test.cpp | 369 | a case list over one subject whose fixtures, helpers and tolerance constants are declared once above the cases and used by all of them; splitting it duplicates that setup into each fragment, where the copies drift and two files then test against different fixtures |
+| tests/unit/analytical_solver_opw_test.cpp | 364 | a case list over one subject whose fixtures, helpers and tolerance constants are declared once above the cases and used by all of them; splitting it duplicates that setup into each fragment, where the copies drift and two files then test against different fixtures |
+| tests/unit/so2_test.cpp | 364 | a case list over one subject with no shared setup to scatter; the harm in splitting is to the reader, who would then have to know which fragment holds a behavior before being able to tell whether it is covered at all |
+| tests/unit/basic_ik_solver_test.cpp | 362 | a case list over one subject whose fixtures, helpers and tolerance constants are declared once above the cases and used by all of them; splitting it duplicates that setup into each fragment, where the copies drift and two files then test against different fixtures |
+| tests/unit/projected_lm_test.cpp | 362 | a case list over one subject whose fixtures, helpers and tolerance constants are declared once above the cases and used by all of them; splitting it duplicates that setup into each fragment, where the copies drift and two files then test against different fixtures |
 | tests/test_utils.h | 361 | a table of definitions reached by name; the entries are independent, and a split would move the count while making every test track which definition lives where |
-| tests/unit/urdf_chain_extractor_test.cpp | 348 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/unit/expected_test.cpp | 340 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/unit/exhaustive_ik_runner_test.cpp | 322 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/unit/screw_axis_test.cpp | 322 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/unit/twist_test.cpp | 321 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/unit/dls_test.cpp | 311 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/unit/quaternion_utils_test.cpp | 311 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/unit/se3_q_matrix_sweep_test.cpp | 300 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/unit/urdf_parser_test.cpp | 290 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/boundary/nonfinite_matrix_test.cpp | 274 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/unit/lbfgsb_test.cpp | 266 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/unit/continuous_joint_fallback_sweep.cpp | 261 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/unit/forward_kinematics_test.cpp | 260 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/unit/projected_lm_bit_identity_test.cpp | 258 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/unit/analytical_solver_2r_test.cpp | 252 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/unit/kinematic_chain_test.cpp | 251 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/unit/analytical_solver_3r_test.cpp | 249 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/embedded/esp32-bench/main/main.cpp | 238 | a firmware entry point: the fixed-size buffers, the serial transport and the measurement loop are allocated once at the top and read by everything below, and the target has no allocator to hand them around with |
-| tests/unit/unwrapped_solver_test.cpp | 233 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/embedded/esp32-smoke/main/main.cpp | 229 | a firmware entry point: the fixed-size buffers, the serial transport and the measurement loop are allocated once at the top and read by everything below, and the target has no allocator to hand them around with |
-| tests/unit/lm_test.cpp | 229 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
+| tests/unit/urdf_chain_extractor_test.cpp | 348 | a case list over one subject with no shared setup to scatter; the harm in splitting is to the reader, who would then have to know which fragment holds a behavior before being able to tell whether it is covered at all |
+| tests/unit/expected_test.cpp | 340 | a case list over one subject with no shared setup to scatter; the harm in splitting is to the reader, who would then have to know which fragment holds a behavior before being able to tell whether it is covered at all |
+| tests/unit/exhaustive_ik_runner_test.cpp | 322 | a case list over one subject with no shared setup to scatter; the harm in splitting is to the reader, who would then have to know which fragment holds a behavior before being able to tell whether it is covered at all |
+| tests/unit/screw_axis_test.cpp | 322 | a case list over one subject with no shared setup to scatter; the harm in splitting is to the reader, who would then have to know which fragment holds a behavior before being able to tell whether it is covered at all |
+| tests/unit/twist_test.cpp | 321 | a case list over one subject with no shared setup to scatter; the harm in splitting is to the reader, who would then have to know which fragment holds a behavior before being able to tell whether it is covered at all |
+| tests/unit/dls_test.cpp | 311 | a case list over one subject whose fixtures, helpers and tolerance constants are declared once above the cases and used by all of them; splitting it duplicates that setup into each fragment, where the copies drift and two files then test against different fixtures |
+| tests/unit/quaternion_utils_test.cpp | 311 | a case list over one subject with no shared setup to scatter; the harm in splitting is to the reader, who would then have to know which fragment holds a behavior before being able to tell whether it is covered at all |
+| tests/unit/se3_q_matrix_sweep_test.cpp | 300 | a case list over one subject whose fixtures, helpers and tolerance constants are declared once above the cases and used by all of them; splitting it duplicates that setup into each fragment, where the copies drift and two files then test against different fixtures |
+| tests/unit/urdf_parser_test.cpp | 290 | a case list over one subject with no shared setup to scatter; the harm in splitting is to the reader, who would then have to know which fragment holds a behavior before being able to tell whether it is covered at all |
+| tests/boundary/nonfinite_matrix_test.cpp | 274 | a case list over one subject whose fixtures, helpers and tolerance constants are declared once above the cases and used by all of them; splitting it duplicates that setup into each fragment, where the copies drift and two files then test against different fixtures |
+| tests/unit/lbfgsb_test.cpp | 266 | a case list over one subject whose fixtures, helpers and tolerance constants are declared once above the cases and used by all of them; splitting it duplicates that setup into each fragment, where the copies drift and two files then test against different fixtures |
+| tests/unit/continuous_joint_fallback_sweep.cpp | 261 | a case list over one subject whose fixtures, helpers and tolerance constants are declared once above the cases and used by all of them; splitting it duplicates that setup into each fragment, where the copies drift and two files then test against different fixtures |
+| tests/unit/forward_kinematics_test.cpp | 260 | a case list over one subject with no shared setup to scatter; the harm in splitting is to the reader, who would then have to know which fragment holds a behavior before being able to tell whether it is covered at all |
+| tests/unit/projected_lm_bit_identity_test.cpp | 258 | a case list over one subject whose fixtures, helpers and tolerance constants are declared once above the cases and used by all of them; splitting it duplicates that setup into each fragment, where the copies drift and two files then test against different fixtures |
+| tests/unit/analytical_solver_2r_test.cpp | 252 | a case list over one subject whose fixtures, helpers and tolerance constants are declared once above the cases and used by all of them; splitting it duplicates that setup into each fragment, where the copies drift and two files then test against different fixtures |
+| tests/unit/kinematic_chain_test.cpp | 251 | a case list over one subject with no shared setup to scatter; the harm in splitting is to the reader, who would then have to know which fragment holds a behavior before being able to tell whether it is covered at all |
+| tests/unit/analytical_solver_3r_test.cpp | 249 | a case list over one subject whose fixtures, helpers and tolerance constants are declared once above the cases and used by all of them; splitting it duplicates that setup into each fragment, where the copies drift and two files then test against different fixtures |
+| tests/embedded/esp32-bench/main/main.cpp | 238 | a firmware entry point whose fixed-size buffers, serial transport and measurement loop are set up once at the top and read by everything below; the target has no allocator, so splitting would mean exporting those buffers across translation units |
+| tests/unit/unwrapped_solver_test.cpp | 233 | a case list over one subject whose fixtures, helpers and tolerance constants are declared once above the cases and used by all of them; splitting it duplicates that setup into each fragment, where the copies drift and two files then test against different fixtures |
+| tests/embedded/esp32-smoke/main/main.cpp | 229 | a firmware entry point whose fixed-size buffers, serial transport and measurement loop are set up once at the top and read by everything below; the target has no allocator, so splitting would mean exporting those buffers across translation units |
+| tests/unit/lm_test.cpp | 229 | a case list over one subject whose fixtures, helpers and tolerance constants are declared once above the cases and used by all of them; splitting it duplicates that setup into each fragment, where the copies drift and two files then test against different fixtures |
 | tests/fixtures/analytical_chains.h | 228 | a table of definitions reached by name; the entries are independent, and a split would move the count while making every test track which definition lives where |
-| tests/unit/solver_factory_test.cpp | 225 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/unit/joint_limits_test.cpp | 219 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/unit/rotation_test.cpp | 216 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/unit/ik_sweep_test.cpp | 215 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
-| tests/unit/transform_test.cpp | 208 | a case count over one subject rather than a scope drawn too broad; the cases are independent and a split would move the count without separating a responsibility |
+| tests/unit/solver_factory_test.cpp | 225 | a case list over one subject whose fixtures, helpers and tolerance constants are declared once above the cases and used by all of them; splitting it duplicates that setup into each fragment, where the copies drift and two files then test against different fixtures |
+| tests/unit/joint_limits_test.cpp | 219 | a case list over one subject whose fixtures, helpers and tolerance constants are declared once above the cases and used by all of them; splitting it duplicates that setup into each fragment, where the copies drift and two files then test against different fixtures |
+| tests/unit/rotation_test.cpp | 216 | a case list over one subject whose fixtures, helpers and tolerance constants are declared once above the cases and used by all of them; splitting it duplicates that setup into each fragment, where the copies drift and two files then test against different fixtures |
+| tests/unit/ik_sweep_test.cpp | 215 | a case list over one subject whose fixtures, helpers and tolerance constants are declared once above the cases and used by all of them; splitting it duplicates that setup into each fragment, where the copies drift and two files then test against different fixtures |
+| tests/unit/transform_test.cpp | 208 | a case list over one subject whose fixtures, helpers and tolerance constants are declared once above the cases and used by all of them; splitting it duplicates that setup into each fragment, where the copies drift and two files then test against different fixtures |
 
 ### Benchmarks
 
@@ -161,7 +181,7 @@ that as the signal to decompose the file.
 | benchmarks/ik_comparison_pinocchio_benchmarks.cpp | 1153 | one benchmark family over a fixture built once at the top of the file and read by every case beneath it; a split would either duplicate the fixture or export it, and a duplicated fixture makes two runs incomparable |
 | benchmarks/fk_pinocchio_benchmarks.cpp | 886 | one benchmark family over a fixture built once at the top of the file and read by every case beneath it; a split would either duplicate the fixture or export it, and a duplicated fixture makes two runs incomparable |
 | benchmarks/ikgeo_comparison_benchmarks.cpp | 417 | one benchmark family over a fixture built once at the top of the file and read by every case beneath it; a split would either duplicate the fixture or export it, and a duplicated fixture makes two runs incomparable |
-| benchmarks/lie_group_benchmarks.cpp | 400 | one benchmark family over a fixture built once at the top of the file and read by every case beneath it; a split would either duplicate the fixture or export it, and a duplicated fixture makes two runs incomparable |
+| benchmarks/lie_group_benchmarks.cpp | 400 | the anti-hoisting protocol every case here depends on -- an input table indexed by the iteration counter so the optimizer cannot fold the operation under test -- is stated once above them; splitting would copy that rationale into each fragment, and a copy that drifts yields a case that times a constant |
 | benchmarks/opw_comparison_benchmarks.cpp | 398 | one benchmark family over a fixture built once at the top of the file and read by every case beneath it; a split would either duplicate the fixture or export it, and a duplicated fixture makes two runs incomparable |
 | benchmarks/ikfast_comparison_benchmarks.cpp | 365 | one benchmark family over a fixture built once at the top of the file and read by every case beneath it; a split would either duplicate the fixture or export it, and a duplicated fixture makes two runs incomparable |
 | benchmarks/benchmark_utils.h | 328 | the chain definitions for every compared library in one place, so a robot's cartan and external descriptions sit next to each other; splitting by library is how the two descriptions of one robot silently stop matching |
@@ -173,7 +193,7 @@ that as the signal to decompose the file.
 | benchmarks/slsqp_per_pose_trace.cpp | 258 | one benchmark family over a fixture built once at the top of the file and read by every case beneath it; a split would either duplicate the fixture or export it, and a duplicated fixture makes two runs incomparable |
 | benchmarks/nlopt_slsqp_per_pose_capture.cpp | 233 | one benchmark family over a fixture built once at the top of the file and read by every case beneath it; a split would either duplicate the fixture or export it, and a duplicated fixture makes two runs incomparable |
 | benchmarks/slsqp_per_pose_capture.cpp | 233 | one benchmark family over a fixture built once at the top of the file and read by every case beneath it; a split would either duplicate the fixture or export it, and a duplicated fixture makes two runs incomparable |
-| benchmarks/jacobian_benchmarks.cpp | 212 | one benchmark family over a fixture built once at the top of the file and read by every case beneath it; a split would either duplicate the fixture or export it, and a duplicated fixture makes two runs incomparable |
+| benchmarks/jacobian_benchmarks.cpp | 212 | the anti-hoisting protocol every case here depends on -- an input table indexed by the iteration counter so the optimizer cannot fold the operation under test -- is stated once above them; splitting would copy that rationale into each fragment, and a copy that drifts yields a case that times a constant |
 
 ### Examples
 
@@ -204,13 +224,26 @@ but not enforced.** No build and no check fails over it today, and this register
 
 What is measured: `.clang-tidy` carries `readability-function-size` with `LineThreshold` set to the
 same twenty-five, so a linter run with that check enabled reports every function over the ceiling.
-Run against all eighty-three translation units of a tests-and-URDF configuration, it produces **one hundred and
-forty-one distinct findings across fifty-four files, seventy-four of them inside `lib/`**, the
-longest single function being three hundred and thirty-two lines.
+Reproduce the figure below with exactly this, from the repository root -- a linter invoked from
+outside the checkout does not find this configuration, falls back to a built-in check set with no
+size threshold in it, and reports nothing while exiting zero:
 
-That figure is a floor, not a total. The configuration it came from compiles no optional solver
-backend, no benchmark, no binding, no example and not the profiling driver, so the functions in
-those areas are unmeasured. Nothing here should be read as a claim that the rest are clean.
+```
+cmake -S . -B <build> -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+      -DCARTAN_BUILD_TESTS=ON -DCARTAN_BUILD_URDF=ON -DCMAKE_BUILD_TYPE=Debug
+run-clang-tidy -p <build> -j2 -quiet -checks='-*,readability-function-size'
+```
+
+That database holds eighty-three translation units, all under `tests/`, and the run produces **one
+hundred and forty-one distinct findings across fifty-four files, seventy-four of them inside
+`lib/`**. The longest function *it reaches* is three hundred and thirty-two lines.
+
+That is a floor, not a total, and the superlative is a property of the configuration rather than of
+the tree. This configuration compiles no optional solver backend, no benchmark, no binding, no
+example and not the profiling driver, so functions in those areas are unmeasured -- and at least one
+of them is longer than anything above: the Python module's registration entry point,
+`python/src/bindings/analytical_bindings.cpp`, is a single function of four hundred and sixty-three
+lines. Nothing here should be read as a claim that the unmeasured areas are clean.
 
 What would change the status: the check moving into the linter's gated subset, with whatever
 grandfathering the full-tree count then turns out to need. Enabling it against this count in one

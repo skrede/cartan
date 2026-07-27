@@ -1,18 +1,13 @@
 #!/usr/bin/env python3
-"""Check every tracked C++ file against the file-size ceiling and its registry."""
+"""Check every tracked C++ file against the file-size ceiling and its register."""
 
 import argparse
-import re
 import subprocess
 import sys
 from pathlib import Path
 
-CEILING = 200
-GROWTH_NUMERATOR = 11
-GROWTH_DENOMINATOR = 10
-REGISTRY_NAME = "EXCEPTIONS.md"
-EXTENSIONS = frozenset({".h", ".hh", ".hpp", ".hxx", ".inl", ".ipp", ".c", ".cc", ".cpp", ".cxx"})
-EXCLUDED_PREFIXES = ("benchmarks/third_party/",)
+from size_rules import CEILING, REGISTRY_NAME, allowance, in_scope, parse_registry
+
 AREAS = ("lib", "tests", "benchmarks", "examples", "python", "profiling")
 
 EXIT_UNLISTED = 1
@@ -20,22 +15,18 @@ EXIT_STALE = 3
 EXIT_GROWTH = 4
 EXIT_REGISTRY = 5
 EXIT_NO_INPUT = 6
+EXIT_INFLATED = 7
 
 EXIT_HELP = """exit codes:
-  0  every overage is registered, every row is live, no registered file has grown past its allowance
-  1  a file is over the ceiling and unregistered -- decide: decompose it, or register it with a reason
-  3  a registered row is stale -- its file is at or under the ceiling, or is no longer tracked; delete the row
-  4  a registered file has grown past its recorded count plus the tolerance -- re-record the count or decompose
-  5  the registry is missing or a row is malformed
-  6  the scan found no files at all, which means the scope or the repository is wrong
+  0  every overage is registered and every row still describes its file
+  1  a file is over the ceiling and unregistered -- decompose it, or register it with a reason
+  2  the arguments are wrong (argparse)
+  3  a row is stale -- its file is under the ceiling or no longer exists; delete or correct the row
+  4  a registered file has grown past its recorded count plus the tolerance -- re-record or decompose
+  5  the register is missing, or a row is malformed and so cannot be checked
+  6  the scan could not read what it was asked to read: no files at all, or a tracked file absent
+  7  a row records more lines than its file has, which would buy the file unearned headroom
 """
-
-ROW_PATH = re.compile(r"^[A-Za-z0-9_./-]+\.[A-Za-z]+$")
-COUNT_IN_REASON = re.compile(r"\b\d+\s*(?:lines|-line)\b|\d{3,}")
-
-
-def in_scope(path: str) -> bool:
-    return Path(path).suffix in EXTENSIONS and not path.startswith(EXCLUDED_PREFIXES)
 
 
 def tracked_sources(root: Path) -> list[str]:
@@ -52,53 +43,15 @@ def line_count(path: Path) -> int:
     return text.count("\n") + (1 if text and not text.endswith("\n") else 0)
 
 
-def measure(root: Path, names: list[str]) -> dict[str, int]:
-    present = ((name, root / name) for name in names)
-    return {name: line_count(path) for name, path in present if path.is_file()}
-
-
-def split_row(line: str) -> list[str] | None:
-    stripped = line.strip()
-    if not stripped.startswith("|"):
-        return None
-    cells = [cell.strip() for cell in stripped.strip("|").split("|")]
-    return cells if cells and ROW_PATH.match(cells[0]) else None
-
-
-def row_fault(cells: list[str], number: int) -> str | None:
-    where = f"{REGISTRY_NAME} line {number}, {cells[0]}"
-    if len(cells) < 3:
-        return f"{where}: a row needs a path, a recorded line count and a reason"
-    if not in_scope(cells[0]):
-        return f"{where}: the path is outside the checked scope"
-    if not cells[1].isdigit():
-        return f"{where}: the recorded count column is not a number"
-    if not cells[2]:
-        return f"{where}: the reason is empty, which is a silent exception with extra steps"
-    if COUNT_IN_REASON.search(cells[2]):
-        return f"{where}: the reason restates a line count instead of saying what a split would harm"
-    return None
-
-
-def parse_registry(text: str) -> tuple[dict[str, int], list[str]]:
-    recorded: dict[str, int] = {}
-    faults: list[str] = []
-    for number, line in enumerate(text.splitlines(), 1):
-        cells = split_row(line)
-        if cells is None:
-            continue
-        fault = row_fault(cells, number)
-        if fault is not None:
-            faults.append(fault)
-        elif cells[0] in recorded:
-            faults.append(f"{REGISTRY_NAME} line {number}, {cells[0]}: the path is registered twice")
+def measure(root: Path, names: list[str]) -> tuple[dict[str, int], list[str]]:
+    counts, absent = {}, []
+    for name in names:
+        path = root / name
+        if path.is_file():
+            counts[name] = line_count(path)
         else:
-            recorded[cells[0]] = int(cells[1])
-    return recorded, faults
-
-
-def allowance(recorded: int) -> int:
-    return (recorded * GROWTH_NUMERATOR + GROWTH_DENOMINATOR - 1) // GROWTH_DENOMINATOR
+            absent.append(name)
+    return counts, absent
 
 
 def area_key(path: str, count: int) -> tuple[int, int, str]:
@@ -121,51 +74,60 @@ def report(messages) -> None:
 def stale_reason(path: str, counts: dict[str, int]) -> str:
     if path in counts:
         return f"it is now {counts[path]} lines, at or under the {CEILING}-line ceiling"
-    return "its file is no longer tracked in the checked scope"
+    return "no tracked file has that path; delete the row, or correct it if the file was renamed"
 
 
 def check(counts: dict[str, int], recorded: dict[str, int]) -> int:
     over = {path: count for path, count in counts.items() if count > CEILING}
-    unlisted = sorted(path for path in over if path not in recorded)
-    stale = sorted(path for path in recorded if path not in over)
-    grown = sorted(path for path in recorded if path in over and over[path] > allowance(recorded[path]))
-    report(f"{path} is {counts[path]} lines, over the {CEILING}-line ceiling, and is not "
-           f"registered in {REGISTRY_NAME}" for path in unlisted)
-    report(f"the {REGISTRY_NAME} row for {path} is stale: {stale_reason(path, counts)}"
-           for path in stale)
-    report(f"{path} has grown to {counts[path]} lines from the {recorded[path]} recorded in "
-           f"{REGISTRY_NAME}, past its allowance of {allowance(recorded[path])}" for path in grown)
-    if unlisted:
-        return EXIT_UNLISTED
-    if stale:
-        return EXIT_STALE
-    return EXIT_GROWTH if grown else 0
+    live = [path for path in sorted(recorded) if path in over]
+    findings = [
+        (EXIT_UNLISTED, [f"{p} is {counts[p]} lines, over the {CEILING}-line ceiling, and is not "
+                         f"registered in {REGISTRY_NAME}" for p in sorted(over) if p not in recorded]),
+        (EXIT_STALE, [f"the {REGISTRY_NAME} row for {p} is stale: {stale_reason(p, counts)}"
+                      for p in sorted(recorded) if p not in over]),
+        (EXIT_GROWTH, [f"{p} has grown to {over[p]} lines from the {recorded[p]} recorded in "
+                       f"{REGISTRY_NAME}, past its allowance of {allowance(recorded[p])}"
+                       for p in live if over[p] > allowance(recorded[p])]),
+        (EXIT_INFLATED, [f"the {REGISTRY_NAME} row for {p} records {recorded[p]} lines but the file "
+                         f"is {over[p]}; re-record it down so the allowance tracks the file"
+                         for p in live if recorded[p] > over[p]]),
+    ]
+    for _, messages in findings:
+        report(messages)
+    return next((code for code, messages in findings if messages), 0)
 
 
-def load_registry(registry: Path) -> tuple[dict[str, int], int]:
+def load_registry(registry: Path, counts: dict[str, int]) -> tuple[dict[str, int], int]:
     if not registry.is_file():
-        print(f"error: the registry {registry} does not exist", file=sys.stderr)
+        print(f"error: the register {registry} does not exist", file=sys.stderr)
         return {}, EXIT_REGISTRY
-    recorded, faults = parse_registry(registry.read_text(encoding="utf-8"))
+    recorded, faults = parse_registry(registry.read_text(encoding="utf-8"), counts)
     report(faults)
     return recorded, EXIT_REGISTRY if faults else 0
 
 
-def run(args: argparse.Namespace) -> int:
-    root = args.source_root
+def scan(root: Path) -> tuple[dict[str, int], int]:
     try:
         names = tracked_sources(root)
     except (OSError, subprocess.CalledProcessError) as exc:
         print(f"error: cannot list the tracked files under {root}: {exc}", file=sys.stderr)
-        return EXIT_NO_INPUT
-    counts = measure(root, names)
+        return {}, EXIT_NO_INPUT
+    counts, absent = measure(root, names)
+    report(f"{path} is tracked but absent from the working tree, so its length cannot be measured; "
+           "restore it, or remove it from the index" for path in absent)
     if not counts:
         print(f"error: no tracked C++ file was found under {root}", file=sys.stderr)
-        return EXIT_NO_INPUT
+    return counts, EXIT_NO_INPUT if absent or not counts else 0
+
+
+def run(args: argparse.Namespace) -> int:
+    counts, failure = scan(args.source_root)
+    if failure:
+        return failure
     if args.print_overages:
         print_overages(counts)
         return 0
-    recorded, failure = load_registry(args.registry or root / REGISTRY_NAME)
+    recorded, failure = load_registry(args.registry or args.source_root / REGISTRY_NAME, counts)
     if failure:
         return failure
     status = check(counts, recorded)
@@ -177,16 +139,16 @@ def run(args: argparse.Namespace) -> int:
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Check every tracked C++ file against the file-size ceiling and its registry.",
+        description="Check every tracked C++ file against the file-size ceiling and its register.",
         epilog=EXIT_HELP,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--source-root", type=Path, default=Path("."),
                         help="repository root to check (default: the current directory)")
     parser.add_argument("--registry", type=Path, default=None,
-                        help=f"registry to read (default: {REGISTRY_NAME} under the source root)")
+                        help=f"register to read (default: {REGISTRY_NAME} under the source root)")
     parser.add_argument("--print-overages", action="store_true",
-                        help="print the current overage set as registry rows, write nothing, and exit 0")
+                        help="print the current overage set as register rows, write nothing, exit 0")
     return parser.parse_args(argv)
 
 
