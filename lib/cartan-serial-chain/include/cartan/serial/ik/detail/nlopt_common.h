@@ -82,8 +82,8 @@ void set_nlopt_bounds(
     for (int i = 0; i < n; ++i)
     {
         auto idx = static_cast<std::size_t>(i);
-        lb[idx] = static_cast<double>(limits[idx].position_min);
-        ub[idx] = static_cast<double>(limits[idx].position_max);
+        lb[idx] = static_cast<double>(limits[idx].position_min());
+        ub[idx] = static_cast<double>(limits[idx].position_max());
     }
     opt.set_lower_bounds(lb);
     opt.set_upper_bounds(ub);
@@ -192,13 +192,13 @@ void perturb_nlopt_solution(
     {
         auto idx = static_cast<std::size_t>(i);
         double range = static_cast<double>(
-            limits[idx].position_max - limits[idx].position_min);
+            limits[idx].position_max() - limits[idx].position_min());
         double perturbation = dist(rng) *
             static_cast<double>(restart_scale) * range;
         x[idx] = std::clamp(
             x[idx] + perturbation,
-            static_cast<double>(limits[idx].position_min),
-            static_cast<double>(limits[idx].position_max));
+            static_cast<double>(limits[idx].position_min()),
+            static_cast<double>(limits[idx].position_max()));
     }
 }
 
@@ -235,7 +235,7 @@ Scalar compute_body_error_norm(
     const std::vector<double>& x)
 {
     auto q = stdvec_to_eigen<Scalar, N>(x);
-    auto fk = forward_kinematics(chain, q);
+    auto fk = forward_kinematics_unchecked(chain, q);
     auto V_b = (target.inverse() * fk.end_effector).log();
     return V_b.norm();
 }
@@ -249,7 +249,7 @@ bool check_nlopt_convergence(
     const std::vector<double>& x)
 {
     auto q = stdvec_to_eigen<Scalar, N>(x);
-    auto fk = forward_kinematics(chain, q);
+    auto fk = forward_kinematics_unchecked(chain, q);
     auto V_b = (target.inverse() * fk.end_effector).log();
 
     Scalar angular_err = V_b.template head<3>().norm();

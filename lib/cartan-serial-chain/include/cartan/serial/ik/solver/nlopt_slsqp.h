@@ -19,6 +19,7 @@
 #include "cartan/serial/ik/concepts/solve_concept.h"
 #include "cartan/serial/ik/solver/detail/analytical_gradient.h"
 #include "cartan/serial/ik/detail/nlopt_common.h"
+#include "cartan/serial/ik/detail/setup_validation.h"
 
 #include "cartan/lie/se3.h"
 #include "cartan/serial/chain/joint_state.h"
@@ -80,6 +81,15 @@ public:
         const position_type& q0,
         const convergence_criteria<scalar_type>& criteria)
     {
+        // The one check the iteration loop below is entitled to assume. Latching
+        // its failure into the status member is how a void setup() reports:
+        // the loop's running guard then refuses to run.
+        if (auto held = cartan::detail::validate_solve_inputs(chain, target, q0); !held)
+        {
+            m_status = held.error();
+            return;
+        }
+
         m_chain = &chain;
         m_target = target;
         m_criteria = criteria;
@@ -258,7 +268,7 @@ private:
     int m_eval_count{};
     int m_restart_count{};
     std::uint64_t m_objective_calls{};
-    ik_status m_status{ik_status::running};
+    ik_status m_status{ik_status::not_initialized};
     std::mt19937 m_rng{0};
 };
 

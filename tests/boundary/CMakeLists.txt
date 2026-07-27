@@ -65,6 +65,7 @@ cartan_add_boundary_test(velocity_boundary_test velocity_boundary_test.cpp)
 cartan_add_boundary_test(velocity_shape_boundary_test velocity_shape_boundary_test.cpp)
 cartan_add_boundary_test(fk_boundary_test fk_boundary_test.cpp)
 cartan_add_boundary_test(jacobian_boundary_test jacobian_boundary_test.cpp)
+cartan_add_boundary_test(solver_setup_boundary_test solver_setup_boundary_test.cpp)
 
 # The tag/axis and classification cells are wrong-value cells with no sanitizer
 # signature, and their demonstrations construct no group element from nonfinite
@@ -114,7 +115,8 @@ unset(CMAKE_REQUIRED_FLAGS)
 # the behavior under demonstration can be observed.
 if (CARTAN_BOUNDARY_ASSERTIONS_OFF)
     foreach (differential IN ITEMS velocity_unchecked_differential_test
-            fk_unchecked_differential_test jacobian_unchecked_differential_test)
+            fk_unchecked_differential_test jacobian_unchecked_differential_test
+            solver_setup_unchecked_differential_test)
         cartan_add_boundary_test(${differential} ${differential}.cpp)
         set_property(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" APPEND
             PROPERTY cartan_boundary_differential "${differential}")
@@ -313,5 +315,5 @@ target_compile_definitions(boundary_evidence_guard PRIVATE
     CARTAN_REGISTERED_EVIDENCE_TESTS=${cartan_boundary_evidence_tests}
     CARTAN_EXPECTED_EVIDENCE_TESTS=21
     CARTAN_REGISTERED_DIFFERENTIAL_TESTS=${cartan_boundary_differential_tests}
-    CARTAN_EXPECTED_DIFFERENTIAL_TESTS=3)
+    CARTAN_EXPECTED_DIFFERENTIAL_TESTS=4)
 add_test(NAME boundary_evidence_registration COMMAND boundary_evidence_guard)

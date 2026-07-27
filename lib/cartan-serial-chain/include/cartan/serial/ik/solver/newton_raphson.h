@@ -16,6 +16,7 @@
 #include "cartan/serial/ik/solver/detail/analytical_gradient.h"
 #include "cartan/serial/ik/detail/convergence.h"
 #include "cartan/serial/ik/detail/stall_detection.h"
+#include "cartan/serial/ik/detail/setup_validation.h"
 #include "cartan/serial/ik/detail/limit_enforcement.h"
 
 #include "cartan/lie/se3.h"
@@ -82,6 +83,15 @@ public:
         const convergence_criteria<scalar_type>& criteria,
         const error_weight<scalar_type>& weight)
     {
+        // The one check the iteration loop below is entitled to assume. Latching
+        // its failure into the status member is how a void setup() reports:
+        // the loop's running guard then refuses to run.
+        if (auto held = cartan::detail::validate_solve_inputs(chain, target, q0); !held)
+        {
+            m_status = held.error();
+            return;
+        }
+
         m_target = target;
         m_q = q0;
         m_criteria = criteria;
@@ -99,8 +109,8 @@ public:
         }
         for (int i = 0; i < n; ++i)
         {
-            m_lower(i) = chain.limits()[static_cast<std::size_t>(i)].position_min;
-            m_upper(i) = chain.limits()[static_cast<std::size_t>(i)].position_max;
+            m_lower(i) = chain.limits()[static_cast<std::size_t>(i)].position_min();
+            m_upper(i) = chain.limits()[static_cast<std::size_t>(i)].position_max();
         }
 
         m_q = m_q.cwiseMax(m_lower).cwiseMin(m_upper);
@@ -140,8 +150,8 @@ public:
                 break;
             }
 
-            auto fk = forward_kinematics(chain, m_q);
-            auto J_b = body_jacobian(chain, fk);
+            auto fk = forward_kinematics_unchecked(chain, m_q);
+            auto J_b = body_jacobian_unchecked(chain, fk);
             int n = static_cast<int>(J_b.cols());
 
             auto H = (J_b.transpose() * J_b).eval();
@@ -217,7 +227,7 @@ private:
     scalar_type m_error_norm{std::numeric_limits<scalar_type>::max()};
     int m_iterations{};
     int m_stall_count{};
-    ik_status m_status{ik_status::running};
+    ik_status m_status{ik_status::not_initialized};
 };
 
 }

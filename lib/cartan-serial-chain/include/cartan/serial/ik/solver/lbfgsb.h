@@ -20,6 +20,7 @@
 #include "cartan/serial/ik/solver/detail/analytical_gradient.h"
 #include "cartan/serial/ik/detail/convergence.h"
 #include "cartan/serial/ik/detail/stall_detection.h"
+#include "cartan/serial/ik/detail/setup_validation.h"
 #include "cartan/serial/ik/detail/limit_enforcement.h"
 
 #include "cartan/lie/se3.h"
@@ -96,6 +97,15 @@ public:
         const convergence_criteria<scalar_type>& criteria,
         const error_weight<scalar_type>& weight)
     {
+        // The one check the iteration loop below is entitled to assume. Latching
+        // its failure into the status member is how a void setup() reports:
+        // the loop's running guard then refuses to run.
+        if (auto held = cartan::detail::validate_solve_inputs(chain, target, q0); !held)
+        {
+            m_status = held.error();
+            return;
+        }
+
         m_target = target;
         m_q = q0;
         m_criteria = criteria;
@@ -110,8 +120,8 @@ public:
         m_upper.resize(n);
         for (std::size_t i = 0; i < static_cast<std::size_t>(n); ++i)
         {
-            m_lower(static_cast<int>(i)) = chain.limits()[i].position_min;
-            m_upper(static_cast<int>(i)) = chain.limits()[i].position_max;
+            m_lower(static_cast<int>(i)) = chain.limits()[i].position_min();
+            m_upper(static_cast<int>(i)) = chain.limits()[i].position_max();
         }
 
         m_q = m_q.cwiseMax(m_lower).cwiseMin(m_upper);
@@ -386,7 +396,7 @@ private:
     scalar_type m_f{};
     scalar_type m_gamma{scalar_type(1)};
     int m_iterations{};
-    ik_status m_status{ik_status::running};
+    ik_status m_status{ik_status::not_initialized};
 };
 
 #ifndef CARTAN_BUILD_ARGMIN

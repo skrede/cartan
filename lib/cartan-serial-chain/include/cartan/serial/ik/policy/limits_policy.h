@@ -60,8 +60,8 @@ struct clamp_limits
         {
             q(i) = std::clamp(
                 q(i),
-                limits[static_cast<std::size_t>(i)].position_min,
-                limits[static_cast<std::size_t>(i)].position_max);
+                limits[static_cast<std::size_t>(i)].position_min(),
+                limits[static_cast<std::size_t>(i)].position_max());
         }
     }
 };
@@ -116,10 +116,10 @@ struct null_space_limits
 
         for (int i = 0; i < n; ++i)
         {
-            Scalar q_mid = (limits[static_cast<std::size_t>(i)].position_min
-                          + limits[static_cast<std::size_t>(i)].position_max) / Scalar(2);
-            Scalar q_range = limits[static_cast<std::size_t>(i)].position_max
-                           - limits[static_cast<std::size_t>(i)].position_min;
+            Scalar q_mid = (limits[static_cast<std::size_t>(i)].position_min()
+                          + limits[static_cast<std::size_t>(i)].position_max()) / Scalar(2);
+            Scalar q_range = limits[static_cast<std::size_t>(i)].position_max()
+                           - limits[static_cast<std::size_t>(i)].position_min();
             // Unbounded angular joints have no meaningful midpoint or range
             // for null-space centering. Skip their contribution by writing
             // zero into the per-joint slot; the surrounding accumulator and

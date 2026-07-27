@@ -29,6 +29,14 @@ bool verify_analytical_solution(
 {
     using Scalar = typename Chain::scalar_type;
 
+    // First, and not left to the comparisons below. A nonfinite candidate makes
+    // the position comparison false, which reads as "inside tolerance", so the
+    // candidate is admitted whenever the orientation check is off -- and one
+    // solver passes that flag off unconditionally. A guard whose effectiveness
+    // depends on a caller's flag is not a guard.
+    if (!q.allFinite())
+        return false;
+
     auto fk = [&]
     {
         if constexpr (Chain::joints == N)
@@ -49,12 +57,18 @@ bool verify_analytical_solution(
         }
     }();
 
-    Scalar position_error = (fk.end_effector.translation() - target.translation()).norm();
+    // The branch above is taken exactly when the chain's joint count differs
+    // from the solver's, so the checked entry point is what turns that into a
+    // typed refusal instead of a read past the vector.
+    if (!fk)
+        return false;
+
+    Scalar position_error = (fk->end_effector.translation() - target.translation()).norm();
     if (position_error >= position_tolerance)
         return false;
     if (!check_orientation)
         return true;
-    Scalar orientation_error = (fk.end_effector.rotation().inverse() * target.rotation()).log().norm();
+    Scalar orientation_error = (fk->end_effector.rotation().inverse() * target.rotation()).log().norm();
     return orientation_error < orientation_tolerance;
 }
 

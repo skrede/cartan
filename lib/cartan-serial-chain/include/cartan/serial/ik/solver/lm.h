@@ -18,6 +18,7 @@
 #include "cartan/serial/ik/concepts/solve_concept.h"
 #include "cartan/serial/ik/detail/convergence.h"
 #include "cartan/serial/ik/detail/stall_detection.h"
+#include "cartan/serial/ik/detail/setup_validation.h"
 #include "cartan/serial/ik/detail/limit_enforcement.h"
 
 #include "cartan/lie/se3.h"
@@ -77,6 +78,15 @@ public:
         const position_type& q0,
         const convergence_criteria<scalar_type>& criteria)
     {
+        // The one check the iteration loop below is entitled to assume. Latching
+        // its failure into the status member is how a void setup() reports:
+        // the loop's running guard then refuses to run.
+        if (auto held = cartan::detail::validate_solve_inputs(chain, target, q0); !held)
+        {
+            m_status = held.error();
+            return;
+        }
+
         m_target = target;
         m_q = q0;
         m_criteria = criteria;
@@ -85,12 +95,12 @@ public:
         m_nu = scalar_type(2);
         m_error_history.clear();
 
-        auto fk = forward_kinematics(chain, m_q);
+        auto fk = forward_kinematics_unchecked(chain, m_q);
         m_V_b = (fk.end_effector.inverse() * m_target).log();
         m_error_norm = m_V_b.norm();
         m_initial_error = m_error_norm;
 
-        auto J_b = body_jacobian(chain, fk);
+        auto J_b = body_jacobian_unchecked(chain, fk);
         int n = static_cast<int>(J_b.cols());
         auto JtJ = (J_b.transpose() * J_b).eval();
         scalar_type max_diag{0};
@@ -110,7 +120,7 @@ public:
         int units = 0;
         while (units < N && m_status == ik_status::running)
         {
-            auto fk = forward_kinematics(chain, m_q);
+            auto fk = forward_kinematics_unchecked(chain, m_q);
             m_V_b = (fk.end_effector.inverse() * m_target).log();
 
             if (cartan::detail::is_converged_unweighted(m_V_b, m_criteria))
@@ -138,7 +148,7 @@ public:
                 break;
             }
 
-            auto J_b = body_jacobian(chain, fk);
+            auto J_b = body_jacobian_unchecked(chain, fk);
             int n = static_cast<int>(J_b.cols());
 
             auto H = (J_b.transpose() * J_b).eval();
@@ -174,7 +184,7 @@ public:
             }
 
             position_type q_trial = m_q + dq;
-            auto fk_trial = forward_kinematics(chain, q_trial);
+            auto fk_trial = forward_kinematics_unchecked(chain, q_trial);
             auto V_b_trial = (fk_trial.end_effector.inverse() * m_target).log();
             const bool accepted = evaluate_gain_and_update_damping(dq, g, q_trial, V_b_trial);
 
@@ -255,7 +265,7 @@ private:
     scalar_type m_lambda{};
     scalar_type m_nu{scalar_type(2)};
     int m_iterations{};
-    ik_status m_status{ik_status::running};
+    ik_status m_status{ik_status::not_initialized};
 };
 
 #ifndef CARTAN_BUILD_ARGMIN

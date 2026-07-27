@@ -10,13 +10,38 @@ namespace cartan
 {
 
 /// Failure modes for the analytical IK solvers.
+///
+/// `non_finite_input` carries the same name here as on the chain and
+/// inverse-kinematics failure enums, because it names the same defect: a NaN or
+/// an infinity crossing a boundary that has no answer for one.
 enum class analytical_failure
 {
     unreachable,             ///< Target lies outside the mechanism's workspace.
     degenerate_geometry,     ///< Joint geometry violates a subproblem precondition (e.g. parallel axes where intersection is required).
     singular_configuration,  ///< Mechanism is at a kinematic singularity for the requested target.
-    verification_failed      ///< Candidate solutions exist but none survived the FK back-check.
+    verification_failed,     ///< Candidate solutions exist but none survived the FK back-check.
+    non_finite_input         ///< An input or candidate joint value is NaN or infinite.
 };
+
+/// Human-readable diagnostic for an analytical_failure, for logging and binding
+/// exception messages. Returns a static string literal; no allocation.
+constexpr const char* message(analytical_failure failure)
+{
+    switch (failure)
+    {
+    case analytical_failure::unreachable:
+        return "Target lies outside the mechanism's workspace";
+    case analytical_failure::degenerate_geometry:
+        return "Joint geometry violates a subproblem precondition";
+    case analytical_failure::singular_configuration:
+        return "Mechanism is at a kinematic singularity for the requested target";
+    case analytical_failure::verification_failed:
+        return "No candidate solution survived the forward-kinematics back-check";
+    case analytical_failure::non_finite_input:
+        return "Input contains a NaN or infinite component";
+    }
+    return "Unknown analytical_failure";
+}
 
 /// Failure diagnostic for analytical solvers. `reason` names the failure mode;
 /// `workspace_distance` is the magnitude (in the chain's linear unit) by which

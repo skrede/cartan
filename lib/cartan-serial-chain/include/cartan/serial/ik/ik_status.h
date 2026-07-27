@@ -13,6 +13,12 @@ namespace cartan
 
 /// Status returned by each IK stepper step() call.
 /// Stepper is running until it converges, hits a limit, or fails.
+///
+/// The last three are terminal before any iteration runs. A solver starts in
+/// `not_initialized` so a caller that never calls setup() cannot enter the work
+/// loop with a default-constructed joint vector, and setup() latches one of the
+/// other two when its precondition fails, because every setup() returns void
+/// and has no other way to report.
 enum class ik_status
 {
     running,
@@ -20,8 +26,39 @@ enum class ik_status
     diverged,
     stalled,
     joint_limit_hit,
-    iteration_limit
+    iteration_limit,
+    not_initialized,
+    dimension_mismatch,
+    non_finite_input
 };
+
+/// Human-readable diagnostic for an ik_status, for logging and binding
+/// exception messages. Returns a static string literal; no allocation.
+constexpr const char* message(ik_status status)
+{
+    switch (status)
+    {
+    case ik_status::running:
+        return "Solver is running";
+    case ik_status::converged:
+        return "Solver converged within the requested tolerances";
+    case ik_status::diverged:
+        return "Solver diverged";
+    case ik_status::stalled:
+        return "Solver stopped making progress";
+    case ik_status::joint_limit_hit:
+        return "Solution lies outside the joint limits";
+    case ik_status::iteration_limit:
+        return "Iteration budget exhausted before convergence";
+    case ik_status::not_initialized:
+        return "Solver was stepped before setup";
+    case ik_status::dimension_mismatch:
+        return "Seed joint vector length does not match the chain's joint count";
+    case ik_status::non_finite_input:
+        return "Seed joint vector or target pose contains a NaN or infinite component";
+    }
+    return "Unknown ik_status";
+}
 
 /// Objective for the IK solve -- controls secondary optimization.
 enum class ik_objective
@@ -33,6 +70,10 @@ enum class ik_objective
 };
 
 /// Failure reason reported in ik_error when solve does not converge.
+///
+/// The three setup-precondition reasons share their names with the terminal
+/// `ik_status` values the solver latches, and the runner maps one onto the other
+/// where it builds the error.
 enum class ik_failure
 {
     unreachable,
@@ -41,8 +82,38 @@ enum class ik_failure
     iteration_limit,
     joint_limit_violation,
     aborted,
-    not_initialized
+    not_initialized,
+    dimension_mismatch,
+    non_finite_input
 };
+
+/// Human-readable diagnostic for an ik_failure, for logging and binding
+/// exception messages. Returns a static string literal; no allocation.
+constexpr const char* message(ik_failure failure)
+{
+    switch (failure)
+    {
+    case ik_failure::unreachable:
+        return "Target lies outside the reachable workspace";
+    case ik_failure::diverged:
+        return "Solver diverged";
+    case ik_failure::stalled:
+        return "Solver stopped making progress";
+    case ik_failure::iteration_limit:
+        return "Iteration budget exhausted before convergence";
+    case ik_failure::joint_limit_violation:
+        return "Solution lies outside the joint limits";
+    case ik_failure::aborted:
+        return "Solve was aborted by the caller";
+    case ik_failure::not_initialized:
+        return "Solve was requested before setup";
+    case ik_failure::dimension_mismatch:
+        return "Seed joint vector length does not match the chain's joint count";
+    case ik_failure::non_finite_input:
+        return "Seed joint vector or target pose contains a NaN or infinite component";
+    }
+    return "Unknown ik_failure";
+}
 
 /// Fine-grained termination reason reported by individual solve policies.
 ///

@@ -15,6 +15,7 @@
 #include "cartan/serial/ik/ik_status.h"
 #include "cartan/serial/ik/policy/error_weight.h"
 #include "cartan/serial/ik/concepts/solve_concept.h"
+#include "cartan/serial/ik/detail/setup_validation.h"
 #include "cartan/serial/ik/detail/limit_enforcement.h"
 #include "cartan/serial/ik/solver/detail/halton_seed_generator.h"
 #include "cartan/serial/ik/solver/projected_lm.h"
@@ -118,6 +119,16 @@ public:
         m_best_valid = false;
         m_aborted = false;
 
+        // Assigned on both outcomes, not only on failure: a wrapper is reusable,
+        // and a latch written only when the check fails would report the stale
+        // rejection for every later solve.
+        auto held = cartan::detail::validate_solve_inputs(chain, target, q0);
+        m_precondition = held ? ik_status::running : held.error();
+        if (!held)
+        {
+            return;
+        }
+
         m_inner.setup(chain, target, q0, criteria);
     }
 
@@ -141,6 +152,13 @@ public:
         m_best_feasible = false;
         m_best_valid = false;
         m_aborted = false;
+
+        auto held = cartan::detail::validate_solve_inputs(chain, target, q0);
+        m_precondition = held ? ik_status::running : held.error();
+        if (!held)
+        {
+            return;
+        }
 
         if constexpr (requires { m_inner.setup(chain, target, q0, criteria, weight); })
         {
@@ -173,6 +191,13 @@ public:
 
     step_result<scalar_type> step(const Chain& chain, int N)
     {
+        // A wrapper-level rejection never reached the inner solver, so there is
+        // nothing to step and nothing to restart from.
+        if (cartan::detail::is_setup_failure(m_precondition))
+        {
+            return {m_precondition, {0, m_inner.error_norm()}};
+        }
+
         if (m_aborted)
         {
             return {ik_status::stalled, {0, m_inner.error_norm()}};
@@ -183,6 +208,14 @@ public:
 
         if (inner_result.status == ik_status::converged
             || inner_result.status == ik_status::running)
+        {
+            return inner_result;
+        }
+
+        // A bad argument is not a failed attempt: it is returned before the
+        // best-candidate tracking so it neither counts against the restart
+        // budget nor pollutes the best-so-far, and no fresh seed can repair it.
+        if (cartan::detail::is_setup_failure(inner_result.status))
         {
             return inner_result;
         }
@@ -242,6 +275,7 @@ public:
         return m_best_q_error;
     }
     int iterations() const { return m_total_iterations; }
+    int restarts() const { return m_restart_count; }
 
     void abort()
     {
@@ -310,6 +344,7 @@ private:
     convergence_criteria<scalar_type> m_criteria{};
     std::optional<error_weight<scalar_type>> m_weight{};
     std::optional<halton_seed_generator<Chain>> m_seed_gen{};
+    ik_status m_precondition{ik_status::not_initialized};
     int m_restart_count{};
     int m_total_iterations{};
     scalar_type m_best_lambda{};

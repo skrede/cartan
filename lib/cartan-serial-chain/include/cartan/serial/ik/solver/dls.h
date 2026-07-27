@@ -18,6 +18,7 @@
 #include "cartan/serial/ik/concepts/solve_concept.h"
 #include "cartan/serial/ik/detail/convergence.h"
 #include "cartan/serial/ik/detail/stall_detection.h"
+#include "cartan/serial/ik/detail/setup_validation.h"
 #include "cartan/serial/ik/detail/limit_enforcement.h"
 
 #include "cartan/lie/se3.h"
@@ -93,6 +94,15 @@ public:
         const position_type& q0,
         const convergence_criteria<scalar_type>& criteria)
     {
+        // The one check the iteration loop below is entitled to assume. Latching
+        // its failure into the status member is how a void setup() reports:
+        // the loop's running guard then refuses to run.
+        if (auto held = cartan::detail::validate_solve_inputs(chain, target, q0); !held)
+        {
+            m_status = held.error();
+            return;
+        }
+
         m_target = target;
         m_q = q0;
         m_criteria = criteria;
@@ -102,7 +112,7 @@ public:
         m_condition_number = scalar_type(0);
         m_manipulability_value = scalar_type(0);
 
-        auto fk = forward_kinematics(chain, m_q);
+        auto fk = forward_kinematics_unchecked(chain, m_q);
         auto V_b = (fk.end_effector.inverse() * m_target).log();
         m_error_norm = V_b.norm();
         m_initial_error = m_error_norm;
@@ -113,7 +123,7 @@ public:
         int units = 0;
         while (units < N && m_status == ik_status::running)
         {
-            auto fk = forward_kinematics(chain, m_q);
+            auto fk = forward_kinematics_unchecked(chain, m_q);
             auto V_b = (fk.end_effector.inverse() * m_target).log();
 
             if (cartan::detail::is_converged_unweighted(V_b, m_criteria))
@@ -153,7 +163,7 @@ public:
                 break;
             }
 
-            auto J_b = body_jacobian(chain, fk);
+            auto J_b = body_jacobian_unchecked(chain, fk);
 
             constexpr unsigned int svd_options = (joints == dynamic)
                 ? (Eigen::ComputeThinU | Eigen::ComputeThinV)
@@ -243,7 +253,7 @@ private:
     scalar_type m_initial_error{};
     scalar_type m_error_norm{};
     int m_iterations{};
-    ik_status m_status{ik_status::running};
+    ik_status m_status{ik_status::not_initialized};
 };
 
 }

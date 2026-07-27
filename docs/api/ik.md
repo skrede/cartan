@@ -299,11 +299,26 @@ enum class ik_status
     diverged,
     stalled,
     joint_limit_hit,
-    iteration_limit
+    iteration_limit,
+    not_initialized,
+    dimension_mismatch,
+    non_finite_input
 };
+
+constexpr const char* message(ik_status status);
 ```
 
 Stepper-level control flow signal returned by `step()` calls.
+
+The last three are terminal before any iteration runs. A solver starts in
+`not_initialized`, so stepping one that was never set up performs no iteration
+and consumes no work units instead of reading a default-constructed joint
+vector. `setup()` returns `void` and reports a rejected seed or target by
+latching `dimension_mismatch` or `non_finite_input`; every solver's work loop
+refuses to run from a latched terminal status, and `basic_ik_runner` maps it
+onto the same-named `ik_failure` reason.
+
+`message()` returns a static diagnostic string; it allocates nothing.
 
 ### ik_termination_reason
 
@@ -363,11 +378,21 @@ enum class ik_failure
     stalled,
     iteration_limit,
     joint_limit_violation,
-    aborted
+    aborted,
+    not_initialized,
+    dimension_mismatch,
+    non_finite_input
 };
+
+constexpr const char* message(ik_failure failure);
 ```
 
-Failure reason reported in `ik_error`.
+Failure reason reported in `ik_error`. The last three name a solve that was
+refused before it ran: `solve()` without a preceding `setup()`, a seed whose
+length differs from the chain's joint count, and a seed or target holding a NaN
+or an infinity.
+
+`message()` returns a static diagnostic string; it allocates nothing.
 
 ### step_metrics
 
@@ -762,7 +787,12 @@ class restart_wrapper;
 Restart wrapper around any inner policy satisfying `solve_policy`. When
 the inner policy reports `stalled`, `diverged`, or `iteration_limit`, the
 wrapper generates a new seed configuration from a Halton sequence and
-re-initializes the inner policy. The best damping parameter (lambda)
+re-initializes the inner policy. A rejected seed or target is not one of those:
+both `setup()` overloads validate their arguments and latch the terminal status
+in the wrapper, so `step()` returns `dimension_mismatch` or `non_finite_input`
+unchanged without consuming a restart, and `restarts()` stays at zero. A later
+well-formed `setup()` clears the latch, so a wrapper that refused one call is
+still usable. The best damping parameter (lambda)
 from near-miss attempts is preserved across restarts for warm-starting
 (when the inner policy supports `set_lambda()`/`lambda()`). Budgets via
 the work-unit contract: the restart event itself charges zero additional
@@ -812,11 +842,18 @@ template <typename Scalar = double, int N = dynamic>
 struct exhaustive_result
 {
     std::vector<ik_result<Scalar, N>> solutions;
+    std::optional<ik_failure> failure{};
     int restarts_attempted{};
     int solutions_before_dedup{};
     int fk_validations_failed{};
 };
 ```
+
+`failure` is engaged only when the enumeration was refused before it could run:
+a seed of the wrong length, or a nonfinite seed or target. The runner returns at
+once in that case rather than working through the remaining seeds, so
+`restarts_attempted` is 1. An enumeration that ran and found nothing reports an
+empty `solutions` with no `failure`, which is a different answer.
 
 ### ranking_strategy
 
@@ -852,10 +889,11 @@ bool verify_solution(
     const convergence_criteria<typename Chain::scalar_type>& criteria);
 ```
 
-Recomputes forward kinematics at `q`, takes the body-frame log of
-`fk.end_effector.inverse() * target`, and returns `true` iff the
-orientation and position components are both below the corresponding
-tolerances in `criteria`. Used by `exhaustive_ik_runner` and by callers
+Recomputes forward kinematics at `q` through the checked entry point, takes the
+body-frame log of `fk.end_effector.inverse() * target`, and returns `true` iff
+the orientation and position components are both below the corresponding
+tolerances in `criteria`. A `q` the boundary refuses -- wrong length, or holding
+a NaN or an infinity -- is not verified: the function returns `false`. Used by `exhaustive_ik_runner` and by callers
 building custom multi-start drivers that need an explicit FK back-check.
 
 ### filter_valid_solutions

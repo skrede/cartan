@@ -30,6 +30,7 @@
 #include "cartan/serial/ik/concepts/solve_concept.h"
 #include "cartan/serial/ik/detail/convergence.h"
 #include "cartan/serial/ik/detail/stall_detection.h"
+#include "cartan/serial/ik/detail/setup_validation.h"
 #include "cartan/serial/ik/detail/limit_enforcement.h"
 #include "cartan/serial/ik/solver/detail/halton_seed_generator.h"
 
@@ -156,6 +157,14 @@ public:
         const convergence_criteria<scalar_type>& criteria,
         const error_weight<scalar_type>& weight)
     {
+        // The one check every attempt below is entitled to assume. Latching its
+        // failure into the status member is how a void setup() reports.
+        if (auto held = cartan::detail::validate_solve_inputs(chain, target, q0); !held)
+        {
+            m_status = held.error();
+            return;
+        }
+
         m_seed_gen.emplace(chain);
         m_restart_count = 0;
         m_total_iterations = 0;
@@ -169,6 +178,14 @@ public:
 
     step_result<scalar_type> step(const Chain& chain, int N)
     {
+        // The loop below admits any status that is not converged, which a
+        // terminal setup status would pass. The predicate is load-bearing for
+        // restart-on-stall and is left alone; the failed setup returns here.
+        if (cartan::detail::is_setup_failure(m_status))
+        {
+            return {m_status, {0, m_error_norm}};
+        }
+
         int units = 0;
         if (m_aborted)
         {
@@ -254,6 +271,11 @@ private:
         const convergence_criteria<scalar_type>& criteria,
         const error_weight<scalar_type>& weight)
     {
+        if (cartan::detail::is_precondition_failure(m_status))
+        {
+            return;
+        }
+
         m_target = target;
         m_q = q0;
         m_criteria = criteria;
@@ -272,18 +294,18 @@ private:
         }
         for (int i = 0; i < n; ++i)
         {
-            m_q_min(i) = chain.limits()[static_cast<std::size_t>(i)].position_min;
-            m_q_max(i) = chain.limits()[static_cast<std::size_t>(i)].position_max;
+            m_q_min(i) = chain.limits()[static_cast<std::size_t>(i)].position_min();
+            m_q_max(i) = chain.limits()[static_cast<std::size_t>(i)].position_max();
         }
 
         m_q = m_q.cwiseMax(m_q_min).cwiseMin(m_q_max);
 
-        auto fk = forward_kinematics(chain, m_q);
+        auto fk = forward_kinematics_unchecked(chain, m_q);
         m_V_b = (fk.end_effector.inverse() * m_target).log();
         m_error_norm = m_V_b.norm();
         m_initial_error = m_error_norm;
 
-        auto J_b = body_jacobian(chain, fk);
+        auto J_b = body_jacobian_unchecked(chain, fk);
         auto JtJ = (J_b.transpose() * J_b).eval();
         scalar_type max_diag{0};
         for (int i = 0; i < n; ++i)
@@ -304,7 +326,7 @@ private:
             return m_status;
         }
 
-        auto fk = forward_kinematics(chain, m_q);
+        auto fk = forward_kinematics_unchecked(chain, m_q);
         m_V_b = (fk.end_effector.inverse() * m_target).log();
 
         if (auto s = check_convergence_and_limits(chain); s != ik_status::running)
@@ -312,7 +334,7 @@ private:
             return s;
         }
 
-        auto J_b = body_jacobian(chain, fk);
+        auto J_b = body_jacobian_unchecked(chain, fk);
         int n = static_cast<int>(J_b.cols());
         auto H = (J_b.transpose() * J_b).eval();
         auto g = (J_b.transpose() * m_V_b).eval();
@@ -471,7 +493,7 @@ private:
         const GradientType& g) -> trial_result<HessianType, GradientType>
     {
         position_type q_trial = (m_q + dq).cwiseMax(m_q_min).cwiseMin(m_q_max);
-        auto fk_trial = forward_kinematics(chain, q_trial);
+        auto fk_trial = forward_kinematics_unchecked(chain, q_trial);
         auto V_b_trial = (fk_trial.end_effector.inverse() * m_target).log();
 
         scalar_type error_old_sq = m_V_b.squaredNorm();
@@ -619,7 +641,7 @@ private:
     int m_iterations{};
     int m_total_iterations{};
     int m_restart_count{};
-    ik_status m_status{ik_status::running};
+    ik_status m_status{ik_status::not_initialized};
     bool m_best_feasible{false};
     bool m_best_valid{false};
     bool m_aborted{false};

@@ -82,8 +82,11 @@ enum class analytical_failure
     unreachable,
     degenerate_geometry,
     singular_configuration,
-    verification_failed
+    verification_failed,
+    non_finite_input
 };
+
+constexpr const char* message(analytical_failure failure);
 ```
 
 - `unreachable` — target lies outside the mechanism's workspace.
@@ -93,6 +96,11 @@ enum class analytical_failure
   the requested target.
 - `verification_failed` — candidate solutions exist but none survived the FK
   back-check.
+- `non_finite_input` — an input or candidate joint value is NaN or infinite.
+  Named to match `chain_failure::non_finite_input` and
+  `ik_failure::non_finite_input`, which name the same defect.
+
+`message()` returns a static diagnostic string; it allocates nothing.
 
 ### paden_kahan_2_result
 

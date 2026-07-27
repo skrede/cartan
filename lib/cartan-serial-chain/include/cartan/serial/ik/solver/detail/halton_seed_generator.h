@@ -127,10 +127,10 @@ public:
             // Scale [0,1] -> [q_min, q_max] for finite-range joints; for an
             // unbounded angular joint, fall back to one principal revolution
             // centered at zero so the seed remains finite.
-            const Scalar range = lim.position_max - lim.position_min;
+            const Scalar range = lim.position_max() - lim.position_min();
             if (std::isfinite(range))
             {
-                q[j] = lim.position_min + h * range;
+                q[j] = lim.position_min() + h * range;
             }
             else
             {

@@ -8,6 +8,7 @@
 #include "cartan/serial/ik/ik_validation.h"
 
 #include "cartan/serial/ik/concepts/solve_concept.h"
+#include "cartan/serial/ik/detail/setup_validation.h"
 
 #include "cartan/serial/ik/solver/detail/halton_seed_generator.h"
 
@@ -16,8 +17,9 @@
 #include "cartan/serial/chain/joint_state.h"
 #include "cartan/serial/chain/chain_concept.h"
 
-#include <algorithm>
 #include <vector>
+#include <optional>
+#include <algorithm>
 
 namespace cartan
 {
@@ -37,10 +39,15 @@ struct exhaustive_options
     ranking_strategy ranking{ranking_strategy::distance_to_seed};
 };
 
+/// `failure` is engaged only when the enumeration was refused before it could
+/// run -- a seed of the wrong length or a nonfinite seed or target. An
+/// enumeration that ran and found nothing reports an empty `solutions` with no
+/// failure, which is a different answer and must not read as the same one.
 template <typename Scalar = double, int N = dynamic>
 struct exhaustive_result
 {
     std::vector<ik_result<Scalar, N>> solutions;
+    std::optional<ik_failure> failure{};
     int restarts_attempted{};
     int solutions_before_dedup{};
     int fk_validations_failed{};
@@ -76,6 +83,16 @@ public:
 
             Policy policy{};
             policy.setup(chain, target, seed_q, criteria);
+
+            // A precondition failure is a property of the caller's arguments,
+            // not of the seed, so trying the next one cannot help and doing so
+            // would report "no solution" with the cause discarded.
+            if (auto held = detail::validate_solve_inputs(chain, target, seed_q); !held)
+            {
+                result.restarts_attempted = restart + 1;
+                result.failure = detail::setup_failure_reason(held.error());
+                return result;
+            }
 
             for (int i = 0; i < criteria.max_iterations_per_attempt; ++i)
             {
@@ -164,7 +181,7 @@ private:
                 for (int j = 0; j < n; ++j)
                 {
                     auto lim = chain.limits()[static_cast<std::size_t>(j)];
-                    mid[j] = (lim.position_min + lim.position_max) / scalar_type(2);
+                    mid[j] = (lim.position_min() + lim.position_max()) / scalar_type(2);
                 }
                 std::ranges::sort(solutions, [&](const auto& a, const auto& b)
                 {

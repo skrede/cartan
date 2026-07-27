@@ -237,8 +237,8 @@ void enforce_limits(
     }
     else if constexpr (has_extended_enforce<LimitsPolicy, Chain>)
     {
-        auto fk = forward_kinematics(chain, q);
-        auto J_b = body_jacobian(chain, fk);
+        auto fk = forward_kinematics_unchecked(chain, q);
+        auto J_b = body_jacobian_unchecked(chain, fk);
 
         // V must be full: matrixV() is then n x n and V.rightCols(n - rank)
         // spans the true Jacobian kernel. A thin V is only n x min(m, n), so

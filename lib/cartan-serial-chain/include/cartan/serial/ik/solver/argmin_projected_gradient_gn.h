@@ -381,7 +381,7 @@ private:
     scalar_type m_error_norm{std::numeric_limits<scalar_type>::max()};
     int m_iterations{};
     int m_attempt_iterations{};
-    ik_status m_status{ik_status::running};
+    ik_status m_status{ik_status::not_initialized};
     ik_termination_reason m_termination_reason{ik_termination_reason::unknown};
     std::optional<cartan::detail::argmin_ik_least_squares_problem<Chain>> m_problem;
     std::optional<argmin_solver> m_solver;

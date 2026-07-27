@@ -24,8 +24,16 @@ bool verify_solution(
     const typename joint_state<typename Chain::scalar_type, Chain::joints>::position_type& q,
     const convergence_criteria<typename Chain::scalar_type>& criteria)
 {
+    // Runs once per candidate, not per iteration, so the checked entry point
+    // costs nothing worth saving. A candidate the boundary refuses is not
+    // verified: the question "does this q reach the target" has no answer for a
+    // q the chain cannot evaluate.
     auto fk = forward_kinematics(chain, q);
-    auto V_b = (fk.end_effector.inverse() * target).log();
+    if (!fk)
+    {
+        return false;
+    }
+    auto V_b = (fk->end_effector.inverse() * target).log();
     return V_b.template head<3>().norm() < criteria.orientation_tol
         && V_b.template tail<3>().norm() < criteria.position_tol;
 }

@@ -16,6 +16,7 @@
 #include "cartan/serial/ik/ik_result.h"
 #include "cartan/serial/ik/ik_status.h"
 #include "cartan/serial/ik/concepts/solve_concept.h"
+#include "cartan/serial/ik/detail/setup_validation.h"
 #include "cartan/serial/ik/solver/detail/halton_seed_generator.h"
 
 #include "cartan/lie/se3.h"
@@ -116,6 +117,15 @@ public:
         m_criteria = criteria;
         m_objective = options.objective;
         m_status = ik_status::running;
+
+        // Latched before any policy is touched, so a rejected seed leaves every
+        // policy in its terminal default rather than half-configured.
+        if (auto held = cartan::detail::validate_solve_inputs(chain, target, q0); !held)
+        {
+            m_status = held.error();
+            return;
+        }
+
         m_best_error = std::numeric_limits<scalar_type>::max();
         m_best_manipulability = scalar_type(0);
         m_best_isotropy = scalar_type(0);
@@ -404,7 +414,10 @@ private:
         return s == ik_status::diverged
             || s == ik_status::stalled
             || s == ik_status::iteration_limit
-            || s == ik_status::joint_limit_hit;
+            || s == ik_status::joint_limit_hit
+            || s == ik_status::not_initialized
+            || s == ik_status::dimension_mismatch
+            || s == ik_status::non_finite_input;
     }
 
     void park_all()
@@ -453,8 +466,8 @@ private:
             }
             case ik_objective::max_manipulability:
             {
-                auto fk = forward_kinematics(m_chain->get(), q);
-                auto J_b = body_jacobian(m_chain->get(), fk);
+                auto fk = forward_kinematics_unchecked(m_chain->get(), q);
+                auto J_b = body_jacobian_unchecked(m_chain->get(), fk);
                 constexpr unsigned int svd_opts = (joints == dynamic)
                     ? (Eigen::ComputeThinU | Eigen::ComputeThinV)
                     : (Eigen::ComputeFullU | Eigen::ComputeFullV);
@@ -474,8 +487,8 @@ private:
             }
             case ik_objective::max_isotropy:
             {
-                auto fk = forward_kinematics(m_chain->get(), q);
-                auto J_b = body_jacobian(m_chain->get(), fk);
+                auto fk = forward_kinematics_unchecked(m_chain->get(), q);
+                auto J_b = body_jacobian_unchecked(m_chain->get(), fk);
                 constexpr unsigned int svd_opts = (joints == dynamic)
                     ? (Eigen::ComputeThinU | Eigen::ComputeThinV)
                     : (Eigen::ComputeFullU | Eigen::ComputeFullV);
@@ -634,6 +647,11 @@ private:
             case ik_status::joint_limit_hit:
                 err.reason = ik_failure::joint_limit_violation;
                 break;
+            case ik_status::not_initialized:
+            case ik_status::dimension_mismatch:
+            case ik_status::non_finite_input:
+                err.reason = cartan::detail::setup_failure_reason(m_status);
+                break;
             default:
                 err.reason = ik_failure::iteration_limit;
                 break;
@@ -687,7 +705,7 @@ private:
     scalar_type m_best_isotropy{};
     scalar_type m_best_error{};
     ik_objective m_objective{ik_objective::speed};
-    ik_status m_status{ik_status::running};
+    ik_status m_status{ik_status::not_initialized};
     int m_total_iterations{};
     bool m_found_convergence{false};
 
