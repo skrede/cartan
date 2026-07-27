@@ -31,9 +31,9 @@ std::array<Scalar, 3> nonfinite_values()
 }
 
 /// Poisons one entry at a time over the whole matrix, so a factory that reads
-/// only the block it validates cannot pass. The rotation block, the affine row
-/// and the translation block of a transform are all covered by one sweep, and
-/// the survey measured those positions behaving differently from each other.
+/// only the block it validates cannot pass: the rotation block, the affine row
+/// and the translation block of a transform are distinct positions, and a
+/// guard that covers one of them says nothing about the other two.
 template <typename Matrix, typename Factory>
 void expect_every_entry_refused(const Matrix& seed, Factory factory)
 {
@@ -54,14 +54,27 @@ void expect_every_entry_refused(const Matrix& seed, Factory factory)
     }
 }
 
+/// Not the aborting test helper: over-rejecting an infinite bound is one of the
+/// regressions this file exists to catch, and an abort would end the process on
+/// the first one, reporting a single failure where the truth is that the sweep
+/// never ran.
 template <typename Scalar>
 cartan::kinematic_chain<Scalar, cartan::dynamic> one_joint_chain(Scalar lo, Scalar hi)
 {
+    auto bounds = cartan::joint_limits<Scalar>::make(lo, hi);
+    REQUIRE(bounds.has_value());
     std::vector<cartan::screw_axis<Scalar>> axes{
         cartan::screw_axis<Scalar>::revolute({0, 0, 1}, {0, 0, 0})};
-    std::vector<cartan::joint_limits<Scalar>> limits{cartan::testing::limits(lo, hi)};
+    std::vector<cartan::joint_limits<Scalar>> limits{*bounds};
     return cartan::kinematic_chain<Scalar, cartan::dynamic>(
         cartan::se3<Scalar>::identity(), std::move(axes), std::move(limits));
+}
+
+template <typename Result>
+void expect_refused(const Result& result, cartan::chain_failure reason)
+{
+    REQUIRE_FALSE(result.has_value());
+    REQUIRE(result.error() == reason);
 }
 
 template <typename Scalar>
@@ -153,25 +166,33 @@ TEMPLATE_TEST_CASE("screw_axis::from_vector refuses a nonfinite component on bot
     }
 }
 
-TEMPLATE_TEST_CASE("joint_limits::make refuses a nonfinite bound",
+/// The reason is asserted and not just the refusal: a NaN bound is refused as
+/// nonfinite input, a like-signed infinite pair by the interval predicate, and
+/// a has_value() check alone would let either cover for the other's removal.
+TEMPLATE_TEST_CASE("joint_limits::make refuses a NaN position bound as nonfinite input and a "
+                   "like-signed infinite pair as an empty interval",
     "[nonfinite][boundary]", double, float)
 {
     using S = TestType;
+    using cartan::chain_failure;
     const S inf_b = std::numeric_limits<S>::infinity();
     const S nan_b = std::numeric_limits<S>::quiet_NaN();
 
-    REQUIRE_FALSE(cartan::joint_limits<S>::make(nan_b, S(1)).has_value());
-    REQUIRE_FALSE(cartan::joint_limits<S>::make(S(-1), nan_b).has_value());
-    REQUIRE_FALSE(cartan::joint_limits<S>::make(inf_b, inf_b).has_value());
-    REQUIRE_FALSE(cartan::joint_limits<S>::make(-inf_b, -inf_b).has_value());
+    expect_refused(cartan::joint_limits<S>::make(nan_b, S(1)), chain_failure::non_finite_input);
+    expect_refused(cartan::joint_limits<S>::make(S(-1), nan_b), chain_failure::non_finite_input);
+    expect_refused(
+        cartan::joint_limits<S>::make(inf_b, inf_b), chain_failure::reversed_position_bounds);
+    expect_refused(
+        cartan::joint_limits<S>::make(-inf_b, -inf_b), chain_failure::reversed_position_bounds);
 
     for (S poison : nonfinite_values<S>())
     {
-        REQUIRE_FALSE(cartan::joint_limits<S>::make(S(-1), S(1), poison).has_value());
-        REQUIRE_FALSE(
-            cartan::joint_limits<S>::make(S(-1), S(1), std::nullopt, poison).has_value());
-        REQUIRE_FALSE(cartan::joint_limits<S>::make(S(-1), S(1), std::nullopt, std::nullopt, poison)
-                          .has_value());
+        expect_refused(
+            cartan::joint_limits<S>::make(S(-1), S(1), poison), chain_failure::non_finite_input);
+        expect_refused(cartan::joint_limits<S>::make(S(-1), S(1), std::nullopt, poison),
+            chain_failure::non_finite_input);
+        expect_refused(cartan::joint_limits<S>::make(S(-1), S(1), std::nullopt, std::nullopt, poison),
+            chain_failure::non_finite_input);
     }
 }
 
@@ -203,10 +224,12 @@ TEMPLATE_TEST_CASE("the analytical verifier refuses a nonfinite candidate whethe
     expect_candidates_refused<decltype(chain), S>(chain, reference->end_effector, true);
 }
 
-/// Over-rejecting an infinity is the regression a phase about refusing things
-/// is most likely to introduce, and these two are the guard against it: the
-/// unbounded joint is *encoded* as a pair of infinities.
-TEMPLATE_TEST_CASE("a finite joint value against an infinite bound stays feasible",
+/// An unbounded continuous joint is *encoded* as the bounds (-inf, +inf), so a
+/// guard that refuses every nonfinite value it meets would make every such
+/// joint infeasible and every such chain unbuildable. This case and the next
+/// are what keeps the sweeps above from being satisfied that way.
+TEMPLATE_TEST_CASE("an infinite bound admits any finite joint value while finite bounds still "
+                   "refuse one outside them",
     "[nonfinite][boundary]", double, float)
 {
     using S = TestType;

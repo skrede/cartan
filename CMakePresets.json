@@ -91,7 +91,6 @@
                 "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=undefined -g",
                 "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined",
                 "CARTAN_BUILD_TESTS": "ON",
-                "CARTAN_BUILD_ARGMIN": "ON",
                 "CARTAN_CMAKE_FETCH_DEPS": "ON"
             }
         },

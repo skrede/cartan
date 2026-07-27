@@ -101,6 +101,7 @@ jobs:
             cc: clang-18
             cxx: clang++-18
             flags: "-fsanitize=address,undefined -fno-omit-frame-pointer"
+            link_flags: "-fsanitize=address,undefined"
           # Optimized, assertions compiled out, and the undefined-behavior
           # sanitizer made non-recovering: without -fno-sanitize-recover a
           # violation prints a diagnostic and the process still exits zero, so
@@ -110,6 +111,7 @@ jobs:
             cc: clang-18
             cxx: clang++-18
             flags: "-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=undefined -g"
+            link_flags: "-fsanitize=address,undefined"
 
     runs-on: ubuntu-24.04
     name: sanitize (${{ matrix.name }})
@@ -124,7 +126,7 @@ jobs:
         run: |
           cmake . -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
             -DCMAKE_CXX_FLAGS="${{ matrix.flags }}" \
-            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined" \
+            -DCMAKE_EXE_LINKER_FLAGS="${{ matrix.link_flags }}" \
             -DCARTAN_BUILD_TESTS=ON \
             -DCARTAN_CMAKE_FETCH_DEPS=ON
 
