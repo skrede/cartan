@@ -115,9 +115,11 @@ cartan_add_test(jacobian_sweep_test jacobian_sweep_test.cpp)
 cartan_add_test(ik_sweep_test ik_sweep_test.cpp)
 cartan_add_test(ik_float_tolerance_sweep_test ik_float_tolerance_sweep_test.cpp)
 
-if(CARTAN_BUILD_NLOPT)
-    target_link_libraries(bobyqa_solve_policy_test PRIVATE cartan::nlopt)
-    target_link_libraries(slsqp_solve_policy_test PRIVATE cartan::nlopt)
+# These two cover the NLopt solve policy, which ships as an example rather than
+# as library surface; each compiles to an empty translation unit without it.
+if(TARGET cartan_examples::nlopt_policy)
+    target_link_libraries(bobyqa_solve_policy_test PRIVATE cartan_examples::nlopt_policy)
+    target_link_libraries(slsqp_solve_policy_test PRIVATE cartan_examples::nlopt_policy)
 endif()
 
 # The cartan-vs-KDL FK comparison is an external-library comparison and lives in

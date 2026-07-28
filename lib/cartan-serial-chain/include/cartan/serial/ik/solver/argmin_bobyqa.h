@@ -45,8 +45,8 @@ namespace cartan
 /// and uses trust-region steps. Each step() call runs a budget of argmin
 /// iterations for cooperative scheduling in basic_ik_runner.
 ///
-/// This is the default (unprefixed) BOBYQA policy. The NLopt-backed variant
-/// is available as cartan::nlopt_bobyqa behind CARTAN_HAS_NLOPT.
+/// This is the default (unprefixed) BOBYQA policy. An NLopt-backed variant is
+/// carried as a solve-policy example rather than as library surface.
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 class argmin_bobyqa
 {

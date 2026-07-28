@@ -10,7 +10,7 @@ every one of them carries a sentinel saying what it is:
 
 A ``snippet`` is emitted as a translation unit: ``tu`` marks a block that is
 already a whole program, anything else is wrapped in the page preamble and an
-``int main()``. ``needs=argmin|nlopt|urdf`` groups a snippet so the build
+``int main()``. ``needs=argmin|urdf`` groups a snippet so the build
 compiles it only where that component exists.
 
 An ``unbuilt`` fence declares one of three classes. ``declaration`` is a

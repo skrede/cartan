@@ -215,7 +215,7 @@ $g = -J_b^\top \xi_b$ (negative gradient).
 ### Cartan Implementation
 
 ```
-nlopt_slsqp<Chain, LimitsPolicy>   // requires CARTAN_HAS_NLOPT
+cartan_examples::nlopt_slsqp<Chain, LimitsPolicy>   // examples/nlopt_policy/
 ```
 
 Cartan wraps NLopt's SLSQP algorithm. Joint limits from the `kinematic_chain`

@@ -5,14 +5,14 @@
 // propagated definition may reach a translation unit. One arriving here means a
 // public name can vary by build option again, which is the state this fixture
 // exists to forbid, so refuse to compile rather than report agreement.
-#if defined(CARTAN_BUILD_ARGMIN) || defined(CARTAN_BUILD_NLOPT)
+#ifdef CARTAN_BUILD_ARGMIN
 #error "a backend build option reached a translation unit; only CARTAN_HAS_<BACKEND> may"
 #endif
 
 // Mirrors the registered backend list. A backend added there and forgotten here
 // leaves the two units below unable to tell their configurations apart, and
 // they refuse to compile rather than compare vacuously.
-#if defined(CARTAN_HAS_ARGMIN) || defined(CARTAN_HAS_NLOPT)
+#ifdef CARTAN_HAS_ARGMIN
 #define CARTAN_ODR_BACKEND_LINKED 1
 #endif
 

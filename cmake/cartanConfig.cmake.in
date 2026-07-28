@@ -12,20 +12,14 @@ if (CARTAN_WITH_URDF)
 endif ()
 
 set(CARTAN_WITH_ARGMIN @CARTAN_BUILD_ARGMIN@)
-set(CARTAN_WITH_NLOPT @CARTAN_BUILD_NLOPT@)
 
 # A backend's own package is resolved only for a consumer that asks for that
 # component. Resolving it unconditionally would make an install built with a
 # backend unusable to every consumer that never links it.
 set(cartan_argmin_FOUND ${CARTAN_WITH_ARGMIN})
-set(cartan_nlopt_FOUND ${CARTAN_WITH_NLOPT})
 
 if (cartan_argmin_FOUND AND "argmin" IN_LIST cartan_FIND_COMPONENTS)
     find_dependency(argmin)
-endif ()
-
-if (cartan_nlopt_FOUND AND "nlopt" IN_LIST cartan_FIND_COMPONENTS)
-    find_dependency(NLopt)
 endif ()
 
 include("${CMAKE_CURRENT_LIST_DIR}/cartanTargets.cmake")

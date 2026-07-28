@@ -52,8 +52,8 @@ namespace cartan
 /// call runs a budget of argmin iterations, allowing cooperative scheduling
 /// with other policies in basic_ik_runner.
 ///
-/// This is the default (unprefixed) SLSQP policy. The NLopt-backed variant
-/// is available as cartan::nlopt_slsqp behind CARTAN_HAS_NLOPT.
+/// This is the default (unprefixed) SLSQP policy. An NLopt-backed variant is
+/// carried as a solve-policy example rather than as library surface.
 ///
 /// The Convergence template parameter lets consumers opt out of argmin's
 /// default four-criterion convergence policy in favor of alternatives like

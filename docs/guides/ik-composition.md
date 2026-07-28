@@ -57,7 +57,7 @@ policy (`no_limits` or `clamp_limits`) as its second.
 These names are configuration-invariant. `lm` and `lbfgsb` alias `builtin_lm`
 and `builtin_lbfgsb` unconditionally, so they denote the native implementations
 in every build; a backend's steppers are reachable only under their own prefixed
-names (`argmin_lm`, `argmin_slsqp`, `nlopt_bobyqa`, and the rest). A policy name
+names (`argmin_lm`, `argmin_slsqp`, `argmin_bobyqa`, and the rest). A policy name
 therefore means the same type in every translation unit, whichever backends the
 build enabled.
 
@@ -290,28 +290,24 @@ cartan::basic_ik_runner solver{cartan::argmin_bobyqa<Chain>{}};
 
 ## NLopt Solvers
 
-`CARTAN_BUILD_NLOPT` decides whether the `cartan::nlopt` component is built; as
-with argmin, linking that component is what makes the `nlopt_slsqp` and
-`nlopt_bobyqa` policies visible, because it carries the backend headers and
-`CARTAN_HAS_NLOPT` on its interface:
+NLopt-backed policies are not library surface. They are carried as a solve-policy
+example under `examples/nlopt_policy/`, which owns its own option and acquires
+NLopt itself, so a cartan build depends on Eigen alone. Enabling
+`CARTAN_EXAMPLE_NLOPT_POLICY` defines `cartan_examples::nlopt_policy`, an
+interface target carrying the headers and the dependency:
 
 ```cmake
-find_package(cartan CONFIG REQUIRED COMPONENTS nlopt)
-target_link_libraries(app PRIVATE cartan::cartan cartan::nlopt)
+target_link_libraries(app PRIVATE cartan::cartan cartan_examples::nlopt_policy)
 ```
 
-An installed NLopt is used when one is available; the configure step reports which
-provider won. Otherwise the build falls back to a pinned upstream revision, which
-is built inside the build tree and so belongs to no export set: `CARTAN_ENABLE_INSTALL`
-then defaults off, and `cmake --install` succeeds having installed nothing. Pass
-`-DCARTAN_ENABLE_INSTALL=ON` to turn that silence into a refusal naming the
-dependency that cannot be exported.
+The example exists because wrapping an optimizer that only runs to completion is
+the case a natively steppable policy cannot demonstrate. See that directory's
+README for what it does and does not claim.
 
 ## Mixing Families
 
-Any combination of native, argmin, and NLopt policies can race together in a
-single `basic_ik_runner`, as long as they all agree on `scalar_type` and
-`joints`:
+Any combination of native and argmin policies can race together in a single
+`basic_ik_runner`, as long as they all agree on `scalar_type` and `joints`:
 
 <!-- cartan:snippet name=mixing-families needs=argmin -->
 ```cpp

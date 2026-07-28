@@ -25,15 +25,6 @@ using backend_solver = cartan::argmin_lm<chain6>;
 #endif
 #endif
 
-#ifdef CONSUMER_EXPECTS_NLOPT
-static_assert(CARTAN_HAS_NLOPT == 1, "linking the component must supply the feature macro");
-using nlopt_backend_solver = cartan::nlopt_slsqp<chain6>;
-#else
-#ifdef CARTAN_HAS_NLOPT
-#error "the backend feature macro reached a consumer that did not link the component"
-#endif
-#endif
-
 int main()
 {
     return 0;

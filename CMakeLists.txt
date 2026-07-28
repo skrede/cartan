@@ -47,7 +47,6 @@ option(CARTAN_BUILD_EXAMPLES "Build examples" OFF)
 option(CARTAN_BUILD_FUZZ_TESTS "Build fuzz test targets" OFF)
 option(CARTAN_BUILD_PROPERTY_TESTS "Build property-based test targets (requires RapidCheck)" OFF)
 option(CARTAN_BUILD_ARGMIN "Build with Argmin NLP solver backend" OFF)
-option(CARTAN_BUILD_NLOPT "Build NLopt solver backend for IK" OFF)
 option(CARTAN_BUILD_URDF "Build URDF loading module" OFF)
 option(CARTAN_BUILD_URDF_EXTENDED_TESTS "Build extended URDF parity tests against vendored real-world URDFs" OFF)
 option(CARTAN_BUILD_BENCHMARKS "Build the benchmark suite; third-party comparison dependencies are auto-detected and any benchmark whose dependency is missing is omitted with a warning" OFF)
@@ -152,6 +151,15 @@ endif ()
 
 if (CARTAN_BUILD_EXAMPLES)
     add_subdirectory(examples)
+endif ()
+
+# The NLopt solve-policy example publishes an interface target that the
+# benchmarks, the profiling target and two policy tests also consume, so it is
+# reachable from any of them rather than from the examples alone. It builds
+# nothing unless its own option is on.
+if (CARTAN_BUILD_EXAMPLES OR CARTAN_BUILD_BENCHMARKS OR CARTAN_BUILD_PROFILING
+        OR CARTAN_BUILD_TESTS)
+    add_subdirectory(examples/nlopt_policy)
 endif ()
 
 if (CARTAN_BUILD_TESTS OR CARTAN_BUILD_FUZZ_TESTS OR CARTAN_BUILD_PROPERTY_TESTS

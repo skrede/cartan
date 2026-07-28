@@ -49,10 +49,9 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
 # owns that group's API, and takes its include roots, language level and feature
 # macro from that target's interface. Nothing here defines a macro by hand, and no
 # object library mixes translation units built under different configurations.
-set(_doc_snippet_groups core argmin nlopt urdf)
+set(_doc_snippet_groups core argmin urdf)
 set(_doc_snippet_core_target cartan::cartan)
 set(_doc_snippet_argmin_target cartan::argmin)
-set(_doc_snippet_nlopt_target cartan::nlopt)
 set(_doc_snippet_urdf_target cartan::urdf)
 
 # The name the rest of the tree builds. It aggregates whichever group libraries

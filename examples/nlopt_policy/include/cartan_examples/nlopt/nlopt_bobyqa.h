@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_NLOPT_BOBYQA_H
-#define HPP_GUARD_CARTAN_SERIAL_IK_SOLVER_NLOPT_BOBYQA_H
+#ifndef HPP_GUARD_CARTAN_EXAMPLES_NLOPT_NLOPT_BOBYQA_H
+#define HPP_GUARD_CARTAN_EXAMPLES_NLOPT_NLOPT_BOBYQA_H
 
 /// NLopt BOBYQA derivative-free IK solve policy with box constraints.
 ///
@@ -7,14 +7,12 @@
 /// using joint limits as box constraints. The objective minimizes
 /// 0.5 * ||V_b||^2 without gradient information.
 ///
-/// Guarded by CARTAN_HAS_NLOPT: only available when NLopt is linked.
 
-#ifdef CARTAN_HAS_NLOPT
+#include "cartan_examples/nlopt/nlopt_common.h"
 
 #include "cartan/serial/ik/ik_status.h"
 #include "cartan/serial/ik/policy/limits_policy.h"
 #include "cartan/serial/ik/concepts/solve_concept.h"
-#include "cartan/serial/ik/detail/nlopt_common.h"
 #include "cartan/serial/ik/detail/setup_validation.h"
 
 #include "cartan/lie/se3.h"
@@ -30,8 +28,13 @@
 #include <random>
 #include <vector>
 
-namespace cartan
+namespace cartan_examples
 {
+// The adapter is written against cartan's vocabulary types, the way a reader
+// pasting this into their own project would write it. It stays out of namespace
+// cartan because a name that exists only when an optional dependency is present
+// is exactly what the library's own name-invariance gate forbids.
+using namespace cartan;
 
 /// NLopt BOBYQA solve policy for constrained IK with box constraints.
 ///
@@ -102,10 +105,10 @@ public:
         m_error_norm = std::numeric_limits<scalar_type>::max();
         m_status = ik_status::running;
 
-        m_q_vec = cartan::detail::eigen_to_stdvec<scalar_type, joints>(q0);
+        m_q_vec = detail::eigen_to_stdvec<scalar_type, joints>(q0);
 
         m_opt = nlopt::opt(nlopt::LN_BOBYQA, static_cast<unsigned>(chain.num_joints()));
-        cartan::detail::set_nlopt_bounds<scalar_type, joints>(m_opt, chain);
+        detail::set_nlopt_bounds<scalar_type, joints>(m_opt, chain);
         m_opt.set_min_objective(objective_func, this);
         m_opt.set_xtol_rel(static_cast<double>(m_options.xtol_rel));
         m_eval_count = m_options.budget_per_step;
@@ -128,7 +131,7 @@ public:
             m_opt.set_maxeval(m_eval_count);
 
             double min_val = 0.0;
-            nlopt::result result = cartan::detail::run_nlopt_optimize(m_opt, m_q_vec, min_val);
+            nlopt::result result = detail::run_nlopt_optimize(m_opt, m_q_vec, min_val);
             ++units;
 
             // Handle exception-sourced results immediately
@@ -139,8 +142,8 @@ public:
             }
             if (result == nlopt::ROUNDOFF_LIMITED)
             {
-                m_error_norm = cartan::detail::compute_body_error_norm<scalar_type, joints>(*m_chain, m_target, m_q_vec);
-                bool conv = cartan::detail::check_nlopt_convergence<scalar_type, joints>(*m_chain, m_target, m_criteria, m_q_vec);
+                m_error_norm = detail::compute_body_error_norm<scalar_type, joints>(*m_chain, m_target, m_q_vec);
+                bool conv = detail::check_nlopt_convergence<scalar_type, joints>(*m_chain, m_target, m_criteria, m_q_vec);
                 m_status = conv ? ik_status::converged : ik_status::stalled;
                 break;
             }
@@ -148,25 +151,25 @@ public:
             ++m_iterations;
 
             m_prev_error = m_error_norm;
-            m_error_norm = cartan::detail::compute_body_error_norm<scalar_type, joints>(*m_chain, m_target, m_q_vec);
+            m_error_norm = detail::compute_body_error_norm<scalar_type, joints>(*m_chain, m_target, m_q_vec);
 
-            bool conv = cartan::detail::check_nlopt_convergence<scalar_type, joints>(*m_chain, m_target, m_criteria, m_q_vec);
+            bool conv = detail::check_nlopt_convergence<scalar_type, joints>(*m_chain, m_target, m_criteria, m_q_vec);
             bool error_stalled = std::abs(m_error_norm - m_prev_error) <
                 scalar_type(1e-10) * (scalar_type(1) + m_error_norm);
             bool can_restart = m_restart_count < m_options.max_restarts;
 
-            if (cartan::detail::needs_restart(result, conv, error_stalled))
+            if (detail::needs_restart(result, conv, error_stalled))
             {
                 ++m_restart_count;
                 can_restart = m_restart_count < m_options.max_restarts;
             }
 
-            m_status = cartan::detail::map_nlopt_result(result, conv, error_stalled, can_restart);
+            m_status = detail::map_nlopt_result(result, conv, error_stalled, can_restart);
 
-            if (m_status == ik_status::running && cartan::detail::needs_restart(result, conv, error_stalled))
+            if (m_status == ik_status::running && detail::needs_restart(result, conv, error_stalled))
             {
-                cartan::detail::perturb_nlopt_solution<scalar_type, joints>(m_q_vec, *m_chain, m_options.restart_scale, m_rng);
-                cartan::detail::reset_nlopt_optimizer<scalar_type, joints>(
+                detail::perturb_nlopt_solution<scalar_type, joints>(m_q_vec, *m_chain, m_options.restart_scale, m_rng);
+                detail::reset_nlopt_optimizer<scalar_type, joints>(
                     m_opt, nlopt::LN_BOBYQA, *m_chain, objective_func, this,
                     static_cast<double>(m_options.xtol_rel), m_options.budget_per_step, m_eval_count);
             }
@@ -177,7 +180,7 @@ public:
                 break;
             }
 
-            cartan::detail::enforce_and_sync_limits<LimitsPolicy, scalar_type, joints>(m_q_vec, chain);
+            detail::enforce_and_sync_limits<LimitsPolicy, scalar_type, joints>(m_q_vec, chain);
         }
         return {m_status, {units, m_error_norm}};
     }
@@ -188,7 +191,7 @@ public:
     /// Current joint configuration.
     position_type solution() const
     {
-        return cartan::detail::stdvec_to_eigen<scalar_type, joints>(m_q_vec);
+        return detail::stdvec_to_eigen<scalar_type, joints>(m_q_vec);
     }
 
     /// Current error norm.
@@ -215,7 +218,7 @@ private:
         void* data)
     {
         auto* self = static_cast<nlopt_bobyqa*>(data);
-        auto q = cartan::detail::stdvec_to_eigen<scalar_type, joints>(x);
+        auto q = detail::stdvec_to_eigen<scalar_type, joints>(x);
 
         auto fk = forward_kinematics_unchecked(*self->m_chain, q);
         auto V_b = (fk.end_effector.inverse() * self->m_target).log();
@@ -241,7 +244,5 @@ private:
 };
 
 }
-
-#endif
 
 #endif

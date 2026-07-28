@@ -57,6 +57,6 @@ function(matrix_cell_embedded_headers)
 endfunction()
 
 function(matrix_cell_embedded_fetched)
-    matrix_embedded_cell(embedded-fetched nlopt
-        -DCARTAN_BUILD_NLOPT=ON -DCMAKE_DISABLE_FIND_PACKAGE_NLopt=ON)
+    matrix_embedded_cell(embedded-fetched argmin
+        -DCARTAN_BUILD_ARGMIN=ON -DCMAKE_DISABLE_FIND_PACKAGE_argmin=ON)
 endfunction()

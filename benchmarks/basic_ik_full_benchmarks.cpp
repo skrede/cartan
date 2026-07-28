@@ -7,7 +7,7 @@
 /// (speed, convergence, restart+LM, Newton-Raphson, Gauss-Newton, aggressive
 /// L-BFGS-B), the variadic racing solver, and TRAC-IK baseline.
 ///
-/// NLopt solvers (BOBYQA, SLSQP) are gated behind CARTAN_HAS_NLOPT.
+/// NLopt solvers (BOBYQA, SLSQP) are gated behind CARTAN_EXAMPLE_HAS_NLOPT.
 ///
 /// Target count: 1,000 (full matrix with 9 robots x 12+ configs; 10,000 would
 /// take prohibitively long for a single benchmark run).
@@ -37,9 +37,9 @@
 #include <cartan/serial/ik/solver/argmin_projected_gradient_gn.h>
 #endif
 
-#ifdef CARTAN_HAS_NLOPT
-#include <cartan/serial/ik/solver/nlopt_bobyqa.h>
-#include <cartan/serial/ik/solver/nlopt_slsqp.h>
+#ifdef CARTAN_EXAMPLE_HAS_NLOPT
+#include <cartan_examples/nlopt/nlopt_bobyqa.h>
+#include <cartan_examples/nlopt/nlopt_slsqp.h>
 #endif
 
 #include <trac_ik/trac_ik.hpp>
@@ -584,15 +584,15 @@ template <int N>
 using nr_ik_solver = cartan::basic_ik_runner<nr_restart<N>>;
 
 // NLopt solvers
-#ifdef CARTAN_HAS_NLOPT
+#ifdef CARTAN_EXAMPLE_HAS_NLOPT
 template <int N>
-using bobyqa_restart = cartan::restart_wrapper<chain_t<N>, cartan::nlopt_bobyqa<chain_t<N>>>;
+using bobyqa_restart = cartan::restart_wrapper<chain_t<N>, cartan_examples::nlopt_bobyqa<chain_t<N>>>;
 
 template <int N>
 using bobyqa_ik_solver = cartan::basic_ik_runner<bobyqa_restart<N>>;
 
 template <int N>
-using slsqp_restart = cartan::restart_wrapper<chain_t<N>, cartan::nlopt_slsqp<chain_t<N>>>;
+using slsqp_restart = cartan::restart_wrapper<chain_t<N>, cartan_examples::nlopt_slsqp<chain_t<N>>>;
 
 template <int N>
 using slsqp_ik_solver = cartan::basic_ik_runner<slsqp_restart<N>>;
@@ -821,7 +821,7 @@ static void bm_full_##ROBOT##_trac_ik(benchmark::State& state)                  
 BENCHMARK(bm_full_##ROBOT##_trac_ik)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 // Register NLopt solver benchmarks for a 6-DOF robot.
-#ifdef CARTAN_HAS_NLOPT
+#ifdef CARTAN_EXAMPLE_HAS_NLOPT
 #define REGISTER_6DOF_NLOPT(ROBOT, CHAIN_FN)                                                         \
                                                                                                      \
 static void bm_full_##ROBOT##_nlopt_bobyqa(benchmark::State& state)                                     \
@@ -1030,7 +1030,7 @@ static void bm_full_##ROBOT##_trac_ik(benchmark::State& state)                  
 BENCHMARK(bm_full_##ROBOT##_trac_ik)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 // Register NLopt solver benchmarks for a 7-DOF robot.
-#ifdef CARTAN_HAS_NLOPT
+#ifdef CARTAN_EXAMPLE_HAS_NLOPT
 #define REGISTER_7DOF_NLOPT(ROBOT, CHAIN_FN)                                                         \
                                                                                                      \
 static void bm_full_##ROBOT##_nlopt_bobyqa(benchmark::State& state)                                     \

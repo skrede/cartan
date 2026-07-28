@@ -40,9 +40,9 @@
 #endif
 #include <cartan/serial/fk/forward_kinematics.h>
 
-#ifdef CARTAN_HAS_NLOPT
-#include <cartan/serial/ik/solver/nlopt_bobyqa.h>
-#include <cartan/serial/ik/solver/nlopt_slsqp.h>
+#ifdef CARTAN_EXAMPLE_HAS_NLOPT
+#include <cartan_examples/nlopt/nlopt_bobyqa.h>
+#include <cartan_examples/nlopt/nlopt_slsqp.h>
 #endif
 
 #include <trac_ik/trac_ik.hpp>
@@ -1028,15 +1028,15 @@ template <int N>
 using argmin_gcmma_solver = cartan::basic_ik_runner<
     cartan::restart_wrapper<chain_t<N>, cartan::gcmma<chain_t<N>>>>;
 
-// NLopt solver type aliases (gated behind CARTAN_HAS_NLOPT)
-#ifdef CARTAN_HAS_NLOPT
+// NLopt solver type aliases (gated behind CARTAN_EXAMPLE_HAS_NLOPT)
+#ifdef CARTAN_EXAMPLE_HAS_NLOPT
 template <int N>
 using nlopt_slsqp_solver = cartan::basic_ik_runner<
-    cartan::restart_wrapper<chain_t<N>, cartan::nlopt_slsqp<chain_t<N>>>>;
+    cartan::restart_wrapper<chain_t<N>, cartan_examples::nlopt_slsqp<chain_t<N>>>>;
 
 template <int N>
 using nlopt_bobyqa_solver = cartan::basic_ik_runner<
-    cartan::restart_wrapper<chain_t<N>, cartan::nlopt_bobyqa<chain_t<N>>>>;
+    cartan::restart_wrapper<chain_t<N>, cartan_examples::nlopt_bobyqa<chain_t<N>>>>;
 #endif
 
 // Convergence criteria shared across comparison benchmarks.
@@ -1646,10 +1646,10 @@ static void bm_comparison_ur3e_argmin_slsqp_last_check_results_alias(benchmark::
 BENCHMARK(bm_comparison_ur3e_argmin_slsqp_last_check_results_alias)
     ->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
-#ifdef CARTAN_HAS_NLOPT
+#ifdef CARTAN_EXAMPLE_HAS_NLOPT
 // Direct-drive NLopt SLSQP bench that also captures nlopt's per-pose
 // objective function call count (via the nlopt_objective_calls accessor
-// on cartan::nlopt_slsqp). Purpose: indirect per-inner-iteration
+// on cartan_examples::nlopt_slsqp). Purpose: indirect per-inner-iteration
 // wall measurement for nlopt on UR3e, to compare against argmin's
 // ~11.4 us/inner-step figure. Same 1000 UR3e poses, seed 42, cartan-
 // tight criteria, direct-drive (no restart_wrapper, no basic_ik_runner)
@@ -1667,7 +1667,7 @@ static void bm_comparison_ur3e_nlopt_slsqp_inner_iter_count(benchmark::State& st
     static const target_set<double, 6> ts(chain, num_targets, 42);
     const auto criteria = argmin_comparison_criteria();
 
-    cartan::nlopt_slsqp<chain_t<6>>::options slsqp_opts{};
+    cartan_examples::nlopt_slsqp<chain_t<6>>::options slsqp_opts{};
     slsqp_opts.budget_per_step = 500;
 
     std::size_t idx = 0;
@@ -1681,7 +1681,7 @@ static void bm_comparison_ur3e_nlopt_slsqp_inner_iter_count(benchmark::State& st
         auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
         ++idx;
 
-        cartan::nlopt_slsqp<chain_t<6>> solver{slsqp_opts};
+        cartan_examples::nlopt_slsqp<chain_t<6>> solver{slsqp_opts};
         solver.setup(chain, target, q_seed, criteria);
 
         while (solver.status() == cartan::ik_status::running)
@@ -1738,7 +1738,7 @@ static void bm_comparison_ur3e_nlopt_slsqp_restart_count(benchmark::State& state
     static const target_set<double, 6> ts(chain, num_targets, 42);
     const auto criteria = argmin_comparison_criteria();
 
-    cartan::nlopt_slsqp<chain_t<6>>::options slsqp_opts{};
+    cartan_examples::nlopt_slsqp<chain_t<6>>::options slsqp_opts{};
     slsqp_opts.budget_per_step = 500;
 
     std::size_t idx = 0;
@@ -1756,7 +1756,7 @@ static void bm_comparison_ur3e_nlopt_slsqp_restart_count(benchmark::State& state
         auto& q_seed = ts.seeds[idx % static_cast<std::size_t>(num_targets)];
         ++idx;
 
-        cartan::nlopt_slsqp<chain_t<6>> solver{slsqp_opts};
+        cartan_examples::nlopt_slsqp<chain_t<6>> solver{slsqp_opts};
         solver.setup(chain, target, q_seed, criteria);
 
         while (solver.status() == cartan::ik_status::running)
@@ -1951,7 +1951,7 @@ static void bm_comparison_ur3e_argmin_slsqp_phi_ls_calls_dynamicN(benchmark::Sta
 }
 BENCHMARK(bm_comparison_ur3e_argmin_slsqp_phi_ls_calls_dynamicN)->Iterations(num_targets)->Unit(benchmark::kMicrosecond);
 
-#ifdef CARTAN_HAS_NLOPT
+#ifdef CARTAN_EXAMPLE_HAS_NLOPT
 static void bm_comparison_ur3e_nlopt_slsqp(benchmark::State& state)
 {
     auto chain = cartan::fixtures::make_ur3e_chain<double>();

@@ -25,7 +25,8 @@ if (CARTAN_BUILD_ARGMIN)
     target_link_libraries(ik_profiling PRIVATE cartan::argmin)
 endif()
 
-# NLopt solvers are optional
-if (CARTAN_BUILD_NLOPT)
-    target_link_libraries(ik_profiling PRIVATE cartan::nlopt)
+# The NLopt solve policy ships as an example rather than as library surface, so
+# the target carrying it exists only when that example's own option is on.
+if (TARGET cartan_examples::nlopt_policy)
+    target_link_libraries(ik_profiling PRIVATE cartan_examples::nlopt_policy)
 endif()

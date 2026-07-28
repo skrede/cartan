@@ -33,7 +33,7 @@ See [IK Methods](../background/ik-methods.md) | [IK Composition Guide](../guides
 | `cartan::lbfgsb` (alias for `builtin_lbfgsb`) | `#include <cartan/serial/ik/solver/lbfgsb.h>` |
 | `cartan::projected_lm`, `cartan::dls`, `cartan::newton_raphson` | `#include <cartan/serial/ik/solver/{projected_lm,dls,newton_raphson}.h>` |
 | argmin-backed: `cartan::argmin_lm`, `argmin_lbfgsb`, `argmin_slsqp`, `argmin_bobyqa`, `argmin_projected_gn`, `argmin_projected_gradient_gn` | `#include <cartan/serial/ik/solver/argmin_*.h>` (requires `CARTAN_HAS_ARGMIN`) |
-| NLopt-backed: `cartan::nlopt_slsqp`, `cartan::nlopt_bobyqa` | `#include <cartan/serial/ik/solver/nlopt_*.h>` (requires `CARTAN_HAS_NLOPT`) |
+| NLopt-backed: `cartan_examples::nlopt_slsqp`, `cartan_examples::nlopt_bobyqa` | carried as a solve-policy example, not library surface: see `examples/nlopt_policy/` |
 | SQP family: `cartan::nw_sqp`, `filter_nw_sqp`, `filter_slsqp` | `#include <cartan/serial/ik/solver/{nw_sqp,filter_nw_sqp,filter_slsqp}.h>` |
 | MMA / GCMMA / CMA-ES / aug. Lagrangian: `cartan::mma`, `gcmma`, `cmaes`, `augmented_lagrangian` | `#include <cartan/serial/ik/solver/{mma,gcmma,cmaes,augmented_lagrangian}.h>` |
 | `cartan::restart_wrapper` | `#include <cartan/serial/ik/wrapper/restart_wrapper.h>` |
@@ -528,7 +528,7 @@ struct no_limits;
 ```
 
 No-op: applies no enforcement. Use when the policy handles constraints
-internally (e.g., `projected_lm`, NLopt/argmin policies with box
+internally (e.g., `projected_lm`, argmin policies with box
 constraints). Default for `cartan::lm` and `cartan::projected_lm`
 — the LM trust-region family for which post-step clamping would
 invalidate the trust-region step.
@@ -544,9 +544,9 @@ struct clamp_limits;
 
 Hard clamping: clamps each `q(i)` to `[position_min, position_max]`.
 Simple and robust, but may cause discontinuities at boundaries. Default
-for the native `lbfgsb`, and for the argmin/NLopt policies that already
+for the native `lbfgsb`, and for the argmin policies that already
 enforce box constraints internally (`argmin_slsqp`, `argmin_bobyqa`,
-`nlopt_*`).
+the argmin policies).
 
 ### null_space_limits
 
@@ -738,28 +738,6 @@ class argmin_projected_gradient_gn;
 ```
 
 argmin-backed projected-gradient Gauss-Newton with Armijo backtracking.
-
-### cartan::nlopt_slsqp
-
-<!-- cartan:unbuilt kind=declaration -->
-```cpp
-template <chain Chain, typename LimitsPolicy = clamp_limits>
-class nlopt_slsqp;
-```
-
-NLopt SLSQP solver. Same algorithm as `argmin_slsqp` but backed by
-NLopt. Guarded by `CARTAN_HAS_NLOPT`.
-
-### cartan::nlopt_bobyqa
-
-<!-- cartan:unbuilt kind=declaration -->
-```cpp
-template <chain Chain, typename LimitsPolicy = clamp_limits>
-class nlopt_bobyqa;
-```
-
-NLopt BOBYQA solver. Same algorithm as `argmin_bobyqa` but backed by
-NLopt. Guarded by `CARTAN_HAS_NLOPT`.
 
 ### cartan::nw_sqp
 

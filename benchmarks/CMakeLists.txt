@@ -111,11 +111,12 @@ cartan_add_benchmark(basic_ik_lm_benchmarks basic_ik_lm_benchmarks.cpp)
 # Exhaustive IK solver benchmarks
 cartan_add_benchmark(exhaustive_ik_full_benchmarks exhaustive_ik_full_benchmarks.cpp)
 
-# BOBYQA/SLSQP benchmarks require NLopt (a library solver backend, not a
-# benchmark-only comparison dependency).
-if (CARTAN_BUILD_NLOPT)
+# BOBYQA/SLSQP benchmarks measure the NLopt solve policy, which ships as an
+# example rather than as library surface; the target carrying it is defined only
+# when that example's own option is on.
+if (TARGET cartan_examples::nlopt_policy)
     cartan_add_benchmark(basic_ik_sqp_benchmarks basic_ik_sqp_benchmarks.cpp)
-    target_link_libraries(basic_ik_sqp_benchmarks PRIVATE cartan::nlopt)
+    target_link_libraries(basic_ik_sqp_benchmarks PRIVATE cartan_examples::nlopt_policy)
 endif()
 
 # --- TRAC-IK comparison benchmarks: trac_ik ships no find_package config, so it
@@ -155,8 +156,8 @@ endif ()
 if (CARTAN_HAVE_TRAC_IK)
     cartan_add_benchmark(ik_comparison_benchmarks ik_comparison_benchmarks.cpp)
     target_link_libraries(ik_comparison_benchmarks PRIVATE trac_ik)
-    if(CARTAN_BUILD_NLOPT)
-        target_link_libraries(ik_comparison_benchmarks PRIVATE cartan::nlopt)
+    if(TARGET cartan_examples::nlopt_policy)
+        target_link_libraries(ik_comparison_benchmarks PRIVATE cartan_examples::nlopt_policy)
     endif()
     if(CARTAN_BUILD_ARGMIN)
         target_link_libraries(ik_comparison_benchmarks PRIVATE cartan::argmin)
@@ -167,8 +168,8 @@ if (CARTAN_HAVE_TRAC_IK)
     if(CARTAN_BUILD_ARGMIN)
         target_link_libraries(basic_ik_full_benchmarks PRIVATE cartan::argmin)
     endif()
-    if(CARTAN_BUILD_NLOPT)
-        target_link_libraries(basic_ik_full_benchmarks PRIVATE cartan::nlopt)
+    if(TARGET cartan_examples::nlopt_policy)
+        target_link_libraries(basic_ik_full_benchmarks PRIVATE cartan_examples::nlopt_policy)
     endif()
 
     if(CARTAN_BUILD_ARGMIN)
@@ -187,12 +188,12 @@ if (CARTAN_HAVE_TRAC_IK)
         target_compile_options(slsqp_per_pose_trace PRIVATE ${CARTAN_WARNING_FLAGS})
     endif()
 
-    if(CARTAN_BUILD_NLOPT)
+    if(TARGET cartan_examples::nlopt_policy)
         add_executable(nlopt_slsqp_per_pose_capture nlopt_slsqp_per_pose_capture.cpp)
         target_link_libraries(nlopt_slsqp_per_pose_capture
             PRIVATE
             cartan::cartan
-            cartan::nlopt)
+            cartan_examples::nlopt_policy)
         target_compile_options(nlopt_slsqp_per_pose_capture PRIVATE ${CARTAN_WARNING_FLAGS})
     endif()
 

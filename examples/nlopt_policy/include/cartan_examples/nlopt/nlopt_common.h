@@ -1,17 +1,15 @@
-#ifndef HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_NLOPT_COMMON_H
-#define HPP_GUARD_CARTAN_SERIAL_IK_DETAIL_NLOPT_COMMON_H
+#ifndef HPP_GUARD_CARTAN_EXAMPLES_NLOPT_NLOPT_COMMON_H
+#define HPP_GUARD_CARTAN_EXAMPLES_NLOPT_NLOPT_COMMON_H
 
 /// Shared NLopt wrapper helpers for NLopt-backed IK solve policies.
 ///
 /// Extracts conversion, bounds setup, optimization dispatch, result mapping,
 /// convergence checking, perturbation, and limit enforcement utilities shared
-/// between cartan::nlopt_slsqp and cartan::nlopt_bobyqa.
+/// between cartan_examples::nlopt_slsqp and cartan_examples::nlopt_bobyqa.
 ///
-/// All functions live in cartan::detail and are guarded by CARTAN_HAS_NLOPT.
+/// All functions live in cartan_examples::detail.
 ///
 /// Rationale: extract shared NLopt boilerplate.
-
-#ifdef CARTAN_HAS_NLOPT
 
 #include "cartan/types.h"
 
@@ -32,8 +30,13 @@
 #include <vector>
 #include <algorithm>
 
-namespace cartan
+namespace cartan_examples
 {
+// The adapter is written against cartan's vocabulary types, the way a reader
+// pasting this into their own project would write it. It stays out of namespace
+// cartan because a name that exists only when an optional dependency is present
+// is exactly what the library's own name-invariance gate forbids.
+using namespace cartan;
 namespace detail
 {
 
@@ -266,7 +269,7 @@ void enforce_and_sync_limits(
     const kinematic_chain<Scalar, N>& chain)
 {
     auto q = stdvec_to_eigen<Scalar, N>(x);
-    enforce_limits<LimitsPolicy>(q, chain);
+    cartan::detail::enforce_limits<LimitsPolicy>(q, chain);
     int n = static_cast<int>(x.size());
     for (int i = 0; i < n; ++i)
     {
@@ -276,7 +279,5 @@ void enforce_and_sync_limits(
 
 }
 }
-
-#endif
 
 #endif

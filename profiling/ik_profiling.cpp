@@ -19,8 +19,8 @@
 #include <cartan/serial/ik/solver/projected_lm.h>
 #include <cartan/serial/ik/solver/newton_raphson.h>
 
-#ifdef CARTAN_HAS_NLOPT
-#include <cartan/serial/ik/solver/nlopt_slsqp.h>
+#ifdef CARTAN_EXAMPLE_HAS_NLOPT
+#include <cartan_examples/nlopt/nlopt_slsqp.h>
 #endif
 
 #include <benchmark/benchmark.h>
@@ -146,10 +146,10 @@ template <int N>
 using argmin_slsqp_solver = cartan::basic_ik_runner<argmin_slsqp_restart<N>>;
 #endif
 
-// NLopt family (behind CARTAN_HAS_NLOPT)
-#ifdef CARTAN_HAS_NLOPT
+// NLopt family (behind CARTAN_EXAMPLE_HAS_NLOPT)
+#ifdef CARTAN_EXAMPLE_HAS_NLOPT
 template <int N>
-using nlopt_slsqp_restart = cartan::restart_wrapper<chain_t<N>, cartan::nlopt_slsqp<chain_t<N>>>;
+using nlopt_slsqp_restart = cartan::restart_wrapper<chain_t<N>, cartan_examples::nlopt_slsqp<chain_t<N>>>;
 
 template <int N>
 using nlopt_slsqp_solver = cartan::basic_ik_runner<nlopt_slsqp_restart<N>>;
@@ -165,7 +165,7 @@ inline cartan::convergence_criteria<double> restart_lm_criteria()           { re
 #ifdef CARTAN_HAS_ARGMIN
 inline cartan::convergence_criteria<double> argmin_criteria()              { return {1e-5, 1e-5, 500}; }
 #endif
-#ifdef CARTAN_HAS_NLOPT
+#ifdef CARTAN_EXAMPLE_HAS_NLOPT
 inline cartan::convergence_criteria<double> nlopt_criteria()                { return {1e-5, 1e-5, 500}; }
 #endif
 
@@ -223,7 +223,7 @@ BENCHMARK(bm_profiling_##ROBOT##_argmin_slsqp)->Iterations(1000)->Unit(benchmark
 #endif
 
 // Register NLopt solver benchmarks for a 6-DOF robot.
-#ifdef CARTAN_HAS_NLOPT
+#ifdef CARTAN_EXAMPLE_HAS_NLOPT
 #define REGISTER_6DOF_NLOPT_PROFILING(ROBOT, CHAIN_FN)                                                 \
                                                                                                        \
 static void bm_profiling_##ROBOT##_nlopt_slsqp(benchmark::State& state)                                \
@@ -287,7 +287,7 @@ BENCHMARK(bm_profiling_##ROBOT##_argmin_slsqp)->Iterations(1000)->Unit(benchmark
 #endif
 
 // Register NLopt solver benchmarks for a 7-DOF robot.
-#ifdef CARTAN_HAS_NLOPT
+#ifdef CARTAN_EXAMPLE_HAS_NLOPT
 #define REGISTER_7DOF_NLOPT_PROFILING(ROBOT, CHAIN_FN)                                                 \
                                                                                                        \
 static void bm_profiling_##ROBOT##_nlopt_slsqp(benchmark::State& state)                                \

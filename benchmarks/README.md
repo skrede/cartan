@@ -36,7 +36,7 @@ To also build SQP benchmarks (requires NLopt):
 ```bash
 cmake --preset=dev \
     -DCARTAN_BUILD_BENCHMARKS=ON \
-    -DCARTAN_BUILD_NLOPT=ON \
+    -DCARTAN_EXAMPLE_NLOPT_POLICY=ON \
     -DCARTAN_CMAKE_FETCH_DEPS=ON
 ```
 

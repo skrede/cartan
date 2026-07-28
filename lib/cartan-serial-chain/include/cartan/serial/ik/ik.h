@@ -39,9 +39,4 @@
 #include "cartan/serial/ik/solver/augmented_lagrangian.h"
 #endif
 
-#ifdef CARTAN_HAS_NLOPT
-#include "cartan/serial/ik/solver/nlopt_slsqp.h"
-#include "cartan/serial/ik/solver/nlopt_bobyqa.h"
-#endif
-
 #endif

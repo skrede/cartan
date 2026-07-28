@@ -1,9 +1,9 @@
-#ifdef CARTAN_HAS_NLOPT
+#ifdef CARTAN_EXAMPLE_HAS_NLOPT
 
 #include "../support/kinematics_helpers.h"
 #include "../support/joint_limits_helpers.h"
 
-#include <cartan/serial/ik/solver/nlopt_bobyqa.h>
+#include <cartan_examples/nlopt/nlopt_bobyqa.h>
 
 #include <cartan/types.h>
 
@@ -61,7 +61,7 @@ spp::ik_status run_stepper(
 
 TEST_CASE("nlopt_bobyqa_solve_policy satisfies ik_solve_policy concept", "[ik][bobyqa]")
 {
-    static_assert(spp::solve_policy<spp::nlopt_bobyqa<spp::kinematic_chain<double, 6>>>);
+    static_assert(spp::solve_policy<cartan_examples::nlopt_bobyqa<spp::kinematic_chain<double, 6>>>);
     SUCCEED();
 }
 
@@ -84,7 +84,7 @@ TEST_CASE("nlopt_bobyqa_solve_policy converges on UR5-like chain", "[ik][bobyqa]
     criteria.position_tol = 1e-4;
     criteria.orientation_tol = 1e-4;
 
-    spp::nlopt_bobyqa<spp::kinematic_chain<double, 6>> stepper;
+    cartan_examples::nlopt_bobyqa<spp::kinematic_chain<double, 6>> stepper;
     stepper.setup(chain, target, q_seed, criteria);
 
     run_stepper(stepper, chain, 50);
