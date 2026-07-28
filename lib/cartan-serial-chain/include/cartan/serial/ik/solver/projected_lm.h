@@ -625,14 +625,14 @@ private:
         // compile-time maximum instead. Clang is clean on the same source and the
         // reported access width follows the vector register width, which is what
         // marks this as a modeling artifact rather than a live over-read.
-#if defined(__GNUC__) && !defined(__clang__) && __GNUC__ >= 15
+#if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Warray-bounds"
 #endif
         scalar_type a_sq = a.squaredNorm();
         scalar_type d_sq = d.squaredNorm();
         scalar_type a_dot_d = a.dot(d);
-#if defined(__GNUC__) && !defined(__clang__) && __GNUC__ >= 15
+#if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC diagnostic pop
 #endif
         scalar_type delta_sq = m_delta * m_delta;

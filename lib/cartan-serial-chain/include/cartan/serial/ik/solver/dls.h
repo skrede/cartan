@@ -184,7 +184,7 @@ public:
             // last element reads as possibly unwritten; for a fixed-size Jacobian it
             // is that minimum unconditionally. Only -O3 raises this -- -O0, -O1 and
             // -O2 are clean, as is clang on the same source.
-#if defined(__GNUC__) && !defined(__clang__) && __GNUC__ >= 15
+#if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 #endif
@@ -195,7 +195,7 @@ public:
 
             scalar_type sigma_min = sigma(rank - 1);
             scalar_type sigma_max = sigma(0);
-#if defined(__GNUC__) && !defined(__clang__) && __GNUC__ >= 15
+#if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC diagnostic pop
 #endif
             scalar_type lambda_sq{0};
