@@ -274,7 +274,15 @@ jobs:
             exit 0
           fi
           mkdir -p ~/.ssh
-          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+          # Pinned rather than keyscanned. ssh-keyscan trusts whatever the
+          # network answers with, which is the one unpinned trust decision in a
+          # workflow that pins its actions and its dependencies by digest. This
+          # is github.com's published ed25519 host key; if GitHub rotates it the
+          # push fails loudly and this line is the fix, which is the failure
+          # direction this repository prefers.
+          printf '%s\n' \
+            'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' \
+            > ~/.ssh/known_hosts
           printf '%s\n' "${CORPUS_KEY}" > ~/.ssh/corpus_key
           chmod 600 ~/.ssh/corpus_key
           export GIT_SSH_COMMAND="ssh -i ~/.ssh/corpus_key -o IdentitiesOnly=yes"
