@@ -255,8 +255,12 @@ inline AnalyticalResult solve_opw_result(const KC &chain, const OPWParametersd &
 
 inline AnalyticalResult solve_pieper_result(const KC &chain, const SE3d &target)
 {
-    cartan::pieper_6r_solver solver(chain);
-    return to_analytical_result(solver.solve(target));
+    auto solver = cartan::pieper_6r_solver<KC>::make(chain);
+    if(!solver)
+    {
+        return to_analytical_error_result(solver.error());
+    }
+    return to_analytical_result(solver->solve(target));
 }
 
 inline AnalyticalResult solve_planar_result(const KC &chain, const SE3d &target)
@@ -382,25 +386,19 @@ void register_analytical(nb::module_ &m)
                           + ", error_metric=" + format_error_metric(r.error_metric) + ")";
                  });
 
-    // ------------------------------------------------------------------
-    // Solver lambdas: solve_pieper_6r, solve_planar_2r, solve_3r.
-    // Each constructs a fresh solver from the dynamic chain via CTAD on
-    // the chain concept, calls solve(target), and unwraps the
-    // expected<...> via to_analytical_result. Hard-fail target validation
-    // happens before the GIL is released so the ValueError is raised on
-    // the calling thread.
-    // ------------------------------------------------------------------
+    // Hard-fail target validation happens before the GIL is released so the
+    // ValueError is raised on the calling thread.
     analytical.def(
             "solve_pieper_6r",
             [](const KC &chain, const SE3d &target) -> AnalyticalResult
             {
                 validate_target_finite("solve_pieper_6r", target);
-                cartan::pieper_6r_solver solver(chain);
-                return to_analytical_result(solver.solve(target));
+                return solve_pieper_result(chain, target);
             },
             "Closed-form 6R inverse kinematics for Pieper-type wrists. "
-            "Returns up to 8 FK-verified branches; on a non-Pieper chain "
-            "status is degenerate_geometry and solutions is empty.",
+            "Returns up to 8 FK-verified branches; a non-Pieper chain is "
+            "rejected when the solver is constructed, so status is "
+            "degenerate_geometry and solutions is empty.",
             nb::arg("chain"), nb::arg("target").noconvert(), nb::call_guard<nb::gil_scoped_release>());
 
     analytical.def(
@@ -713,11 +711,8 @@ void register_analytical(nb::module_ &m)
                 switch(n)
                 {
                     case 6:
-                        {
-                            cartan::pieper_6r_solver solver(chain);
-                            result = to_analytical_result(solver.solve(target));
-                            break;
-                        }
+                        result = solve_pieper_result(chain, target);
+                        break;
                     case 2:
                         result = solve_planar_result(chain, target);
                         break;

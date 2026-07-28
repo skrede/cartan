@@ -4,7 +4,7 @@
 ///        random targets. Pass `--csv <path>` to write per-target rows for
 ///        cross-language parity checks.
 ///
-/// Shows: cartan::pieper_6r_solver direct construction on a static_chain;
+/// Shows: cartan::pieper_6r_solver validated construction on a static_chain;
 ///        branch collapse by cartan::closest_to_seed over the populated
 ///        subset of analytical_result::solutions; projected_lm-based
 ///        iterative IK wrapped in basic_ik_runner; std::chrono per-call
@@ -217,13 +217,20 @@ int main(int argc, char** argv)
     // --- Solver instances --------------------------------------------------
     //
     // Both solvers are constructed once outside the per-seed loop. The
-    // closed-form path pre-computes a chain-dependent wrist offset at
-    // construction; reconstructing it per seed would waste those cycles.
+    // closed-form path validates the chain's Pieper geometry and pre-computes
+    // a chain-dependent wrist offset at construction; reconstructing it per
+    // seed would waste those cycles.
     // The iterative path is a basic_ik_runner wrapping projected_lm with
     // the no_limits policy (the closed-form path itself imposes no joint
     // limits on its decomposition, so we make the iterative comparison
     // apples-to-apples by also dropping the box projection for this race).
-    cartan::pieper_6r_solver<chain_t> analytical(chain);
+    auto analytical = cartan::pieper_6r_solver<chain_t>::make(chain);
+    if (!analytical.has_value())
+    {
+        std::cerr << "closed-form solver construction failed: "
+                  << cartan::message(analytical.error().reason) << '\n';
+        return 1;
+    }
 
     cartan::basic_ik_runner<
         cartan::projected_lm<chain_t, cartan::no_limits>>
@@ -297,7 +304,7 @@ int main(int argc, char** argv)
         // branch set to the one nearest q_seed.
         {
             auto t0 = std::chrono::steady_clock::now();
-            auto result = analytical.solve(target);
+            auto result = analytical->solve(target);
             auto t1 = std::chrono::steady_clock::now();
 
             call_record rec;

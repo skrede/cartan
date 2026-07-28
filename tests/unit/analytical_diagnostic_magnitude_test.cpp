@@ -136,15 +136,14 @@ TEST_CASE("analytical diagnostics: a 6R failure that evaluated no inequality car
         pieper_6r_solver<decltype(offset_shoulder)>::make(offset_shoulder));
     absent("6R factory: wrist is not spherical",
         pieper_6r_solver<decltype(near_spherical)>::make(near_spherical));
-    absent("6R solve: invalid state", pieper_6r_solver<dyn_chain>(two).solve(at(1, 0, 0)));
     // Wrist center on the axis-1 line leaves joint 1 undetermined.
     absent("6R solve: shoulder singularity",
-        pieper_6r_solver<dyn_chain>(puma).solve(at(0.1, 0.0, 0.6)));
+        pieper_6r_solver<dyn_chain>::make(puma)->solve(at(0.1, 0.0, 0.6)));
     absent("6R solve: subproblem reports a nonfinite input",
-        pieper_6r_solver<dyn_chain>(puma).solve(at(nan_v, 0, 0)));
+        pieper_6r_solver<dyn_chain>::make(puma)->solve(at(nan_v, 0, 0)));
 
     absent("6R solve: subproblem reports an unreachable target",
-        pieper_6r_solver<dyn_chain>(puma).solve(at(50, 50, 50)));
+        pieper_6r_solver<dyn_chain>::make(puma)->solve(at(50, 50, 50)));
 }
 
 TEST_CASE("analytical diagnostics: an OPW failure that evaluated no inequality carries nothing")

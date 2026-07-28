@@ -744,9 +744,6 @@ private:
     bool m_valid{false};
 };
 
-template <chain Chain>
-opw_6r_solver(const Chain&) -> opw_6r_solver<Chain>;
-
 static_assert(analytical_solver<opw_6r_solver<static_chain<double,
     revolute_z, revolute_y, revolute_y, revolute_z, revolute_y, revolute_z>>>,
     "opw_6r_solver must satisfy analytical_solver concept");

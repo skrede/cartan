@@ -609,30 +609,30 @@ Decomposition:
 3. All solutions are FK-verified with both position and orientation
    checks.
 
-### Constructor
+### Factory
 
 <!-- cartan:unbuilt kind=declaration -->
 ```cpp
-explicit pieper_6r_solver(
-    const chain_type& chain,
-    verification_tolerance<scalar_type> tolerance
-        = default_verification_tolerance_v<scalar_type>);
-
 static cartan::expected<pieper_6r_solver, analytical_error<scalar_type>>
 make(const chain_type& chain,
      verification_tolerance<scalar_type> tolerance
          = default_verification_tolerance_v<scalar_type>);
 ```
 
-Captures the chain by value. Pre-computes the wrist-center geometry from
-the joint-4/5/6 screw axes. The tolerance's `position()` field is a distance in
-the chain's linear unit and `orientation()` an angle in radians; the FK
-back-check compares each residual against its own field, so a length never
-gates an angle. `make` validates the Pieper preconditions before returning a
-solver and judges both of them — the shoulder-axis gap and the wrist
-sphericity — against `position()`, the same threshold the back-check applies,
-so an admitted chain yields at least one branch that verifies to the bound the
-caller asked for.
+The constructor is private and `make` is the only way in, so a chain the
+Pieper decomposition does not support cannot reach a solver. `make` requires
+six revolute joints and judges both geometric preconditions — the
+shoulder-axis gap between joints 1 and 2, and the sphericity of the joint-4/5/6
+wrist — against `position()`, the same threshold the FK back-check applies, so
+an admitted chain yields at least one branch that verifies to the bound the
+caller asked for. A chain failing any of these is rejected with
+`degenerate_geometry` and no magnitude.
+
+The solver captures the chain by value and pre-computes the wrist-center
+geometry from the wrist center `make` already derived. The tolerance's
+`position()` field is a distance in the chain's linear unit and `orientation()`
+an angle in radians; the FK back-check compares each residual against its own
+field, so a length never gates an angle.
 
 Admission promises **one** verifying branch, not all eight. Measured on a
 near-spherical family whose wrist axes miss the common center by `d`, the
@@ -658,13 +658,15 @@ pose (both position and orientation).
 <!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar, joint_tag... Joints>
-auto solve_6r(
+cartan::expected<analytical_result<Scalar, 6, 8>, analytical_error<Scalar>>
+solve_6r(
     const static_chain<Scalar, Joints...>& chain,
     const se3<Scalar>& target);
 ```
 
-Convenience wrapper: constructs a `pieper_6r_solver` from the given
-chain and immediately invokes `solve(target)`.
+Convenience wrapper: constructs a `pieper_6r_solver` through `make` and
+immediately invokes `solve(target)`. A chain the factory rejects is forwarded
+as that same construction failure, so this path applies both geometry gates.
 
 Reference: Lynch & Park, Modern Robotics, Section 6.1.1.
            Murray, Li and Sastry (1994), Section 3.3.

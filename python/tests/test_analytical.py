@@ -386,8 +386,8 @@ def test_solve_pieper_6r_ur5e_soft_fails_on_wrist_offset(
     target = cartan.forward_kinematics(chain, q_truth)
     result = cartan.analytical.solve_pieper_6r(chain, target)
     # UR5e vendored URDF has an offset wrist; the strict Pieper solver
-    # rejects it at ctor (degenerate_geometry) or during decomposition
-    # (unreachable / verification_failed).
+    # rejects it when the factory validates the chain (degenerate_geometry) or
+    # during decomposition (unreachable / verification_failed).
     assert result.status in (
         cartan.AnalyticalStatus.degenerate_geometry,
         cartan.AnalyticalStatus.unreachable,
@@ -665,7 +665,7 @@ def test_solve_all_dispatches_by_joint_count(
     assert len(result_2r.solutions) >= 1
 
     # cartanbot has prismatic / 6 joints with non-revolute -> Pieper rejects;
-    # solve_all dispatches to pieper_6r_solver for n=6, which fails at ctor.
+    # solve_all dispatches to pieper_6r_solver for n=6, whose factory rejects it.
     target_bot = cartan.forward_kinematics(
         cartanbot_chain, np.zeros(cartanbot_chain.num_joints()))
     result_bot = cartan.analytical.solve_all(cartanbot_chain, target_bot)

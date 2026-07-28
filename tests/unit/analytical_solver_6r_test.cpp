@@ -22,6 +22,19 @@ using Catch::Matchers::WithinAbs;
 
 static constexpr double tolerance = 1e-6;
 
+/// The validating factory is the only way to a solver, so a case whose subject
+/// is a solve says so by failing here rather than by exercising a solver whose
+/// geometry was never gated.
+template <typename Chain>
+pieper_6r_solver<Chain> made(
+    const Chain& chain,
+    verification_tolerance<double> tol = default_verification_tolerance_v<double>)
+{
+    auto solver = pieper_6r_solver<Chain>::make(chain, tol);
+    REQUIRE(solver.has_value());
+    return *solver;
+}
+
 /// The FK back-check's tolerance parameter carries no default, so a solver that
 /// forgets to forward its own cannot fall back to a third one. Detected rather
 /// than asserted in prose: the first trait must be false and the second true, or
@@ -161,7 +174,7 @@ TEST_CASE("6R Pieper: reachable target from known FK returns solutions")
     q_known << 0.3, -0.4, 0.5, 0.2, -0.3, 0.1;
 
     auto fk = testing::fk_at(chain, q_known);
-    auto result = pieper_6r_solver(chain).solve(fk.end_effector);
+    auto result = made(chain).solve(fk.end_effector);
 
     REQUIRE(result.has_value());
     REQUIRE(result->count >= 1);
@@ -186,7 +199,7 @@ TEST_CASE("6R Pieper: recovers original angles as one of the solutions")
     q_known << 0.3, -0.4, 0.5, 0.2, -0.3, 0.1;
 
     auto fk = testing::fk_at(chain, q_known);
-    auto result = pieper_6r_solver(chain).solve(fk.end_effector);
+    auto result = made(chain).solve(fk.end_effector);
 
     REQUIRE(result.has_value());
 
@@ -215,7 +228,7 @@ TEST_CASE("6R Pieper: multiple solutions are distinct")
     q_known << 0.3, -0.4, 0.5, 0.2, -0.3, 0.1;
 
     auto fk = testing::fk_at(chain, q_known);
-    auto result = pieper_6r_solver(chain).solve(fk.end_effector);
+    auto result = made(chain).solve(fk.end_effector);
 
     REQUIRE(result.has_value());
 
@@ -240,7 +253,7 @@ TEST_CASE("6R Pieper: unreachable target returns error")
         so3<double>::identity(),
         Eigen::Vector3d(100.0, 100.0, 100.0));
 
-    auto result = pieper_6r_solver(chain).solve(far_target);
+    auto result = made(chain).solve(far_target);
 
     REQUIRE_FALSE(result.has_value());
     CHECK(result.error().reason == analytical_failure::unreachable);
@@ -264,9 +277,9 @@ TEST_CASE("6R Pieper: a target whose branches are all rejected reports a failed 
 
     // The premise: at the module default this same target solves, so nothing
     // about it is out of reach.
-    REQUIRE(pieper_6r_solver(chain).solve(target).has_value());
+    REQUIRE(made(chain).solve(target).has_value());
 
-    auto result = pieper_6r_solver<decltype(chain)>(
+    auto result = made(
         chain, verification_tolerance<double>(1e-6, 0.0)).solve(target);
 
     REQUIRE_FALSE(result.has_value());
@@ -289,7 +302,7 @@ TEST_CASE("6R Pieper: a target for which no branch was placed is not a failed "
     q_known << 0.3, -0.4, 0.5, 0.2, -0.3, 0.1;
     auto target = testing::fk_at(chain, q_known).end_effector;
 
-    auto result = pieper_6r_solver<decltype(chain)>(
+    auto result = made(
         chain, verification_tolerance<double>(0.0, 1e-6)).solve(target);
 
     REQUIRE_FALSE(result.has_value());
@@ -304,7 +317,7 @@ TEST_CASE("6R Pieper: wrist singularity (theta5 near zero)")
     q_singular << 0.3, -0.4, 0.5, 0.0, 0.0, 0.0;
 
     auto fk = testing::fk_at(chain, q_singular);
-    auto result = pieper_6r_solver(chain).solve(fk.end_effector);
+    auto result = made(chain).solve(fk.end_effector);
 
     REQUIRE(result.has_value());
     REQUIRE(result->count >= 1);
@@ -333,7 +346,7 @@ TEST_CASE("6R Pieper: identity target")
     auto chain = make_puma_chain();
     auto home_target = chain.home();
 
-    auto result = pieper_6r_solver(chain).solve(home_target);
+    auto result = made(chain).solve(home_target);
 
     // Home pose should be reachable (all zeros is a solution)
     REQUIRE(result.has_value());
@@ -359,22 +372,12 @@ TEST_CASE("6R Pieper: convenience function solve_6r works")
 
     auto fk = testing::fk_at(chain, q_known);
 
-    auto result_direct = pieper_6r_solver(chain).solve(fk.end_effector);
+    auto result_direct = made(chain).solve(fk.end_effector);
     auto result_convenience = solve_6r(chain, fk.end_effector);
 
     REQUIRE(result_direct.has_value());
     REQUIRE(result_convenience.has_value());
     CHECK(result_direct->count == result_convenience->count);
-}
-
-TEST_CASE("6R Pieper: CTAD deduction guide works")
-{
-    auto chain = make_puma_chain();
-    pieper_6r_solver solver(chain);
-    static_assert(std::same_as<
-        decltype(solver),
-        pieper_6r_solver<static_chain<double, revolute_z, revolute_y, revolute_y,
-                                      revolute_z, revolute_y, revolute_z>>>);
 }
 
 TEST_CASE("6R Pieper: anti-parallel outer wrist solves reachable poses")
@@ -394,7 +397,7 @@ TEST_CASE("6R Pieper: anti-parallel outer wrist solves reachable poses")
     for (const auto& q_known : configs)
     {
         auto fk = testing::fk_at(chain, q_known);
-        auto result = pieper_6r_solver(chain).solve(fk.end_effector);
+        auto result = made(chain).solve(fk.end_effector);
 
         REQUIRE(result.has_value());
         REQUIRE(result->count >= 1);
@@ -427,7 +430,7 @@ TEST_CASE("6R Pieper: solutions are wrapped to (-pi, pi] and deduplicated")
     q_known << 0.3, -0.4, 0.5, 0.2, -0.3, 0.1;
 
     auto fk = testing::fk_at(chain, q_known);
-    auto result = pieper_6r_solver(chain).solve(fk.end_effector);
+    auto result = made(chain).solve(fk.end_effector);
 
     REQUIRE(result.has_value());
     REQUIRE(result->count >= 1);
@@ -484,17 +487,11 @@ TEST_CASE("6R Pieper: solutions are wrapped to (-pi, pi] and deduplicated")
 TEST_CASE("6R Pieper: non-Pieper chain fails gracefully")
 {
     auto chain = make_non_pieper_chain();
-    pieper_6r_solver solver(chain);
+    auto solver = pieper_6r_solver<decltype(chain)>::make(chain);
 
-    // Non-Pieper geometry should fail at solve() with degenerate_geometry
-    Eigen::Vector<double, 6> q_test;
-    q_test << 0.1, 0.2, 0.3, 0.4, 0.5, 0.6;
-    auto fk = testing::fk_at(chain, q_test);
-
-    auto result = solver.solve(fk.end_effector);
-
-    REQUIRE_FALSE(result.has_value());
-    CHECK(result.error().reason == analytical_failure::degenerate_geometry);
+    REQUIRE_FALSE(solver.has_value());
+    CHECK(solver.error().reason == analytical_failure::degenerate_geometry);
+    CHECK_FALSE(solver.error().workspace_distance.has_value());
 }
 
 // FK-back-verify every returned solution against the target to the acceptance
@@ -502,9 +499,17 @@ TEST_CASE("6R Pieper: non-Pieper chain fails gracefully")
 // least one returned solution verifies to `tolerance` on both position and
 // orientation.
 template <typename Chain>
-static bool fk_solvable(const Chain& chain, const se3<double>& target)
+static bool fk_solvable(const Chain& chain, const se3<double>& target, double miss)
 {
-    auto result = pieper_6r_solver(chain).solve(target);
+    // The callers hand this chains their own geometry gate refuses, so entry is
+    // bought with a position bound just past that chain's own miss rather than
+    // a blanket loose one -- the tolerance also drives the solver's internal
+    // fold and singularity thresholds, so widening it far distorts the branches
+    // it is meant to admit. Every branch is judged against the acceptance
+    // tolerance below, independently of what the solver reports.
+    const verification_tolerance<double> reachable(
+        std::max(2.0 * miss, tolerance), tolerance);
+    auto result = made(chain, reachable).solve(target);
     if (!result || result->count < 1)
         return false;
     for (int i = 0; i < result->count; ++i)
@@ -575,7 +580,7 @@ TEST_CASE("6R Pieper: near-spherical wrist is rejected at construction")
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.4, 0.5, 0.2, -0.3, 0.1;
     auto fk = testing::fk_at(chain, q_known);
-    CHECK_FALSE(fk_solvable(chain, fk.end_effector));
+    CHECK_FALSE(fk_solvable(chain, fk.end_effector, 5e-4));
 }
 
 TEST_CASE("6R Pieper: the shoulder-axis gate judges its distance against the "
@@ -623,7 +628,7 @@ TEST_CASE("6R Pieper: shoulder singularity returns the error channel")
     // The orientation field is zero: the radial test judges a distance, so a
     // test reading the orientation field would compare a norm against zero,
     // never fire, and report something other than a singular configuration.
-    auto result = pieper_6r_solver<decltype(chain)>(
+    auto result = made(
         chain, verification_tolerance<double>(1e-6, 0.0)).solve(fk.end_effector);
 
     REQUIRE_FALSE(result.has_value());
@@ -666,7 +671,7 @@ TEST_CASE("6R Pieper: wrist-intersection tolerance sweep (construction gate)")
         auto fk = testing::fk_at(chain, q_probe);
 
         INFO("wrist offset = " << s.offset);
-        bool solvable = fk_solvable(chain, fk.end_effector);
+        bool solvable = fk_solvable(chain, fk.end_effector, s.offset);
         CHECK(solvable == s.expect_solvable);
 
         // The construction gate (anchored to pos_tol) must agree with actual
@@ -684,9 +689,9 @@ TEST_CASE("6R Pieper: wrist-intersection tolerance sweep (construction gate)")
     auto narrow = testing::unwrap(
         fixtures::make_near_spherical_wrist_puma<double>(1e-7),
         "make_near_spherical_wrist_puma");
-    auto wide_result = pieper_6r_solver(wide).solve(
+    auto wide_result = made(wide).solve(
         testing::fk_at(wide, q_probe).end_effector);
-    auto narrow_result = pieper_6r_solver(narrow).solve(
+    auto narrow_result = made(narrow).solve(
         testing::fk_at(narrow, q_probe).end_effector);
     REQUIRE(wide_result.has_value());
     REQUIRE(narrow_result.has_value());
@@ -727,25 +732,33 @@ TEST_CASE("6R Pieper: an acceptance tolerance below the module default rejects "
     q_known << 0.3, -0.4, 0.5, 0.2, -0.3, 0.1;
     auto target = testing::fk_at(chain, q_known).end_effector;
 
-    auto at_default = pieper_6r_solver<decltype(chain)>(chain).solve(target);
+    auto at_default = made(chain).solve(target);
     REQUIRE(at_default.has_value());
     REQUIRE(at_default->count > 0);
     auto [best, worst] = position_residual_range(chain, at_default, target);
     CHECK(best > 1e-9);
     CHECK(worst < 1e-6);
 
-    const verification_tolerance<double> tight(1e-9, 1e-9);
-    auto at_tight = pieper_6r_solver<decltype(chain)>(chain, tight).solve(target);
-    CHECK_FALSE(at_tight.has_value());
+    // The sphericity gate admits this wrist at exactly its own miss distance,
+    // so 1e-7 is the tightest back-check this chain can be asked for: below it
+    // construction refuses and no back-check runs at all.
+    const verification_tolerance<double> banded(1e-7, 1e-7);
+    auto at_banded = made(chain, banded).solve(target);
+    REQUIRE(at_banded.has_value());
+    CHECK(at_banded->count < at_default->count);
+    auto [tight_best, tight_worst] = position_residual_range(chain, at_banded, target);
+    CHECK(tight_best > 1e-9);
+    CHECK(tight_worst < 1e-7);
 }
 
 TEST_CASE("6R Pieper: an acceptance tolerance above the module default admits "
           "branches the default rejects")
 {
-    // Wrist offset 1e-4 pushes every branch's residual past the module default,
-    // so a solver at the default reports the arm unreachable. Pre-fix a solver
-    // built at 1e-3 reported the same, because the solve-time back-check
-    // applied the default rather than the configured bound.
+    // Wrist offset 1e-4 misses the module default by two decades, so the
+    // sphericity gate refuses the chain outright and no back-check runs; the
+    // admission that follows is what the looser bound buys. Pre-fix the bare
+    // constructor admitted this wrist at the intersection helper's 1e-3
+    // default whatever tolerance it was handed.
     auto chain = testing::unwrap(
         fixtures::make_near_spherical_wrist_puma<double>(1e-4),
         "make_near_spherical_wrist_puma");
@@ -753,10 +766,10 @@ TEST_CASE("6R Pieper: an acceptance tolerance above the module default admits "
     q_known << 0.3, -0.4, 0.5, 0.2, -0.3, 0.1;
     auto target = testing::fk_at(chain, q_known).end_effector;
 
-    CHECK_FALSE(pieper_6r_solver<decltype(chain)>(chain).solve(target).has_value());
+    CHECK_FALSE(pieper_6r_solver<decltype(chain)>::make(chain).has_value());
 
     const verification_tolerance<double> loose(1e-3, 1e-3);
-    auto at_loose = pieper_6r_solver<decltype(chain)>(chain, loose).solve(target);
+    auto at_loose = made(chain, loose).solve(target);
     REQUIRE(at_loose.has_value());
     REQUIRE(at_loose->count > 0);
     auto [best, worst] = position_residual_range(chain, at_loose, target);
@@ -776,17 +789,17 @@ TEST_CASE("6R Pieper: the solver forwards both fields of its own tolerance to "
     q_known << 0.3, -0.4, 0.5, 0.2, -0.3, 0.1;
     auto target = testing::fk_at(exact, q_known).end_effector;
 
-    auto baseline = pieper_6r_solver<decltype(exact)>(exact).solve(target);
+    auto baseline = made(exact).solve(target);
     REQUIRE(baseline.has_value());
     CHECK(baseline->count == 8);
 
     // A zero orientation field must reject every branch: a solver that passed
     // its position field to both comparisons would return all eight.
-    CHECK_FALSE(pieper_6r_solver<decltype(exact)>(
+    CHECK_FALSE(made(
         exact, verification_tolerance<double>(1e-6, 0.0)).solve(target).has_value());
 
     // And a zero position field, for the mirror substitution.
-    CHECK_FALSE(pieper_6r_solver<decltype(exact)>(
+    CHECK_FALSE(made(
         exact, verification_tolerance<double>(0.0, 1e-6)).solve(target).has_value());
 
     // Neither zero probe separates the fields from a swap of the two, because
@@ -797,7 +810,7 @@ TEST_CASE("6R Pieper: the solver forwards both fields of its own tolerance to "
         fixtures::make_near_spherical_wrist_puma<double>(1e-7),
         "make_near_spherical_wrist_puma");
     auto skewed_target = testing::fk_at(skewed, q_known).end_effector;
-    CHECK(pieper_6r_solver<decltype(skewed)>(
+    CHECK(made(
         skewed, verification_tolerance<double>(1e-6, 1e-12))
             .solve(skewed_target).has_value());
 }
@@ -843,7 +856,7 @@ TEST_CASE("6R Pieper: asymmetric ZYX wrist solves via Euler extraction")
     q_known << 0.3, -0.4, 0.5, 0.2, -0.3, 0.1;
 
     auto fk = testing::fk_at(chain, q_known);
-    auto result = pieper_6r_solver(chain).solve(fk.end_effector);
+    auto result = made(chain).solve(fk.end_effector);
 
     REQUIRE(result.has_value());
     REQUIRE(result->count >= 1);
@@ -878,7 +891,7 @@ TEST_CASE("6R Pieper: theta5 near pi drives the symmetric gimbal branch")
     q_gimbal << 0.3, -0.4, 0.5, 0.0, std::numbers::pi, 0.0;
 
     auto fk = testing::fk_at(chain, q_gimbal);
-    auto result = pieper_6r_solver(chain).solve(fk.end_effector);
+    auto result = made(chain).solve(fk.end_effector);
 
     REQUIRE(result.has_value());
     REQUIRE(result->count >= 1);
@@ -901,22 +914,6 @@ TEST_CASE("6R Pieper: theta5 near pi drives the symmetric gimbal branch")
             found_match = true;
     }
     CHECK(found_match);
-}
-
-TEST_CASE("6R Pieper: prismatic joint fails the constructor validity guard")
-{
-    // The bare constructor's joint-kind guard sets the solver invalid when any
-    // axis is not revolute; solve() then reports degenerate_geometry rather
-    // than a misleading per-pose unreachable.
-    auto chain = make_prismatic_third_joint_chain();
-    pieper_6r_solver solver(chain);
-
-    auto target = se3<double>(so3<double>::identity(),
-        Eigen::Vector3d(0.6, 0.0, 0.5));
-    auto result = solver.solve(target);
-
-    REQUIRE_FALSE(result.has_value());
-    CHECK(result.error().reason == analytical_failure::degenerate_geometry);
 }
 
 TEST_CASE("6R Pieper: make() rejects a prismatic joint up front")

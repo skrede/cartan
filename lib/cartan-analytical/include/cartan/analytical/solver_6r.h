@@ -50,52 +50,6 @@ public:
     static constexpr int joints = 6;
     static constexpr int max_solutions = 8;
 
-    explicit pieper_6r_solver(
-        const Chain& chain,
-        verification_tolerance<scalar_type> tolerance
-            = default_verification_tolerance_v<scalar_type>)
-        : m_chain(chain)
-        , m_tolerance(tolerance)
-    {
-        if (chain.num_joints() != 6)
-        {
-            m_valid = false;
-            return;
-        }
-        for (int i = 0; i < 6; ++i)
-        {
-            if (!chain.axis(i).is_revolute())
-            {
-                m_valid = false;
-                return;
-            }
-        }
-
-        for (std::size_t i = 0; i < 6; ++i)
-        {
-            const auto& s = chain.axis(static_cast<int>(i));
-            m_omega[i] = s.omega();
-            m_q[i] = s.omega().cross(s.v());
-        }
-
-        auto wrist = detail::find_wrist_intersection(
-            chain.axis(3), chain.axis(4), chain.axis(5));
-
-        if (!wrist)
-        {
-            m_valid = false;
-            return;
-        }
-        m_wrist_center_home = *wrist;
-        m_valid = true;
-
-        // Tool offset: vector from wrist center to EE in home config,
-        // expressed in the home rotation frame (body frame).
-        vector3<scalar_type> tool_offset_world =
-            chain.home().translation() - m_wrist_center_home;
-        m_tool_offset = chain.home().rotation().inverse().act(tool_offset_world);
-    }
-
     /// Construction-time geometry validation. Returns a ready solver only when
     /// the chain satisfies the Pieper preconditions this closed form relies on;
     /// otherwise fails loudly with `degenerate_geometry` rather than deferring
@@ -108,8 +62,9 @@ public:
     ///      the acceptance tolerance.
     ///
     /// Both gates judge a distance, so both read the tolerance's position field
-    /// (the same threshold the FK back-check applies to its position residual),
-    /// not the loose 1e-3 default of find_wrist_intersection.
+    /// -- the same threshold the FK back-check applies to its position residual.
+    /// This is the only place the wrist intersection is computed, so no path can
+    /// take the intersection helper's far looser default.
     ///
     /// What admission does and does not promise, measured on the swept
     /// near-spherical family in the 6R solver test suite: a wrist whose axes
@@ -165,7 +120,7 @@ public:
                 analytical_failure::degenerate_geometry, std::nullopt});
         }
 
-        return pieper_6r_solver(chain, tolerance);
+        return pieper_6r_solver(chain, tolerance, *wrist);
     }
 
     cartan::expected<
@@ -173,12 +128,6 @@ public:
         analytical_error<scalar_type>>
     solve(const se3<scalar_type>& target) const
     {
-        if (!m_valid)
-        {
-            return cartan::unexpected(analytical_error<scalar_type>{
-                analytical_failure::degenerate_geometry, std::nullopt});
-        }
-
         // Step 1: Compute wrist center position from target pose
         vector3<scalar_type> p_wrist = detail::compute_wrist_center(target, m_tool_offset);
 
@@ -205,8 +154,8 @@ public:
         // Same SP3+SP2 decomposition as the 3R solver.
 
         // Reference point: intersection of axes 1 and 2
-        vector3<scalar_type> r = find_axes_reference(
-            m_omega[0], m_q[0], m_omega[1], m_q[1]);
+        vector3<scalar_type> r = detail::closest_approach_midpoint<scalar_type>(
+            m_q[0], m_omega[0], m_q[1], m_omega[1]);
 
         // SP3: find theta3 such that rotating wrist_center_home about axis 3
         // gives a point at distance ||p_wrist - r|| from r.
@@ -304,6 +253,31 @@ private:
     /// re-shaped from <typename Scalar, joint_tag... Joints> to <chain Chain>.
     using Scalar = scalar_type;
 
+    /// The wrist center comes from the caller because make() has already
+    /// computed it while gating sphericity; deriving it a second time here
+    /// would be a second gate at a second tolerance.
+    pieper_6r_solver(
+        const Chain& chain,
+        verification_tolerance<scalar_type> tolerance,
+        const vector3<scalar_type>& wrist_center)
+        : m_chain(chain)
+        , m_wrist_center_home(wrist_center)
+        , m_tolerance(tolerance)
+    {
+        for (std::size_t i = 0; i < 6; ++i)
+        {
+            const auto& s = chain.axis(static_cast<int>(i));
+            m_omega[i] = s.omega();
+            m_q[i] = s.omega().cross(s.v());
+        }
+
+        // Tool offset: vector from wrist center to EE in home config,
+        // expressed in the home rotation frame (body frame).
+        vector3<scalar_type> tool_offset_world =
+            chain.home().translation() - m_wrist_center_home;
+        m_tool_offset = chain.home().rotation().inverse().act(tool_offset_world);
+    }
+
     /// Wrap a joint angle to the half-open interval (-pi, pi]. std::remainder
     /// maps into [-pi, pi]; the boundary is nudged so the interval is
     /// half-open, giving a single canonical representative per angle.
@@ -349,32 +323,6 @@ private:
                 return true;
         }
         return false;
-    }
-
-    /// Find the reference point for axes 1-2 (closest approach midpoint).
-    static vector3<Scalar> find_axes_reference(
-        const vector3<Scalar>& omega1,
-        const vector3<Scalar>& q1,
-        const vector3<Scalar>& omega2,
-        const vector3<Scalar>& q2)
-    {
-        vector3<Scalar> w = q1 - q2;
-        Scalar a = omega1.dot(omega1);
-        Scalar b = omega1.dot(omega2);
-        Scalar c = omega2.dot(omega2);
-        Scalar e = omega1.dot(w);
-        Scalar f = omega2.dot(w);
-
-        Scalar denom = a * c - b * b;
-        if (std::abs(denom) < detail::epsilon_v<Scalar>)
-            return q1;
-
-        Scalar t = (b * f - c * e) / denom;
-        Scalar s = (a * f - b * e) / denom;
-
-        vector3<Scalar> p1 = q1 + t * omega1;
-        vector3<Scalar> p2 = q2 + s * omega2;
-        return (p1 + p2) / Scalar(2);
     }
 
     /// Compute the rotation from base to joint 3 frame:
@@ -739,11 +687,7 @@ private:
     vector3<Scalar> m_wrist_center_home;
     vector3<Scalar> m_tool_offset;
     verification_tolerance<Scalar> m_tolerance;
-    bool m_valid{false};
 };
-
-template <chain Chain>
-pieper_6r_solver(const Chain&) -> pieper_6r_solver<Chain>;
 
 static_assert(analytical_solver<pieper_6r_solver<static_chain<double,
     revolute_z, revolute_y, revolute_y, revolute_z, revolute_y, revolute_z>>>,
@@ -752,13 +696,19 @@ static_assert(analytical_solver<pieper_6r_solver<static_chain<double,
 static_assert(analytical_solver<pieper_6r_solver<kinematic_chain<double, dynamic>>>,
     "pieper_6r_solver must also satisfy analytical_solver concept against dynamic chain");
 
+/// A chain the Pieper decomposition does not support is reported through the
+/// same channel as an unsolvable pose, so a caller that only inspects the
+/// error never sees an unvalidated solver.
 template <typename Scalar, joint_tag... Joints>
-auto solve_6r(
+cartan::expected<analytical_result<Scalar, 6, 8>, analytical_error<Scalar>>
+solve_6r(
     const static_chain<Scalar, Joints...>& chain,
     const se3<Scalar>& target)
 {
-    pieper_6r_solver solver(chain);
-    return solver.solve(target);
+    auto solver = pieper_6r_solver<static_chain<Scalar, Joints...>>::make(chain);
+    if (!solver)
+        return cartan::unexpected(solver.error());
+    return solver->solve(target);
 }
 
 }
