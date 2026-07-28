@@ -123,9 +123,91 @@ jobs:
 
       # Every stored input executed once, no mutation. This proves the targets
       # execute and that the fixtures still parse; --no-tests=error so a filter
-      # that matches nothing fails instead of reporting success.
+      # that matches nothing fails instead of reporting success. This runs before
+      # the accumulated corpus is layered on, so it stays a regression check over
+      # the committed fixtures rather than over whatever last week's run found.
       - name: Regression replay over the committed corpus
         run: ctest --test-dir build --output-on-failure --no-tests=error
+
+      # The credential is read into the environment and never interpolated into a
+      # command line. A fork's pull request has no secrets, so this resolves false
+      # there and the two steps it guards are skipped: the gate still runs, it
+      # just does not accumulate.
+      - name: Detect the corpus credential
+        id: corpus
+        env:
+          CORPUS_KEY: ${{ secrets.FUZZ_CORPUS_DEPLOY_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -n "${CORPUS_KEY:-}" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::no corpus credential; this run fuzzes from the committed seeds only"
+          fi
+
+      # Layered on top of the seeds, not in place of them: a run that always
+      # starts from the committed fixtures rediscovers the same shallow inputs
+      # every week and never reaches past them. Restoring into the build tree
+      # copy keeps the committed fixtures unwritable by any run, which is the
+      # property the seeding function was written for.
+      #
+      # An empty store is the expected state on the first run and is not an
+      # error. An unreachable one is: a silently skipped restore would degrade
+      # every subsequent run to seed-only while still reporting green.
+      - name: Restore the accumulated corpus
+        if: steps.corpus.outputs.available == 'true'
+        env:
+          CORPUS_KEY: ${{ secrets.FUZZ_CORPUS_DEPLOY_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+          printf '%s\n' "${CORPUS_KEY}" > ~/.ssh/corpus_key
+          chmod 600 ~/.ssh/corpus_key
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/corpus_key -o IdentitiesOnly=yes"
+
+          # The branch is named on both sides rather than inherited from the
+          # store's default HEAD. A clone that follows a default pointing at a
+          # branch the push step never writes checks out nothing, restores
+          # nothing, and reports success -- accumulation would silently never
+          # happen. Measured: that is exactly what a default clone of a store
+          # written this way does.
+          git init -q accumulated
+          cd accumulated
+          git remote add origin git@github.com:skrede/cartan-fuzz-corpus.git
+
+          # Reachability and authentication first, and separately: ls-remote
+          # succeeds with no output against a store that exists and is empty,
+          # and fails against one that is unreachable or refuses the key. Only
+          # the first is a legitimate first run.
+          if ! git ls-remote origin > /tmp/store-refs 2>/tmp/store-err; then
+            echo "::error::the corpus store is unreachable or refused the key" >&2
+            cat /tmp/store-err >&2
+            exit 1
+          fi
+          if ! grep -q 'refs/heads/main$' /tmp/store-refs; then
+            echo "::notice::the store has no main branch yet; fuzzing from the committed seeds only"
+            exit 0
+          fi
+
+          git fetch -q --depth 1 origin main
+          git checkout -q FETCH_HEAD
+          cd ..
+          restored=0
+          for target in $CARTAN_FUZZ_TARGETS; do
+            if [ -d accumulated/"$target" ]; then
+              count=$(find accumulated/"$target" -type f | wc -l)
+              cp -a accumulated/"$target"/. build/fuzz/corpus/"$target"/
+              restored=$((restored + count))
+              echo "$target: restored $count accumulated inputs"
+            fi
+          done
+          if [ "$restored" -lt 1 ]; then
+            echo "::error::the store carries a main branch but no inputs for any target" >&2
+            exit 1
+          fi
+          echo "restored $restored input(s) from the store"
 
       # The gate proper. Everything above this point either builds the targets
       # or replays inputs that already exist, and neither can discover a defect
@@ -184,6 +266,64 @@ jobs:
         with:
           name: minimized-corpus
           path: minimized-corpus/
+
+      # Only from master, and never from a pull request. A corpus grown against
+      # unmerged code is a corpus of inputs for a program that does not exist,
+      # and it would be indistinguishable from the rest once stored.
+      #
+      # The store receives the merged set only. Crash inputs land under
+      # fuzz-artifacts/ and travel as a failure artifact; they are never written
+      # here, and a failed run does not reach this step at all.
+      #
+      # This pushes to a different repository than the one GITHUB_TOKEN governs,
+      # so the job's contents:read permission block is still correct and is
+      # deliberately left alone.
+      - name: Push the merged corpus to the store
+        if: >-
+          steps.corpus.outputs.available == 'true'
+          && github.event_name != 'pull_request'
+          && github.ref == 'refs/heads/master'
+        env:
+          CORPUS_KEY: ${{ secrets.FUZZ_CORPUS_DEPLOY_KEY }}
+        run: |
+          set -euo pipefail
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/corpus_key -o IdentitiesOnly=yes"
+
+          # A merge that produced nothing would empty the store on push. That is
+          # the same count-over-an-empty-set failure this job guards everywhere
+          # else, and here it would destroy accumulated work rather than just
+          # report a false green.
+          total=$(find minimized-corpus -type f | wc -l)
+          if [ "$total" -lt 1 ]; then
+            echo "::error::the merge produced no inputs; refusing to overwrite the store" >&2
+            exit 1
+          fi
+          for target in $CARTAN_FUZZ_TARGETS; do
+            count=$(find minimized-corpus/"$target" -type f 2>/dev/null | wc -l)
+            if [ "$count" -lt 1 ]; then
+              echo "::error::$target merged to zero inputs; refusing to overwrite the store" >&2
+              exit 1
+            fi
+          done
+
+          cd accumulated
+          git config user.name "cartan fuzz"
+          git config user.email "noreply@github.com"
+          # A clone of an empty repository has a symbolic HEAD but no commit, so
+          # the branch has to be created on the first push and only then.
+          git rev-parse --verify HEAD > /dev/null 2>&1 || git checkout -b main
+          for target in $CARTAN_FUZZ_TARGETS; do
+            rm -rf "$target"
+            cp -a ../minimized-corpus/"$target" "$target"
+          done
+          git add -A
+          if git diff --cached --quiet; then
+            echo "the merged set is identical to the store; nothing to push"
+            exit 0
+          fi
+          git commit -m "Merge corpus from ${GITHUB_SHA:0:12} (${total} inputs)"
+          git push origin HEAD:main
+          echo "pushed ${total} input(s) to the store"
 
       # A crash input nobody kept is a crash nobody can reproduce, which is most
       # of what a finding is worth. The per-target log travels with it because
