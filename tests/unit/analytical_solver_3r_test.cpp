@@ -10,6 +10,7 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <cmath>
+#include <vector>
 #include <numbers>
 
 using namespace cartan;
@@ -312,6 +313,50 @@ TEST_CASE("3R solver: a parallel shoulder is refused at construction")
         "parallel shoulder 3R chain");
 
     auto solver = spatial_3r_solver<yyy_3r_chain>::make(chain);
+
+    REQUIRE_FALSE(solver.has_value());
+    CHECK(solver.error().reason == analytical_failure::degenerate_geometry);
+    CHECK_FALSE(solver.error().workspace_distance.has_value());
+}
+
+// The joint count and the joint kinds are carried in the type of a static_chain,
+// so both gates are only reachable through a runtime-sized chain. Each chain
+// below clears every other gate the factory applies, so nothing but the gate
+// under test can account for the refusal.
+TEST_CASE("3R solver: a fourth joint is refused at construction")
+{
+    std::vector<screw_axis<double>> axes
+        = {screw_axis<double>::revolute({0, 0, 1}, {0, 0, 0}),
+           screw_axis<double>::revolute({0, 1, 0}, {0, 0, 0}),
+           screw_axis<double>::revolute({0, 0, 1}, {0.4, 0, 0}),
+           screw_axis<double>::revolute({0, 1, 0}, {0.8, 0, 0})};
+    std::vector<joint_limits<double>> limits(4, testing::limits(-10.0, 10.0));
+    kinematic_chain<double, dynamic> chain(
+        se3<double>(so3<double>::identity(), Eigen::Vector3d(1.2, 0, 0)),
+        std::move(axes), std::move(limits));
+
+    auto solver = spatial_3r_solver<kinematic_chain<double, dynamic>>::make(chain);
+
+    REQUIRE_FALSE(solver.has_value());
+    CHECK(solver.error().reason == analytical_failure::degenerate_geometry);
+    CHECK_FALSE(solver.error().workspace_distance.has_value());
+}
+
+// The prismatic axis is placed last: a prismatic axis recovers its joint point
+// as omega x v = 0, and at either shoulder position that zero point would be
+// refused by the axis-intersection gate whatever the joint-kind gate does.
+TEST_CASE("3R solver: a prismatic joint is refused at construction")
+{
+    std::vector<screw_axis<double>> axes
+        = {screw_axis<double>::revolute({0, 0, 1}, {0, 0, 0}),
+           screw_axis<double>::revolute({0, 1, 0}, {0, 0, 0}),
+           screw_axis<double>::prismatic({0, 0, 1})};
+    std::vector<joint_limits<double>> limits(3, testing::limits(-10.0, 10.0));
+    kinematic_chain<double, dynamic> chain(
+        se3<double>(so3<double>::identity(), Eigen::Vector3d(0.5, 0, 0)),
+        std::move(axes), std::move(limits));
+
+    auto solver = spatial_3r_solver<kinematic_chain<double, dynamic>>::make(chain);
 
     REQUIRE_FALSE(solver.has_value());
     CHECK(solver.error().reason == analytical_failure::degenerate_geometry);

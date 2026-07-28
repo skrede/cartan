@@ -8,6 +8,7 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <cmath>
+#include <vector>
 #include <cstddef>
 #include <numbers>
 
@@ -367,6 +368,30 @@ TEST_CASE("2R solver: perpendicular axes are refused at construction")
         "perpendicular 2R chain");
 
     auto solver = planar_2r_solver<perpendicular_2r_chain>::make(chain);
+
+    REQUIRE_FALSE(solver.has_value());
+    CHECK(solver.error().reason == analytical_failure::degenerate_geometry);
+    CHECK_FALSE(solver.error().workspace_distance.has_value());
+}
+
+// The joint kinds are carried in the type of a static_chain, so this gate is
+// only reachable through a runtime-sized chain. The first axis is placed off the
+// origin deliberately: a prismatic axis recovers its joint point as omega x v,
+// which is zero, so a chain carrying one alongside an axis through the origin is
+// refused by the zero-length-link gate whatever the joint-kind gate does. Offset
+// this way the chain clears every other gate, and only the joint-kind gate
+// accounts for the refusal.
+TEST_CASE("2R solver: a prismatic joint is refused at construction")
+{
+    std::vector<screw_axis<double>> axes
+        = {screw_axis<double>::revolute({0, 1, 0}, {0, 0, 1}),
+           screw_axis<double>::prismatic({0, 0, 1})};
+    std::vector<joint_limits<double>> limits(2, testing::limits(-10.0, 10.0));
+    kinematic_chain<double, dynamic> chain(
+        se3<double>(so3<double>::identity(), Eigen::Vector3d(1, 0, 1)),
+        std::move(axes), std::move(limits));
+
+    auto solver = planar_2r_solver<kinematic_chain<double, dynamic>>::make(chain);
 
     REQUIRE_FALSE(solver.has_value());
     CHECK(solver.error().reason == analytical_failure::degenerate_geometry);

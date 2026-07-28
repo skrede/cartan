@@ -83,7 +83,7 @@ TEST_CASE("analytical diagnostics: a 2R failure that evaluated no inequality car
 
     absent("2R factory: joint count", planar_2r_solver<dyn_chain>::make(three));
     absent("2R factory: non-revolute axis", planar_2r_solver<dyn_chain>::make(
-        chain_of({rev(y, {0, 0, 0}), screw_axis<double>::prismatic({0, 0, 1})}, {1, 0, 0})));
+        chain_of({rev(y, {0, 0, 1}), screw_axis<double>::prismatic({0, 0, 1})}, {1, 0, 1})));
     absent("2R factory: zero-length link", planar_2r_solver<dyn_chain>::make(
         chain_of({rev(y, {0, 0, 0}), rev(y, {0, 0, 0})}, {1, 0, 0})));
     // A zero acceptance length rejects every candidate, evaluating no inequality.
