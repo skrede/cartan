@@ -19,8 +19,8 @@ enum class analytical_failure
 {
     unreachable,             ///< Target lies outside the mechanism's workspace.
     degenerate_geometry,     ///< Joint geometry violates a subproblem precondition (e.g. parallel axes where intersection is required).
-    singular_configuration,  ///< Mechanism is at a kinematic singularity for the requested target.
-    verification_failed,     ///< Candidate solutions exist but none survived the FK back-check.
+    singular_configuration,  ///< Mechanism is at a kinematic singularity for the requested target, or the decomposition broke down and placed no candidate.
+    verification_failed,     ///< Candidates were constructed and every one was rejected by the FK back-check.
     non_finite_input         ///< An input or candidate joint value is NaN or infinite.
 };
 
@@ -35,7 +35,7 @@ constexpr const char* message(analytical_failure failure)
     case analytical_failure::degenerate_geometry:
         return "Joint geometry violates a subproblem precondition";
     case analytical_failure::singular_configuration:
-        return "Mechanism is at a kinematic singularity for the requested target";
+        return "Mechanism is at a kinematic singularity, or the decomposition placed no candidate";
     case analytical_failure::verification_failed:
         return "No candidate solution survived the forward-kinematics back-check";
     case analytical_failure::non_finite_input:
@@ -46,10 +46,16 @@ constexpr const char* message(analytical_failure failure)
 
 /// Failure diagnostic for analytical solvers. `reason` names the failure mode.
 /// `workspace_distance` is present only where a geometric inequality was
-/// evaluated and failed, and is then the deficit at that inequality in the
-/// chain's linear unit; it is absent for every other failure. Absence is not
+/// evaluated and failed, and is then a deficit measured at such an inequality in
+/// the chain's linear unit; it is absent for every other failure. Absence is not
 /// zero: a target sitting exactly on the workspace boundary has a deficit of
 /// zero, so zero cannot also stand for "no magnitude was computed".
+///
+/// Where several inequalities were evaluated the value is a lower bound on the
+/// motion the target needs, not a figure attached to `reason`: inequalities that
+/// must all hold contribute the largest of their deficits, alternatives the
+/// smallest of theirs, and a later check that measures nothing does not discard
+/// what an earlier one measured.
 template <typename Scalar>
 struct analytical_error
 {

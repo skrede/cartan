@@ -223,6 +223,7 @@ public:
         }
 
         analytical_result<scalar_type, 6, 8> result;
+        bool any_candidate = false;
 
         // For each theta3 candidate, find theta1/theta2 and then wrist angles
         for (int i = 0; i < sp3_result->count; ++i)
@@ -260,6 +261,7 @@ public:
 
                     Eigen::Vector<scalar_type, 6> q_candidate;
                     q_candidate << theta1, theta2, theta3, theta4, theta5, theta6;
+                    any_candidate = true;
 
                     if (detail::verify_analytical_solution(
                             m_chain, q_candidate, target, true, m_tolerance))
@@ -286,11 +288,14 @@ public:
         if (result.count > 0)
             return result;
 
-        // Branches were generated and every one was rejected. Rejecting a
-        // candidate is not a proof that no solution exists, so the report names
-        // the rejection and claims nothing about the workspace.
+        // Rejecting every branch is not a proof that no solution exists, so the
+        // report names the rejection and claims nothing about the workspace.
+        // Where the second subproblem placed no branch at all there is nothing
+        // to have rejected, and the decomposition broke down instead.
         return cartan::unexpected(analytical_error<scalar_type>{
-            analytical_failure::verification_failed, std::nullopt});
+            any_candidate ? analytical_failure::verification_failed
+                          : analytical_failure::singular_configuration,
+            std::nullopt});
     }
 
 private:

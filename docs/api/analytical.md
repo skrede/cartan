@@ -74,13 +74,32 @@ struct analytical_error
 ```
 
 `reason` names the failure mode. `workspace_distance` is present only where a
-geometric inequality was evaluated and failed, and is then the deficit at that
-inequality in the chain's linear unit; it is absent for every other failure.
-Absence is not zero: a target sitting exactly on the workspace boundary has a
-deficit of zero, so zero cannot also stand for "no magnitude was computed". A
-degenerate geometry, a singular configuration, a nonfinite input, and a failed
-back-check all carry no magnitude, including where the reason was decided by a
-Paden-Kahan subproblem and forwarded.
+geometric inequality was evaluated and failed, and is then a deficit measured at
+such an inequality in the chain's linear unit; it is absent for every other
+failure. Absence is not zero: a target sitting exactly on the workspace boundary
+has a deficit of zero, so zero cannot also stand for "no magnitude was computed".
+A degenerate geometry, a singular configuration, a nonfinite input, and a failed
+back-check all carry no magnitude.
+
+Where several inequalities were evaluated the value is a **lower bound on the
+motion the target needs**, not a per-reason figure. Inequalities that must all
+hold contribute the largest of their deficits, and inequalities that are
+alternatives contribute the smallest of theirs. One consequence is worth stating
+plainly: a solver that fails a check computing no deficit, having already
+measured one at an earlier check, reports what it measured — so an absent
+magnitude means "nothing was measured anywhere", while a present one names a
+distance the target is short by and not the inequality that ended the solve.
+
+A reason decided by a Paden-Kahan subproblem and forwarded carries no magnitude
+either, whichever reason it is: the inequality that failed is inside the
+subproblem, whose error channel has no payload for a deficit, so a forwarding
+solver has nothing to report and substitutes nothing in its place. Every
+magnitude that is present was measured at a geometric inequality: the OPW
+lateral-offset guard reports the radial difference between the offset and the
+wrist center's radius in that plane, and the shoulder-wrist reach guard reports
+the smaller of the two shoulder families' shortfalls, the two families being
+alternatives rather than joint requirements. Those two guards are joint
+requirements of each other, so a target failing both reports the larger.
 
 ### analytical_failure
 
@@ -102,9 +121,11 @@ constexpr const char* message(analytical_failure failure);
 - `degenerate_geometry` — joint geometry violates a subproblem precondition
   (e.g. parallel axes where intersection is required).
 - `singular_configuration` — the mechanism is at a kinematic singularity for
-  the requested target.
-- `verification_failed` — candidate solutions exist but none survived the FK
-  back-check.
+  the requested target, or the decomposition broke down and placed no candidate
+  to check.
+- `verification_failed` — candidates were constructed and every one of them was
+  rejected by the FK back-check. This is a rejection, not a proof that no
+  solution exists.
 - `non_finite_input` — an input or candidate joint value is NaN or infinite.
   Named to match `chain_failure::non_finite_input` and
   `ik_failure::non_finite_input`, which name the same defect.
@@ -659,7 +680,9 @@ revolute joints, axis 1 perpendicular to axis 2, axis 2 parallel to axis 3, and
 a spherical wrist within `tolerance.position()`) and is the only way in.
 
 `tolerance` is the FK back-check's acceptance bound, `position()` a distance in
-the chain's linear unit and `orientation()` an angle in radians.
+the chain's linear unit and `orientation()` an angle in radians. `position()`
+also bounds the lateral-offset cylinder gate inside `solve`, which judges the
+wrist center's radius in that plane against the offset as two lengths.
 `singularity_tolerance` is a separate scalar and stays one: it thresholds
 `|sin(theta5)|`, a dimensionless quantity, below which the wrist fold path is
 taken. Its default is pinned empirically rather than copied from the reference

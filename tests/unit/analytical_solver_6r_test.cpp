@@ -274,6 +274,29 @@ TEST_CASE("6R Pieper: a target whose branches are all rejected reports a failed 
     CHECK_FALSE(result.error().workspace_distance.has_value());
 }
 
+TEST_CASE("6R Pieper: a target for which no branch was placed is not a failed "
+          "verification")
+{
+    // The terminal report is also reached when the second subproblem places no
+    // branch for any theta3, where there is no rejected candidate to report at
+    // all. Pre-fix that path claimed a failed verification, which the enum
+    // documents as candidates existing and none surviving: a false attestation
+    // in place of the false certification it replaced. Driving it needs a
+    // position field of zero, since no residual is below zero and the
+    // subproblem then places nothing.
+    auto chain = make_puma_chain();
+    Eigen::Vector<double, 6> q_known;
+    q_known << 0.3, -0.4, 0.5, 0.2, -0.3, 0.1;
+    auto target = testing::fk_at(chain, q_known).end_effector;
+
+    auto result = pieper_6r_solver<decltype(chain)>(
+        chain, verification_tolerance<double>(0.0, 1e-6)).solve(target);
+
+    REQUIRE_FALSE(result.has_value());
+    CHECK(result.error().reason == analytical_failure::singular_configuration);
+    CHECK_FALSE(result.error().workspace_distance.has_value());
+}
+
 TEST_CASE("6R Pieper: wrist singularity (theta5 near zero)")
 {
     auto chain = make_puma_chain();

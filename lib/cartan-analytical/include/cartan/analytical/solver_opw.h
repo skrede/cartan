@@ -402,19 +402,20 @@ public:
         // wrist center must lie outside of. The excess is radial, the difference
         // of the two lengths: the square root of the difference of their squares
         // is a chord half-length, which overstates the radial excess without
-        // bound as the radius approaches the offset.
-        const Scalar lateral_radius = std::hypot(center.x(), center.y());
-        const bool inside_cylinder =
-            lateral_radius < std::abs(p.b) - m_tolerance.position();
-        if (inside_cylinder)
+        // bound as the radius approaches the offset. The guard reads the same
+        // quantity the clamp below does, so it fires exactly when nx1 is clamped.
+        const Scalar nx1_arg =
+            center.x() * center.x() + center.y() * center.y() - p.b * p.b;
+        if (nx1_arg < Scalar(0))
         {
             domain_failed = true;
-            workspace_deficit = std::abs(p.b) - lateral_radius;
+            workspace_deficit =
+                std::abs(p.b) - std::hypot(center.x(), center.y());
         }
 
         const Scalar nx1 = std::sqrt(std::clamp(
-            center.x() * center.x() + center.y() * center.y() - p.b * p.b,
-            Scalar(0), std::numeric_limits<Scalar>::infinity())) - p.a1;
+            nx1_arg, Scalar(0), std::numeric_limits<Scalar>::infinity()))
+            - p.a1;
 
         const Scalar tmp1 = std::atan2(center.y(), center.x());
         const Scalar tmp2 = std::atan2(p.b, nx1 + p.a1);
@@ -439,17 +440,23 @@ public:
         // Triangle-inequality reach check on both shoulder families. They are
         // alternatives, so the target is out of reach only when both violate it,
         // and the deficit is then the smaller of the two -- the motion that
-        // brings the nearer family into reach. Inside the cylinder nx1 came from
-        // a clamp, so neither distance measures anything.
+        // brings the nearer family into reach.
+        //
+        // The cylinder and the reach are instead a conjunction, so their
+        // deficits merge with the larger. Where nx1 was clamped the distances
+        // below are measured from the nearest point on the cylinder, which makes
+        // the shortfall they report the one that remains after the radial motion
+        // rather than a length in place of it.
         const Scalar reach_max = p.c2 + k_reach;
         const Scalar reach_min = std::abs(p.c2 - k_reach);
         const Scalar reach_deficit_front = std::max({Scalar(0), s1 - reach_max, reach_min - s1});
         const Scalar reach_deficit_back = std::max({Scalar(0), s2 - reach_max, reach_min - s2});
         const Scalar reach_deficit = std::min(reach_deficit_front, reach_deficit_back);
-        if (!inside_cylinder && reach_deficit > sqrt_eps)
+        if (reach_deficit > sqrt_eps)
         {
             domain_failed = true;
-            workspace_deficit = reach_deficit;
+            workspace_deficit =
+                std::max(workspace_deficit.value_or(Scalar(0)), reach_deficit);
         }
 
         // acos with domain clamping; a genuine (beyond-rounding) out-of-range
@@ -481,9 +488,10 @@ public:
         const std::optional<Scalar> tmp12 = acos_ratio(tmp8, tmp9);
 
         // Per (theta1, theta2, theta3) branch j = shoulder * 2 + elbow:
-        //   j = 0 front/up, 1 front/down, 2 back/up, 3 back/down. A family's four
-        //   angles come from its own two arc-cosines, so one undefined arc-cosine
-        //   leaves the family undefined and it emits no branch below.
+        //   j = 0 front/up, 1 front/down, 2 back/up, 3 back/down. A family whose
+        //   theta2 arc-cosine is undefined emits no branch below; the two theta3
+        //   arc-cosines share a denominator that is a constant of the arm, so
+        //   theirs is a condition on the parameters and not on the family.
         const bool front_defined = tmp13.has_value() && tmp11.has_value();
         const bool back_defined = tmp15.has_value() && tmp12.has_value();
 
