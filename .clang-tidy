@@ -182,7 +182,11 @@ readability-function-cognitive-complexity,
 # check says and harmless because the bound rules out the overflow it guards against.,
 -bugprone-misplaced-widening-cast,
 # an Eigen fixed-size vector taken by value in a test helper. Not a library finding.,
--performance-unnecessary-value-param'
+-performance-unnecessary-value-param,
+# seven converting constructors of the std::expected mirror, whose explicit specifier is a
+# dependent expression. The pinned linter reads a conditional explicit as no explicit at all
+# and reports every one; a current one reports none. Re-enable when the pin moves.,
+-google-explicit-constructor'
 CheckOptions:
   - { key: readability-function-size.LineThreshold,                value: 25 }
   - { key: readability-function-size.StatementThreshold,           value: -1 }
