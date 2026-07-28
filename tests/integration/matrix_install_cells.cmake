@@ -80,7 +80,3 @@ function(matrix_cell_argmin)
     matrix_package_dir("${cell}" "${moved}" "${CARTAN_ARGMIN_PACKAGE}" dependency_dir)
     matrix_backend_cell("${cell}" argmin "${dependency_dir}" "-DCMAKE_PREFIX_PATH=${moved}")
 endfunction()
-
-function(matrix_cell_nlopt)
-    matrix_backend_cell(nlopt nlopt "")
-endfunction()

@@ -6,16 +6,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 option(CONSUMER_EXPECTS_ARGMIN "Link the argmin component of the installed cartan package" OFF)
-option(CONSUMER_EXPECTS_NLOPT "Link the nlopt component of the installed cartan package" OFF)
 
 set(consumer_components "")
 if (CONSUMER_EXPECTS_ARGMIN)
     list(APPEND consumer_components argmin)
 endif ()
-if (CONSUMER_EXPECTS_NLOPT)
-    list(APPEND consumer_components nlopt)
-endif ()
-
 if (consumer_components)
     find_package(cartan CONFIG REQUIRED COMPONENTS ${consumer_components})
 else ()

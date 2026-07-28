@@ -34,7 +34,7 @@ endif ()
 add_executable(embedded_consumer main.cpp)
 target_link_libraries(embedded_consumer PRIVATE cartan::cartan)
 
-foreach (backend IN ITEMS argmin nlopt)
+foreach (backend IN ITEMS argmin)
     string(TOUPPER "${backend}" backend_upper)
     if (CARTAN_BUILD_${backend_upper})
         target_link_libraries(embedded_consumer PRIVATE cartan::${backend})
