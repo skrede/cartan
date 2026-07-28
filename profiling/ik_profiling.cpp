@@ -165,7 +165,9 @@ inline cartan::convergence_criteria<double> restart_lm_criteria()           { re
 #ifdef CARTAN_HAS_ARGMIN
 inline cartan::convergence_criteria<double> argmin_criteria()              { return {1e-5, 1e-5, 500}; }
 #endif
+#ifdef CARTAN_HAS_NLOPT
 inline cartan::convergence_criteria<double> nlopt_criteria()                { return {1e-5, 1e-5, 500}; }
+#endif
 
 // ============================================================================
 // Macro-based benchmark registration
