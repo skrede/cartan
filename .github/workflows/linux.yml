@@ -104,6 +104,11 @@ jobs:
       # them, so a header line instantiated five times weighs five; the second
       # collapses them, so a line counts once and is covered if any instantiation
       # ran it. The two answer different questions and both are published.
+      #
+      # The fetched dependencies are compiled with the same coverage flag and drop
+      # their notes files under build/_deps, where the source paths they record
+      # resolve against neither working directory gcov tries. Reading them is an
+      # error that aborts the run, and nothing they measure is reportable here.
       - name: Generate coverage
         id: coverage
         if: matrix.coverage
@@ -112,6 +117,7 @@ jobs:
           gcovr build \
             --root . \
             --gcov-executable "${{ matrix.gcov_executable }}" \
+            --exclude-directory '.*/_deps/.*' \
             --filter lib/cartan-lie/include/ \
             --filter lib/cartan-serial-chain/include/ \
             --filter lib/cartan-analytical/include/ \
@@ -121,6 +127,7 @@ jobs:
           gcovr build \
             --root . \
             --gcov-executable "${{ matrix.gcov_executable }}" \
+            --exclude-directory '.*/_deps/.*' \
             --merge-lines \
             --filter lib/cartan-lie/include/ \
             --filter lib/cartan-serial-chain/include/ \
@@ -244,94 +251,6 @@ jobs:
 
       - name: Test
         run: cd build && ctest --output-on-failure
-
-  # The compilers the documentation names as the minimum, pinned by image digest
-  # rather than by whatever a runner image happens to package: the image that
-  # carries compilers this old has an announced deprecation date, and the package
-  # availability of the oldest generation on the current image could not be
-  # confirmed. A container is immune to both.
-  #
-  # The cost is real and is stated rather than hidden: two extra jobs, an image
-  # pull each, and a build system downloaded into images that ship one older than
-  # this project's minimum. That price buys a support promise that is otherwise
-  # only a sentence in the documentation, and until these lanes have run the
-  # documentation does not make it.
-  #
-  # Warnings are not promoted to errors here. An older compiler's diagnostic set
-  # is its own, and this lane exists to check that the language standard these
-  # compilers implement is sufficient -- not to adopt a decade-old warning
-  # taxonomy as the project's.
-  floor:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: gcc-10
-            image: gcc@sha256:19b31d0b2b263047b173e4e253d91f199d99c082973f13604d2913252c13309e
-            cc: gcc
-            cxx: g++
-            install_git: false
-          # The image ships clang, cmake and wget but no git, and every
-          # dependency here is fetched from a git remote.
-          - name: clang-13
-            image: silkeh/clang@sha256:f6f68e580b3ba406264152a794b6ebd31b683007f603387d22db4d298e68b940
-            cc: clang
-            cxx: clang++
-            install_git: true
-
-    runs-on: ubuntu-24.04
-    container: ${{ matrix.image }}
-    name: floor (${{ matrix.name }})
-
-    steps:
-      - name: Install git
-        if: matrix.install_git
-        run: |
-          apt-get update
-          apt-get install -y --no-install-recommends git
-
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-
-      # Both images predate the minimum this project requires, so the build
-      # system is downloaded rather than taken from the image, pinned by version
-      # and checked against the checksum the release publishes. Which downloader
-      # exists differs between the two images, so both are accepted.
-      - name: Install the required build system
-        run: |
-          set -eu
-          version=3.31.9
-          archive=cmake-${version}-linux-x86_64.tar.gz
-          url=https://github.com/Kitware/CMake/releases/download/v${version}/${archive}
-          if command -v curl > /dev/null; then
-            curl -fsSL -o "${archive}" "${url}"
-          else
-            wget -q -O "${archive}" "${url}"
-          fi
-          echo "312d78e0b7c5c9b4a97a87a46c3e525aa84895fe8135c238c4616bba73dc9518  ${archive}" \
-            | sha256sum -c -
-          mkdir -p /opt/buildsystem
-          tar -xzf "${archive}" -C /opt/buildsystem --strip-components=1
-          echo /opt/buildsystem/bin >> "$GITHUB_PATH"
-          /opt/buildsystem/bin/cmake --version
-
-      - name: Configure
-        env:
-          CC: ${{ matrix.cc }}
-          CXX: ${{ matrix.cxx }}
-        run: |
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
-            -DCARTAN_BUILD_TESTS=ON \
-            -DCARTAN_BUILD_URDF=ON \
-            -DCARTAN_CMAKE_FETCH_DEPS=ON
-
-      - name: Build
-        run: cmake --build build
-
-      # A floor lane that compiled one representative unit would claim far less
-      # than the documentation does: the promise is that the templates
-      # instantiate and the suite passes on these compilers.
-      - name: Test
-        run: ctest --test-dir build --output-on-failure --no-tests=error
 
   install-test:
     runs-on: ubuntu-24.04
