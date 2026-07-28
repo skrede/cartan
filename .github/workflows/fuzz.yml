@@ -129,43 +129,23 @@ jobs:
       - name: Regression replay over the committed corpus
         run: ctest --test-dir build --output-on-failure --no-tests=error
 
-      # The credential is read into the environment and never interpolated into a
-      # command line. A fork's pull request has no secrets, so this resolves false
-      # there and the two steps it guards are skipped: the gate still runs, it
-      # just does not accumulate.
-      - name: Detect the corpus credential
-        id: corpus
-        env:
-          CORPUS_KEY: ${{ secrets.FUZZ_CORPUS_DEPLOY_KEY }}
-        run: |
-          set -euo pipefail
-          if [ -n "${CORPUS_KEY:-}" ]; then
-            echo "available=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::no corpus credential; this run fuzzes from the committed seeds only"
-          fi
-
       # Layered on top of the seeds, not in place of them: a run that always
       # starts from the committed fixtures rediscovers the same shallow inputs
       # every week and never reaches past them. Restoring into the build tree
       # copy keeps the committed fixtures unwritable by any run, which is the
       # property the seeding function was written for.
       #
+      # The store is public, so reading it needs no credential and this step is
+      # unconditional -- a fork's pull request accumulates on read exactly as a
+      # branch push does. Only writing back needs the key, and only that step is
+      # gated on it.
+      #
       # An empty store is the expected state on the first run and is not an
       # error. An unreachable one is: a silently skipped restore would degrade
       # every subsequent run to seed-only while still reporting green.
       - name: Restore the accumulated corpus
-        if: steps.corpus.outputs.available == 'true'
-        env:
-          CORPUS_KEY: ${{ secrets.FUZZ_CORPUS_DEPLOY_KEY }}
         run: |
           set -euo pipefail
-          mkdir -p ~/.ssh
-          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
-          printf '%s\n' "${CORPUS_KEY}" > ~/.ssh/corpus_key
-          chmod 600 ~/.ssh/corpus_key
-          export GIT_SSH_COMMAND="ssh -i ~/.ssh/corpus_key -o IdentitiesOnly=yes"
 
           # The branch is named on both sides rather than inherited from the
           # store's default HEAD. A clone that follows a default pointing at a
@@ -175,23 +155,22 @@ jobs:
           # written this way does.
           git init -q accumulated
           cd accumulated
-          git remote add origin git@github.com:skrede/cartan-fuzz-corpus.git
+          git remote add origin https://github.com/skrede/cartan-fuzz-corpus.git
 
-          # Reachability and authentication first, and separately: ls-remote
-          # succeeds with no output against a store that exists and is empty,
-          # and fails against one that is unreachable or refuses the key. Only
-          # the first is a legitimate first run.
+          # Reachability and emptiness, separately: ls-remote succeeds with no
+          # output against a store that exists and is empty, and fails against
+          # one that is unreachable. Only the first is a legitimate first run.
           if ! git ls-remote origin > /tmp/store-refs 2>/tmp/store-err; then
-            echo "::error::the corpus store is unreachable or refused the key" >&2
+            echo "::error::the corpus store is unreachable" >&2
             cat /tmp/store-err >&2
             exit 1
           fi
-          if ! grep -q 'refs/heads/main$' /tmp/store-refs; then
-            echo "::notice::the store has no main branch yet; fuzzing from the committed seeds only"
+          if ! grep -q 'refs/heads/master$' /tmp/store-refs; then
+            echo "::notice::the store has no master branch yet; fuzzing from the committed seeds only"
             exit 0
           fi
 
-          git fetch -q --depth 1 origin main
+          git fetch -q --depth 1 origin master
           git checkout -q FETCH_HEAD
           cd ..
           restored=0
@@ -204,7 +183,7 @@ jobs:
             fi
           done
           if [ "$restored" -lt 1 ]; then
-            echo "::error::the store carries a main branch but no inputs for any target" >&2
+            echo "::error::the store carries a master branch but no inputs for any target" >&2
             exit 1
           fi
           echo "restored $restored input(s) from the store"
@@ -280,13 +259,24 @@ jobs:
       # deliberately left alone.
       - name: Push the merged corpus to the store
         if: >-
-          steps.corpus.outputs.available == 'true'
-          && github.event_name != 'pull_request'
+          github.event_name != 'pull_request'
           && github.ref == 'refs/heads/master'
         env:
           CORPUS_KEY: ${{ secrets.FUZZ_CORPUS_DEPLOY_KEY }}
         run: |
           set -euo pipefail
+
+          # Writing is the only half that needs the key; reading the public store
+          # above did not. An absent secret is reported and skipped rather than
+          # failed, so the gate itself does not depend on the store existing.
+          if [ -z "${CORPUS_KEY:-}" ]; then
+            echo "::notice::no corpus credential; the merged set was uploaded as an artifact but not stored"
+            exit 0
+          fi
+          mkdir -p ~/.ssh
+          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+          printf '%s\n' "${CORPUS_KEY}" > ~/.ssh/corpus_key
+          chmod 600 ~/.ssh/corpus_key
           export GIT_SSH_COMMAND="ssh -i ~/.ssh/corpus_key -o IdentitiesOnly=yes"
 
           # A merge that produced nothing would empty the store on push. That is
@@ -307,11 +297,14 @@ jobs:
           done
 
           cd accumulated
+          # The restore read the store anonymously over https; pushing needs the
+          # key, so the same remote is re-pointed at its ssh URL here.
+          git remote set-url origin git@github.com:skrede/cartan-fuzz-corpus.git
           git config user.name "cartan fuzz"
           git config user.email "noreply@github.com"
-          # A clone of an empty repository has a symbolic HEAD but no commit, so
-          # the branch has to be created on the first push and only then.
-          git rev-parse --verify HEAD > /dev/null 2>&1 || git checkout -b main
+          # An empty store leaves HEAD symbolic but unborn, so the branch has to
+          # be created on the first push and only then.
+          git rev-parse --verify HEAD > /dev/null 2>&1 || git checkout -b master
           for target in $CARTAN_FUZZ_TARGETS; do
             rm -rf "$target"
             cp -a ../minimized-corpus/"$target" "$target"
@@ -322,7 +315,7 @@ jobs:
             exit 0
           fi
           git commit -m "Merge corpus from ${GITHUB_SHA:0:12} (${total} inputs)"
-          git push origin HEAD:main
+          git push origin HEAD:master
           echo "pushed ${total} input(s) to the store"
 
       # A crash input nobody kept is a crash nobody can reproduce, which is most
