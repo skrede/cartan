@@ -19,7 +19,7 @@ namespace
 
 constexpr double pi = std::numbers::pi;
 constexpr double two_pi = 2.0 * pi;
-constexpr double tolerance = 1e-9;
+constexpr double check_tolerance = 1e-9;
 
 // Worst of position and orientation reconstruction error of q against target.
 template <typename Chain>
@@ -87,8 +87,8 @@ TEST_CASE("unwrapped_solver: symmetric range yields the single in-range represen
         saw_in_range = true;
         const auto& q = result->solutions[static_cast<std::size_t>(i)];
         for (int k = 0; k < 3; ++k)
-            CHECK((q(k) >= -pi - tolerance && q(k) <= pi + tolerance));
-        CHECK(fk_position_error(chain, q, target) < tolerance);
+            CHECK((q(k) >= -pi - check_tolerance && q(k) <= pi + check_tolerance));
+        CHECK(fk_position_error(chain, q, target) < check_tolerance);
     }
     CHECK(saw_in_range);
 }
@@ -117,8 +117,8 @@ TEST_CASE("unwrapped_solver: asymmetric range keeps in-range branches within lim
         saw_in_range = true;
         const auto& q = result->solutions[static_cast<std::size_t>(i)];
         for (int k = 0; k < 3; ++k)
-            CHECK((q(k) >= -0.5 - tolerance && q(k) <= 2.5 + tolerance));
-        CHECK(fk_position_error(chain, q, target) < tolerance);
+            CHECK((q(k) >= -0.5 - check_tolerance && q(k) <= 2.5 + check_tolerance));
+        CHECK(fk_position_error(chain, q, target) < check_tolerance);
     }
     CHECK(saw_in_range);
 }
@@ -153,8 +153,8 @@ TEST_CASE("unwrapped_solver: multi-turn range honors the per-call reference")
         if (std::abs(qs(0) - qz(0) - two_pi) < 1e-6)
         {
             saw_full_turn = true;
-            CHECK(fk_position_error(chain, qz, target) < tolerance);
-            CHECK(fk_position_error(chain, qs, target) < tolerance);
+            CHECK(fk_position_error(chain, qz, target) < check_tolerance);
+            CHECK(fk_position_error(chain, qs, target) < check_tolerance);
         }
     }
     CHECK(saw_full_turn);
@@ -207,7 +207,7 @@ TEST_CASE("unwrapped_solver: composes over the OPW solver with identical wrapper
     auto chain = fixtures::make_kr6_r900_opw_chain<double>();
     auto params = fixtures::kr6_r900_opw_parameters<double>();
     auto inner = opw_6r_solver<decltype(chain)>::make(
-        chain, params, verification_tolerance<double>(tolerance, tolerance));
+        chain, params, verification_tolerance<double>(check_tolerance, check_tolerance));
     REQUIRE(inner.has_value());
 
     unwrapped_solver wrapper(*inner);
@@ -228,8 +228,8 @@ TEST_CASE("unwrapped_solver: composes over the OPW solver with identical wrapper
         saw_in_range = true;
         const auto& q = result->solutions[static_cast<std::size_t>(i)];
         for (int k = 0; k < 6; ++k)
-            CHECK((q(k) >= -pi - tolerance && q(k) <= pi + tolerance));
-        CHECK(fk_error(chain, q, target) < tolerance);
+            CHECK((q(k) >= -pi - check_tolerance && q(k) <= pi + check_tolerance));
+        CHECK(fk_error(chain, q, target) < check_tolerance);
     }
     CHECK(saw_in_range);
 

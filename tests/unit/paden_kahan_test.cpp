@@ -11,7 +11,7 @@
 using namespace cartan;
 using Catch::Matchers::WithinAbs;
 
-static constexpr double tolerance = 1e-10;
+static constexpr double check_tolerance = 1e-10;
 
 // The separation of the two threshold species is only worth its cost if the
 // compiler enforces it, so pin it here rather than trusting a naming convention.
@@ -34,7 +34,7 @@ TEST_CASE("paden_kahan_1: 90-degree rotation about z through origin")
 
     auto result = paden_kahan_1(omega, q, p, p_prime);
     REQUIRE(result.has_value());
-    CHECK_THAT(*result, WithinAbs(std::numbers::pi / 2, tolerance));
+    CHECK_THAT(*result, WithinAbs(std::numbers::pi / 2, check_tolerance));
 }
 
 TEST_CASE("paden_kahan_1: rotation about z through offset point")
@@ -48,7 +48,7 @@ TEST_CASE("paden_kahan_1: rotation about z through offset point")
 
     auto result = paden_kahan_1(omega, q, p, p_prime);
     REQUIRE(result.has_value());
-    CHECK_THAT(*result, WithinAbs(std::numbers::pi / 2, tolerance));
+    CHECK_THAT(*result, WithinAbs(std::numbers::pi / 2, check_tolerance));
 }
 
 TEST_CASE("paden_kahan_1: unreachable (different distances from axis)")
@@ -72,7 +72,7 @@ TEST_CASE("paden_kahan_1: negative angle")
 
     auto result = paden_kahan_1(omega, q, p, p_prime);
     REQUIRE(result.has_value());
-    CHECK_THAT(*result, WithinAbs(-std::numbers::pi / 2, tolerance));
+    CHECK_THAT(*result, WithinAbs(-std::numbers::pi / 2, check_tolerance));
 }
 
 TEST_CASE("paden_kahan_1: coincident points on the axis are a singular instance")
@@ -271,7 +271,7 @@ TEST_CASE("paden_kahan_1_direction: non-unit and nonfinite arguments are refused
     auto unit = paden_kahan_1_direction(
         omega, vector3<double>{1, 0, 0}, vector3<double>{0, 1, 0});
     REQUIRE(unit.has_value());
-    CHECK_THAT(*unit, WithinAbs(std::numbers::pi / 2, tolerance));
+    CHECK_THAT(*unit, WithinAbs(std::numbers::pi / 2, check_tolerance));
 }
 
 TEST_CASE("paden_kahan_2: two rotations mapping a known point")

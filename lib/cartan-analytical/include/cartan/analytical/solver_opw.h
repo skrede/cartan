@@ -386,7 +386,7 @@ public:
         const matrix3<Scalar> matrix = target.rotation().matrix();
         const vector3<Scalar> translation = target.translation();
 
-        const Scalar pi = std::numbers::pi_v<Scalar>;
+        const Scalar half_turn = std::numbers::pi_v<Scalar>;
         const Scalar sqrt_eps = detail::sqrt_epsilon_v<Scalar>;
 
         // Step 1: wrist center = flange - c4 * approach axis.
@@ -420,7 +420,7 @@ public:
         const Scalar tmp1 = std::atan2(center.y(), center.x());
         const Scalar tmp2 = std::atan2(p.b, nx1 + p.a1);
         const Scalar theta1_i = tmp1 - tmp2;
-        const Scalar theta1_ii = tmp1 + tmp2 - pi;
+        const Scalar theta1_ii = tmp1 + tmp2 - half_turn;
 
         // Step 3: theta2 / theta3 -- law of cosines over the shoulder-wrist
         // triangle, two elbow branches for each theta1 branch.
@@ -595,9 +595,9 @@ public:
             Scalar q6 = theta6_base[j];
             if (wrist != 0)
             {
-                q4 = theta4_base[j] + pi;
+                q4 = theta4_base[j] + half_turn;
                 q5 = -theta5_base[j];
-                q6 = theta6_base[j] - pi;
+                q6 = theta6_base[j] - half_turn;
             }
 
             Eigen::Vector<Scalar, 6> q_internal;

@@ -20,7 +20,7 @@
 using namespace cartan;
 using Catch::Matchers::WithinAbs;
 
-static constexpr double tolerance = 1e-6;
+static constexpr double check_tolerance = 1e-6;
 
 /// The validating factory is the only way to a solver, so a case whose subject
 /// is a solve says so by failing here rather than by exercising a solver whose
@@ -187,8 +187,8 @@ TEST_CASE("6R Pieper: reachable target from known FK returns solutions")
             - fk.end_effector.translation()).norm();
         double orientation_error = (fk_check.end_effector.rotation().inverse()
             * fk.end_effector.rotation()).log().norm();
-        CHECK(position_error < tolerance);
-        CHECK(orientation_error < tolerance);
+        CHECK(position_error < check_tolerance);
+        CHECK(orientation_error < check_tolerance);
     }
 }
 
@@ -212,7 +212,7 @@ TEST_CASE("6R Pieper: recovers original angles as one of the solutions")
             - fk.end_effector.translation()).norm();
         double orientation_error = (fk_check.end_effector.rotation().inverse()
             * fk.end_effector.rotation()).log().norm();
-        if (position_error < tolerance && orientation_error < tolerance)
+        if (position_error < check_tolerance && orientation_error < check_tolerance)
         {
             found_match = true;
             break;
@@ -336,8 +336,8 @@ TEST_CASE("6R Pieper: wrist singularity (theta5 near zero)")
             - fk.end_effector.translation()).norm();
         double orientation_error = (fk_check.end_effector.rotation().inverse()
             * fk.end_effector.rotation()).log().norm();
-        CHECK(position_error < tolerance);
-        CHECK(orientation_error < tolerance);
+        CHECK(position_error < check_tolerance);
+        CHECK(orientation_error < check_tolerance);
     }
 }
 
@@ -414,9 +414,9 @@ TEST_CASE("6R Pieper: anti-parallel outer wrist solves reachable poses")
                 - fk.end_effector.translation()).norm();
             double orientation_error = (fk_check.end_effector.rotation().inverse()
                 * fk.end_effector.rotation()).log().norm();
-            CHECK(position_error < tolerance);
-            CHECK(orientation_error < tolerance);
-            if (position_error < tolerance && orientation_error < tolerance)
+            CHECK(position_error < check_tolerance);
+            CHECK(orientation_error < check_tolerance);
+            if (position_error < check_tolerance && orientation_error < check_tolerance)
                 found_match = true;
         }
         CHECK(found_match);
@@ -453,8 +453,8 @@ TEST_CASE("6R Pieper: solutions are wrapped to (-pi, pi] and deduplicated")
             - fk.end_effector.translation()).norm();
         double orientation_error = (fk_check.end_effector.rotation().inverse()
             * fk.end_effector.rotation()).log().norm();
-        CHECK(position_error < tolerance);
-        CHECK(orientation_error < tolerance);
+        CHECK(position_error < check_tolerance);
+        CHECK(orientation_error < check_tolerance);
     }
 
     // No two returned solutions may coincide modulo 2*pi on every joint.
@@ -508,7 +508,7 @@ static bool fk_solvable(const Chain& chain, const se3<double>& target, double mi
     // it is meant to admit. Every branch is judged against the acceptance
     // tolerance below, independently of what the solver reports.
     const verification_tolerance<double> reachable(
-        std::max(2.0 * miss, tolerance), tolerance);
+        std::max(2.0 * miss, check_tolerance), check_tolerance);
     auto result = made(chain, reachable).solve(target);
     if (!result || result->count < 1)
         return false;
@@ -522,7 +522,7 @@ static bool fk_solvable(const Chain& chain, const se3<double>& target, double mi
         double pe = (fk.end_effector.translation() - target.translation()).norm();
         double oe = (fk.end_effector.rotation().inverse()
             * target.rotation()).log().norm();
-        if (pe < tolerance && oe < tolerance)
+        if (pe < check_tolerance && oe < check_tolerance)
             return true;
     }
     return false;
@@ -917,9 +917,9 @@ TEST_CASE("6R Pieper: asymmetric ZYX wrist solves via Euler extraction")
             - fk.end_effector.translation()).norm();
         double orientation_error = (fk_check.end_effector.rotation().inverse()
             * fk.end_effector.rotation()).log().norm();
-        CHECK(position_error < tolerance);
-        CHECK(orientation_error < tolerance);
-        if (position_error < tolerance && orientation_error < tolerance)
+        CHECK(position_error < check_tolerance);
+        CHECK(orientation_error < check_tolerance);
+        if (position_error < check_tolerance && orientation_error < check_tolerance)
             found_match = true;
     }
     CHECK(found_match);
@@ -952,9 +952,9 @@ TEST_CASE("6R Pieper: theta5 near pi drives the symmetric gimbal branch")
             - fk.end_effector.translation()).norm();
         double orientation_error = (fk_check.end_effector.rotation().inverse()
             * fk.end_effector.rotation()).log().norm();
-        CHECK(position_error < tolerance);
-        CHECK(orientation_error < tolerance);
-        if (position_error < tolerance && orientation_error < tolerance)
+        CHECK(position_error < check_tolerance);
+        CHECK(orientation_error < check_tolerance);
+        if (position_error < check_tolerance && orientation_error < check_tolerance)
             found_match = true;
     }
     CHECK(found_match);

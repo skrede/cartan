@@ -28,20 +28,20 @@ Scalar unwrap_to_range_nearest(
     {
         return theta;
     }
-    constexpr Scalar two_pi = Scalar(2) * std::numbers::pi_v<Scalar>;
+    constexpr Scalar full_turn = Scalar(2) * std::numbers::pi_v<Scalar>;
     const Scalar inf = std::numeric_limits<Scalar>::infinity();
     const Scalar base = canonical_angle_in_limits(theta, lo, hi, tol);
     const Scalar k_lo =
-        std::isfinite(lo) ? std::ceil((lo - base - tol) / two_pi) : -inf;
+        std::isfinite(lo) ? std::ceil((lo - base - tol) / full_turn) : -inf;
     const Scalar k_hi =
-        std::isfinite(hi) ? std::floor((hi - base + tol) / two_pi) : inf;
+        std::isfinite(hi) ? std::floor((hi - base + tol) / full_turn) : inf;
     if (k_lo > k_hi)
     {
         return base;
     }
     const Scalar k =
-        std::clamp(std::round((reference - base) / two_pi), k_lo, k_hi);
-    return base + two_pi * k;
+        std::clamp(std::round((reference - base) / full_turn), k_lo, k_hi);
+    return base + full_turn * k;
 }
 
 }

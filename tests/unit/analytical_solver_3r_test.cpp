@@ -16,7 +16,7 @@
 using namespace cartan;
 using Catch::Matchers::WithinAbs;
 
-static constexpr double tolerance = 1e-6;
+static constexpr double check_tolerance = 1e-6;
 
 using zyz_3r_chain = static_chain<double, revolute_z, revolute_y, revolute_z>;
 
@@ -58,7 +58,7 @@ TEST_CASE("3R solver: reachable target returns solutions")
         auto fk_check = testing::fk_at(chain, result->solutions[static_cast<std::size_t>(i)]);
         double error = (fk_check.end_effector.translation()
             - fk.end_effector.translation()).norm();
-        CHECK(error < tolerance);
+        CHECK(error < check_tolerance);
     }
 }
 
@@ -81,7 +81,7 @@ TEST_CASE("3R solver: FK-computed target recovers original angles as one solutio
         auto fk_check = testing::fk_at(chain, result->solutions[static_cast<std::size_t>(i)]);
         double error = (fk_check.end_effector.translation()
             - fk.end_effector.translation()).norm();
-        if (error < tolerance)
+        if (error < check_tolerance)
         {
             found_match = true;
             break;
@@ -199,7 +199,7 @@ TEST_CASE("3R solver: all solutions FK-verify")
         auto fk_check = testing::fk_at(chain, result->solutions[static_cast<std::size_t>(i)]);
         double position_error = (fk_check.end_effector.translation()
             - fk.end_effector.translation()).norm();
-        CHECK(position_error < tolerance);
+        CHECK(position_error < check_tolerance);
     }
 }
 
@@ -396,6 +396,6 @@ TEST_CASE("3R solver: shoulder axes meeting away from their stored points are so
         auto fk = testing::fk_at(
             chain, result->solutions[static_cast<std::size_t>(i)]);
         CHECK((fk.end_effector.translation() - target.translation()).norm()
-            < tolerance);
+            < check_tolerance);
     }
 }

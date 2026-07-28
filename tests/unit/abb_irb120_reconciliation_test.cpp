@@ -17,8 +17,8 @@ using namespace cartan;
 // Solve and re-verify at the same 1e-9 bar the OPW round-trip uses: the closed
 // form never gets to grade its own homework, every returned branch is checked
 // by an independent forward map.
-static constexpr double tolerance = 1e-9;
-static constexpr verification_tolerance<double> acceptance(tolerance, tolerance);
+static constexpr double check_tolerance = 1e-9;
+static constexpr verification_tolerance<double> acceptance(check_tolerance, check_tolerance);
 
 // Worst of position and orientation reconstruction error of q against target.
 template <typename Chain>
@@ -78,11 +78,11 @@ TEST_CASE("IRB120: reconciled-geometry FK accuracy over a workspace-spanning "
                 CHECK_FALSE(std::isnan(sol(k)));
             const double e = fk_error(chain, sol, target);
             worst = std::max(worst, e);
-            CHECK(e < tolerance);
+            CHECK(e < check_tolerance);
         }
     }
     INFO("worst per-call FK error = " << worst);
-    CHECK(worst < tolerance);
+    CHECK(worst < check_tolerance);
 }
 
 TEST_CASE("IRB120: reconciled chain and static factory agree on FK away from "

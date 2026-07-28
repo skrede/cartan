@@ -20,8 +20,8 @@ using namespace cartan;
 // is explicitly insufficient, so the round-trip below spans over a thousand
 // full-joint-range configurations and re-verifies every returned solution by an
 // independent forward map at 1e-9 (never trusting the solver's own report).
-static constexpr double tolerance = 1e-9;
-static constexpr verification_tolerance<double> acceptance(tolerance, tolerance);
+static constexpr double check_tolerance = 1e-9;
+static constexpr verification_tolerance<double> acceptance(check_tolerance, check_tolerance);
 
 using non_parallel_6r_chain = static_chain<double, revolute_z, revolute_y, revolute_x,
     revolute_x, revolute_y, revolute_x>;
@@ -102,7 +102,7 @@ TEST_CASE("OPW: FK round-trip reconstructs KR6 R900 targets at 1e-9 over a "
             const auto& sol = result->solutions[static_cast<std::size_t>(i)];
             for (int k = 0; k < 6; ++k)
                 CHECK_FALSE(std::isnan(sol(k)));
-            CHECK(fk_error(chain, sol, target) < tolerance);
+            CHECK(fk_error(chain, sol, target) < check_tolerance);
         }
     }
 
@@ -181,7 +181,7 @@ TEST_CASE("OPW: wrist singularity returns FK-verified folded solutions")
                 const auto& sol = result->solutions[static_cast<std::size_t>(i)];
                 for (int k = 0; k < 6; ++k)
                     CHECK_FALSE(std::isnan(sol(k)));
-                CHECK(fk_error(chain, sol, target) < tolerance);
+                CHECK(fk_error(chain, sol, target) < check_tolerance);
             }
         }
     }

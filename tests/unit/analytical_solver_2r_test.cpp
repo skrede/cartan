@@ -16,7 +16,7 @@ using namespace cartan;
 using Catch::Matchers::WithinAbs;
 using Catch::Matchers::WithinRel;
 
-static constexpr double tolerance = 1e-6;
+static constexpr double check_tolerance = 1e-6;
 
 using planar_2r_chain = static_chain<double, revolute_y, revolute_y>;
 
@@ -54,7 +54,7 @@ TEST_CASE("2R solver: reachable interior target returns 2 solutions")
         auto fk = testing::fk_at(chain, result->solutions[i]);
         double error = (fk.end_effector.translation()
             - Eigen::Vector3d(1.0, 0, 0)).norm();
-        CHECK(error < tolerance);
+        CHECK(error < check_tolerance);
     }
 }
 
@@ -71,7 +71,7 @@ TEST_CASE("2R solver: fully extended boundary returns 1 solution")
     auto fk = testing::fk_at(chain, result->solutions[0]);
     double error = (fk.end_effector.translation()
         - Eigen::Vector3d(2.0, 0, 0)).norm();
-    CHECK(error < tolerance);
+    CHECK(error < check_tolerance);
 }
 
 TEST_CASE("2R solver: fully folded boundary returns 1 solution")
@@ -140,7 +140,7 @@ TEST_CASE("2R solver: convenience function solve_2r matches solver")
     {
         double diff = (result_solver->solutions[i]
             - result_free->solutions[i]).norm();
-        CHECK(diff < tolerance);
+        CHECK(diff < check_tolerance);
     }
 }
 
@@ -191,7 +191,7 @@ TEST_CASE("2R solver: bent home is solved and FK-reconstructs the target")
         auto fk = testing::fk_at(chain, result->solutions[i]);
         double error = (fk.end_effector.translation()
             - Eigen::Vector3d(0.8, 0, 0.9)).norm();
-        CHECK(error < tolerance);
+        CHECK(error < check_tolerance);
     }
 }
 
@@ -210,7 +210,7 @@ TEST_CASE("2R solver: bent home recovers the target at the home configuration")
         auto fk = testing::fk_at(chain, result->solutions[i]);
         double error = (fk.end_effector.translation()
             - Eigen::Vector3d(1.0, 0, 1.0)).norm();
-        CHECK(error < tolerance);
+        CHECK(error < check_tolerance);
     }
 }
 
@@ -227,7 +227,7 @@ TEST_CASE("2R solver: different link lengths")
         auto fk = testing::fk_at(chain, result->solutions[i]);
         double error = (fk.end_effector.translation()
             - Eigen::Vector3d(1.0, 0, 0.5)).norm();
-        CHECK(error < tolerance);
+        CHECK(error < check_tolerance);
     }
 }
 
@@ -246,9 +246,9 @@ TEST_CASE("2R solver: the configured acceptance tolerance reaches the FK "
     auto chain = make_2r_chain(1.0, 1.0);
     auto target = target_at(1.0, 0, 0.5);
 
-    auto solve_at = [&](verification_tolerance<double> tolerance)
+    auto solve_at = [&](verification_tolerance<double> acceptance)
     {
-        auto solver = planar_2r_solver<planar_2r_chain>::make(chain, tolerance);
+        auto solver = planar_2r_solver<planar_2r_chain>::make(chain, acceptance);
         REQUIRE(solver.has_value());
         return solver->solve(target);
     };
@@ -325,7 +325,7 @@ TEST_CASE("2R solver: a target inside the acceptance length of the boundary is s
     REQUIRE(result.has_value());
     REQUIRE(result->count == 1);
     auto fk = testing::fk_at(chain, result->solutions[0]);
-    CHECK((fk.end_effector.translation() - reached).norm() < tolerance);
+    CHECK((fk.end_effector.translation() - reached).norm() < check_tolerance);
 }
 
 // The fixture's joints turn about y, so its mechanism plane is the xz plane and

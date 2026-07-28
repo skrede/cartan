@@ -151,16 +151,16 @@ inline Scalar canonical_angle_in_limits(
         return theta;
     }
 
-    constexpr Scalar two_pi = Scalar(2) * std::numbers::pi_v<Scalar>;
+    constexpr Scalar full_turn = Scalar(2) * std::numbers::pi_v<Scalar>;
     if (std::isfinite(lo))
     {
-        const Scalar k = std::ceil((lo - theta - tol) / two_pi);
-        return theta + two_pi * k;
+        const Scalar k = std::ceil((lo - theta - tol) / full_turn);
+        return theta + full_turn * k;
     }
     if (std::isfinite(hi))
     {
-        const Scalar k = std::floor((hi - theta + tol) / two_pi);
-        return theta + two_pi * k;
+        const Scalar k = std::floor((hi - theta + tol) / full_turn);
+        return theta + full_turn * k;
     }
     return theta;
 }
