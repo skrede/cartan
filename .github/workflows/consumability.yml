@@ -52,14 +52,16 @@ jobs:
 
     steps:
       # Deliberately short: a compiler, the build system at the version the
-      # documentation names as the minimum, the version-control client the fetch
-      # uses, and the interpreter the extractor needs. Every package beyond that
-      # is a chance to satisfy the dependency the gate must find missing.
+      # documentation names as the minimum, the program that build system
+      # generates for, the version-control client the fetch uses, and the
+      # interpreter the extractor needs. Every package beyond that is a chance to
+      # satisfy the dependency the gate must find missing. Recommends are off, so
+      # make is named here rather than arriving with cmake.
       - name: Install the consumer toolchain only, with Eigen deliberately not installed
         run: |
           set -eu
           apt-get update
-          apt-get install -y --no-install-recommends g++ cmake git python3 ca-certificates
+          apt-get install -y --no-install-recommends g++ make cmake git python3 ca-certificates
 
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
