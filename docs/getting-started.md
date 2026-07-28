@@ -76,6 +76,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(FetchContent)
+set(CARTAN_CMAKE_FETCH_DEPS ON)
 FetchContent_Declare(
     cartan
     GIT_REPOSITORY https://github.com/skrede/cartan.git
