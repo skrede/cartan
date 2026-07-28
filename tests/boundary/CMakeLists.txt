@@ -86,21 +86,15 @@ cartan_add_boundary_test(axis_classification_test axis_classification_test.cpp)
 include(CheckCXXSourceCompiles)
 include(CheckCXXSourceRuns)
 
-# try_compile does not apply CMAKE_CXX_FLAGS_<CONFIG>, and -DNDEBUG lives there,
-# so the per-configuration flags and the directory-level options are both handed
-# to the probes explicitly or the answer is about a configuration nobody builds.
+# try_compile does not apply CMAKE_CXX_FLAGS_<CONFIG>, and the sanitizer switches
+# can live there, so the per-configuration flags and the directory-level options
+# are both handed to the probe explicitly or the answer is about a configuration
+# nobody builds.
 get_directory_property(cartan_boundary_directory_options COMPILE_OPTIONS)
 list(JOIN cartan_boundary_directory_options " " cartan_boundary_extra_flags)
 string(TOUPPER "${CMAKE_BUILD_TYPE}" cartan_boundary_config)
 set(CMAKE_REQUIRED_FLAGS
     "${cartan_boundary_extra_flags} ${CMAKE_CXX_FLAGS_${cartan_boundary_config}}")
-
-check_cxx_source_compiles("
-#ifndef NDEBUG
-#error assertions are live
-#endif
-int main() { return 0; }
-" CARTAN_BOUNDARY_ASSERTIONS_OFF)
 
 check_cxx_source_runs("
 #if defined(__SANITIZE_ADDRESS__)
@@ -120,15 +114,23 @@ unset(CMAKE_REQUIRED_FLAGS)
 # needs assertions compiled out. Eigen asserts on the dimension mismatch and
 # cartan asserts on a nonfinite quaternion, and either aborts the process before
 # the behavior under demonstration can be observed.
-if (CARTAN_BOUNDARY_ASSERTIONS_OFF)
-    foreach (differential IN ITEMS velocity_unchecked_differential_test
-            fk_unchecked_differential_test jacobian_unchecked_differential_test
-            solver_setup_unchecked_differential_test)
-        cartan_add_boundary_test(${differential} ${differential}.cpp)
-        set_property(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" APPEND
-            PROPERTY cartan_boundary_differential "${differential}")
-    endforeach ()
-endif ()
+#
+# Each therefore compiles its own assertions out rather than depending on the
+# surrounding build type, for the reason the sanitizer probes below do: a
+# configure-time answer about the build type is not one a multi-configuration
+# generator has, which left this whole group unregistered under Visual Studio
+# while the guard was compiled with NDEBUG and accounted for it. Depending on the
+# build type also silently dropped the group from every Debug build. The library
+# is header-only, so no other translation unit in these binaries sees the
+# definition and there is nothing for it to disagree with.
+foreach (differential IN ITEMS velocity_unchecked_differential_test
+        fk_unchecked_differential_test jacobian_unchecked_differential_test
+        solver_setup_unchecked_differential_test)
+    cartan_add_boundary_test(${differential} ${differential}.cpp)
+    target_compile_definitions(${differential} PRIVATE NDEBUG _GLIBCXX_NO_ASSERTIONS)
+    set_property(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" APPEND
+        PROPERTY cartan_boundary_differential "${differential}")
+endforeach ()
 
 if (CARTAN_BOUNDARY_ADDRESS_SANITIZER)
     # A probe carries no test framework and exists solely to reproduce what the
