@@ -29,12 +29,16 @@ jobs:
       - name: Select Xcode ${{ matrix.xcode }}
         run: sudo xcode-select -s /Applications/Xcode_${{ matrix.xcode }}.app
 
+      # The exclusion list for the examples is empty: every example and tutorial
+      # is built here and the three tutorials run as registered tests. Nothing is
+      # skipped for being known broken.
       - name: Configure
         run: |
           cmake . -B build -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_FLAGS="-Werror" \
             -DCARTAN_BUILD_TESTS=ON \
-            -DCARTAN_BUILD_EXAMPLES=OFF \
+            -DCARTAN_BUILD_EXAMPLES=ON \
+            -DCARTAN_BUILD_URDF=ON \
             -DCARTAN_CMAKE_FETCH_DEPS=ON
 
       - name: Build

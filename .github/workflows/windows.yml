@@ -21,13 +21,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # No standard flag is passed here. The compile features declared on the
+      # cartan targets are the single source of the standard, and a flag in this
+      # string competes with them: the build system emits this string first and
+      # its own standard flag last, so the compiler honored the latter and this
+      # one asserted a standard the build never used. Warnings are promoted the
+      # same way they are on the other platforms; the warning level alone left
+      # this platform outside a claim the project makes everywhere else.
+      #
+      # The exclusion list for the examples is empty: every example and tutorial
+      # is built and run here as well, and nothing is skipped for being known
+      # broken.
       - name: Configure
         run: |
           cmake . -B build -A x64 `
             -DCARTAN_BUILD_TESTS=ON `
-            -DCARTAN_BUILD_EXAMPLES=OFF `
+            -DCARTAN_BUILD_EXAMPLES=ON `
+            -DCARTAN_BUILD_URDF=ON `
             -DCARTAN_CMAKE_FETCH_DEPS=ON `
-            '-DCMAKE_CXX_FLAGS=/std:c++latest /W4 /EHsc'
+            '-DCMAKE_CXX_FLAGS=/W4 /WX /EHsc'
 
       - name: Build
         run: cmake --build build --config Release
@@ -53,7 +65,7 @@ jobs:
             -DCARTAN_BUILD_NETWORK_TESTS=ON `
             -DCARTAN_CMAKE_FETCH_DEPS=OFF `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
-            '-DCMAKE_CXX_FLAGS=/std:c++latest /EHsc'
+            '-DCMAKE_CXX_FLAGS=/EHsc'
 
       - name: Install, relocate and consume
         run: ctest --test-dir build -C Release -R install_matrix --output-on-failure --no-tests=error

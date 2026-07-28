@@ -2,8 +2,9 @@
 
 ## Prerequisites
 
-- C++20 compiler: GCC 10+, Clang 13+, MSVC 17.x+ (tested on GCC 14, Clang 18,
-  MSVC 17.10). Embedded targets build with an exceptions-off C++20 GCC backend.
+- C++20 compiler &mdash; CI builds and tests GCC 14, Clang 18, AppleClang (Xcode
+  16.2) and MSVC 2022 (VS 17.x); older C++20 toolchains are untested. Embedded
+  targets build with an exceptions-off C++20 GCC backend.
 - CMake 3.28+
 - Eigen 3.4+ (fetched automatically via FetchContent)
 

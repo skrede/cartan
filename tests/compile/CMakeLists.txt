@@ -3,6 +3,16 @@ target_link_libraries(include_test PRIVATE cartan::cartan)
 target_compile_options(include_test PRIVATE ${CARTAN_WARNING_FLAGS})
 add_test(NAME include_test COMMAND include_test)
 
+# The standard is declared by target_compile_features on the cartan targets and
+# nowhere else, so linking cartan::cartan is what puts the standard flag on this
+# unit's command line. The assertion is an equality: a later standard fails it
+# just as an earlier one does, which is what makes it a check on the declaration
+# rather than a lower bound.
+add_executable(standard_assertion_test standard_assertion_test.cpp)
+target_link_libraries(standard_assertion_test PRIVATE cartan::cartan)
+target_compile_options(standard_assertion_test PRIVATE ${CARTAN_WARNING_FLAGS})
+add_test(NAME standard_assertion_test COMMAND standard_assertion_test)
+
 # Two-mode proof that the validated Lie factories compile with C++ exceptions
 # both disabled and enabled. The exceptions-off build mirrors the embedded
 # posture (ESP-IDF defaults to -fno-exceptions -fno-rtti) and guards against a
