@@ -66,7 +66,9 @@ std::array<joint_limits<double>, 3> uniform_limits(double lo, double hi)
 TEST_CASE("unwrapped_solver: symmetric range yields the single in-range representative")
 {
     auto chain = make_3r_zyz(uniform_limits(-pi, pi));
-    auto inner = spatial_3r_solver(chain);
+    auto built = spatial_3r_solver<decltype(chain)>::make(chain);
+    REQUIRE(built.has_value());
+    const auto& inner = *built;
     unwrapped_solver wrapper(inner);
 
     Eigen::Vector3d q_known;
@@ -94,7 +96,9 @@ TEST_CASE("unwrapped_solver: symmetric range yields the single in-range represen
 TEST_CASE("unwrapped_solver: asymmetric range keeps in-range branches within limits")
 {
     auto chain = make_3r_zyz(uniform_limits(-0.5, 2.5));
-    auto inner = spatial_3r_solver(chain);
+    auto built = spatial_3r_solver<decltype(chain)>::make(chain);
+    REQUIRE(built.has_value());
+    const auto& inner = *built;
     unwrapped_solver wrapper(inner);
 
     Eigen::Vector3d q_known;
@@ -122,7 +126,9 @@ TEST_CASE("unwrapped_solver: asymmetric range keeps in-range branches within lim
 TEST_CASE("unwrapped_solver: multi-turn range honors the per-call reference")
 {
     auto chain = make_3r_zyz(uniform_limits(-3.0 * pi, 3.0 * pi));
-    auto inner = spatial_3r_solver(chain);
+    auto built = spatial_3r_solver<decltype(chain)>::make(chain);
+    REQUIRE(built.has_value());
+    const auto& inner = *built;
     unwrapped_solver wrapper(inner);
 
     Eigen::Vector3d q_known;
@@ -157,7 +163,9 @@ TEST_CASE("unwrapped_solver: multi-turn range honors the per-call reference")
 TEST_CASE("unwrapped_solver: tight range tags out-of-arc branches, never drops them")
 {
     auto chain = make_3r_zyz(uniform_limits(0.1, 0.2));
-    auto inner = spatial_3r_solver(chain);
+    auto built = spatial_3r_solver<decltype(chain)>::make(chain);
+    REQUIRE(built.has_value());
+    const auto& inner = *built;
     unwrapped_solver wrapper(inner);
 
     Eigen::Vector3d q_known;
@@ -179,7 +187,9 @@ TEST_CASE("unwrapped_solver: tight range tags out-of-arc branches, never drops t
 TEST_CASE("unwrapped_solver: passes an inner whole-solve failure through unchanged")
 {
     auto chain = make_3r_zyz(uniform_limits(-pi, pi));
-    auto inner = spatial_3r_solver(chain);
+    auto built = spatial_3r_solver<decltype(chain)>::make(chain);
+    REQUIRE(built.has_value());
+    const auto& inner = *built;
     unwrapped_solver wrapper(inner);
 
     auto far_target =

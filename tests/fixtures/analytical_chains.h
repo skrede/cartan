@@ -2,7 +2,7 @@
 #define HPP_GUARD_CARTAN_TESTS_FIXTURES_ANALYTICAL_CHAINS_H
 
 /// @file analytical_chains.h
-/// @brief 6R chain fixtures exercising analytical-solver output hygiene.
+/// @brief Chain fixtures exercising analytical-solver output hygiene.
 ///
 /// The zero-offset PUMA in analytical_solver_6r_test.cpp uses a +z outer-wrist
 /// axis and generous +/-10 rad joint limits, which hides two output defects:
@@ -178,6 +178,43 @@ auto make_near_spherical_wrist_puma(Scalar wrist_offset)
         cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
         cartan::revolute_z, cartan::revolute_y, cartan::revolute_z>;
     return chain_type::make(home, {s0, s1, s2, s3, s4, s5}, limits);
+}
+
+/// ZYZ 3R chain whose first two axes miss each other by `separation`: axis 2
+/// (direction y) is shifted along x, perpendicular to both axis directions, so
+/// the shoulder is skew rather than meeting at a point. The Paden-Kahan
+/// decomposition rotates about the point where those two axes meet, which a
+/// skew pair does not have, so a valid factory must reject it at construction.
+///
+/// Like the near-spherical wrist above it takes a runtime parameter, so its
+/// construction can be refused for a reason that is the caller's rather than a
+/// bug in a literal; it returns the fallible result instead of unwrapping it.
+template <typename Scalar>
+auto make_skew_shoulder_3r(Scalar separation)
+    -> cartan::expected<
+        cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y,
+                             cartan::revolute_z>,
+        cartan::chain_failure>
+{
+    using vec3 = cartan::vector3<Scalar>;
+
+    const Scalar link = Scalar(0.5), tool = Scalar(0.3);
+
+    auto s0 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(0), Scalar(1)), vec3(Scalar(0), Scalar(0), Scalar(0)));
+    auto s1 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(1), Scalar(0)), vec3(separation, Scalar(0), Scalar(0)));
+    auto s2 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(0), Scalar(1)), vec3(link, Scalar(0), Scalar(0)));
+
+    auto home = cartan::se3<Scalar>(
+        cartan::so3<Scalar>::identity(), vec3(link + tool, Scalar(0), Scalar(0)));
+    auto lim = cartan::testing::limits(Scalar(-10), Scalar(10));
+    std::array<cartan::joint_limits<Scalar>, 3> limits = {lim, lim, lim};
+
+    using chain_type = cartan::static_chain<Scalar,
+        cartan::revolute_z, cartan::revolute_y, cartan::revolute_z>;
+    return chain_type::make(home, {s0, s1, s2}, limits);
 }
 
 /// PUMA-type 6R chain (Z, Y, Y | Z, Y, Z) with realistic [-pi, pi] joint

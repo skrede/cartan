@@ -160,7 +160,13 @@ void bm_closed_form_solver(
 {
     using Scalar = typename Chain::scalar_type;
 
-    Solver solver(static_chain_for_solver);
+    auto built = Solver::make(static_chain_for_solver);
+    if (!built.has_value())
+    {
+        state.SkipWithError(message(built.error().reason));
+        return;
+    }
+    const Solver& solver = *built;
     const auto target_count = ts.targets.size();
 
     // Accuracy pass (untimed): FK-gated success and error means over the
@@ -222,7 +228,13 @@ void bm_closed_form_coverage(
     const Chain& static_chain_for_solver,
     const BboxTargetSet& bbox_ts)
 {
-    Solver solver(static_chain_for_solver);
+    auto built = Solver::make(static_chain_for_solver);
+    if (!built.has_value())
+    {
+        state.SkipWithError(message(built.error().reason));
+        return;
+    }
+    const Solver& solver = *built;
 
     std::size_t idx = 0;
     int hits = 0;

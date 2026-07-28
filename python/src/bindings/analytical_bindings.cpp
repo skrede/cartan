@@ -261,14 +261,22 @@ inline AnalyticalResult solve_pieper_result(const KC &chain, const SE3d &target)
 
 inline AnalyticalResult solve_planar_result(const KC &chain, const SE3d &target)
 {
-    cartan::planar_2r_solver solver(chain);
-    return to_analytical_result(solver.solve(target));
+    auto solver = cartan::planar_2r_solver<KC>::make(chain);
+    if(!solver)
+    {
+        return to_analytical_error_result(solver.error());
+    }
+    return to_analytical_result(solver->solve(target));
 }
 
 inline AnalyticalResult solve_spatial_3r_result(const KC &chain, const SE3d &target)
 {
-    cartan::spatial_3r_solver solver(chain);
-    return to_analytical_result(solver.solve(target));
+    auto solver = cartan::spatial_3r_solver<KC>::make(chain);
+    if(!solver)
+    {
+        return to_analytical_error_result(solver.error());
+    }
+    return to_analytical_result(solver->solve(target));
 }
 
 }
@@ -400,11 +408,14 @@ void register_analytical(nb::module_ &m)
             [](const KC &chain, const SE3d &target) -> AnalyticalResult
             {
                 validate_target_finite("solve_planar_2r", target);
-                cartan::planar_2r_solver solver(chain);
-                return to_analytical_result(solver.solve(target));
+                return solve_planar_result(chain, target);
             },
             "Closed-form planar 2R inverse kinematics. Returns up to two "
-            "FK-verified branches (elbow-up and elbow-down).",
+            "FK-verified branches (elbow-up and elbow-down). A chain that is "
+            "not two revolute joints on parallel axes, whose home end-effector "
+            "leaves the mechanism plane, or that has a zero-length link is "
+            "rejected at construction: status is degenerate_geometry and "
+            "solutions is empty.",
             nb::arg("chain"), nb::arg("target").noconvert(), nb::call_guard<nb::gil_scoped_release>());
 
     analytical.def(
@@ -412,11 +423,14 @@ void register_analytical(nb::module_ &m)
             [](const KC &chain, const SE3d &target) -> AnalyticalResult
             {
                 validate_target_finite("solve_3r", target);
-                cartan::spatial_3r_solver solver(chain);
-                return to_analytical_result(solver.solve(target));
+                return solve_spatial_3r_result(chain, target);
             },
             "Closed-form spatial 3R position-only inverse kinematics. "
-            "Returns up to four FK-verified branches.",
+            "Returns up to four FK-verified branches. A chain that is not "
+            "three revolute joints whose first two axes meet at a point, or "
+            "whose home end-effector lies on the third axis, is rejected at "
+            "construction: status is degenerate_geometry and solutions is "
+            "empty.",
             nb::arg("chain"), nb::arg("target").noconvert(), nb::call_guard<nb::gil_scoped_release>());
 
     analytical.def(
@@ -705,17 +719,11 @@ void register_analytical(nb::module_ &m)
                             break;
                         }
                     case 2:
-                        {
-                            cartan::planar_2r_solver solver(chain);
-                            result = to_analytical_result(solver.solve(target));
-                            break;
-                        }
+                        result = solve_planar_result(chain, target);
+                        break;
                     case 3:
-                        {
-                            cartan::spatial_3r_solver solver(chain);
-                            result = to_analytical_result(solver.solve(target));
-                            break;
-                        }
+                        result = solve_spatial_3r_result(chain, target);
+                        break;
                     default:
                         result.status       = py_analytical_status::degenerate_geometry;
                         result.error_metric = std::nullopt;

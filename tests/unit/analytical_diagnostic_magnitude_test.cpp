@@ -86,36 +86,36 @@ TEST_CASE("analytical diagnostics: a 2R failure that evaluated no inequality car
         chain_of({rev(y, {0, 0, 0}), screw_axis<double>::prismatic({0, 0, 1})}, {1, 0, 0})));
     absent("2R factory: zero-length link", planar_2r_solver<dyn_chain>::make(
         chain_of({rev(y, {0, 0, 0}), rev(y, {0, 0, 0})}, {1, 0, 0})));
-    absent("2R solve: invalid state",
-        planar_2r_solver<dyn_chain>(three).solve(at(1, 0, 0)));
     // A zero acceptance length rejects every candidate, evaluating no inequality.
-    absent("2R solve: verification failed", planar_2r_solver<dyn_chain>(
-        two, verification_tolerance<double>(0.0, 0.0)).solve(at(1, 0, 0)));
+    absent("2R solve: verification failed", planar_2r_solver<dyn_chain>::make(
+        two, verification_tolerance<double>(0.0, 0.0))->solve(at(1, 0, 0)));
 
     deficit("2R solve: beyond the outer reach",
-        planar_2r_solver<dyn_chain>(two).solve(at(5, 0, 0)));
-    deficit("2R solve: inside the reach hole", planar_2r_solver<dyn_chain>(
-        chain_of({rev(y, {0, 0, 0}), rev(y, {3, 0, 0})}, {4, 0, 0})).solve(at(0, 0, 0)));
+        planar_2r_solver<dyn_chain>::make(two)->solve(at(5, 0, 0)));
+    deficit("2R solve: inside the reach hole", planar_2r_solver<dyn_chain>::make(
+        chain_of({rev(y, {0, 0, 0}), rev(y, {3, 0, 0})}, {4, 0, 0}))->solve(at(0, 0, 0)));
 }
 
 TEST_CASE("analytical diagnostics: a 3R failure that evaluated no inequality carries nothing")
 {
     const Eigen::Vector3d z(0, 0, 1), y(0, 1, 0);
     const axis_list zyy = {rev(z, {0, 0, 0}), rev(y, {0, 0, 0}), rev(y, {0.4, 0, 0})};
+    const axis_list zyz = {rev(z, {0, 0, 0}), rev(y, {0, 0, 0}), rev(z, {0, 0, 0})};
 
-    absent("3R solve: invalid state", spatial_3r_solver<dyn_chain>(
-        chain_of({rev(y, {0, 0, 0}), rev(y, {1, 0, 0})}, {2, 0, 0})).solve(at(1, 0, 0)));
-    // Parallel shoulder axes: no candidate is placed, so none is verified.
-    absent("3R solve: verification failed", spatial_3r_solver<dyn_chain>(
-        chain_of({rev(y, {0, 0, 0}), rev(y, {0, 0, 0.1}), rev(y, {0.4, 0, 0.1})}, {0.7, 0, 0.1}))
-            .solve(at(0.2, 0.3, 0.1)));
+    // Tool point on the third axis leaves the achieved distance independent of
+    // the angle, so no angle is determined and none is left to reject.
+    absent("3R factory: home end-effector on the third axis",
+        spatial_3r_solver<dyn_chain>::make(chain_of(zyy, {0.4, 0, 0})));
+    // A zero acceptance length rejects every candidate, evaluating no inequality.
+    absent("3R solve: verification failed", spatial_3r_solver<dyn_chain>::make(
+        chain_of(zyy, {0.7, 0, 0}), verification_tolerance<double>(0.0, 0.0))
+            ->solve(at(0.7, 0, 0)));
     // On a nonfinite input the length the caller would attach is itself a NaN.
     absent("3R solve: subproblem reports a nonfinite input",
-        spatial_3r_solver<dyn_chain>(chain_of(zyy, {0.7, 0, 0})).solve(at(nan_v, 0, 0)));
-    // Tool point on the third axis makes the achieved distance independent of
-    // the angle: singular, not a reach failure.
+        spatial_3r_solver<dyn_chain>::make(chain_of(zyy, {0.7, 0, 0}))->solve(at(nan_v, 0, 0)));
+    // A third axis through the shoulder point leaves it singular the same way.
     absent("3R solve: subproblem reports a singular configuration",
-        spatial_3r_solver<dyn_chain>(chain_of(zyy, {0.4, 0, 0})).solve(at(0, 0, 0.4)));
+        spatial_3r_solver<dyn_chain>::make(chain_of(zyz, {0.5, 0, 0}))->solve(at(0, 0.5, 0)));
 
     // A forwarded subproblem reason carries nothing, unreachable included.
     CHECK_FALSE(subproblem_error<double>(analytical_failure::unreachable)

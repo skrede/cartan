@@ -82,13 +82,23 @@ void drive_solver(const Solver& solver, const cartan::se3<double>& target)
 void solve_planar_2r(const cartan::se3<double>& target)
 {
     static const auto chain = cartan::fixtures::make_planar_2r_static<double>();
-    drive_solver(cartan::planar_2r_solver(chain), target);
+    using chain_type = std::remove_const_t<decltype(chain)>;
+    auto solver = cartan::planar_2r_solver<chain_type>::make(chain);
+    if (solver.has_value())
+    {
+        drive_solver(*solver, target);
+    }
 }
 
 void solve_spatial_3r(const cartan::se3<double>& target)
 {
     static const auto chain = cartan::fixtures::make_spatial_3r_static<double>();
-    drive_solver(cartan::spatial_3r_solver(chain), target);
+    using chain_type = std::remove_const_t<decltype(chain)>;
+    auto solver = cartan::spatial_3r_solver<chain_type>::make(chain);
+    if (solver.has_value())
+    {
+        drive_solver(*solver, target);
+    }
 }
 
 void solve_pieper_6r(const cartan::se3<double>& target)

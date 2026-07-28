@@ -41,7 +41,9 @@ static se3<double> target_at(double x, double y, double z)
 TEST_CASE("2R solver: reachable interior target returns 2 solutions")
 {
     auto chain = make_2r_chain(1.0, 1.0);
-    auto result = planar_2r_solver(chain).solve(target_at(1.0, 0, 0));
+    auto solver = planar_2r_solver<planar_2r_chain>::make(chain);
+    REQUIRE(solver.has_value());
+    auto result = solver->solve(target_at(1.0, 0, 0));
 
     REQUIRE(result.has_value());
     REQUIRE(result->count == 2);
@@ -58,7 +60,9 @@ TEST_CASE("2R solver: reachable interior target returns 2 solutions")
 TEST_CASE("2R solver: fully extended boundary returns 1 solution")
 {
     auto chain = make_2r_chain(1.0, 1.0);
-    auto result = planar_2r_solver(chain).solve(target_at(2.0, 0, 0));
+    auto solver = planar_2r_solver<planar_2r_chain>::make(chain);
+    REQUIRE(solver.has_value());
+    auto result = solver->solve(target_at(2.0, 0, 0));
 
     REQUIRE(result.has_value());
     CHECK(result->count == 1);
@@ -72,7 +76,9 @@ TEST_CASE("2R solver: fully extended boundary returns 1 solution")
 TEST_CASE("2R solver: fully folded boundary returns 1 solution")
 {
     auto chain = make_2r_chain(2.0, 1.0);
-    auto result = planar_2r_solver(chain).solve(target_at(1.0, 0, 0));
+    auto solver = planar_2r_solver<planar_2r_chain>::make(chain);
+    REQUIRE(solver.has_value());
+    auto result = solver->solve(target_at(1.0, 0, 0));
 
     REQUIRE(result.has_value());
     CHECK(result->count == 1);
@@ -81,7 +87,9 @@ TEST_CASE("2R solver: fully folded boundary returns 1 solution")
 TEST_CASE("2R solver: unreachable target returns error")
 {
     auto chain = make_2r_chain(1.0, 1.0);
-    auto result = planar_2r_solver(chain).solve(target_at(3.0, 0, 0));
+    auto solver = planar_2r_solver<planar_2r_chain>::make(chain);
+    REQUIRE(solver.has_value());
+    auto result = solver->solve(target_at(3.0, 0, 0));
 
     REQUIRE(!result.has_value());
     CHECK(result.error().reason == analytical_failure::unreachable);
@@ -92,7 +100,9 @@ TEST_CASE("2R solver: unreachable target returns error")
 TEST_CASE("2R solver: unreachable target inside hole returns error")
 {
     auto chain = make_2r_chain(3.0, 1.0);
-    auto result = planar_2r_solver(chain).solve(target_at(0, 0, 0));
+    auto solver = planar_2r_solver<planar_2r_chain>::make(chain);
+    REQUIRE(solver.has_value());
+    auto result = solver->solve(target_at(0, 0, 0));
 
     REQUIRE(!result.has_value());
     CHECK(result.error().reason == analytical_failure::unreachable);
@@ -101,7 +111,9 @@ TEST_CASE("2R solver: unreachable target inside hole returns error")
 TEST_CASE("2R solver: solutions are distinct configurations")
 {
     auto chain = make_2r_chain(1.0, 1.0);
-    auto result = planar_2r_solver(chain).solve(target_at(1.0, 0, 0.5));
+    auto solver = planar_2r_solver<planar_2r_chain>::make(chain);
+    REQUIRE(solver.has_value());
+    auto result = solver->solve(target_at(1.0, 0, 0.5));
 
     REQUIRE(result.has_value());
     REQUIRE(result->count == 2);
@@ -114,7 +126,9 @@ TEST_CASE("2R solver: convenience function solve_2r matches solver")
     auto chain = make_2r_chain(1.0, 1.0);
     auto target = target_at(1.0, 0, 0.5);
 
-    auto result_solver = planar_2r_solver(chain).solve(target);
+    auto solver = planar_2r_solver<planar_2r_chain>::make(chain);
+    REQUIRE(solver.has_value());
+    auto result_solver = solver->solve(target);
     auto result_free = solve_2r(chain, target);
 
     REQUIRE(result_solver.has_value());
@@ -127,14 +141,6 @@ TEST_CASE("2R solver: convenience function solve_2r matches solver")
             - result_free->solutions[i]).norm();
         CHECK(diff < tolerance);
     }
-}
-
-TEST_CASE("2R solver: CTAD deduction guide works")
-{
-    auto chain = make_2r_chain(1.0, 1.0);
-    planar_2r_solver solver(chain);
-    auto result = solver.solve(target_at(1.0, 0, 0));
-    REQUIRE(result.has_value());
 }
 
 // 2R chain with a BENT home: the second link leaves the first-link direction
@@ -210,7 +216,9 @@ TEST_CASE("2R solver: bent home recovers the target at the home configuration")
 TEST_CASE("2R solver: different link lengths")
 {
     auto chain = make_2r_chain(1.5, 0.7);
-    auto result = planar_2r_solver(chain).solve(target_at(1.0, 0, 0.5));
+    auto solver = planar_2r_solver<planar_2r_chain>::make(chain);
+    REQUIRE(solver.has_value());
+    auto result = solver->solve(target_at(1.0, 0, 0.5));
 
     REQUIRE(result.has_value());
     for (std::size_t i = 0; i < static_cast<std::size_t>(result->count); ++i)
@@ -237,17 +245,24 @@ TEST_CASE("2R solver: the configured acceptance tolerance reaches the FK "
     auto chain = make_2r_chain(1.0, 1.0);
     auto target = target_at(1.0, 0, 0.5);
 
-    auto at_default = planar_2r_solver(chain).solve(target);
+    auto solve_at = [&](verification_tolerance<double> tolerance)
+    {
+        auto solver = planar_2r_solver<planar_2r_chain>::make(chain, tolerance);
+        REQUIRE(solver.has_value());
+        return solver->solve(target);
+    };
+
+    auto defaulted = planar_2r_solver<planar_2r_chain>::make(chain);
+    REQUIRE(defaulted.has_value());
+    auto at_default = defaulted->solve(target);
     REQUIRE(at_default.has_value());
     CHECK(at_default->count == 2);
 
-    auto lax_position = planar_2r_solver<decltype(chain)>(
-        chain, verification_tolerance<double>(1e-2, 0.0)).solve(target);
+    auto lax_position = solve_at(verification_tolerance<double>(1e-2, 0.0));
     REQUIRE(lax_position.has_value());
     CHECK(lax_position->count == 2);
 
-    auto zero_position = planar_2r_solver<decltype(chain)>(
-        chain, verification_tolerance<double>(0.0, 1e-2)).solve(target);
+    auto zero_position = solve_at(verification_tolerance<double>(0.0, 1e-2));
     REQUIRE_FALSE(zero_position.has_value());
     CHECK(zero_position.error().reason == analytical_failure::verification_failed);
 }
@@ -260,7 +275,9 @@ TEST_CASE("2R solver: the configured acceptance tolerance reaches the FK "
 TEST_CASE("2R solver: equal links reaching the base point are singular")
 {
     auto chain = make_2r_chain(1.0, 1.0);
-    auto result = planar_2r_solver(chain).solve(target_at(0, 0, 0));
+    auto solver = planar_2r_solver<planar_2r_chain>::make(chain);
+    REQUIRE(solver.has_value());
+    auto result = solver->solve(target_at(0, 0, 0));
 
     REQUIRE_FALSE(result.has_value());
     CHECK(result.error().reason == analytical_failure::singular_configuration);
@@ -279,7 +296,9 @@ TEST_CASE("2R solver: a near-equal-link base-point target carries its deficit")
     constexpr double link_1 = 1.0;
     constexpr double link_2 = 1.0 - 1e-4;
     auto chain = make_2r_chain(link_1, link_2);
-    auto result = planar_2r_solver(chain).solve(target_at(0, 0, 0));
+    auto solver = planar_2r_solver<planar_2r_chain>::make(chain);
+    REQUIRE(solver.has_value());
+    auto result = solver->solve(target_at(0, 0, 0));
 
     REQUIRE_FALSE(result.has_value());
     CHECK(result.error().reason == analytical_failure::unreachable);
@@ -298,7 +317,9 @@ TEST_CASE("2R solver: a target inside the acceptance length of the boundary is s
 {
     auto chain = make_2r_chain(1.0, 1.0);
     auto reached = Eigen::Vector3d(2.0 + 1e-8, 0, 0);
-    auto result = planar_2r_solver(chain).solve(target_at(reached.x(), 0, 0));
+    auto solver = planar_2r_solver<planar_2r_chain>::make(chain);
+    REQUIRE(solver.has_value());
+    auto result = solver->solve(target_at(reached.x(), 0, 0));
 
     REQUIRE(result.has_value());
     REQUIRE(result->count == 1);
@@ -317,10 +338,75 @@ TEST_CASE("2R solver: a target off the mechanism plane is unreachable")
 {
     constexpr double out_of_plane = 0.1;
     auto chain = make_2r_chain(1.0, 1.0);
-    auto result = planar_2r_solver(chain).solve(target_at(1.0, out_of_plane, 0));
+    auto solver = planar_2r_solver<planar_2r_chain>::make(chain);
+    REQUIRE(solver.has_value());
+    auto result = solver->solve(target_at(1.0, out_of_plane, 0));
 
     REQUIRE_FALSE(result.has_value());
     CHECK(result.error().reason == analytical_failure::unreachable);
     REQUIRE(result.error().workspace_distance.has_value());
     CHECK_THAT(*result.error().workspace_distance, WithinRel(out_of_plane, 1e-12));
+}
+
+// The derivation needs a plane both rotations move in, and two perpendicular
+// axes offer none. Until the factory tested for it the chain was admitted: the
+// constructor manufactured a plane normal from the cross product of the two
+// axes, a plane containing neither rotation's motion circle, and every solve
+// then reported `unreachable` carrying the target's component along the first
+// link -- a length no reach inequality had compared against anything.
+TEST_CASE("2R solver: perpendicular axes are refused at construction")
+{
+    using perpendicular_2r_chain = static_chain<double, revolute_y, revolute_z>;
+    auto no_limits = testing::limits(-10.0, 10.0);
+    auto chain = testing::unwrap(
+        perpendicular_2r_chain::make(
+            se3<double>(so3<double>::identity(), Eigen::Vector3d(2, 0, 0)),
+            {screw_axis<double>::revolute({0, 1, 0}, {0, 0, 0}),
+             screw_axis<double>::revolute({0, 0, 1}, {1, 0, 0})},
+            {no_limits, no_limits}),
+        "perpendicular 2R chain");
+
+    auto solver = planar_2r_solver<perpendicular_2r_chain>::make(chain);
+
+    REQUIRE_FALSE(solver.has_value());
+    CHECK(solver.error().reason == analytical_failure::degenerate_geometry);
+    CHECK_FALSE(solver.error().workspace_distance.has_value());
+}
+
+// The second link length the derivation names is an in-plane length, so a home
+// end-effector off the plane is not a chain it can answer for. Until the factory
+// tested for it the chain was admitted, the second link was measured as a
+// three-dimensional distance, and the failure surfaced per pose as a failed
+// back-check.
+//
+// Only the end-effector needs the test. A screw axis carries a line rather than
+// a point on it, and the point recovered as omega x v is the foot of the
+// perpendicular from the origin, so both recovered joint points are
+// perpendicular to a shared axis direction: once the axes are parallel the first
+// link is in the plane identically, and no chain can be built that is not.
+TEST_CASE("2R solver: a home end-effector off the mechanism plane is refused at "
+          "construction")
+{
+    constexpr double out_of_plane = 0.25;
+    auto no_limits = testing::limits(-10.0, 10.0);
+    auto chain = testing::unwrap(
+        planar_2r_chain::make(
+            se3<double>(
+                so3<double>::identity(), Eigen::Vector3d(2.0, out_of_plane, 0)),
+            {screw_axis<double>::revolute({0, 1, 0}, {0, 0, 0}),
+             screw_axis<double>::revolute({0, 1, 0}, {1.0, 0, 0})},
+            {no_limits, no_limits}),
+        "off-plane 2R chain");
+
+    auto solver = planar_2r_solver<planar_2r_chain>::make(chain);
+
+    REQUIRE_FALSE(solver.has_value());
+    CHECK(solver.error().reason == analytical_failure::degenerate_geometry);
+    CHECK_FALSE(solver.error().workspace_distance.has_value());
+
+    // The premise: displacing the second joint along the shared axis direction
+    // instead would leave the recovered joint point, and so the chain, unchanged.
+    auto displaced = screw_axis<double>::revolute({0, 1, 0}, {1.0, out_of_plane, 0});
+    CHECK((displaced.omega().cross(displaced.v()) - Eigen::Vector3d(1, 0, 0)).norm()
+        == 0.0);
 }

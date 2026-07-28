@@ -5,6 +5,7 @@
 #include "cartan/analytical/analytical_solver.h"
 #include "cartan/analytical/paden_kahan.h"
 #include "cartan/analytical/detail/axis_rotation.h"
+#include "cartan/analytical/detail/wrist_center.h"
 #include "cartan/analytical/detail/fk_verification.h"
 
 #include "cartan/serial/chain/joint_tags.h"
@@ -15,6 +16,7 @@
 #include "cartan/lie/se3.h"
 #include "cartan/detail/epsilon.h"
 
+#include <array>
 #include <cmath>
 #include <optional>
 #include "cartan/expected.h"
@@ -45,39 +47,24 @@ public:
     static constexpr int joints = 3;
     static constexpr int max_solutions = 4;
 
-    explicit spatial_3r_solver(
-        const Chain& chain,
-        verification_tolerance<scalar_type> tolerance
-            = default_verification_tolerance_v<scalar_type>)
-        : m_chain(chain)
-        , m_omega{vector3<Scalar>::Zero(), vector3<Scalar>::Zero(), vector3<Scalar>::Zero()}
-        , m_q{vector3<Scalar>::Zero(), vector3<Scalar>::Zero(), vector3<Scalar>::Zero()}
-        , m_tolerance(tolerance)
-        , m_p_ee(vector3<Scalar>::Zero())
-        , m_valid(false)
+    /// The only way to build one of these. Admits exactly the chains the
+    /// subproblem decomposition is written for: three revolute joints whose
+    /// first two axes are not parallel and meet within the acceptance length,
+    /// and whose home end-effector is off the third axis by more than that
+    /// length. The reference point the decomposition rotates about is derived
+    /// once here rather than on every solve.
+    static cartan::expected<spatial_3r_solver, analytical_error<scalar_type>>
+    make(const Chain& chain,
+         verification_tolerance<scalar_type> tolerance
+             = default_verification_tolerance_v<scalar_type>)
     {
-        if (chain.num_joints() != 3)
+        if (std::optional<analytical_error<scalar_type>> rejection
+                = reject_chain(chain, tolerance.position()))
         {
-            m_valid = false;
-            return;
-        }
-        for (int i = 0; i < 3; ++i)
-        {
-            if (!chain.axis(i).is_revolute())
-            {
-                m_valid = false;
-                return;
-            }
+            return cartan::unexpected(*rejection);
         }
 
-        for (std::size_t i = 0; i < 3; ++i)
-        {
-            const auto& s = chain.axis(static_cast<int>(i));
-            m_omega[i] = s.omega();
-            m_q[i] = s.omega().cross(s.v());
-        }
-        m_p_ee = chain.home().translation();
-        m_valid = true;
+        return spatial_3r_solver(chain, tolerance);
     }
 
     cartan::expected<
@@ -85,19 +72,8 @@ public:
         analytical_error<scalar_type>>
     solve(const se3<scalar_type>& target) const
     {
-        if (!m_valid)
-        {
-            return cartan::unexpected(analytical_error<scalar_type>{
-                analytical_failure::degenerate_geometry, std::nullopt});
-        }
-
         vector3<Scalar> p_target = target.translation();
-
-        // Axes 1 and 2 intersect at m_q[0] (for chains where q0 = q1, the
-        // typical case). Use the closest approach midpoint as the reference
-        // point r for the SP3/SP2 decomposition.
-        vector3<Scalar> r = find_axes_intersection(
-            m_omega[0], m_q[0], m_omega[1], m_q[1]);
+        const vector3<Scalar>& r = m_reference;
 
         // SP3: find theta3 such that ||rot(w3,q3,t3)*p_ee - r|| = ||p_d - r||.
         // Rotation about axes 1-2 through r preserves distance from r, so the
@@ -161,55 +137,92 @@ private:
     /// <typename Scalar, joint_tag... Joints> to <chain Chain>.
     using Scalar = scalar_type;
 
-    /// Find the intersection point of two lines (or closest approach midpoint).
-    /// Line i: point q_i + t * omega_i.
-    static vector3<Scalar> find_axes_intersection(
-        const vector3<Scalar>& omega1,
-        const vector3<Scalar>& q1,
-        const vector3<Scalar>& omega2,
-        const vector3<Scalar>& q2)
-    {
-        vector3<Scalar> d = q2 - q1;
-        Scalar a = omega1.dot(omega1);
-        Scalar b = omega1.dot(omega2);
-        Scalar c = omega2.dot(omega2);
-        Scalar e = omega1.dot(d);
-        Scalar f = omega2.dot(d);
-
-        Scalar denom = a * c - b * b;
-        if (std::abs(denom) < detail::epsilon_v<Scalar>)
-            return q1;
-
-        Scalar t = (b * f - c * e) / denom;
-        Scalar s = (a * f - b * e) / denom;
-
-        vector3<Scalar> p1 = q1 + t * omega1;
-        vector3<Scalar> p2 = q2 + s * omega2;
-        return (p1 + p2) / Scalar(2);
-    }
-
     chain_type m_chain;
     std::array<vector3<Scalar>, 3> m_omega;
     std::array<vector3<Scalar>, 3> m_q;
     verification_tolerance<Scalar> m_tolerance;
     vector3<Scalar> m_p_ee;
-    bool m_valid;
-};
+    vector3<Scalar> m_reference;
 
-template <chain Chain>
-spatial_3r_solver(const Chain&) -> spatial_3r_solver<Chain>;
+    spatial_3r_solver(
+        const Chain& chain,
+        verification_tolerance<scalar_type> tolerance)
+        : m_chain(chain)
+        , m_omega{vector3<Scalar>::Zero(), vector3<Scalar>::Zero(), vector3<Scalar>::Zero()}
+        , m_q{vector3<Scalar>::Zero(), vector3<Scalar>::Zero(), vector3<Scalar>::Zero()}
+        , m_tolerance(tolerance)
+        , m_p_ee(chain.home().translation())
+        , m_reference(vector3<Scalar>::Zero())
+    {
+        for (std::size_t i = 0; i < 3; ++i)
+        {
+            const auto& s = chain.axis(static_cast<int>(i));
+            m_omega[i] = s.omega();
+            m_q[i] = s.omega().cross(s.v());
+        }
+        m_reference = detail::closest_approach_midpoint<Scalar>(
+            m_q[0], m_omega[0], m_q[1], m_omega[1]);
+    }
+
+    /// The chains the subproblem decomposition has no answer for. The first two
+    /// axes must meet, because the decomposition rotates about their common
+    /// point; they must not be parallel first, because the closest-approach
+    /// helpers answer a parallel pair with a fallback point rather than
+    /// reporting, so an intersection test alone would pass vacuously. The home
+    /// end-effector must be off the third axis, or the distance constraint is
+    /// met by every angle or by none. A separation is not a workspace excess,
+    /// so no rejection carries a magnitude.
+    static std::optional<analytical_error<Scalar>> reject_chain(
+        const Chain& chain, Scalar accept)
+    {
+        const analytical_error<Scalar> degenerate{
+            analytical_failure::degenerate_geometry, std::nullopt};
+
+        if (chain.num_joints() != 3)
+            return degenerate;
+        for (int i = 0; i < 3; ++i)
+            if (!chain.axis(i).is_revolute())
+                return degenerate;
+
+        const auto& s0 = chain.axis(0);
+        const auto& s1 = chain.axis(1);
+        const auto& s2 = chain.axis(2);
+
+        if (s0.omega().cross(s1.omega()).norm() <= detail::sqrt_epsilon_v<Scalar>)
+            return degenerate;
+        if (detail::closest_approach_distance<Scalar>(
+                s0.omega().cross(s0.v()), s0.omega(),
+                s1.omega().cross(s1.v()), s1.omega()) > accept)
+            return degenerate;
+
+        vector3<Scalar> to_ee
+            = chain.home().translation() - s2.omega().cross(s2.v());
+        if ((to_ee - to_ee.dot(s2.omega()) * s2.omega()).norm() <= accept)
+            return degenerate;
+
+        return std::nullopt;
+    }
+};
 
 static_assert(analytical_solver<spatial_3r_solver<static_chain<double, revolute_z, revolute_y, revolute_z>>>);
 
 static_assert(analytical_solver<spatial_3r_solver<kinematic_chain<double, dynamic>>>,
     "spatial_3r_solver must also satisfy analytical_solver concept against dynamic chain");
 
+/// Convenience wrapper around spatial_3r_solver: validates the given
+/// static_chain through the factory and immediately solves for the target pose.
+/// A rejected chain travels out on the same diagnostic channel a failed solve
+/// uses, so the two failures need no separate handling at the call site.
 template <typename Scalar, joint_tag... Joints>
-auto solve_3r(
+cartan::expected<analytical_result<Scalar, 3, 4>, analytical_error<Scalar>>
+solve_3r(
     const static_chain<Scalar, Joints...>& chain,
     const se3<Scalar>& target)
 {
-    return spatial_3r_solver(chain).solve(target);
+    auto solver = spatial_3r_solver<static_chain<Scalar, Joints...>>::make(chain);
+    if (!solver)
+        return cartan::unexpected(solver.error());
+    return solver->solve(target);
 }
 
 }

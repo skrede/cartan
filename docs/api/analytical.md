@@ -391,9 +391,8 @@ class planar_2r_solver;
 
 The `Chain` type must satisfy the `chain` concept (e.g. `static_chain` or a
 `kinematic_chain`, fixed or dynamic). It must model a two-joint mechanism with
-both joints revolute. The joint count and revolute-only requirement are checked
-at construction; a chain that violates them yields a solver that fails every
-`solve` with `analytical_failure::degenerate_geometry`.
+both joints revolute. The constructor is private and `make` is the only way in,
+so a chain that violates a requirement is refused rather than yielding a solver.
 
 <!-- cartan:unbuilt kind=declaration -->
 ```cpp
@@ -403,28 +402,38 @@ static constexpr int joints = 2;
 static constexpr int max_solutions = 2;
 ```
 
-### Constructor
+### Factory
 
 <!-- cartan:unbuilt kind=declaration -->
 ```cpp
-explicit planar_2r_solver(
-    const chain_type& chain,
-    verification_tolerance<scalar_type> tolerance
-        = default_verification_tolerance_v<scalar_type>);
-
 static cartan::expected<planar_2r_solver, analytical_error<scalar_type>>
 make(const chain_type& chain,
      verification_tolerance<scalar_type> tolerance
          = default_verification_tolerance_v<scalar_type>);
 ```
 
-Pre-computes the link lengths, the base point, and an orthonormal basis for
-the mechanism plane from the chain's screw axes and home pose. Construction
-is `O(1)` in the chain's joint count. `make` additionally rejects a chain that
-is not two revolute joints or that has a zero-length link. The tolerance is the
-bound the FK back-check applies to each candidate: `position()` is a distance
-in the chain's linear unit and `orientation()` an angle in radians. This solver
-solves position only, so only `position()` gates its results.
+The only public construction path. Rejects, with
+`analytical_failure::degenerate_geometry` and no `workspace_distance`:
+
+| Rejected chain | Why the derivation needs it |
+| --- | --- |
+| not exactly two joints, or a non-revolute joint | the closed form is a two-revolute one |
+| axes not parallel (their cross product exceeds `sqrt(epsilon)`) | non-parallel axes share no plane, so there is no mechanism plane to solve in |
+| home end-effector further than `tolerance.position()` from the plane through the first axis point | the second link length the derivation names is an in-plane length |
+| either link shorter than `sqrt(epsilon)` | the law of cosines divides by both |
+
+The second joint needs no such test: a screw axis carries a line rather than a
+point on it, and the point recovered as `omega x v` is the foot of the
+perpendicular from the origin, so with parallel axes both recovered joint points
+are perpendicular to the shared direction and the first link lies in the plane
+identically.
+
+An admitted chain then pre-computes the link lengths, the base point, and an
+orthonormal basis for the mechanism plane; construction is `O(1)` in the chain's
+joint count. The tolerance is also the bound the FK back-check applies to each
+candidate: `position()` is a distance in the chain's linear unit and
+`orientation()` an angle in radians. This solver solves position only, so only
+`position()` gates its results.
 
 ### Method
 
@@ -461,13 +470,16 @@ follows. Each candidate is FK-verified; only verified solutions are returned.
 <!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar, joint_tag... Joints>
-auto solve_2r(
+cartan::expected<analytical_result<Scalar, 2, 2>, analytical_error<Scalar>>
+solve_2r(
     const static_chain<Scalar, Joints...>& chain,
     const se3<Scalar>& target);
 ```
 
-Convenience wrapper: constructs a `planar_2r_solver` from the given chain
-and immediately invokes `solve(target)`.
+Convenience wrapper: validates the given chain through `make` and immediately
+invokes `solve(target)`. A rejected chain travels out on the same diagnostic
+channel a failed solve uses, so the two need no separate handling at the call
+site.
 
 Reference: Lynch & Park, Modern Robotics, Section 6.1.2 (planar two-link
 inverse kinematics).
@@ -484,9 +496,10 @@ class spatial_3r_solver;
 ```
 
 The `Chain` type must satisfy the `chain` concept and model a three-joint
-mechanism. The solver requires that the first two joint axes intersect at a common point
-(the standard configuration for 3R mechanisms, e.g. spherical wrists with
-an offset third joint).
+mechanism whose first two joint axes meet at a common point (the standard
+configuration for 3R mechanisms, e.g. spherical wrists with an offset third
+joint). The constructor is private and `make` is the only way in, so a chain
+that violates a requirement is refused rather than yielding a solver.
 
 <!-- cartan:unbuilt kind=declaration -->
 ```cpp
@@ -504,22 +517,32 @@ Decomposition:
    candidate.
 3. All candidates are FK-verified; only verified solutions are returned.
 
-### Constructor
+### Factory
 
 <!-- cartan:unbuilt kind=declaration -->
 ```cpp
-explicit spatial_3r_solver(
-    const chain_type& chain,
-    verification_tolerance<scalar_type> tolerance
-        = default_verification_tolerance_v<scalar_type>);
+static cartan::expected<spatial_3r_solver, analytical_error<scalar_type>>
+make(const chain_type& chain,
+     verification_tolerance<scalar_type> tolerance
+         = default_verification_tolerance_v<scalar_type>);
 ```
 
-Captures the chain by value for use during `solve`. Extracts the common
-intersection point of the first two joint axes for use by the subproblem
-decomposition. The tolerance's `position()` field bounds the FK back-check's
-position residual and is forwarded as the `length_tolerance` of both
-subproblems; `orientation()` is unused, because this solver solves position
-only.
+The only public construction path. Rejects, with
+`analytical_failure::degenerate_geometry` and no `workspace_distance`:
+
+| Rejected chain | Why the derivation needs it |
+| --- | --- |
+| not exactly three joints, or a non-revolute joint | the decomposition is a three-revolute one |
+| first two axes parallel (their cross product at or below `sqrt(epsilon)`) | a parallel pair has no meeting point, and the closest-approach helpers answer one with a fallback point rather than reporting, so this is tested first |
+| first two axes further apart than `tolerance.position()` at closest approach | subproblem 2 references both axes to their meeting point |
+| home end-effector within `tolerance.position()` of the third axis | the distance constraint of subproblem 3 is then met by every angle or by none |
+
+An admitted chain captures the chain by value for use during `solve` and derives
+the meeting point of the first two axes once, rather than on every solve. The
+tolerance's `position()` field bounds the FK back-check's position residual;
+`orientation()` is unused, because this solver solves position only. It is not
+forwarded to the subproblems, which apply the module's default
+`length_tolerance`.
 
 ### Method
 
@@ -537,13 +560,16 @@ Returns up to 4 verified joint configurations achieving the target pose
 <!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar, joint_tag... Joints>
-auto solve_3r(
+cartan::expected<analytical_result<Scalar, 3, 4>, analytical_error<Scalar>>
+solve_3r(
     const static_chain<Scalar, Joints...>& chain,
     const se3<Scalar>& target);
 ```
 
-Convenience wrapper: constructs a `spatial_3r_solver` from the given
-chain and immediately invokes `solve(target)`.
+Convenience wrapper: validates the given chain through `make` and immediately
+invokes `solve(target)`. A rejected chain travels out on the same diagnostic
+channel a failed solve uses, so the two need no separate handling at the call
+site.
 
 Reference: Murray, Li and Sastry, *A Mathematical Introduction to Robotic
 Manipulation* (1994), Section 3.3.
