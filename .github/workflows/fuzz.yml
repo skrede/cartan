@@ -264,6 +264,11 @@ jobs:
         env:
           CORPUS_KEY: ${{ secrets.FUZZ_CORPUS_DEPLOY_KEY }}
         run: |
+          # Never add -x to this line. This repository is public, so its job logs
+          # are too, and -x echoes every command with its arguments expanded --
+          # which would put the private key below into a world-readable log. The
+          # key reaches disk only by redirection and is never printed; masking is
+          # a backstop, not the protection.
           set -euo pipefail
 
           # Writing is the only half that needs the key; reading the public store
