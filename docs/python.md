@@ -93,6 +93,7 @@ examples/ik_composition.cpp | python/tutorials/03_ik_composition.py | Mirrored b
 examples/ik_service_multi.cpp | None | C++ only for now | Demonstrates C++ service-style orchestration around native solver types; Python users compose the bound solver functions directly.
 examples/ik_service_single.cpp | None | C++ only for now | Demonstrates a C++ single-service wrapper over native solver types; Python users call `cartan.solve_ik*` directly.
 examples/lie_basics.cpp | None | No standalone counterpart | Python SO(3)/SE(3) usage is covered in the quick smoke and tests; SO(2)/SE(2) remain C++ only.
+examples/nlopt_policy/nlopt_policy_example.cpp | None | C++ only | Writing a solve policy is a C++ extension point: a policy is a compile-time template parameter of the runner, so there is nothing for a binding to expose. The example wraps a third-party optimizer that only runs to completion.
 examples/tutorials/01_urdf_walkthrough.cpp | python/tutorials/01_urdf_walkthrough.py | Direct mirror | Both load a URDF, FK-walk a reachable target, solve IK, and FK-back-verify the result.
 examples/tutorials/02_fk_and_jacobians.cpp | python/tutorials/02_fk_and_jacobians.py | Direct mirror | Both build planar 3R and spatial 6R chains from screw axes, then print FK and Jacobians.
 examples/tutorials/03_ik_composition.cpp | python/tutorials/03_ik_composition.py | Direct mirror | Both run a deterministic 50-target closed-form versus iterative IK comparison and can emit CSV rows.
