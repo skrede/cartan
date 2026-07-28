@@ -12,7 +12,7 @@
 # There is one record per coverage instrument, and this one is GCC's. The flavors
 # disagree about which headers produce records at all: Clang's emits entries for
 # implicitly-defined special members and attributes them to the declaring line,
-# GCC's emits none, and five headers differ. Sharing one record would force the
+# GCC's emits none, and six headers differ. Sharing one record would force the
 # check to stop refuting a whole class of row, which is how a wrong row survives.
 #
 # One row per header: the path, then the reason. A reason is legitimate only when
@@ -66,6 +66,7 @@ lib/cartan-serial-chain/include/cartan/serial/ik/detail/argmin_problem.h        
 lib/cartan-serial-chain/include/cartan/serial/ik/detail/argmin_unconstrained_problem.h  backend-not-built CARTAN_BUILD_ARGMIN
 lib/cartan-serial-chain/include/cartan/serial/ik/detail/nlopt_common.h                  backend-not-built CARTAN_BUILD_NLOPT
 lib/cartan-serial-chain/include/cartan/serial/ik/ik.h                                   declaration-only
+lib/cartan-serial-chain/include/cartan/serial/ik/ik_result.h                            declaration-only
 lib/cartan-serial-chain/include/cartan/serial/ik/ik_status.h                            no-instantiating-test
 lib/cartan-serial-chain/include/cartan/serial/ik/solver/argmin_bobyqa.h                 backend-not-built CARTAN_BUILD_ARGMIN
 lib/cartan-serial-chain/include/cartan/serial/ik/solver/argmin_lbfgsb.h                 backend-not-built CARTAN_BUILD_ARGMIN
