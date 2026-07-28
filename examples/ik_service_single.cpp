@@ -7,6 +7,7 @@
 
 #include "cartan/serial_chain.h"
 
+#include <atomic>
 #include <condition_variable>
 #include <iostream>
 #include <mutex>
@@ -62,14 +63,19 @@ class ik_service
 public:
     explicit ik_service(cartan::kinematic_chain<double, 6> chain)
         : m_chain(std::move(chain))
-        , m_worker([this](std::stop_token stoken) { worker_loop(stoken); })
+        , m_stop(false)
+        , m_worker([this] { worker_loop(); })
     {
     }
 
     ~ik_service()
     {
-        m_worker.request_stop();
+        {
+            std::lock_guard lock(m_mutex);
+            m_stop.store(true);
+        }
         m_cv.notify_one();
+        m_worker.join();
     }
 
     /// Submit an IK request and block until the result is ready.
@@ -91,18 +97,16 @@ public:
     }
 
 private:
-    void worker_loop(std::stop_token stoken)
+    void worker_loop()
     {
         cartan::convergence_criteria<double> criteria{1e-6, 1e-6, 200};
 
-        while (!stoken.stop_requested())
+        while (!m_stop.load())
         {
             std::unique_lock lock(m_mutex);
-            m_cv.wait(lock, [this, &stoken] {
-                return !m_requests.empty() || stoken.stop_requested();
-            });
+            m_cv.wait(lock, [this] { return !m_requests.empty() || m_stop.load(); });
 
-            if (stoken.stop_requested())
+            if (m_stop.load())
                 break;
 
             ik_request req = m_requests.front();
@@ -129,7 +133,11 @@ private:
     std::condition_variable m_response_cv;
     std::queue<ik_request> m_requests;
     std::optional<ik_response> m_response;
-    std::jthread m_worker;
+    // std::jthread would carry the stop flag and the join, but libc++ still
+    // ships <stop_token> behind an experimental opt-in, so an example meant to
+    // build on every supported toolchain owns both explicitly.
+    std::atomic<bool> m_stop;
+    std::thread m_worker;
 };
 
 int main()
