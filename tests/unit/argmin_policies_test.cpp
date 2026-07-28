@@ -137,8 +137,17 @@ TEST_CASE("cmaes_solve_policy converges on UR5-like chain", "[ik][argmin][cmaes]
     // not trusted: FK-re-verify the recovered configuration against the same
     // convergence criteria (the twist error the runner claims must actually
     // hold under forward kinematics).
+    //
+    // The reported norm covers the whole twist while the criteria bound its
+    // rotational and translational halves separately, so the largest norm they
+    // admit is the hypotenuse of the two rather than either one. Comparing it
+    // against a single tolerance asks the combined norm to beat a per-component
+    // bound, which a converged run meets only by luck of the seed: over sixty
+    // seeds the norm spans 0.0057 to 0.0138, every one inside the hypotenuse and
+    // most above the tolerance alone.
     REQUIRE(result.has_value());
-    REQUIRE(result->final_error_norm < 1e-2);
+    REQUIRE(result->final_error_norm
+        < std::hypot(criteria.position_tol, criteria.orientation_tol));
     REQUIRE(cartan::verify_solution(chain, target, result->solution.position, criteria));
 }
 
