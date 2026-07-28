@@ -100,29 +100,37 @@ function(cartan_add_compile_fail_test TEST_NAME TEST_SOURCE)
         COMMAND ${CMAKE_COMMAND} -E echo "PASS: ${TEST_NAME} correctly fails to compile")
 endfunction()
 
-# The control: the same subproject, the same include plumbing, a well-formed
-# program. It must compile, or every rejection below is meaningless.
-string(REPLACE ";" "|" cartan_control_includes "${CARTAN_COMPILE_FAIL_INCLUDES}")
-string(REPLACE ";" "|" cartan_control_eigen "${CARTAN_COMPILE_FAIL_EIGEN}")
-try_compile(CARTAN_COMPILE_FAIL_CONTROL_COMPILES
-    PROJECT compile_fail_control
-    SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/fail"
-    BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/compile_fail_control"
-    TARGET compile_fail_target
-    CMAKE_FLAGS
-        "-DCMAKE_CXX_STANDARD=23"
-        "-DCARTAN_INCLUDE_DIR=${cartan_control_includes}"
-        "-DEIGEN_INCLUDE_DIR=${cartan_control_eigen}"
-        "-DTEST_SOURCE=joint_limits_control.cpp"
-    OUTPUT_VARIABLE cartan_compile_fail_control_output
-)
-if(NOT CARTAN_COMPILE_FAIL_CONTROL_COMPILES)
-    message(FATAL_ERROR
-        "The compile-fail control did not compile, so the rejections below prove nothing:\n"
-        "${cartan_compile_fail_control_output}")
-endif()
-add_test(NAME compile_fail_control
-    COMMAND ${CMAKE_COMMAND} -E echo "PASS: the compile-fail harness compiles a valid program")
+# A control is the same subproject and the same include plumbing running a
+# well-formed program: without one, a rejection beside it proves nothing, since
+# a broken include list rejects everything.
+function(cartan_add_compile_pass_test TEST_NAME TEST_SOURCE)
+    string(REPLACE ";" "|" pass_includes "${CARTAN_COMPILE_FAIL_INCLUDES}")
+    string(REPLACE ";" "|" pass_eigen "${CARTAN_COMPILE_FAIL_EIGEN}")
+    try_compile(${TEST_NAME}_COMPILES
+        PROJECT compile_pass_${TEST_NAME}
+        SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/fail"
+        BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}_control"
+        TARGET compile_fail_target
+        CMAKE_FLAGS
+            "-DCMAKE_CXX_STANDARD=23"
+            "-DCARTAN_INCLUDE_DIR=${pass_includes}"
+            "-DEIGEN_INCLUDE_DIR=${pass_eigen}"
+            "-DTEST_SOURCE=${TEST_SOURCE}"
+        OUTPUT_VARIABLE compile_pass_output
+    )
+
+    if(NOT ${TEST_NAME}_COMPILES)
+        message(FATAL_ERROR
+            "The compile-fail control '${TEST_NAME}' did not compile, so the rejection it "
+            "controls for proves nothing:\n${compile_pass_output}")
+    endif()
+
+    add_test(NAME compile_pass_${TEST_NAME}
+        COMMAND ${CMAKE_COMMAND} -E echo "PASS: ${TEST_NAME} compiles as it must")
+endfunction()
+
+cartan_add_compile_pass_test(control joint_limits_control.cpp)
+cartan_add_compile_pass_test(factory_pieper_constructor factory_pieper_constructor.cpp)
 
 cartan_add_compile_fail_test(frame_mismatch_compose frame_mismatch_compose.cpp)
 cartan_add_compile_fail_test(frame_mismatch_inverse_compose frame_mismatch_inverse_compose.cpp)
@@ -131,3 +139,4 @@ cartan_add_compile_fail_test(frame_mismatch_coadjoint_wrench frame_mismatch_coad
 cartan_add_compile_fail_test(joint_limits_aggregate joint_limits_aggregate.cpp)
 cartan_add_compile_fail_test(joint_limits_field_assign joint_limits_field_assign.cpp)
 cartan_add_compile_fail_test(joint_limits_member_assign joint_limits_member_assign.cpp)
+cartan_add_compile_fail_test(private_pieper_constructor private_pieper_constructor.cpp)

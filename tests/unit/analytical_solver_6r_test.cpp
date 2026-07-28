@@ -583,6 +583,50 @@ TEST_CASE("6R Pieper: near-spherical wrist is rejected at construction")
     CHECK_FALSE(fk_solvable(chain, fk.end_effector, 5e-4));
 }
 
+TEST_CASE("6R Pieper: the convenience function rejects an offset shoulder")
+{
+    // Pre-fix the free function built the solver through the public
+    // constructor, which ran no shoulder gate at any tolerance, so this chain
+    // reached the Paden-Kahan decomposition and came back with a per-pose
+    // `unreachable`. Routed through the factory it fails at construction.
+    auto chain = fixtures::make_offset_shoulder_puma<double>();
+    Eigen::Vector<double, 6> q_known;
+    q_known << 0.2, -0.5, 0.6, 0.1, -0.2, 0.4;
+    auto fk = testing::fk_at(chain, q_known);
+
+    auto result = solve_6r(chain, fk.end_effector);
+
+    REQUIRE_FALSE(result.has_value());
+    CHECK(result.error().reason == analytical_failure::degenerate_geometry);
+    CHECK_FALSE(result.error().workspace_distance.has_value());
+}
+
+TEST_CASE("6R Pieper: a near-spherical wrist is rejected on both public paths")
+{
+    // Pre-fix the public constructor called the wrist-intersection helper
+    // without a tolerance and took its 1e-3 default, so a 5e-4 miss was
+    // admitted there and by the free function above it, while the factory
+    // already refused it at the 1e-6 acceptance length. One tolerance now
+    // governs both surviving paths.
+    const double wrist_offset = 5e-4;
+    auto chain = testing::unwrap(
+        fixtures::make_near_spherical_wrist_puma<double>(wrist_offset),
+        "make_near_spherical_wrist_puma");
+    Eigen::Vector<double, 6> q_known;
+    q_known << 0.3, -0.4, 0.5, 0.2, -0.3, 0.1;
+    auto fk = testing::fk_at(chain, q_known);
+
+    auto factory = pieper_6r_solver<decltype(chain)>::make(chain);
+    REQUIRE_FALSE(factory.has_value());
+    CHECK(factory.error().reason == analytical_failure::degenerate_geometry);
+    CHECK_FALSE(factory.error().workspace_distance.has_value());
+
+    auto convenience = solve_6r(chain, fk.end_effector);
+    REQUIRE_FALSE(convenience.has_value());
+    CHECK(convenience.error().reason == analytical_failure::degenerate_geometry);
+    CHECK_FALSE(convenience.error().workspace_distance.has_value());
+}
+
 TEST_CASE("6R Pieper: the shoulder-axis gate judges its distance against the "
           "position field")
 {
