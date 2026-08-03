@@ -81,7 +81,21 @@ cartan::expected<singular_values_t<Derived>, singularity_failure> singular_value
     constexpr unsigned int options = (Derived::ColsAtCompileTime == Eigen::Dynamic)
         ? (Eigen::ComputeThinU | Eigen::ComputeThinV)
         : (Eigen::ComputeFullU | Eigen::ComputeFullV);
-    return Eigen::JacobiSVD<svd_matrix_t<Derived>>(scaled, options).singularValues();
+    // GCC reports the decomposition's singular values as possibly uninitialized
+    // when it inlines this copy at -O2 and above; it cannot see that Eigen fills
+    // them before returning. Clang is clean on the same source, and every
+    // optimization level below -O2 is clean on GCC. Bracketed on every GCC that
+    // raises it rather than one version, because a version-scoped bracket leaves
+    // the same false positive unhandled on the compilers below the newest.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
+    Eigen::JacobiSVD<svd_matrix_t<Derived>> svd(scaled, options);
+    return svd.singularValues();
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 }
 
 /// singular_values of the chain's body Jacobian at q.
