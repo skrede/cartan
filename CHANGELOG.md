@@ -146,6 +146,12 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   objective selected rather than the lowest residual among the policies: under
   `max_manipulability` on a six-joint chain those were 1.275081e-06 and
   1.567070e-07, two configurations' residuals reported as one.
+- **Breaking.** `restart_wrapper::error_norm()` and `solution()` report NaN when
+  `setup()` refuses their arguments, where they reported the largest
+  representable residual and an all-zero configuration -- the same pair, for the
+  same reason, that the runner reported. The largest representable value is the
+  sentinel the wrapper's best-so-far retention minimizes against; it keeps that
+  role and is no longer handed to a caller as a measurement.
 - **Breaking.** A race whose work budget runs out with every policy still
   running reports the lowest-residual live iterate as `last_q`, with its
   measured residual in `last_error_norm`. It previously reported the seed the

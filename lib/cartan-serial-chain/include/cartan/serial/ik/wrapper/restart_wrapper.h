@@ -139,7 +139,7 @@ public:
         m_best_feasible = false;
         m_best_valid = false;
         m_aborted = false;
-        m_best_q = position_type::Zero(chain.num_joints());
+        m_best_q = detail::poison_joint_position<scalar_type, joints>(chain.num_joints());
         m_setup_joints = chain.num_joints();
 
         // Assigned on both outcomes, not only on failure: a wrapper is reusable,
@@ -176,7 +176,7 @@ public:
         m_best_feasible = false;
         m_best_valid = false;
         m_aborted = false;
-        m_best_q = position_type::Zero(chain.num_joints());
+        m_best_q = detail::poison_joint_position<scalar_type, joints>(chain.num_joints());
         m_setup_joints = chain.num_joints();
 
         auto held = cartan::detail::validate_solve_inputs(chain, target, q0);
@@ -275,7 +275,11 @@ public:
 
     // On a converged solve the live inner iterate is the answer; on a terminal
     // solve report the feasibility-first best-so-far captured across restarts
-    // rather than the last (discarded) attempt.
+    // rather than the last (discarded) attempt. A refused setup ran no attempt,
+    // so both report the poison: a zero configuration reads as the home pose and
+    // the largest representable residual as a measured distance. The sentinel
+    // the retention below minimizes against keeps that largest value, which is
+    // what it is for -- it is never reported.
     position_type solution() const
     {
         if (cartan::detail::is_setup_failure(m_precondition))
@@ -293,7 +297,7 @@ public:
     {
         if (cartan::detail::is_setup_failure(m_precondition))
         {
-            return std::numeric_limits<scalar_type>::max();
+            return std::numeric_limits<scalar_type>::quiet_NaN();
         }
         if (m_inner.converged() || !m_best_valid)
         {

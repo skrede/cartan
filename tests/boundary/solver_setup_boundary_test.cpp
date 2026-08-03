@@ -394,9 +394,10 @@ TEMPLATE_TEST_CASE("a refused setup leaves nothing of the previous solve readabl
 
     wrapper.setup(chain, target, joint_vector<Scalar>(n - 1, Scalar(0.1)), criteria);
     REQUIRE_FALSE(wrapper.converged());
-    REQUIRE(wrapper.error_norm() == std::numeric_limits<Scalar>::max());
     REQUIRE(wrapper.iterations() == 0);
-    REQUIRE(wrapper.solution().isZero());
+    REQUIRE(std::isnan(wrapper.error_norm()));
+    REQUIRE(wrapper.solution().size() == n);
+    REQUIRE(wrapper.solution().array().isNaN().all());
 }
 
 TEMPLATE_TEST_CASE("the exhaustive runner evaluates one seed and returns the failure",
