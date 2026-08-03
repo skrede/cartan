@@ -16,7 +16,7 @@ on:
       - 'tools/doc_snippets/**'
       - '.github/workflows/docs.yml'
   pull_request:
-    branches: [master, develop]
+    branches: [master]
     paths:
       - 'docs/**'
       - 'lib/**'

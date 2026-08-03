@@ -20,7 +20,7 @@ on:
       - 'tests/consumability/**'
       - '.github/workflows/consumability.yml'
   pull_request:
-    branches: [master, develop]
+    branches: [master]
     paths:
       - 'README.md'
       - 'docs/getting-started.md'

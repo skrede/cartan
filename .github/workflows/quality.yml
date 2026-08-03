@@ -8,7 +8,7 @@ on:
   push:
     branches: [master, develop, 'milestone/**']
   pull_request:
-    branches: [master, develop, 'milestone/**']
+    branches: [master]
   workflow_dispatch:
 
 jobs:
