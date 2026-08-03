@@ -50,6 +50,21 @@ concept has_lambda = requires(const S& s)
     { s.lambda() } -> std::convertible_to<typename S::scalar_type>;
 };
 
+/// Detect whether a policy accepts a task weight through a five-argument
+/// setup. Only some policies apply a weight, so the wrapper constrains its own
+/// weighted setup on this rather than accepting a weight it cannot pass on.
+template <typename S, typename C>
+concept weighted_setup_policy = requires(
+    S& s,
+    const C& chain,
+    const se3<typename C::scalar_type>& target,
+    const typename joint_state<typename C::scalar_type, C::joints>::position_type& q0,
+    const convergence_criteria<typename C::scalar_type>& criteria,
+    const error_weight<typename C::scalar_type>& weight)
+{
+    { s.setup(chain, target, q0, criteria, weight) };
+};
+
 }
 
 /// Restart wrapper solve policy with warm-start lambda preservation.
@@ -146,6 +161,7 @@ public:
         const position_type& q0,
         const convergence_criteria<scalar_type>& criteria,
         const error_weight<scalar_type>& weight)
+        requires detail::weighted_setup_policy<InnerPolicy, Chain>
     {
         m_chain = std::cref(chain);
         m_target = target;
@@ -170,14 +186,7 @@ public:
             return;
         }
 
-        if constexpr (requires { m_inner.setup(chain, target, q0, criteria, weight); })
-        {
-            m_inner.setup(chain, target, q0, criteria, weight);
-        }
-        else
-        {
-            m_inner.setup(chain, target, q0, criteria);
-        }
+        m_inner.setup(chain, target, q0, criteria, weight);
     }
 
     /// Deleted rvalue overloads: the wrapper borrows the chain for its whole
@@ -197,7 +206,8 @@ public:
         const se3<scalar_type>&,
         const position_type&,
         const convergence_criteria<scalar_type>&,
-        const error_weight<scalar_type>&) = delete;
+        const error_weight<scalar_type>&)
+        requires detail::weighted_setup_policy<InnerPolicy, Chain> = delete;
 
     step_result<scalar_type> step(const Chain& chain, int N)
     {
@@ -246,24 +256,7 @@ public:
             return inner_result;
         }
 
-        auto q_new = (*m_seed_gen)(m_restart_count);
-
-        if (m_weight.has_value())
-        {
-            if constexpr (requires { m_inner.setup(chain, m_target, q_new, m_criteria, *m_weight); })
-            {
-                m_inner.setup(chain, m_target, q_new, m_criteria, *m_weight);
-            }
-            else
-            {
-                m_inner.setup(chain, m_target, q_new, m_criteria);
-            }
-        }
-        else
-        {
-            m_inner.setup(chain, m_target, q_new, m_criteria);
-        }
-
+        reseed_inner(chain, (*m_seed_gen)(m_restart_count));
         apply_warm_start_lambda();
 
         ++m_restart_count;
@@ -358,6 +351,22 @@ private:
             m_best_feasible = feasible;
             m_best_valid = true;
         }
+    }
+
+    // A weight is held only when the constrained setup accepted one, which
+    // requires the inner policy to take it, so the unweighted branch is never
+    // a discarded weight.
+    void reseed_inner(const Chain& chain, const position_type& q0)
+    {
+        if constexpr (detail::weighted_setup_policy<InnerPolicy, Chain>)
+        {
+            if (m_weight.has_value())
+            {
+                m_inner.setup(chain, m_target, q0, m_criteria, *m_weight);
+                return;
+            }
+        }
+        m_inner.setup(chain, m_target, q0, m_criteria);
     }
 
     void apply_warm_start_lambda()

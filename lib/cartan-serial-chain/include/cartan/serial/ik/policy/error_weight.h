@@ -15,16 +15,6 @@ struct error_weight
     {
         return weights.cwiseProduct(v);
     }
-
-    Scalar weighted_angular_norm(const vector6<Scalar>& v) const
-    {
-        return (weights.template head<3>().cwiseProduct(v.template head<3>())).norm();
-    }
-
-    Scalar weighted_linear_norm(const vector6<Scalar>& v) const
-    {
-        return (weights.template tail<3>().cwiseProduct(v.template tail<3>())).norm();
-    }
 };
 
 }

@@ -321,26 +321,6 @@ TEST_CASE("helical DOF is not wrapped by canonicalization", "[ik][semantics][fea
 // the convergence gate tests raw (unweighted) component norms
 // ============================================================================
 
-TEST_CASE("convergence gate ignores error_weight", "[ik][semantics][gate]")
-{
-    // A body error whose raw component norms sit just below the tolerance, but
-    // whose weighted norms are pushed above it by a non-unit weight. The gate
-    // the solvers now use must key off the raw norms.
-    cartan::convergence_criteria<double> criteria{};
-    criteria.orientation_tol = 1e-3;
-    criteria.position_tol = 1e-3;
-
-    Eigen::Vector<double, 6> body_error;
-    body_error << 8e-4, 0.0, 0.0,   // angular (head<3>): raw norm 8e-4 < 1e-3
-                  8e-4, 0.0, 0.0;   // linear  (tail<3>): raw norm 8e-4 < 1e-3
-
-    cartan::error_weight<double> heavy;
-    heavy.weights << 5.0, 5.0, 5.0, 5.0, 5.0, 5.0;  // weighted norm 4e-3 > 1e-3
-
-    REQUIRE(cartan::detail::is_converged_unweighted(body_error, criteria));
-    REQUIRE_FALSE(cartan::detail::is_converged(body_error, heavy, criteria));
-}
-
 // A solver carrying a heavy error_weight still declares convergence on a
 // reachable in-limit target, because the stopping test no longer weights the
 // body error. Seeding at the exact solution makes the gate fire on entry.

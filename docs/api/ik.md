@@ -574,8 +574,6 @@ struct error_weight
     vector6<Scalar> weights{vector6<Scalar>::Ones()};
 
     vector6<Scalar> apply(const vector6<Scalar>& v) const;
-    Scalar weighted_angular_norm(const vector6<Scalar>& v) const;
-    Scalar weighted_linear_norm(const vector6<Scalar>& v) const;
 };
 ```
 
@@ -583,6 +581,14 @@ Per-component weight on the 6-vector pose error. Position and
 orientation components can be weighted independently for tasks where
 one dominates the other. The default (all-ones) gives equal weight to
 all components.
+
+A weight is supplied through the five-argument `setup()` overload, which
+`newton_raphson`, `lbfgsb` and `projected_lm` provide; those three apply it
+throughout their step mathematics. Policies without that overload do not
+accept a weight, and `restart_wrapper` offers the overload only when its
+inner policy does, so passing one where it cannot be honored fails to
+compile rather than being ignored. The weight steers the step; the
+convergence gate always reads the raw component norms.
 
 ## Solvers
 
@@ -834,7 +840,7 @@ Restart wrapper around any inner policy satisfying `solve_policy`. When
 the inner policy reports `stalled`, `diverged`, or `iteration_limit`, the
 wrapper generates a new seed configuration from a Halton sequence and
 re-initializes the inner policy. A rejected seed or target is not one of those:
-both `setup()` overloads validate their arguments and latch the terminal status
+every `setup()` overload validates its arguments and latches the terminal status
 in the wrapper, so `step()` returns `dimension_mismatch` or `non_finite_input`
 unchanged without consuming a restart, and `restarts()` stays at zero. A later
 well-formed `setup()` clears the latch, so a wrapper that refused one call is

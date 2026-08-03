@@ -103,7 +103,7 @@ public:
         auto V_b = (target.inverse() * fk.end_effector).log();
         m_initial_error = V_b.norm();
 
-        m_problem.emplace(chain, target, m_weight);
+        m_problem.emplace(chain, target, error_weight<scalar_type>{});
 
         int n = chain.num_joints();
         Eigen::VectorXd x0(n);
@@ -217,7 +217,6 @@ private:
     const Chain* m_chain{nullptr};
     se3<scalar_type> m_target{se3<scalar_type>::identity()};
     convergence_criteria<scalar_type> m_criteria{};
-    error_weight<scalar_type> m_weight{};
     options m_options{};
     position_type m_q;
     cartan::detail::error_ring<scalar_type> m_error_history;

@@ -14,7 +14,6 @@
 ///            Nielsen, H. B. (1999) "Damping Parameter in Marquardt's Method".
 
 #include "cartan/serial/ik/ik_status.h"
-#include "cartan/serial/ik/policy/error_weight.h"
 #include "cartan/serial/ik/policy/limits_policy.h"
 #include "cartan/serial/ik/concepts/solve_concept.h"
 #include "cartan/serial/ik/detail/convergence.h"
