@@ -47,6 +47,45 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   the 200-unit default of `max_total_work_units`, so a racing solve left on the
   defaults now does less work and may fail where it previously converged. There
   is no deprecation path and no compatibility shim.
+- **Behavior change.** `projected_lm` applies the task weight it is given. The
+  five-argument `setup` stored an `error_weight` and no part of the step
+  mathematics read it, so two weights spanning six orders of magnitude in
+  opposite directions produced first steps identical to the last mantissa bit.
+  The weight now scales the residual and the Jacobian's rows, and through them
+  the normal matrix, the gradient, both trust-region reductions, the dogleg
+  Cauchy scale, the damping initialization and the stall detector. The reported
+  `error_norm()` keeps its unweighted meaning, so accuracy figures stay in the
+  units they were in. Every solve reached through the four-argument `setup` runs
+  at the identity weight and is bit-identical to before.
+- **Breaking.** `restart_wrapper`'s weighted `setup` overload exists only when
+  the wrapped policy has one. It previously accepted an `error_weight` for any
+  inner policy and dropped it silently when the inner policy could not take one;
+  passing a weight to such a wrapper is now a compile error naming the
+  unsatisfied constraint. `cartan::detail::is_converged` — a weighted
+  convergence check no solver called — is removed along with
+  `error_weight::weighted_angular_norm` and `error_weight::weighted_linear_norm`,
+  which were reachable only through it. Ten backend-adapted policies
+  (`argmin_bobyqa`, `argmin_lbfgsb`, `argmin_slsqp`, `augmented_lagrangian`,
+  `cmaes`, `filter_nw_sqp`, `filter_slsqp`, `gcmma`, `mma`, `nw_sqp`) no longer
+  carry a weight member; none was settable, so each was permanently the identity.
+- **Behavior change.** `newton_raphson` keeps its current configuration when the
+  line search accepts no step length, and reports `stalled` on the spot. It
+  previously committed the last rejected trial regardless, which raised the error
+  on 58 of 60 steps on a bounded chain, and its sufficient-decrease test measured
+  the raw direction scaled by the step length rather than the displacement the
+  joint-box projection actually produced. A bare policy that used to keep
+  stepping now stops; a restart-wrapped one reseeds instead of spending its whole
+  budget drifting, which is where the behavior improves most.
+- **Behavior change.** A joint with one infinite bound gets a substituted search
+  interval anchored to its finite side. The two consumers that need an absolute
+  coordinate — the constrained-problem adapter and the multistart seed generator
+  — previously took half the fallback width as a coordinate, so a `[10, +inf)`
+  joint was given `[10, 6.283]`, an empty interval, and every multistart seed for
+  it landed below its lower bound. A fully unbounded joint is now centered on a
+  caller-supplied reference configuration instead of on zero, and that reference
+  is a required constructor argument at both consumers. `unwrap_to_range_nearest`
+  with both bounds infinite returns the equivalent angle nearest its reference
+  rather than the input unchanged. Chains with finite bounds are unaffected.
 - **Behavior change.** Inputs that were previously accepted are now rejected, and
   some that were rejected now report a different code. A NaN was accepted by all
   of the factories above; an infinity was accepted by `so3::from_matrix` outside
@@ -86,6 +125,48 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   single precision. Chains from `load_urdf<float>` now classify as `general` and
   take the generic evaluation path, which evaluates the true axis and is the
   more faithful of the two; a `double` parse is unaffected.
+- **Breaking.** The closed-form solvers are constructed through a validating
+  factory: `planar_2r_solver::make`, `spatial_3r_solver::make` and
+  `pieper_6r_solver::make`, each returning
+  `cartan::expected<solver, analytical_error<Scalar>>`. The public constructors
+  and the deduction guides are removed, and `solve_2r`, `solve_3r` and
+  `solve_pieper_6r` — in C++ and in Python — route through the factory. Each
+  factory rejects the preconditions its derivation consumes rather than letting
+  a chain that violates them construct and then fail every solve: a planar 2R
+  whose axes are not parallel, or whose home end-effector is off the plane; a
+  spatial 3R whose shoulder axes do not intersect; a six-axis chain that is not
+  Pieper. A rejected chain now reports a typed reason at construction, where
+  previously it constructed silently and every solve returned `unreachable`
+  carrying a length no reach inequality had compared against.
+- **Breaking.** `analytical_error<Scalar>`'s magnitude is
+  `std::optional<Scalar>`. Every failure whose contract carries no magnitude now
+  says so explicitly instead of reporting a zero or a stale value, and that
+  absence crosses into Python as `None`. Where a magnitude is reported it is now
+  the deficit read off the inequality that actually failed: an out-of-workspace
+  Pieper 6R target whose branches were all rejected is reported as a failed
+  verification rather than certified unreachable, and a reason forwarded from a
+  Paden-Kahan subproblem carries no magnitude at all rather than the caller's
+  substituted length.
+- **Behavior change.** The Paden-Kahan subproblems reject nonfinite input and a
+  non-unit axis on the error channel. `paden_kahan_3` had no input guard: every
+  comparison in its body is false against a NaN, so a NaN axis, point, target or
+  distance fell through to the two-solution branch and was reported as a success
+  carrying two NaN angles. The single-axis rotation subproblem additionally
+  enforces the axial condition and the reconstruction residual it previously
+  computed and discarded, both against a relative threshold that scales with the
+  mechanism rather than an absolute one that tightens as the arm grows.
+- **Behavior change.** Each analytical solver verifies its candidate solutions at
+  the acceptance tolerance it was constructed with. The shared forward-kinematics
+  back-check previously took a default, so a solver configured at `1e-9` still
+  verified at that default and a solver configured at `1e-3` rejected solutions
+  it was asked to accept. Default-configured results are unchanged.
+- **Behavior change.** A folded equal-link planar 2R — target at the base point,
+  both links the same length — is reported as `singular_configuration` with no
+  solutions, decided before the law of cosines divides by the in-plane distance.
+  It previously divided by zero, produced two candidates with a not-a-number
+  shoulder angle, and reported `verification_failed`. Both reach gates now
+  compare lengths against the same acceptance length the back-check applies,
+  rather than comparing squared distances against squared reaches.
 
 ## [0.4.1] - 2026-07-06
 
