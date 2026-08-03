@@ -182,10 +182,7 @@ TEST_CASE("default_solver converges on harder target", "[ik][default_solvers]")
     criteria.max_iterations_per_attempt = 300;
     criteria.max_total_work_units = 600;
 
-    spp::solver_options<double> opts;
-    opts.max_total_iterations = 600;
-
-    solver.setup(chain, target, q0, criteria, opts);
+    solver.setup(chain, target, q0, criteria);
     auto result = solver.solve();
 
     REQUIRE(result.has_value());

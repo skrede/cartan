@@ -16,6 +16,37 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   comparison that is false for a NaN.
 
 ### Changed
+- **Breaking.** `basic_ik_runner::step()` and `step_n()` now charge the work they
+  consume against `convergence_criteria::max_total_work_units` and stop once it
+  is spent. Previously neither touched the runner's accumulator and neither read
+  the budget, so a hand-driven caller ran without bound while `iterations()`
+  reported zero and `status()` stayed `running`: five thousand `step()` calls
+  against a five-unit budget reported no work at all. `step()`, `step_n()` and
+  `solve()` now share one charging path and report the same iteration count, the
+  same terminal status and the same error norm from the same setup. Code that
+  drove `step()` past the budget and relied on it continuing must raise
+  `max_total_work_units`; there is no deprecation path and no compatibility
+  shim.
+- **Breaking.** `solve()` latches a terminal status before it returns. It
+  previously left the runner `running` after exhausting the budget, which made
+  the returned failure reason a fall-through default rather than a report of
+  what happened, and left `status()` contradicting the returned error. A caller
+  that read `status()` after `solve()` and treated `running` as "resumable" now
+  sees `converged` or `iteration_limit`.
+- **Breaking.** `solver_options::max_total_iterations` is removed, along with the
+  `max_total_iterations` keyword argument and field on the Python `IkConfig`.
+  Multi-policy racing counted round-robin ticks against this separate cap while
+  single-policy solves counted algorithmic work units against
+  `max_total_work_units`, and `ik_result::iterations` reported whichever the
+  solve happened to produce — one field with two incompatible meanings. Racing
+  now bills the work units its policies consume against `max_total_work_units`
+  like every other path, so `iterations` means work units everywhere. A racing
+  round-robin tick is atomic and can carry the accumulator past the cap by at
+  most one unit per still-active policy. Express a racing bound in work units:
+  the previous default of 500 ticks over two policies is roughly 1000 units, not
+  the 200-unit default of `max_total_work_units`, so a racing solve left on the
+  defaults now does less work and may fail where it previously converged. There
+  is no deprecation path and no compatibility shim.
 - **Behavior change.** Inputs that were previously accepted are now rejected, and
   some that were rejected now report a different code. A NaN was accepted by all
   of the factories above; an infinity was accepted by `so3::from_matrix` outside

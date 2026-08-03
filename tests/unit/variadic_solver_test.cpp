@@ -288,8 +288,7 @@ TEST_CASE("harder target benefits from racing", "[ik][variadic_solver]")
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria{1e-6, 1e-6, 200, 400};
-    spp::solver_options<double> opts{.max_total_iterations = 600};
-    solver.setup(chain, target, q0, criteria, opts);
+    solver.setup(chain, target, q0, criteria);
 
     auto result = solver.solve();
     REQUIRE(result.has_value());
@@ -355,8 +354,7 @@ TEST_CASE("multi-policy all-fail yields iteration_limit and finite error", "[ik]
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria{1e-6, 1e-6, 30, 400};
-    spp::solver_options<double> opts{.max_total_iterations = 3000};
-    solver.setup(chain, target, q0, criteria, opts);
+    solver.setup(chain, target, q0, criteria);
 
     auto result = solver.solve();
     REQUIRE_FALSE(result.has_value());

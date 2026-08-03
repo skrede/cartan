@@ -114,7 +114,6 @@ inline cartan::python::IkResult run_ik(const KC& chain,
     };
     cartan::solver_options<double> opts{
         cfg.objective,
-        cfg.max_total_iterations,
         cfg.halton_seed
     };
 
@@ -196,7 +195,6 @@ void register_ik(nb::module_& m)
                int max_total_work_units,
                double position_tol,
                double orientation_tol,
-               int max_total_iterations,
                cartan::ik_objective objective,
                unsigned int halton_seed)
             {
@@ -205,7 +203,6 @@ void register_ik(nb::module_& m)
                     max_total_work_units,
                     position_tol,
                     orientation_tol,
-                    max_total_iterations,
                     objective,
                     halton_seed
                 };
@@ -215,14 +212,12 @@ void register_ik(nb::module_& m)
             nb::arg("max_total_work_units")       = 200,
             nb::arg("position_tol")               = 1e-6,
             nb::arg("orientation_tol")            = 1e-6,
-            nb::arg("max_total_iterations")       = 500,
             nb::arg("objective")                  = cartan::ik_objective::speed,
             nb::arg("halton_seed")                = 42u)
         .def_rw("max_iterations_per_attempt", &IkConfig::max_iterations_per_attempt)
         .def_rw("max_total_work_units",       &IkConfig::max_total_work_units)
         .def_rw("position_tol",               &IkConfig::position_tol)
         .def_rw("orientation_tol",            &IkConfig::orientation_tol)
-        .def_rw("max_total_iterations",       &IkConfig::max_total_iterations)
         .def_rw("objective",                  &IkConfig::objective)
         .def_rw("halton_seed",                &IkConfig::halton_seed)
         .def("__repr__",
@@ -231,7 +226,6 @@ void register_ik(nb::module_& m)
                      + ", max_total_work_units=" + std::to_string(c.max_total_work_units)
                      + ", position_tol=" + format_double(c.position_tol)
                      + ", orientation_tol=" + format_double(c.orientation_tol)
-                     + ", max_total_iterations=" + std::to_string(c.max_total_iterations)
                      + ", halton_seed=" + std::to_string(c.halton_seed) + ")";
             });
 

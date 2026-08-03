@@ -154,10 +154,13 @@ solve();
 ```
 
 Convenience method: drives the runner until convergence or the work-unit
-cap is hit. Single-policy mode uses the total-budget accumulator loop
-(asks the inner policy for as many units as remain in the budget;
-accumulates returned `units_consumed`). Multi-policy mode loops `step()`
-until all policies are parked or `max_total_iterations` is hit.
+cap is hit. `step()`, `step_n()` and `solve()` share one charging path, so
+all three accumulate `units_consumed` against
+`convergence_criteria::max_total_work_units`, stop once it is spent, and
+latch a terminal status before returning. A multi-policy round-robin tick
+is atomic and bills the sum of its policies' units, so the last tick can
+carry the accumulator past the cap by at most one unit per still-active
+policy.
 
 ### Query methods
 
@@ -471,14 +474,14 @@ template <typename Scalar = double>
 struct solver_options
 {
     ik_objective objective{ik_objective::speed};
-    int max_total_iterations{500};
     unsigned int halton_seed{42};
 };
 ```
 
-Controls multi-policy racing behavior: the racing objective, the
-aggregate round-robin tick cap, and the Halton seed offset for
-reproducible secondary-policy seeding.
+Controls multi-policy racing behavior: the racing objective and the
+Halton seed offset for reproducible secondary-policy seeding. The total
+work budget lives on `convergence_criteria::max_total_work_units` and
+bounds the racing loop as well.
 
 ### ik_result
 

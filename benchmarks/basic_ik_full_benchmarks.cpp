@@ -171,8 +171,7 @@ template <int N, typename Solver>
 void bm_racing_solver(
     benchmark::State& state,
     const cartan::kinematic_chain<double, N>& chain,
-    const target_set<double, N>& ts,
-    int max_total_iterations)
+    const target_set<double, N>& ts)
 {
     cartan::convergence_criteria<double> criteria{
         .position_tol               = 1e-5,
@@ -197,7 +196,6 @@ void bm_racing_solver(
 
         Solver solver;
         cartan::solver_options<double> opts;
-        opts.max_total_iterations = max_total_iterations;
         opts.halton_seed = static_cast<unsigned int>(idx);
         solver.setup(chain, target, q0, criteria, opts);
         auto result = solver.solve();
@@ -801,7 +799,7 @@ static void bm_full_##ROBOT##_cartan_racing(benchmark::State& state)            
 {                                                                                                    \
     auto chain = cartan::fixtures::CHAIN_FN<double>();                                              \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                   \
-    bm_racing_solver<6, racing_solver<6>>(state, chain, ts, 1000);                                \
+    bm_racing_solver<6, racing_solver<6>>(state, chain, ts);                                     \
 }                                                                                                    \
 BENCHMARK(bm_full_##ROBOT##_cartan_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
@@ -1011,7 +1009,7 @@ static void bm_full_##ROBOT##_cartan_racing(benchmark::State& state)            
 {                                                                                                    \
     auto chain = cartan::fixtures::CHAIN_FN<double>();                                              \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                   \
-    bm_racing_solver<7, racing_solver<7>>(state, chain, ts, 1000);                                \
+    bm_racing_solver<7, racing_solver<7>>(state, chain, ts);                                     \
 }                                                                                                    \
 BENCHMARK(bm_full_##ROBOT##_cartan_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 

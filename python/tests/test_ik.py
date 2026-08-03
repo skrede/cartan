@@ -57,7 +57,6 @@ def test_ik_config_defaults() -> None:
     assert cfg.max_total_work_units == 200
     assert cfg.position_tol == pytest.approx(1e-6)
     assert cfg.orientation_tol == pytest.approx(1e-6)
-    assert cfg.max_total_iterations == 500
     assert cfg.objective == cartan.IkObjective.speed
     assert cfg.halton_seed == 42
 
@@ -85,9 +84,9 @@ def test_ik_config_positional_rejected() -> None:
 def test_ik_config_mutable_fields() -> None:
     cfg = cartan.IkConfig()
     cfg.position_tol = 1e-8
-    cfg.max_total_iterations = 1000
+    cfg.max_total_work_units = 1000
     assert cfg.position_tol == pytest.approx(1e-8)
-    assert cfg.max_total_iterations == 1000
+    assert cfg.max_total_work_units == 1000
 
 
 def test_ik_config_repr_populated() -> None:

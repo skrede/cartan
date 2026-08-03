@@ -34,6 +34,7 @@
 #include <optional>
 #include "cartan/expected.h"
 #include <concepts>
+#include <algorithm>
 #include <functional>
 #include <type_traits>
 
@@ -120,7 +121,7 @@ public:
         m_target = target;
         m_criteria = criteria;
         m_objective = options.objective;
-        reset_state(chain, options);
+        reset_state(chain);
 
         // Reset first, validate second, and latch before any policy is touched:
         // a rejected seed must leave neither a half-configured policy nor the
@@ -160,35 +161,16 @@ public:
     /// an empty borrow.
     ik_status step()
     {
-        if (!m_chain)
-        {
-            return ik_status::not_initialized;
-        }
-
-        if (m_status != ik_status::running)
-        {
-            return m_status;
-        }
-
-        if constexpr (sizeof...(Policies) == 1)
-        {
-            // Single tick: drive the inner policy for one algorithmic work unit.
-            return step_single_metrics(1).status;
-        }
-        else
-        {
-            return step_multi();
-        }
+        return charge_and_step(1).status;
     }
 
     ik_status step_n(int n)
     {
         for (int i = 0; i < n; ++i)
         {
-            auto s = step();
-            if (s != ik_status::running)
+            if (charge_and_step(1).status != ik_status::running)
             {
-                return s;
+                break;
             }
         }
         return m_status;
@@ -202,41 +184,8 @@ public:
                 ik_error<scalar_type, joints>{.reason = ik_failure::not_initialized});
         }
 
-        if constexpr (sizeof...(Policies) == 1)
+        while (charge_and_step(m_criteria.max_total_work_units).status == ik_status::running)
         {
-            // Total-budget accumulator loop: ask the inner policy for as many
-            // algorithmic work units as the remaining runner budget allows;
-            // the policy returns the actual units consumed (which may be less
-            // than the request on convergence / stall / per-attempt cap hit).
-            int total_units = 0;
-            while (total_units < m_criteria.max_total_work_units
-                   && m_status == ik_status::running)
-            {
-                int remaining = m_criteria.max_total_work_units - total_units;
-                auto result = step_single_metrics(remaining);
-                total_units += result.metrics.units_consumed;
-                m_total_iterations = total_units;
-                if (result.status != ik_status::running)
-                    break;
-                // min_units_per_step contract: a step that returns
-                // ik_status::running must bill at least one work unit.
-                // A `{running, units=0}` return signals a solver that
-                // cannot make forward progress (e.g. inner converged at
-                // entry q with no work, then runner restarted inner at
-                // the same q under a non-speed objective). Without this
-                // guard the accumulator loop runs forever.
-                if (result.metrics.units_consumed == 0)
-                {
-                    m_status = m_found_convergence
-                        ? ik_status::converged
-                        : ik_status::iteration_limit;
-                    break;
-                }
-            }
-        }
-        else
-        {
-            while (step() == ik_status::running) {}
         }
 
         return build_result();
@@ -289,7 +238,53 @@ private:
         ik_termination_reason termination_reason{ik_termination_reason::unknown};
     };
 
-    void reset_state(const chain_type& chain, const solver_options<scalar_type>& options)
+    /// The single owner of the work-unit accumulator and of the total-budget
+    /// comparison. step(), step_n() and solve() reach the policies only through
+    /// here, so the three agree on the budget, on the terminal status they
+    /// latch and on the metrics they report by construction rather than by
+    /// three implementations happening to coincide.
+    ///
+    /// min_units_per_step contract: a step that returns ik_status::running must
+    /// bill at least one work unit. A `{running, units=0}` return signals a
+    /// solver that cannot make forward progress (e.g. the inner policy
+    /// converged at the entry q with no work and was restarted there under a
+    /// non-speed objective), and is terminated on the same rule as an exhausted
+    /// budget.
+    step_result<scalar_type> charge_and_step(int requested)
+    {
+        if (m_status != ik_status::running)
+        {
+            return {m_status, {0, error_norm()}};
+        }
+
+        const int remaining = m_criteria.max_total_work_units - m_total_iterations;
+        auto stepped = dispatch_step(std::min(requested, remaining));
+        m_total_iterations += stepped.metrics.units_consumed;
+
+        const bool spent = stepped.metrics.units_consumed == 0
+            || m_total_iterations >= m_criteria.max_total_work_units;
+
+        if (spent && m_status == ik_status::running)
+        {
+            m_status = m_found_convergence ? ik_status::converged : ik_status::iteration_limit;
+        }
+
+        return {m_status, stepped.metrics};
+    }
+
+    step_result<scalar_type> dispatch_step(int units)
+    {
+        if constexpr (sizeof...(Policies) == 1)
+        {
+            return step_single_metrics(units);
+        }
+        else
+        {
+            return step_multi();
+        }
+    }
+
+    void reset_state(const chain_type& chain)
     {
         m_status = ik_status::running;
         m_best_error = std::numeric_limits<scalar_type>::max();
@@ -298,7 +293,6 @@ private:
         m_total_iterations = 0;
         m_found_convergence = false;
         m_best_q = position_type::Zero(chain.num_joints());
-        m_max_total_iterations = options.max_total_iterations;
         m_early_stop = false;
         m_parked = {};
         m_results = {};
@@ -323,14 +317,6 @@ private:
             }
 
             update_best(q);
-
-            if (m_total_iterations + inner.metrics.units_consumed
-                    >= m_criteria.max_total_work_units)
-            {
-                m_status = ik_status::converged;
-                return inner;
-            }
-
             std::get<0>(m_policies).setup(m_chain->get(), m_target, q, m_criteria);
             return {ik_status::running, inner.metrics};
         }
@@ -346,42 +332,40 @@ private:
         return inner;
     }
 
-    ik_status step_multi()
+    /// One round-robin across the active policies. A tick is atomic, so it bills
+    /// the sum of the units its policies consumed and the caller's budget is
+    /// honored at tick granularity: the last tick can carry the accumulator
+    /// past the budget by at most one unit per still-active policy.
+    step_result<scalar_type> step_multi()
         requires (sizeof...(Policies) > 1)
     {
         bool any_running = false;
+        int units = 0;
 
         [&]<std::size_t... Is>(std::index_sequence<Is...>)
         {
-            (tick_policy<Is>(any_running), ...);
+            (tick_policy<Is>(any_running, units), ...);
         }(std::index_sequence_for<Policies...>{});
-
-        ++m_total_iterations;
-
-        if (m_total_iterations >= m_max_total_iterations)
-        {
-            m_status = m_found_convergence ? ik_status::converged : ik_status::iteration_limit;
-            return m_status;
-        }
 
         if (!any_running)
         {
             m_status = m_found_convergence ? ik_status::converged : ik_status::iteration_limit;
-            return m_status;
         }
 
-        return ik_status::running;
+        return {m_status, {units, error_norm()}};
     }
 
     template <std::size_t I>
-    void tick_policy(bool& any_running)
+    void tick_policy(bool& any_running, int& units)
         requires (sizeof...(Policies) > 1)
     {
         if (m_early_stop || m_parked[I])
             return;
 
         auto& policy = std::get<I>(m_policies);
-        auto status = policy.step(m_chain->get(), 1).status;
+        auto ticked = policy.step(m_chain->get(), 1);
+        auto status = ticked.status;
+        units += ticked.metrics.units_consumed;
 
         if (status == ik_status::converged)
         {
@@ -729,7 +713,6 @@ private:
     std::array<bool, sizeof...(Policies)> m_parked{};
     std::array<std::optional<parked_result>, sizeof...(Policies)> m_results{};
     std::optional<halton_seed_generator<chain_type>> m_seed_gen{};
-    int m_max_total_iterations{500};
     int m_best_solver_index{-1};
     bool m_early_stop{false};
 };

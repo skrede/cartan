@@ -43,7 +43,6 @@ struct IkConfig
     int max_total_work_units{200};
     double position_tol{1e-6};
     double orientation_tol{1e-6};
-    int max_total_iterations{500};
     cartan::ik_objective objective{cartan::ik_objective::speed};
     unsigned int halton_seed{42};
 };

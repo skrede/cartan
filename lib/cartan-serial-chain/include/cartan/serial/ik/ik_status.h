@@ -207,7 +207,9 @@ inline constexpr Scalar default_orientation_tol_v =
 /// restart). `max_total_work_units` bounds the runner-level total budget,
 /// measured in algorithmic work units (1 unit = one major iteration of the
 /// solver's design); the runner accumulates `step_result::metrics.units_consumed`
-/// against this cap.
+/// against this cap on every entry point, single-policy and racing alike. A
+/// racing round-robin tick is atomic, so it can carry the accumulator past the
+/// cap by at most one unit per still-active policy.
 template <typename Scalar = double>
 struct convergence_criteria
 {
@@ -244,9 +246,10 @@ struct step_result
 
 /// Options controlling multi-policy solver racing behavior.
 ///
-/// Separate from convergence_criteria, which controls per-policy behavior.
-/// solver_options governs the outer racing loop: how many total iterations,
-/// which objective selects the winner, and the Halton seed for reproducibility.
+/// Separate from convergence_criteria, which controls per-policy behavior and
+/// carries the runner's total work budget. solver_options governs the outer
+/// racing loop: which objective selects the winner, and the Halton seed for
+/// reproducibility.
 template <typename Scalar = double>
 struct solver_options
 {
@@ -254,7 +257,6 @@ struct solver_options
         "solver_options requires a floating-point Scalar type");
 
     ik_objective objective{ik_objective::speed};
-    int max_total_iterations{500};
     unsigned int halton_seed{42};
 };
 

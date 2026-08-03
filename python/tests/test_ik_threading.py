@@ -68,6 +68,11 @@ def test_solve_ik_scales_across_threads(
     # 1.0-rad seed perturbation is the smallest one that produces a
     # per-call wall above 50 us on UR5e at default IkConfig, which keeps the
     # total wall above 4 ms and the ratio measurement statistically meaningful.
+    #
+    # The budget is stated rather than defaulted: a racing tick bills one work
+    # unit per still-active policy, so the two-policy race consumes the 200-unit
+    # default in about a hundred ticks and the hardest of these seeds needs more
+    # than that.
     targets: list[cartan.SE3] = []
     seeds: list[np.ndarray] = []
     for _ in range(n_solves):
@@ -83,8 +88,10 @@ def test_solve_ik_scales_across_threads(
         targets.append(cartan.forward_kinematics(chain, q_truth))
         seeds.append(q_truth + rng.uniform(-1.0, 1.0, size=n))
 
+    config = cartan.IkConfig(max_total_work_units=600)
+
     def _solve(idx: int) -> cartan.IkResult:
-        return cartan.solve_ik(chain, targets[idx], seeds[idx])
+        return cartan.solve_ik(chain, targets[idx], seeds[idx], config)
 
     # Warm up the runner allocator and the OS thread pool so the first
     # ThreadPoolExecutor.map call does not pay one-time setup overhead in
