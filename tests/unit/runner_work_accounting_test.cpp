@@ -68,7 +68,7 @@ spp::convergence_criteria<double> criteria_with(int total_units)
 /// is the path on which the unaccounted work accumulated.
 spp::solver_options<double> continuing_objective()
 {
-    return {.objective = spp::ik_objective::min_distance};
+    return {.objective = spp::ik_objective::min_error_norm};
 }
 
 bool terminal(spp::ik_status status)

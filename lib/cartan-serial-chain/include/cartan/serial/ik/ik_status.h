@@ -30,7 +30,8 @@ enum class ik_status
     aborted,
     not_initialized,
     dimension_mismatch,
-    non_finite_input
+    non_finite_input,
+    unsupported_configuration
 };
 
 /// Human-readable diagnostic for an ik_status, for logging and binding
@@ -59,15 +60,23 @@ constexpr const char* message(ik_status status)
         return "Seed joint vector length does not match the chain's joint count";
     case ik_status::non_finite_input:
         return "Seed joint vector or target pose contains a NaN or infinite component";
+    case ik_status::unsupported_configuration:
+        return "Selection objective is not defined for this chain or characteristic length";
     }
     return "Unknown ik_status";
 }
 
 /// Objective for the IK solve -- controls secondary optimization.
+///
+/// `min_error_norm` ranks on the pose residual and `min_joint_distance` on the
+/// displacement from the seed configuration; the two Jacobian measures rank on
+/// the singular values of the body Jacobian normalized by the characteristic
+/// length. Each definition lives once, in detail/selection_metrics.h.
 enum class ik_objective
 {
     speed,
-    min_distance,
+    min_error_norm,
+    min_joint_distance,
     max_manipulability,
     max_isotropy
 };
@@ -87,7 +96,8 @@ enum class ik_failure
     aborted,
     not_initialized,
     dimension_mismatch,
-    non_finite_input
+    non_finite_input,
+    unsupported_configuration
 };
 
 /// Human-readable diagnostic for an ik_failure, for logging and binding
@@ -114,6 +124,8 @@ constexpr const char* message(ik_failure failure)
         return "Seed joint vector length does not match the chain's joint count";
     case ik_failure::non_finite_input:
         return "Seed joint vector or target pose contains a NaN or infinite component";
+    case ik_failure::unsupported_configuration:
+        return "Selection objective is not defined for this chain or characteristic length";
     }
     return "Unknown ik_failure";
 }
@@ -253,6 +265,13 @@ struct step_result
 /// carries the runner's total work budget. solver_options governs the outer
 /// racing loop: which objective selects the winner, and the Halton seed for
 /// reproducibility.
+///
+/// `characteristic_length` is in the chain's linear unit and divides the body
+/// Jacobian's linear rows before the decomposition the two Jacobian objectives
+/// rank on, so those rows are commensurable with the angular ones. It applies
+/// to those objectives alone and is not a library-wide scale. The default of
+/// one reproduces the unnormalized arithmetic exactly, which states the unit
+/// scale the measures always assumed rather than changing any ranking.
 template <typename Scalar = double>
 struct solver_options
 {
@@ -261,6 +280,7 @@ struct solver_options
 
     ik_objective objective{ik_objective::speed};
     unsigned int halton_seed{42};
+    Scalar characteristic_length{1};
 };
 
 }

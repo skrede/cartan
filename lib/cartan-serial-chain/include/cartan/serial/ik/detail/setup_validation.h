@@ -54,13 +54,14 @@ ik_status chain_bound_status(ik_status status, int setup_joints, const Chain& ch
     return chain.num_joints() == setup_joints ? status : ik_status::dimension_mismatch;
 }
 
-/// The two statuses a failed precondition latches. A wrapper that restarts on a
+/// The statuses a failed precondition latches. A wrapper that restarts on a
 /// terminal inner status tests this to tell a caller's bad argument, which no
 /// fresh seed can repair, from a stalled or diverged attempt, which one can.
 constexpr bool is_precondition_failure(ik_status status)
 {
     return status == ik_status::dimension_mismatch
-        || status == ik_status::non_finite_input;
+        || status == ik_status::non_finite_input
+        || status == ik_status::unsupported_configuration;
 }
 
 /// The statuses from which no iteration may run: a failed precondition, or a
@@ -80,6 +81,10 @@ constexpr ik_failure setup_failure_reason(ik_status status)
     if (status == ik_status::non_finite_input)
     {
         return ik_failure::non_finite_input;
+    }
+    if (status == ik_status::unsupported_configuration)
+    {
+        return ik_failure::unsupported_configuration;
     }
     return ik_failure::not_initialized;
 }

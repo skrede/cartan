@@ -17,15 +17,12 @@
 #include "cartan/serial/ik/ik_status.h"
 #include "cartan/serial/ik/concepts/solve_concept.h"
 #include "cartan/serial/ik/detail/setup_validation.h"
+#include "cartan/serial/ik/detail/selection_metrics.h"
 #include "cartan/serial/ik/solver/detail/halton_seed_generator.h"
 
 #include "cartan/lie/se3.h"
-#include "cartan/serial/fk/jacobian.h"
 #include "cartan/serial/chain/joint_state.h"
 #include "cartan/serial/chain/chain_concept.h"
-#include "cartan/serial/fk/forward_kinematics.h"
-
-#include <Eigen/SVD>
 
 #include <array>
 #include <cmath>
@@ -101,12 +98,14 @@ public:
 
     basic_ik_runner()
         : m_best_q(detail::poison_joint_position<scalar_type, joints>())
+        , m_reference_q(detail::poison_joint_position<scalar_type, joints>())
     {
     }
 
     explicit basic_ik_runner(Policies... policies)
         : m_policies(std::move(policies)...)
         , m_best_q(detail::poison_joint_position<scalar_type, joints>())
+        , m_reference_q(detail::poison_joint_position<scalar_type, joints>())
     {
     }
 
@@ -121,23 +120,23 @@ public:
         m_target = target;
         m_criteria = criteria;
         m_objective = options.objective;
+        m_length = options.characteristic_length;
+        m_restart_index = static_cast<int>(options.halton_seed);
         reset_state(chain);
 
-        // Reset first, validate second, and latch before any policy is touched:
-        // a rejected seed must leave neither a half-configured policy nor the
-        // previous solve's convergence flag, iterate and counters readable.
-        if (auto held = cartan::detail::validate_solve_inputs(chain, target, q0); !held)
+        if (auto refused = refuse_setup(chain, target, q0); refused)
         {
-            m_status = held.error();
+            m_status = *refused;
             return;
         }
 
         m_best_q = q0;
+        m_reference_q = q0;
+        m_seed_gen.emplace(chain, q0);
         std::get<0>(m_policies).setup(chain, target, q0, criteria);
 
         if constexpr (sizeof...(Policies) > 1)
         {
-            m_seed_gen.emplace(chain, q0);
             setup_remaining_policies(chain, target, criteria, options.halton_seed,
                 std::make_index_sequence<sizeof...(Policies) - 1>{});
         }
@@ -233,10 +232,26 @@ private:
     {
         position_type q;
         scalar_type error_norm{};
+        std::optional<scalar_type> metric{};
         int iterations{};
         bool converged{false};
         ik_termination_reason termination_reason{ik_termination_reason::unknown};
     };
+
+    /// Everything setup() establishes before a policy is touched, so a rejected
+    /// call leaves neither a half-configured policy nor the previous solve's
+    /// convergence flag, iterate and counters readable.
+    std::optional<ik_status> refuse_setup(
+        const chain_type& chain,
+        const se3<scalar_type>& target,
+        const position_type& q0) const
+    {
+        if (auto held = cartan::detail::validate_solve_inputs(chain, target, q0); !held)
+        {
+            return held.error();
+        }
+        return cartan::detail::selection_admissibility(m_objective, chain, m_length);
+    }
 
     /// The single owner of the work-unit accumulator and of the total-budget
     /// comparison. step(), step_n() and solve() reach the policies only through
@@ -287,9 +302,7 @@ private:
     void reset_state(const chain_type& chain)
     {
         m_status = ik_status::running;
-        m_best_error = std::numeric_limits<scalar_type>::max();
-        m_best_manipulability = scalar_type(0);
-        m_best_isotropy = scalar_type(0);
+        m_best_metric = std::nullopt;
         m_total_iterations = 0;
         m_found_convergence = false;
         m_best_q = position_type::Zero(chain.num_joints());
@@ -317,7 +330,7 @@ private:
             }
 
             update_best(q);
-            std::get<0>(m_policies).setup(m_chain->get(), m_target, q, m_criteria);
+            std::get<0>(m_policies).setup(m_chain->get(), m_target, restart_seed(), m_criteria);
             return {ik_status::running, inner.metrics};
         }
 
@@ -373,6 +386,7 @@ private:
             m_results[I].emplace(parked_result{
                 .q = policy.solution(),
                 .error_norm = policy.error_norm(),
+                .metric = candidate_metric(policy.solution(), policy.error_norm()),
                 .iterations = policy.iterations(),
                 .converged = true,
                 .termination_reason = policy_termination_reason(policy)
@@ -446,68 +460,30 @@ private:
         std::get<I>(m_policies).setup(chain, target, seed, criteria);
     }
 
+    std::optional<scalar_type> candidate_metric(const position_type& q, scalar_type error_norm) const
+    {
+        return cartan::detail::selection_metric(
+            m_objective, m_chain->get(), q, m_reference_q, error_norm, m_length);
+    }
+
     void update_best(const position_type& q)
     {
-        scalar_type err = std::get<0>(m_policies).error_norm();
+        auto metric = candidate_metric(q, std::get<0>(m_policies).error_norm());
 
-        switch (m_objective)
+        if (cartan::detail::improves_on(m_objective, metric, m_best_metric))
         {
-            case ik_objective::min_distance:
-            {
-                if (err < m_best_error)
-                {
-                    m_best_error = err;
-                    m_best_q = q;
-                }
-                break;
-            }
-            case ik_objective::max_manipulability:
-            {
-                auto fk = forward_kinematics_unchecked(m_chain->get(), q);
-                auto J_b = body_jacobian_unchecked(m_chain->get(), fk);
-                constexpr unsigned int svd_opts = (joints == dynamic)
-                    ? (Eigen::ComputeThinU | Eigen::ComputeThinV)
-                    : (Eigen::ComputeFullU | Eigen::ComputeFullV);
-                Eigen::JacobiSVD<jacobian_matrix<scalar_type, joints>> svd(J_b, svd_opts);
-                auto sigma = svd.singularValues();
-                scalar_type manip = scalar_type(1);
-                for (int i = 0; i < static_cast<int>(sigma.size()); ++i)
-                {
-                    manip *= sigma(i);
-                }
-                if (manip > m_best_manipulability)
-                {
-                    m_best_manipulability = manip;
-                    m_best_q = q;
-                }
-                break;
-            }
-            case ik_objective::max_isotropy:
-            {
-                auto fk = forward_kinematics_unchecked(m_chain->get(), q);
-                auto J_b = body_jacobian_unchecked(m_chain->get(), fk);
-                constexpr unsigned int svd_opts = (joints == dynamic)
-                    ? (Eigen::ComputeThinU | Eigen::ComputeThinV)
-                    : (Eigen::ComputeFullU | Eigen::ComputeFullV);
-                Eigen::JacobiSVD<jacobian_matrix<scalar_type, joints>> svd(J_b, svd_opts);
-                auto sigma = svd.singularValues();
-                int rank = static_cast<int>(sigma.size());
-                scalar_type isotropy = (sigma(0) > scalar_type(0))
-                    ? sigma(rank - 1) / sigma(0)
-                    : scalar_type(0);
-                if (isotropy > m_best_isotropy)
-                {
-                    m_best_isotropy = isotropy;
-                    m_best_q = q;
-                }
-                break;
-            }
-            default:
-            {
-                m_best_q = q;
-                break;
-            }
+            m_best_metric = metric;
+            m_best_q = q;
         }
+    }
+
+    /// A continuation under a non-speed objective needs a start the policy has
+    /// not already converged at: re-seeding it at the candidate it just returned
+    /// converges again for zero work, which the budget guard reads as a spent
+    /// solve, so a single start would be reported as a multistart.
+    position_type restart_seed()
+    {
+        return (*m_seed_gen)(m_restart_index++);
     }
 
     cartan::expected<ik_result<scalar_type, joints>, ik_error<scalar_type, joints>> build_result()
@@ -521,6 +497,8 @@ private:
                 result.iterations = m_total_iterations;
                 result.final_error_norm = std::get<0>(m_policies).error_norm();
                 result.solver_index = 0;
+                result.selection_metric = m_best_metric;
+                result.selection_objective = m_objective;
                 return result;
             }
             else
@@ -543,29 +521,15 @@ private:
         }
 
         int best_index = -1;
-        scalar_type best_metric = std::numeric_limits<scalar_type>::max();
+        std::optional<scalar_type> best_metric{};
 
         auto check = [&]<std::size_t I>()
         {
-            if (m_results[I] && m_results[I]->converged)
+            if (m_results[I] && m_results[I]->converged
+                && cartan::detail::improves_on(m_objective, m_results[I]->metric, best_metric))
             {
-                scalar_type metric = m_results[I]->error_norm;
-                if (m_objective == ik_objective::min_distance)
-                {
-                    if (metric < best_metric)
-                    {
-                        best_metric = metric;
-                        best_index = static_cast<int>(I);
-                    }
-                }
-                else
-                {
-                    if (best_index < 0 || metric < best_metric)
-                    {
-                        best_metric = metric;
-                        best_index = static_cast<int>(I);
-                    }
-                }
+                best_metric = m_results[I]->metric;
+                best_index = static_cast<int>(I);
             }
         };
         (check.template operator()<Is>(), ...);
@@ -588,6 +552,8 @@ private:
         result.iterations = m_total_iterations;
         result.final_error_norm = pr.error_norm;
         result.solver_index = index;
+        result.selection_metric = pr.metric;
+        result.selection_objective = m_objective;
         return result;
     }
 
@@ -706,12 +672,13 @@ private:
     se3<scalar_type> m_target{se3<scalar_type>::identity()};
     convergence_criteria<scalar_type> m_criteria{};
     position_type m_best_q;
-    scalar_type m_best_manipulability{};
-    scalar_type m_best_isotropy{};
-    scalar_type m_best_error{};
+    position_type m_reference_q;
+    std::optional<scalar_type> m_best_metric{};
     ik_objective m_objective{ik_objective::speed};
     ik_status m_status{ik_status::not_initialized};
+    scalar_type m_length{1};
     int m_total_iterations{};
+    int m_restart_index{};
     bool m_found_convergence{false};
 
     std::array<bool, sizeof...(Policies)> m_parked{};

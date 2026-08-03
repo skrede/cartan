@@ -11,12 +11,17 @@
 #include "cartan/serial/chain/storage_trait.h"
 
 #include <limits>
+#include <optional>
 #include <type_traits>
 
 namespace cartan
 {
 
 /// Successful IK result containing solution configuration and diagnostics.
+///
+/// `selection_metric` is the value the winning candidate was ranked on, under
+/// `selection_objective`. It is absent where the objective ranks nothing, which
+/// is the `speed` case, so an unranked win reads as absent rather than as zero.
 template <typename Scalar = double, int N = dynamic>
 struct ik_result
 {
@@ -26,6 +31,8 @@ struct ik_result
     Scalar final_error_norm{};
     int iterations{};
     int solver_index{};
+    std::optional<Scalar> selection_metric{};
+    ik_objective selection_objective{ik_objective::speed};
 };
 
 /// IK error containing failure diagnostics. Every payload field defaults to a

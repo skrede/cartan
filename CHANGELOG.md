@@ -16,6 +16,59 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   comparison that is false for a NaN.
 
 ### Changed
+- **Breaking.** `ik_objective::min_distance` is removed and replaced by
+  `ik_objective::min_error_norm`. The old name promised a distance and selected
+  on the pose residual; the name was the untruth, so the name changed and the
+  behavior did not. There is no alias and no deprecation path: C++ code naming
+  the old value fails to compile, and Python code naming
+  `IkObjective.min_distance` fails at attribute lookup rather than at a type
+  check. `ik_objective::min_joint_distance` is added and supplies the capability
+  the removed name promised — the Euclidean displacement from the seed
+  configuration, which the runner now stores at `setup()`. Because it is a
+  Euclidean norm over joint coordinates, it is refused on a chain mixing
+  revolute and prismatic joints, whose components carry different units; a
+  caller-supplied scale for that case may be added later, and refusing now
+  forecloses nothing.
+- **Breaking.** `ik_objective::max_manipulability` and
+  `ik_objective::max_isotropy` were documented as the racing selection's
+  criteria but were never implemented on the racing path: it ranked every
+  objective on the stored error norm and silently returned the lowest-residual
+  candidate under all three. Both measures now have one definition, read by the
+  single-policy and the racing paths alike, so the two agree by construction
+  rather than by two implementations happening to coincide. On a nine-joint
+  measurement fixture the three objectives previously returned the same
+  candidate; they now return the candidate each objective actually ranks
+  highest.
+- **Breaking.** Both Jacobian measures are undefined, rather than one or zero,
+  where the decomposition has no singular values. A chain with no joints
+  previously drove a product over an empty set, which evaluates to one and would
+  have reported such a chain as maximally manipulable; in practice it faulted
+  inside the decomposition's own construction before reaching that value.
+  `setup()` now refuses the combination. `ik_status` and `ik_failure` each gain
+  `unsupported_configuration`, so a switch over either that was previously
+  exhaustive needs one more arm.
+- `solver_options` gains `characteristic_length`, in the chain's linear unit,
+  which divides the body Jacobian's linear rows before the decomposition so the
+  singular values are commensurable with the angular rows. It applies to the
+  selection objectives alone and is not a library-wide scale. Its default of one
+  reproduces the previous arithmetic exactly, so nothing is reranked by adopting
+  it; a zero, negative or non-finite value is refused at `setup()`. Note that on
+  a square body Jacobian the length cannot reorder the manipulability measure at
+  all — it rescales every candidate by the same factor — though it does reorder
+  the isotropy measure, and reorders manipulability on a chain with fewer than
+  six joints.
+- `ik_result` gains `selection_metric` and `selection_objective`, the value the
+  winning candidate was ranked on and the objective it was computed under. The
+  metric is absent under `speed`, which ranks nothing, so an unranked win reads
+  as absent rather than as a zero.
+- **Breaking.** A single-policy solve under a non-`speed` objective now performs
+  a real multistart. It previously re-seeded its policy at the configuration it
+  had just converged to, which converged again immediately for zero work and
+  tripped the budget guard: one start dressed as a multistart. Measured on a
+  six-joint fixture with a three-thousand-unit budget, the old path spent five
+  units; the new one spends the budget it was given and returns a better-ranked
+  configuration. Callers who relied on the old early return will see such a
+  solve consume its stated budget.
 - **Breaking.** `abort()` is now terminal for the solve it interrupts. The runner
   previously assigned itself `running` immediately after aborting its policies,
   so `status()` reported `running` and the caller's instruction left no trace on

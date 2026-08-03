@@ -65,11 +65,11 @@ def test_ik_config_kwargs_override() -> None:
     cfg = cartan.IkConfig(
         position_tol=1e-7,
         halton_seed=99,
-        objective=cartan.IkObjective.min_distance,
+        objective=cartan.IkObjective.min_error_norm,
     )
     assert cfg.position_tol == pytest.approx(1e-7)
     assert cfg.halton_seed == 99
-    assert cfg.objective == cartan.IkObjective.min_distance
+    assert cfg.objective == cartan.IkObjective.min_error_norm
     # Other fields keep their defaults.
     assert cfg.max_iterations_per_attempt == 100
     assert cfg.orientation_tol == pytest.approx(1e-6)
@@ -95,15 +95,32 @@ def test_ik_config_repr_populated() -> None:
     assert "position_tol" in rep
 
 
+def test_ik_config_characteristic_length() -> None:
+    # Defaults to one in the chain's linear unit, which reproduces the
+    # unnormalized Jacobian measures exactly.
+    assert cartan.IkConfig().characteristic_length == pytest.approx(1.0)
+    cfg = cartan.IkConfig(characteristic_length=0.25)
+    assert cfg.characteristic_length == pytest.approx(0.25)
+    cfg.characteristic_length = 0.5
+    assert cfg.characteristic_length == pytest.approx(0.5)
+
+
 # ---------------------------------------------------------------------------
 # Enum surface: spot-check the four bound enums are accessible and distinct.
 # ---------------------------------------------------------------------------
 
 
 def test_ik_objective_enum_values() -> None:
-    for name in ("speed", "min_distance", "max_manipulability", "max_isotropy"):
+    for name in (
+        "speed",
+        "min_error_norm",
+        "min_joint_distance",
+        "max_manipulability",
+        "max_isotropy",
+    ):
         assert hasattr(cartan.IkObjective, name), f"IkObjective missing variant {name}"
-    assert cartan.IkObjective.speed != cartan.IkObjective.min_distance
+    assert not hasattr(cartan.IkObjective, "min_distance")
+    assert cartan.IkObjective.speed != cartan.IkObjective.min_error_norm
 
 
 def test_ik_failure_enum_values() -> None:
@@ -114,6 +131,7 @@ def test_ik_failure_enum_values() -> None:
         "iteration_limit",
         "joint_limit_violation",
         "aborted",
+        "unsupported_configuration",
     ):
         assert hasattr(cartan.IkFailure, name), f"IkFailure missing variant {name}"
 
@@ -332,3 +350,27 @@ def test_solve_ik_accepts_explicit_config(
     result = cartan.solve_ik(chain, target, q_seed, cfg)
     assert result.converged
     assert result.error_norm < TOL_ERROR_NORM
+
+
+def test_solve_ik_reports_the_selection_it_made(
+    cartanbot_chain: cartan.KinematicChain,
+) -> None:
+    chain = cartanbot_chain
+    rng = np.random.default_rng(seed=17)
+    q_truth = _random_q_within_limits(chain, rng)
+    target = cartan.forward_kinematics(chain, q_truth)
+    q_seed = q_truth + rng.uniform(-0.02, 0.02, size=chain.num_joints())
+
+    # The speed objective ranks nothing, so its metric is absent rather than a
+    # zero a caller could read as a measurement.
+    speed = cartan.solve_ik(chain, target, q_seed)
+    assert speed.converged
+    assert speed.selection_objective == cartan.IkObjective.speed
+    assert speed.selection_metric is None
+
+    cfg = cartan.IkConfig(objective=cartan.IkObjective.max_manipulability)
+    ranked = cartan.solve_ik(chain, target, q_seed, cfg)
+    assert ranked.converged
+    assert ranked.selection_objective == cartan.IkObjective.max_manipulability
+    assert ranked.selection_metric is not None
+    assert ranked.selection_metric > 0.0

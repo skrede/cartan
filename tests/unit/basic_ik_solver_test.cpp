@@ -267,10 +267,10 @@ TEST_CASE("IkSolver returns ik_error on unreachable target", "[ik][solver]")
 }
 
 // ============================================================================
-// IkSolver min_distance objective continues past first convergence
+// IkSolver min_error_norm objective continues past first convergence
 // ============================================================================
 
-TEST_CASE("IkSolver min_distance objective continues past first convergence", "[ik][solver]")
+TEST_CASE("IkSolver min_error_norm objective continues past first convergence", "[ik][solver]")
 {
     auto chain = make_ur5_like_chain();
 
@@ -285,7 +285,7 @@ TEST_CASE("IkSolver min_distance objective continues past first convergence", "[
     criteria.max_iterations_per_attempt = 200;
     criteria.max_total_work_units = 400;
 
-    spp::solver_options<double> opts{.objective = spp::ik_objective::min_distance};
+    spp::solver_options<double> opts{.objective = spp::ik_objective::min_error_norm};
     solver.setup(chain, target, q0, criteria, opts);
     auto result = solver.solve();
 

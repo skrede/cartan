@@ -17,10 +17,11 @@ TEST_CASE("IK types compile", "[ik][compile]")
     (void)s1; (void)s2; (void)s3; (void)s4; (void)s5; (void)s6;
 
     auto o1 = spp::ik_objective::speed;
-    auto o2 = spp::ik_objective::min_distance;
-    auto o3 = spp::ik_objective::max_manipulability;
-    auto o4 = spp::ik_objective::max_isotropy;
-    (void)o1; (void)o2; (void)o3; (void)o4;
+    auto o2 = spp::ik_objective::min_error_norm;
+    auto o3 = spp::ik_objective::min_joint_distance;
+    auto o4 = spp::ik_objective::max_manipulability;
+    auto o5 = spp::ik_objective::max_isotropy;
+    (void)o1; (void)o2; (void)o3; (void)o4; (void)o5;
 
     auto f1 = spp::ik_failure::unreachable;
     auto f2 = spp::ik_failure::diverged;

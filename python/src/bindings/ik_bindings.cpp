@@ -114,7 +114,8 @@ inline cartan::python::IkResult run_ik(const KC& chain,
     };
     cartan::solver_options<double> opts{
         cfg.objective,
-        cfg.halton_seed
+        cfg.halton_seed,
+        cfg.characteristic_length
     };
 
     Runner runner;
@@ -143,7 +144,8 @@ void register_ik(nb::module_& m)
     nb::enum_<cartan::ik_objective>(m, "IkObjective",
         "Secondary optimization objective for multi-policy IK racing.")
         .value("speed",              cartan::ik_objective::speed)
-        .value("min_distance",       cartan::ik_objective::min_distance)
+        .value("min_error_norm",     cartan::ik_objective::min_error_norm)
+        .value("min_joint_distance", cartan::ik_objective::min_joint_distance)
         .value("max_manipulability", cartan::ik_objective::max_manipulability)
         .value("max_isotropy",       cartan::ik_objective::max_isotropy);
 
@@ -180,7 +182,9 @@ void register_ik(nb::module_& m)
         .value("aborted",               cartan::ik_failure::aborted)
         .value("not_initialized",       cartan::ik_failure::not_initialized)
         .value("dimension_mismatch",    cartan::ik_failure::dimension_mismatch)
-        .value("non_finite_input",      cartan::ik_failure::non_finite_input);
+        .value("non_finite_input",      cartan::ik_failure::non_finite_input)
+        .value("unsupported_configuration",
+            cartan::ik_failure::unsupported_configuration);
 
     // ------------------------------------------------------------------
     // IkConfig (kw-only ctor; def_rw on each field)
@@ -196,7 +200,8 @@ void register_ik(nb::module_& m)
                double position_tol,
                double orientation_tol,
                cartan::ik_objective objective,
-               unsigned int halton_seed)
+               unsigned int halton_seed,
+               double characteristic_length)
             {
                 new (self) IkConfig{
                     max_iterations_per_attempt,
@@ -204,7 +209,8 @@ void register_ik(nb::module_& m)
                     position_tol,
                     orientation_tol,
                     objective,
-                    halton_seed
+                    halton_seed,
+                    characteristic_length
                 };
             },
             nb::kw_only(),
@@ -213,13 +219,15 @@ void register_ik(nb::module_& m)
             nb::arg("position_tol")               = 1e-6,
             nb::arg("orientation_tol")            = 1e-6,
             nb::arg("objective")                  = cartan::ik_objective::speed,
-            nb::arg("halton_seed")                = 42u)
+            nb::arg("halton_seed")                = 42u,
+            nb::arg("characteristic_length")      = 1.0)
         .def_rw("max_iterations_per_attempt", &IkConfig::max_iterations_per_attempt)
         .def_rw("max_total_work_units",       &IkConfig::max_total_work_units)
         .def_rw("position_tol",               &IkConfig::position_tol)
         .def_rw("orientation_tol",            &IkConfig::orientation_tol)
         .def_rw("objective",                  &IkConfig::objective)
         .def_rw("halton_seed",                &IkConfig::halton_seed)
+        .def_rw("characteristic_length",      &IkConfig::characteristic_length)
         .def("__repr__",
             [](const IkConfig& c) {
                 return "IkConfig(max_iterations_per_attempt=" + std::to_string(c.max_iterations_per_attempt)
@@ -244,7 +252,9 @@ void register_ik(nb::module_& m)
         "and condition_number / near_singular reflect the failure-state "
         "Jacobian. condition_number is 0.0 on the success path; cartan does "
         "not currently compute it on convergence to keep the hot path "
-        "Jacobian-SVD free.")
+        "Jacobian-SVD free. selection_metric is the value the winning candidate "
+        "was ranked on under selection_objective, and is None where the "
+        "objective ranks nothing.")
         .def_ro("q",                  &IkResult::q)
         .def_ro("converged",          &IkResult::converged)
         .def_ro("iterations",         &IkResult::iterations)
@@ -254,6 +264,8 @@ void register_ik(nb::module_& m)
         .def_ro("termination_reason", &IkResult::termination_reason)
         .def_ro("near_singular",      &IkResult::near_singular)
         .def_ro("condition_number",   &IkResult::condition_number)
+        .def_ro("selection_metric",   &IkResult::selection_metric)
+        .def_ro("selection_objective", &IkResult::selection_objective)
         .def("__repr__",
             [](const IkResult& r) {
                 return std::string("IkResult(converged=") + (r.converged ? "True" : "False")

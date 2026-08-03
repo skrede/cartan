@@ -20,6 +20,7 @@
 
 #include <string>
 #include <utility>
+#include <optional>
 
 namespace cartan::python
 {
@@ -35,6 +36,8 @@ struct IkResult
     cartan::ik_termination_reason termination_reason{cartan::ik_termination_reason::unknown};
     bool near_singular{false};
     double condition_number{0.0};
+    std::optional<double> selection_metric{};
+    cartan::ik_objective selection_objective{cartan::ik_objective::speed};
 };
 
 struct IkConfig
@@ -45,6 +48,7 @@ struct IkConfig
     double orientation_tol{1e-6};
     cartan::ik_objective objective{cartan::ik_objective::speed};
     unsigned int halton_seed{42};
+    double characteristic_length{1.0};
 };
 
 inline std::string ik_failure_to_string(cartan::ik_failure r)
@@ -60,6 +64,8 @@ inline std::string ik_failure_to_string(cartan::ik_failure r)
         case cartan::ik_failure::not_initialized:       return "not_initialized";
         case cartan::ik_failure::dimension_mismatch:    return "dimension_mismatch";
         case cartan::ik_failure::non_finite_input:      return "non_finite_input";
+        case cartan::ik_failure::unsupported_configuration:
+            return "unsupported_configuration";
     }
     return "unknown";
 }
@@ -77,6 +83,8 @@ inline IkResult to_ik_result(cartan::ik_result<double, N>&& ok)
     out.termination_reason = cartan::ik_termination_reason::converged;
     out.near_singular      = false;
     out.condition_number   = 0.0;
+    out.selection_metric   = ok.selection_metric;
+    out.selection_objective = ok.selection_objective;
     return out;
 }
 

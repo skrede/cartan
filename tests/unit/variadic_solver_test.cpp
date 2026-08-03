@@ -299,10 +299,10 @@ TEST_CASE("harder target benefits from racing", "[ik][variadic_solver]")
 }
 
 // ============================================================================
-// min_distance objective selects the lowest-error winner across policies
+// min_error_norm objective selects the lowest-residual winner across policies
 // ============================================================================
 
-TEST_CASE("min_distance objective picks the lowest-error solution", "[ik][variadic_solver]")
+TEST_CASE("min_error_norm objective picks the lowest-error solution", "[ik][variadic_solver]")
 {
     auto chain = make_ur5_like_chain();
 
@@ -317,14 +317,14 @@ TEST_CASE("min_distance objective picks the lowest-error solution", "[ik][variad
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria{1e-6, 1e-6, 200, 400};
-    spp::solver_options<double> opts{.objective = spp::ik_objective::min_distance};
+    spp::solver_options<double> opts{.objective = spp::ik_objective::min_error_norm};
     solver.setup(chain, target, q0, criteria, opts);
 
     auto result = solver.solve();
     REQUIRE(result.has_value());
 
-    // select_best_result(min_distance) returns the converged policy with the
-    // lowest error norm, which is exactly what error_norm() reports as best.
+    // The racing selection returns the converged policy with the lowest pose
+    // residual, which is exactly what error_norm() reports as best.
     REQUIRE(result->final_error_norm == solver.error_norm());
 
     auto fk_sol = spp::testing::fk_at(chain, result->solution.position);
@@ -378,8 +378,8 @@ TEST_CASE("single-policy max_manipulability converges to a valid pose", "[ik][va
     spp::basic_ik_runner<spp::lm<spp::kinematic_chain<double, 6>>> solver;
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
-    // Large total budget so the runner re-seeds after each convergence and the
-    // max_manipulability update keeps the higher-manipulability configuration.
+    // Large total budget so the runner re-seeds from the generator after each
+    // convergence and ranks the several configurations it reaches.
     spp::convergence_criteria<double> criteria{1e-6, 1e-6, 200, 3000};
     spp::solver_options<double> opts{.objective = spp::ik_objective::max_manipulability};
     solver.setup(chain, target, q0, criteria, opts);
@@ -420,10 +420,10 @@ TEST_CASE("single-policy max_isotropy converges to a valid pose", "[ik][variadic
 }
 
 // ============================================================================
-// multi-policy abort resets status to running and does not crash
+// multi-policy abort is terminal and reported and does not crash
 // ============================================================================
 
-TEST_CASE("multi-policy abort resets status to running", "[ik][variadic_solver]")
+TEST_CASE("multi-policy abort is terminal and reported", "[ik][variadic_solver]")
 {
     auto chain = make_ur5_like_chain();
 
@@ -472,7 +472,7 @@ TEST_CASE("multi-policy error_norm matches the winning result", "[ik][variadic_s
 
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
     spp::convergence_criteria<double> criteria{1e-6, 1e-6, 200, 400};
-    spp::solver_options<double> opts{.objective = spp::ik_objective::min_distance};
+    spp::solver_options<double> opts{.objective = spp::ik_objective::min_error_norm};
     solver.setup(chain, target, q0, criteria, opts);
 
     auto result = solver.solve();

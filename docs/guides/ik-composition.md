@@ -109,8 +109,11 @@ bound is seeded from a finite window of two full turns anchored to whichever
 side is finite, or centered on `q0` when neither is, so its seeds satisfy the
 chain's declared limits too. For the `speed` objective
 (the default), the first policy to converge wins and the runner stops the rest.
-For the other objectives (`min_distance`, `max_manipulability`,
-`max_isotropy`), all policies run to completion and the best is selected.
+For the other objectives (`min_error_norm`, `min_joint_distance`,
+`max_manipulability`, `max_isotropy`), all policies run to completion and the
+best is selected, on one definition of the objective's metric shared with the
+single-policy path. The winning candidate's metric is reported on the result
+together with the objective it was computed under.
 
 This cooperative model is the key differentiator versus TRAC-IK: **all policies
 run in the calling thread**, ticked round-robin, with no thread spawning or

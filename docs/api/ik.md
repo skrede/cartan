@@ -336,7 +336,8 @@ enum class ik_status
     aborted,
     not_initialized,
     dimension_mismatch,
-    non_finite_input
+    non_finite_input,
+    unsupported_configuration
 };
 
 constexpr const char* message(ik_status status);
@@ -344,14 +345,15 @@ constexpr const char* message(ik_status status);
 
 Stepper-level control flow signal returned by `step()` calls.
 
-The last three are terminal before any iteration runs. Every solve policy starts
+The last four are terminal before any iteration runs. Every solve policy starts
 in `not_initialized`, so stepping one that was never set up performs no iteration
 and consumes no work units instead of reading a default-constructed joint
 vector, and every policy's work loop refuses to run from a latched terminal
 status.
 
 `setup()` returns `void`, so it reports a rejected seed or target by latching
-`dimension_mismatch` or `non_finite_input`. Every solve policy validates its
+`dimension_mismatch` or `non_finite_input`, and `basic_ik_runner` reports a
+selection it cannot rank by latching `unsupported_configuration`. Every solve policy validates its
 arguments this way, as do `basic_ik_runner`, `restart_wrapper` and
 `exhaustive_ik_runner`; the policies that require the optional numeric backend
 are no exception, so a solve driven straight through one of them, rather than
@@ -402,7 +404,8 @@ propagates the reported value into `ik_error::termination_reason`.
 enum class ik_objective
 {
     speed,
-    min_distance,
+    min_error_norm,
+    min_joint_distance,
     max_manipulability,
     max_isotropy
 };
@@ -410,8 +413,22 @@ enum class ik_objective
 
 Controls multi-policy racing selection. `speed` stops at the first
 converging policy; the other objectives keep all policies running and
-select the best converged result by min error norm, max manipulability
+select the best converged result by min error norm, min joint-space
+displacement from the seed configuration, max manipulability
 (`product of singular values`), or max isotropy (`sigma_min / sigma_max`).
+
+Each objective has one definition, read by both the single-policy and the
+racing selection paths. The two Jacobian measures divide the body Jacobian's
+linear rows by `solver_options::characteristic_length` before the
+decomposition, so the singular values are commensurable; both are undefined on
+a chain with no joints, and `setup()` refuses that combination rather than
+ranking on a fabricated value. `min_joint_distance` measures a Euclidean
+displacement, so it is refused on a chain mixing revolute and prismatic joints,
+where the components carry different units.
+
+The winning candidate's metric is reported on `ik_result::selection_metric`
+together with the objective it was computed under. Under `speed` nothing is
+ranked and the metric is absent.
 
 ### ik_failure
 
@@ -427,16 +444,18 @@ enum class ik_failure
     aborted,
     not_initialized,
     dimension_mismatch,
-    non_finite_input
+    non_finite_input,
+    unsupported_configuration
 };
 
 constexpr const char* message(ik_failure failure);
 ```
 
-Failure reason reported in `ik_error`. The last three name a solve that was
+Failure reason reported in `ik_error`. The last four name a solve that was
 refused before it ran: `solve()` without a preceding `setup()`, a seed whose
-length differs from the chain's joint count, and a seed or target holding a NaN
-or an infinity.
+length differs from the chain's joint count, a seed or target holding a NaN or
+an infinity, and a selection objective the chain or the characteristic length
+leaves undefined.
 
 `message()` returns a static diagnostic string; it allocates nothing.
 
@@ -481,13 +500,20 @@ struct solver_options
 {
     ik_objective objective{ik_objective::speed};
     unsigned int halton_seed{42};
+    Scalar characteristic_length{1};
 };
 ```
 
-Controls multi-policy racing behavior: the racing objective and the
-Halton seed offset for reproducible secondary-policy seeding. The total
-work budget lives on `convergence_criteria::max_total_work_units` and
-bounds the racing loop as well.
+Controls multi-policy racing behavior: the racing objective, the Halton seed
+offset for reproducible secondary-policy seeding, and the characteristic length
+the two Jacobian objectives normalize by. The total work budget lives on
+`convergence_criteria::max_total_work_units` and bounds the racing loop as well.
+
+`characteristic_length` is in the chain's linear unit and applies to the
+selection objectives alone; it is not a library-wide scale. Its default of one
+reproduces the unnormalized arithmetic exactly, so it states the unit scale
+those measures always assumed rather than changing any ranking. A zero,
+negative or non-finite value is refused at `setup()`.
 
 ### ik_result
 
@@ -500,11 +526,15 @@ struct ik_result
     Scalar final_error_norm{};
     int iterations{};
     int solver_index{};
+    std::optional<Scalar> selection_metric{};
+    ik_objective selection_objective{ik_objective::speed};
 };
 ```
 
 Successful IK outcome. `solver_index` identifies which policy produced
-the solution in multi-policy racing.
+the solution in multi-policy racing. `selection_metric` is the value that
+candidate was ranked on under `selection_objective`, and is absent where the
+objective ranks nothing.
 
 ### ik_error
 
