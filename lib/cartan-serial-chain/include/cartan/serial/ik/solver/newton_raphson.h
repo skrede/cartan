@@ -106,7 +106,6 @@ public:
         m_criteria = criteria;
         m_weight = weight;
         m_iterations = 0;
-        m_stall_count = 0;
         m_status = ik_status::running;
         m_error_history.clear();
 
@@ -173,19 +172,19 @@ public:
 
             position_type dq = -H.ldlt().solve(grad);
 
-            scalar_type directional_derivative = grad.dot(dq);
             scalar_type alpha = scalar_type(1);
             bool step_accepted = false;
-            position_type q_trial = m_q;
 
             for (int ls = 0; ls < m_options.max_line_search_steps; ++ls)
             {
-                q_trial = (m_q + alpha * dq).cwiseMax(m_lower).cwiseMin(m_upper);
-
+                position_type q_trial = (m_q + alpha * dq).cwiseMax(m_lower).cwiseMin(m_upper);
                 auto trial = ObjectivePolicy::evaluate(chain, m_target, q_trial, m_weight);
-                scalar_type f_trial = trial.objective;
 
-                if (f_trial <= f_current + m_options.line_search_c * alpha * directional_derivative)
+                // Projected-arc Armijo condition (Bertsekas, SIAM J. Control Optim. 20(2), 1982;
+                // Nocedal & Wright section 16.7): the projected displacement already carries the
+                // step length, and a projected arc need not descend, so every trial can be rejected.
+                scalar_type projected_decrease = grad.dot(q_trial - m_q);
+                if (trial.objective <= f_current + m_options.line_search_c * projected_decrease)
                 {
                     m_q = q_trial;
                     m_error_norm = trial.body_error.norm();
@@ -198,9 +197,9 @@ public:
 
             if (!step_accepted)
             {
-                m_q = q_trial;
-                m_error_norm = ObjectivePolicy::evaluate(chain, m_target, m_q, m_weight)
-                    .body_error.norm();
+                m_error_norm = body_error.norm();
+                m_status = ik_status::stalled;
+                break;
             }
 
             auto stall_result = cartan::detail::check_stall_divergence(
@@ -237,7 +236,6 @@ private:
     scalar_type m_initial_error{std::numeric_limits<scalar_type>::max()};
     scalar_type m_error_norm{std::numeric_limits<scalar_type>::max()};
     int m_iterations{};
-    int m_stall_count{};
     int m_setup_joints{-1};
     ik_status m_status{ik_status::not_initialized};
 };
