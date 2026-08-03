@@ -267,41 +267,6 @@ TEST_CASE("projected_lm dogleg converges", "[ik][projected_lm]")
 }
 
 // ============================================================================
-// Error weight affects convergence
-// ============================================================================
-
-TEST_CASE("projected_lm with error weight", "[ik][projected_lm]")
-{
-    auto chain = make_ur5_like_chain();
-
-    Eigen::Vector<double, 6> q_known;
-    q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
-
-    auto fk_target = spp::testing::fk_at(chain, q_known);
-    auto target = fk_target.end_effector;
-
-    // Weight emphasizing position (linear part) over orientation
-    spp::error_weight<double> weight;
-    weight.weights << 1.0, 1.0, 1.0, 100.0, 100.0, 100.0;
-
-    spp::projected_lm<spp::kinematic_chain<double, 6>> stepper;
-    Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
-    spp::convergence_criteria<double> criteria;
-    criteria.max_iterations_per_attempt = 200;
-    criteria.max_total_work_units = 400;
-
-    stepper.setup(chain, target, q0, criteria, weight);
-    auto status = run_stepper(stepper, chain, 200);
-
-    REQUIRE(status == spp::ik_status::converged);
-
-    auto fk_sol = spp::testing::fk_at(chain, stepper.solution());
-    auto err = (fk_sol.end_effector.inverse() * target).log();
-    REQUIRE(err.head<3>().norm() < 1e-6);
-    REQUIRE(err.tail<3>().norm() < 1e-6);
-}
-
-// ============================================================================
 // Stall detection
 // ============================================================================
 

@@ -311,10 +311,12 @@ private:
         auto fk = forward_kinematics_unchecked(chain, m_q);
         m_V_b = (fk.end_effector.inverse() * m_target).log();
         m_error_norm = m_V_b.norm();
-        m_initial_error = m_error_norm;
+        m_weighted_error_norm = m_weight.apply(m_V_b).norm();
+        m_initial_error = m_weighted_error_norm;
 
         auto J_b = body_jacobian_unchecked(chain, fk);
-        auto JtJ = (J_b.transpose() * J_b).eval();
+        auto J_w = weighted_jacobian(J_b);
+        auto JtJ = (J_w.transpose() * J_w).eval();
         scalar_type max_diag{0};
         for (int i = 0; i < n; ++i)
         {
@@ -343,20 +345,23 @@ private:
         }
 
         auto J_b = body_jacobian_unchecked(chain, fk);
-        int n = static_cast<int>(J_b.cols());
-        auto H = (J_b.transpose() * J_b).eval();
-        auto g = (J_b.transpose() * m_V_b).eval();
+        auto J_w = weighted_jacobian(J_b);
+        auto e_w = m_weight.apply(m_V_b);
+        int n = static_cast<int>(J_w.cols());
+        auto H = (J_w.transpose() * J_w).eval();
+        auto g = (J_w.transpose() * e_w).eval();
 
         auto free_indices = identify_active_set(g, n);
-        position_type dq = solve_projected_system(J_b, H, g, free_indices, n);
+        position_type dq = solve_projected_system(J_w, H, g, free_indices, n);
 
         auto [q_trial, V_b_trial, rho] = evaluate_trial_step(chain, dq, H, g);
 
         update_damping(rho, dq, q_trial, V_b_trial);
 
         m_error_norm = m_V_b.norm();
+        m_weighted_error_norm = m_weight.apply(m_V_b).norm();
         auto stall_result = cartan::detail::check_stall_divergence(
-            m_error_history, m_error_norm, m_initial_error,
+            m_error_history, m_weighted_error_norm, m_initial_error,
             m_options.stall_window, m_options.stall_threshold,
             m_options.divergence_factor);
         if (stall_result != ik_status::running)
@@ -367,6 +372,17 @@ private:
 
         cartan::detail::enforce_limits<LimitsPolicy>(m_q, chain);
         return m_status;
+    }
+
+    // Scaling the Jacobian's rows up front, rather than placing a diagonal
+    // between the transpose and its operand, keeps the normal-equation products
+    // in the same two-factor expression shape Eigen sees today. At a unit weight
+    // the scaling is an exact multiply by one, so the trajectory is unchanged to
+    // the last mantissa bit.
+    jacobian_matrix<scalar_type, joints> weighted_jacobian(
+        const jacobian_matrix<scalar_type, joints>& J_b) const
+    {
+        return m_weight.weights.asDiagonal() * J_b;
     }
 
     ik_status check_convergence_and_limits(const Chain& chain)
@@ -430,7 +446,7 @@ private:
 
     template <typename JacobianType, typename HessianType, typename GradientType>
     position_type solve_projected_system(
-        const JacobianType& J_b,
+        const JacobianType& J_w,
         const HessianType& H,
         const GradientType& g,
         const active_set& free_indices,
@@ -466,7 +482,7 @@ private:
         free_vec dq_free;
         if (m_options.use_dogleg)
         {
-            dq_free = dogleg_step(J_b, H_free, g_free, free_indices, n_free);
+            dq_free = dogleg_step(J_w, H_free, g_free, free_indices, n_free);
         }
         else
         {
@@ -504,8 +520,8 @@ private:
         auto fk_trial = forward_kinematics_unchecked(chain, q_trial);
         auto V_b_trial = (fk_trial.end_effector.inverse() * m_target).log();
 
-        scalar_type error_old_sq = m_V_b.squaredNorm();
-        scalar_type error_new_sq = V_b_trial.squaredNorm();
+        scalar_type error_old_sq = m_weight.apply(m_V_b).squaredNorm();
+        scalar_type error_new_sq = m_weight.apply(V_b_trial).squaredNorm();
         scalar_type actual_reduction = scalar_type(0.5) * (error_old_sq - error_new_sq);
 
         scalar_type predicted_reduction;
@@ -572,7 +588,7 @@ private:
 
     template <typename JacobianType>
     free_vec dogleg_step(
-        const JacobianType& J_b,
+        const JacobianType& J_w,
         const free_mat& H_free,
         const free_vec& g_free,
         const active_set& free_indices,
@@ -580,14 +596,14 @@ private:
     {
         free_vec delta_sd = g_free;
 
-        free_jac J_b_free(6, n_free);
+        free_jac J_w_free(6, n_free);
         for (int i = 0; i < n_free; ++i)
         {
-            J_b_free.col(i) = J_b.col(free_indices[i]);
+            J_w_free.col(i) = J_w.col(free_indices[i]);
         }
 
         scalar_type g_sq = g_free.squaredNorm();
-        auto Jg = (J_b_free * g_free).eval();
+        auto Jg = (J_w_free * g_free).eval();
         scalar_type Jg_sq = Jg.squaredNorm();
         scalar_type t = (Jg_sq > std::numeric_limits<scalar_type>::epsilon())
             ? g_sq / Jg_sq
@@ -656,7 +672,11 @@ private:
     std::optional<halton_seed_generator<Chain>> m_seed_gen{};
     cartan::detail::error_ring<scalar_type> m_error_history;
     scalar_type m_initial_error{};
+    // The reported norm keeps its unweighted meaning for the public accessor and
+    // the best-so-far ranking; the weighted one is what the step minimizes, so it
+    // is the quantity the stall and divergence detector watches.
     scalar_type m_error_norm{};
+    scalar_type m_weighted_error_norm{};
     scalar_type m_lambda{};
     scalar_type m_nu{scalar_type(2)};
     scalar_type m_delta{scalar_type(1)};

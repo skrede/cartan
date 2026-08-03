@@ -42,6 +42,7 @@ cartan_add_test(ik_compile_test ik_compile_test.cpp)
 cartan_add_test(dls_test dls_test.cpp)
 cartan_add_test(lm_test lm_test.cpp)
 cartan_add_test(projected_lm_test projected_lm_test.cpp)
+cartan_add_test(projected_lm_metric_test projected_lm_metric_test.cpp)
 cartan_add_test(projected_lm_bit_identity_test projected_lm_bit_identity_test.cpp)
 target_compile_definitions(projected_lm_bit_identity_test
     PRIVATE CARTAN_PLM_GOLDEN_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
