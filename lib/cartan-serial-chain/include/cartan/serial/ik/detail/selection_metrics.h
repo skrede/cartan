@@ -9,10 +9,7 @@
 
 #include "cartan/serial/ik/ik_status.h"
 
-#include "cartan/serial/fk/jacobian.h"
-#include "cartan/serial/fk/forward_kinematics.h"
-
-#include <Eigen/SVD>
+#include "cartan/serial/fk/singularity_analysis.h"
 
 #include <cmath>
 #include <optional>
@@ -74,24 +71,13 @@ std::optional<ik_status> selection_admissibility(
     return std::nullopt;
 }
 
-/// Singular values of the body Jacobian whose linear rows -- the last three, in
-/// the omega-first convention -- are divided by a characteristic length, so they
-/// are commensurable with the dimensionless angular rows above them. Yoshikawa
-/// normalizes by a characteristic length for that reason; without it the product
-/// below has no coherent unit and the ratio compares incommensurables.
+/// The Jacobian measure an objective ranks a candidate on, absent where that
+/// measure is undefined.
 ///
-/// Yoshikawa, Manipulability of Robotic Mechanisms, International Journal of
-/// Robotics Research 4(2), 1985 -- the product of the singular values.
-/// Salisbury & Craig, Articulated Hands: Force Control and Kinematic Issues,
-/// International Journal of Robotics Research 1(1), 1982 -- the inverse
-/// condition number.
-///
-/// Both are undefined, rather than one or zero, where the decomposition has no
-/// singular values: the product over an empty set is one, which would report a
-/// chain with no joints as maximally manipulable. The guard precedes the
-/// decomposition because constructing it over an empty matrix is itself the
-/// fault -- Eigen's preconditioner resizes a fixed-size vector to zero, which
-/// trips an assertion in a checked build and faults in one without.
+/// The measures, the characteristic-length normalization they are read through
+/// and the empty-spectrum guard all live once, in fk/singularity_analysis.h, so
+/// a caller analyzing a configuration and the selection ranking it cannot drift
+/// apart.
 template <typename Chain, typename Vector>
 std::optional<typename Chain::scalar_type> jacobian_metric(
     ik_objective objective,
@@ -99,37 +85,10 @@ std::optional<typename Chain::scalar_type> jacobian_metric(
     const Vector& q,
     typename Chain::scalar_type length)
 {
-    using scalar = typename Chain::scalar_type;
-
-    if (chain.num_joints() == 0)
-    {
-        return std::nullopt;
-    }
-
-    auto J = body_jacobian_unchecked(chain, forward_kinematics_unchecked(chain, q));
-    J.template bottomRows<3>() /= length;
-
-    constexpr unsigned int svd_opts = (Chain::joints == dynamic)
-        ? (Eigen::ComputeThinU | Eigen::ComputeThinV)
-        : (Eigen::ComputeFullU | Eigen::ComputeFullV);
-    Eigen::JacobiSVD<jacobian_matrix<scalar, Chain::joints>> svd(J, svd_opts);
-    const auto& sigma = svd.singularValues();
-
-    if (objective == ik_objective::max_manipulability)
-    {
-        scalar product{1};
-        for (int i = 0; i < static_cast<int>(sigma.size()); ++i)
-        {
-            product *= sigma(i);
-        }
-        return product;
-    }
-
-    if (!(sigma(0) > scalar(0)))
-    {
-        return std::nullopt;
-    }
-    return sigma(sigma.size() - 1) / sigma(0);
+    auto sigma = singular_values(chain, q, length);
+    return objective == ik_objective::max_manipulability
+        ? manipulability(sigma)
+        : isotropy(sigma);
 }
 
 /// The metric a candidate is ranked on, absent where the objective defines

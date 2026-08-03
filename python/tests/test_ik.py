@@ -200,9 +200,12 @@ def test_solve_ik_trio_converges_on_fk_walked_target(
     # On success the populated termination_reason is the converged variant.
     assert result.termination_reason == cartan.IkTerminationReason.converged
     assert result.failure_reason == ""
-    # C-06: condition_number is 0.0 on the success path.
-    assert result.condition_number == 0.0
-    assert result.near_singular is False
+    # The two fabricated diagnostics are gone from the result rather than
+    # reporting a zero condition number and a definite negative on a solve that
+    # measured neither. Conditioning is asked of the configuration instead.
+    assert not hasattr(result, "condition_number")
+    assert not hasattr(result, "near_singular")
+    assert result.solved_feasible_set == cartan.FeasibleSet.declared
 
 
 @pytest.mark.parametrize(
@@ -374,3 +377,44 @@ def test_solve_ik_reports_the_selection_it_made(
     assert ranked.selection_objective == cartan.IkObjective.max_manipulability
     assert ranked.selection_metric is not None
     assert ranked.selection_metric > 0.0
+
+
+def test_singularity_analysis_reads_one_spectrum(
+    cartanbot_chain: cartan.KinematicChain,
+) -> None:
+    chain = cartanbot_chain
+    rng = np.random.default_rng(seed=23)
+    q = _random_q_within_limits(chain, rng)
+
+    sigma = cartan.singular_values(chain, q)
+    assert sigma.shape == (min(6, chain.num_joints()),)
+    assert np.all(np.diff(sigma) <= 0.0), "singular values are largest first"
+
+    kappa = cartan.condition_number(sigma)
+    assert kappa is not None
+    assert kappa == pytest.approx(sigma[0] / sigma[-1])
+    assert cartan.manipulability(sigma) == pytest.approx(float(np.prod(sigma)))
+    assert cartan.isotropy(sigma) == pytest.approx(1.0 / kappa)
+
+    # The threshold is the caller's, and it is in the signature rather than
+    # baked into a stored flag, so the same configuration answers both ways.
+    assert cartan.is_near_singular(sigma, kappa * 0.5) is True
+    assert cartan.is_near_singular(sigma, kappa * 2.0) is False
+    assert cartan.is_near_singular(chain, q, kappa * 0.5) is True
+
+
+def test_singularity_analysis_is_absent_rather_than_false_without_a_spectrum() -> None:
+    empty = np.zeros(0, dtype=np.float64)
+
+    # None is falsy, so a truth test conflates "no answer" with "not near a
+    # singularity". Each of these must be checked against None, not for truth.
+    assert cartan.condition_number(empty) is None
+    assert cartan.manipulability(empty) is None
+    assert cartan.isotropy(empty) is None
+    assert cartan.is_near_singular(empty) is None
+
+
+def test_feasible_set_enum_values() -> None:
+    for name in ("declared", "substituted"):
+        assert hasattr(cartan.FeasibleSet, name), f"FeasibleSet missing variant {name}"
+    assert cartan.FeasibleSet.declared != cartan.FeasibleSet.substituted

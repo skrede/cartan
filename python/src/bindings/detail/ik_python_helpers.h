@@ -8,10 +8,7 @@
 /// convergence_criteria + solver_options pair before driving a runner.
 ///
 /// The to_ik_result / to_ik_result_from_error helpers unwrap a
-/// cartan::expected<ik_result, ik_error> into IkResult. The success branch
-/// leaves condition_number = 0.0 because the runner does not compute the
-/// Jacobian SVD on convergence (a Jacobian condition number is only
-/// populated on the failure path).
+/// cartan::expected<ik_result, ik_error> into IkResult.
 
 #include "cartan/serial/ik/ik_status.h"
 #include "cartan/serial/ik/ik_result.h"
@@ -34,10 +31,9 @@ struct IkResult
     std::string failure_reason;
     int solver_index{0};
     cartan::ik_termination_reason termination_reason{cartan::ik_termination_reason::unknown};
-    bool near_singular{false};
-    double condition_number{0.0};
     std::optional<double> selection_metric{};
     cartan::ik_objective selection_objective{cartan::ik_objective::speed};
+    cartan::feasible_set solved_feasible_set{cartan::feasible_set::declared};
 };
 
 struct IkConfig
@@ -81,10 +77,9 @@ inline IkResult to_ik_result(cartan::ik_result<double, N>&& ok)
     out.failure_reason     = "";
     out.solver_index       = ok.solver_index;
     out.termination_reason = cartan::ik_termination_reason::converged;
-    out.near_singular      = false;
-    out.condition_number   = 0.0;
     out.selection_metric   = ok.selection_metric;
     out.selection_objective = ok.selection_objective;
+    out.solved_feasible_set = ok.solved_feasible_set;
     return out;
 }
 
@@ -99,8 +94,6 @@ inline IkResult to_ik_result_from_error(cartan::ik_error<double, N>&& err, int i
     out.failure_reason     = ik_failure_to_string(err.reason);
     out.solver_index       = -1;
     out.termination_reason = err.termination_reason;
-    out.near_singular      = err.near_singular;
-    out.condition_number   = err.condition_number;
     return out;
 }
 

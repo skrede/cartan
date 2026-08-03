@@ -149,6 +149,15 @@ void register_ik(nb::module_& m)
         .value("max_manipulability", cartan::ik_objective::max_manipulability)
         .value("max_isotropy",       cartan::ik_objective::max_isotropy);
 
+    nb::enum_<cartan::feasible_set>(m, "FeasibleSet",
+        "Which joint bounds a policy solved over. A backend that cannot accept "
+        "an infinite coordinate receives a finite interval substituted for the "
+        "non-finite one, so on a chain with an unbounded joint it solves a "
+        "different problem from one that box-projects against the declared "
+        "bounds.")
+        .value("declared",    cartan::feasible_set::declared)
+        .value("substituted", cartan::feasible_set::substituted);
+
     nb::enum_<cartan::ik_termination_reason>(m, "IkTerminationReason",
         "Fine-grained terminator reported by individual IK policies. "
         "Distinguishes the inner solver's terminator (solver_*) from the "
@@ -247,14 +256,15 @@ void register_ik(nb::module_& m)
         "q field holds the converged joint vector, error_norm the final task "
         "error magnitude, iterations the total work units charged, and "
         "termination_reason carries the policy's fine-grained terminator. "
-        "On .converged == False the q field holds the best-seen position, "
-        "failure_reason names the coarse category (mirror of cartan::ik_failure), "
-        "and condition_number / near_singular reflect the failure-state "
-        "Jacobian. condition_number is 0.0 on the success path; cartan does "
-        "not currently compute it on convergence to keep the hot path "
-        "Jacobian-SVD free. selection_metric is the value the winning candidate "
-        "was ranked on under selection_objective, and is None where the "
-        "objective ranks nothing.")
+        "On .converged == False the q field holds the best-seen position and "
+        "failure_reason names the coarse category (mirror of cartan::ik_failure). "
+        "selection_metric is the value the winning candidate was ranked on under "
+        "selection_objective, and is None where the objective ranks nothing. "
+        "solved_feasible_set reports whether the winning policy solved over the "
+        "chain's declared joint bounds or over a finite interval substituted for "
+        "a non-finite one. For the conditioning of the Jacobian at any "
+        "configuration, including a failed solve's .q, use singular_values, "
+        "condition_number, manipulability, isotropy or is_near_singular.")
         .def_ro("q",                  &IkResult::q)
         .def_ro("converged",          &IkResult::converged)
         .def_ro("iterations",         &IkResult::iterations)
@@ -262,19 +272,16 @@ void register_ik(nb::module_& m)
         .def_ro("failure_reason",     &IkResult::failure_reason)
         .def_ro("solver_index",       &IkResult::solver_index)
         .def_ro("termination_reason", &IkResult::termination_reason)
-        .def_ro("near_singular",      &IkResult::near_singular)
-        .def_ro("condition_number",   &IkResult::condition_number)
         .def_ro("selection_metric",   &IkResult::selection_metric)
         .def_ro("selection_objective", &IkResult::selection_objective)
+        .def_ro("solved_feasible_set", &IkResult::solved_feasible_set)
         .def("__repr__",
             [](const IkResult& r) {
                 return std::string("IkResult(converged=") + (r.converged ? "True" : "False")
                      + ", iterations=" + std::to_string(r.iterations)
                      + ", error_norm=" + format_double(r.error_norm)
                      + ", solver_index=" + std::to_string(r.solver_index)
-                     + ", failure_reason='" + r.failure_reason + "'"
-                     + ", near_singular=" + (r.near_singular ? "True" : "False")
-                     + ", condition_number=" + format_double(r.condition_number) + ")";
+                     + ", failure_reason='" + r.failure_reason + "')";
             });
 
     // ------------------------------------------------------------------

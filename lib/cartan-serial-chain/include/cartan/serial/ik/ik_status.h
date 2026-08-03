@@ -14,11 +14,11 @@ namespace cartan
 /// Status returned by each IK stepper step() call.
 /// Stepper is running until it converges, hits a limit, or fails.
 ///
-/// The last three are terminal before any iteration runs. A solver starts in
-/// `not_initialized` so a caller that never calls setup() cannot enter the work
-/// loop with a default-constructed joint vector, and setup() latches one of the
-/// other two when its precondition fails, because every setup() returns void
-/// and has no other way to report.
+/// The values from `not_initialized` onward are terminal before any iteration
+/// runs. A solver starts in `not_initialized` so a caller that never calls
+/// setup() cannot enter the work loop with a default-constructed joint vector,
+/// and setup() latches one of the others when its precondition fails, because
+/// every setup() returns void and has no other way to report.
 enum class ik_status
 {
     running,
@@ -31,7 +31,8 @@ enum class ik_status
     not_initialized,
     dimension_mismatch,
     non_finite_input,
-    unsupported_configuration
+    unsupported_configuration,
+    unreachable
 };
 
 /// Human-readable diagnostic for an ik_status, for logging and binding
@@ -62,9 +63,25 @@ constexpr const char* message(ik_status status)
         return "Seed joint vector or target pose contains a NaN or infinite component";
     case ik_status::unsupported_configuration:
         return "Selection objective is not defined for this chain or characteristic length";
+    case ik_status::unreachable:
+        return "Target lies outside the reachable workspace";
     }
     return "Unknown ik_status";
 }
+
+/// Which set of joint bounds a policy actually solved over.
+///
+/// A backend that cannot accept an infinite coordinate is handed a finite
+/// interval substituted for the non-finite one, so on a chain carrying an
+/// unbounded joint it solves a different problem from a policy that box-projects
+/// against the declared bounds. Racing the two is legitimate and the split is
+/// deliberate; reporting which one produced the answer is what keeps it from
+/// being silent.
+enum class feasible_set
+{
+    declared,
+    substituted
+};
 
 /// Objective for the IK solve -- controls secondary optimization.
 ///

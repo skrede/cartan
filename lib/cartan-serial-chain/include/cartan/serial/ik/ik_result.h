@@ -22,6 +22,9 @@ namespace cartan
 /// `selection_metric` is the value the winning candidate was ranked on, under
 /// `selection_objective`. It is absent where the objective ranks nothing, which
 /// is the `speed` case, so an unranked win reads as absent rather than as zero.
+///
+/// `solved_feasible_set` is the bounds the winning policy actually solved over,
+/// which is not always the chain's declared bounds.
 template <typename Scalar = double, int N = dynamic>
 struct ik_result
 {
@@ -33,12 +36,18 @@ struct ik_result
     int solver_index{};
     std::optional<Scalar> selection_metric{};
     ik_objective selection_objective{ik_objective::speed};
+    feasible_set solved_feasible_set{feasible_set::declared};
 };
 
-/// IK error containing failure diagnostics. Every payload field defaults to a
-/// NaN poison so an unpopulated diagnostic surfaces as an obvious failure rather
-/// than a plausible value (a zero last_q reads as the home pose; a zero
+/// IK error containing failure diagnostics. Every numeric payload field defaults
+/// to a NaN poison so an unpopulated diagnostic surfaces as an obvious failure
+/// rather than a plausible value (a zero last_q reads as the home pose; a zero
 /// last_error_norm reads as "converged").
+///
+/// The conditioning of the Jacobian at the failing iterate is not carried here.
+/// It is computed from last_q through fk/singularity_analysis.h, which answers
+/// the same question at any configuration rather than only at the one a solve
+/// happened to fail at.
 template <typename Scalar = double, int N = dynamic>
 struct ik_error
 {
@@ -48,8 +57,6 @@ struct ik_error
     ik_termination_reason termination_reason{ik_termination_reason::unknown};
     typename joint_state<Scalar, N>::position_type last_q{detail::poison_joint_position<Scalar, N>()};
     Scalar last_error_norm{std::numeric_limits<Scalar>::quiet_NaN()};
-    Scalar condition_number{std::numeric_limits<Scalar>::quiet_NaN()};
-    bool near_singular{};
 };
 
 }

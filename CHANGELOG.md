@@ -8,6 +8,35 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 ## [Unreleased]
 
 ### Added
+- `cartan/serial/fk/singularity_analysis.h`: `singular_values`, `condition_number`,
+  `manipulability`, `isotropy` and `is_near_singular` as free functions over a
+  body Jacobian, bound to Python under the same names. They live in the
+  kinematics module rather than the IK one because they need only a Jacobian, so
+  singularity analysis and manipulability-ellipsoid plotting along a trajectory
+  do not pull in the solver stack. Ask for the spectrum once and read every
+  measure off it; there is deliberately no per-measure `(chain, q)` form, which
+  would hide four decompositions behind four one-line calls. Each measure is
+  absent rather than zero on an empty spectrum, and `is_near_singular` takes its
+  threshold as an argument with a documented default of `1e3`, because how close
+  is too close is a property of the robot and the task. The selection objectives
+  read these same definitions, so a caller analyzing a configuration and the
+  racing selection ranking it cannot drift apart.
+- `cartan::feasible_set` and `ik_result::solved_feasible_set` (Python:
+  `cartan.FeasibleSet` and `IkResult.solved_feasible_set`). A backend that cannot
+  accept an infinite coordinate -- the active-set QP behind `nw_sqp`,
+  `filter_nw_sqp` and `augmented_lagrangian` -- receives a finite interval
+  substituted for a non-finite joint bound, so on a chain with an unbounded joint
+  it solves a different problem from a policy that box-projects. Racing the two
+  is legitimate and unchanged; the result now says which one produced the answer
+  instead of leaving the split silent. A fully bounded chain reports `declared`
+  for every policy.
+- `ik_status::unreachable`, latched at `setup()` for a chain with no joints whose
+  target is away from the single pose it can hold. `ik_failure::unreachable` was
+  declared and carried a message but was emitted nowhere on the iterative path,
+  which was correct: an iterative solver cannot certify infeasibility from a
+  failed search. A chain with no joints is the one case where it can, because its
+  workspace is one point. Such a target previously reported `diverged`, which
+  claims a search went wrong rather than that no solution exists.
 - `cartan::lie_failure::non_finite_input`, reported by `so2`/`so3`/`se2`/`se3`
   `from_matrix`, `so3::from_quaternion`, the frame-tagged `rotation`/`transform`
   wrappers and `screw_axis::from_vector` when an input component is NaN or
@@ -16,6 +45,32 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   comparison that is false for a NaN.
 
 ### Changed
+- **Breaking.** `ik_error::condition_number` and `ik_error::near_singular` are
+  removed, along with `IkResult.condition_number` and `IkResult.near_singular` in
+  Python and both fields in the result's `__repr__`. Neither was ever measured:
+  no policy, wrapper or runner path wrote a computed value into either one. The
+  error builder opened by writing a literal zero over the condition number's NaN
+  poison and a literal `false` into the flag, and the Python helper wrote the
+  same two values again on the success path, independently of the library. A
+  condition number of zero reads as a perfectly conditioned Jacobian, which is
+  the opposite of what an unavailable diagnostic should suggest, and the binding
+  docstring stated the fabrication as a contract. Restoring the poison alone
+  would have shipped two fields that could only ever report "unknown", so both
+  are gone and the measurement is available from `singular_values` and the
+  functions above at **any** configuration, including a failed solve's `.q` --
+  which is where a trajectory-level analysis needs it, not only at the point a
+  solve gave up. **The cost is explicit:** conditioning at the failure point now
+  requires recomputing forward kinematics, the Jacobian and its decomposition.
+  That is an extra decomposition on a diagnostic path, and the recomputed
+  spectrum is that of the undamped, unweighted Jacobian -- a policy that solved
+  through a damped one internally will not reproduce it bit for bit.
+  `dls::condition_number()` remains the accessor for that policy's own value.
+- **Breaking.** `ik_error::last_error_norm` keeps its NaN poison when `setup()`
+  refuses its arguments, where it previously reported the largest representable
+  value. A refused setup measures no residual, and the largest representable
+  value reads as a measured distance rather than as one that was never taken. In
+  Python this surfaces as `IkResult.error_norm` being `nan` rather than
+  `1.7976931348623157e+308` on that path.
 - **Breaking.** `ik_objective::min_distance` is removed and replaced by
   `ik_objective::min_error_norm`. The old name promised a distance and selected
   on the pose residual; the name was the untruth, so the name changed and the

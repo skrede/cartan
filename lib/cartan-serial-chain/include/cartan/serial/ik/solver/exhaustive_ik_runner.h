@@ -87,7 +87,7 @@ public:
             if (auto held = detail::validate_solve_inputs(chain, target, seed_q); !held)
             {
                 result.restarts_attempted = restart + 1;
-                result.failure = detail::setup_failure_reason(held.error());
+                result.failure = detail::failure_reason_for(held.error());
                 return result;
             }
 

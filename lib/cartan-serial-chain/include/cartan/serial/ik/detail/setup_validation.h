@@ -61,7 +61,8 @@ constexpr bool is_precondition_failure(ik_status status)
 {
     return status == ik_status::dimension_mismatch
         || status == ik_status::non_finite_input
-        || status == ik_status::unsupported_configuration;
+        || status == ik_status::unsupported_configuration
+        || status == ik_status::unreachable;
 }
 
 /// The statuses from which no iteration may run: a failed precondition, or a
@@ -71,20 +72,29 @@ constexpr bool is_setup_failure(ik_status status)
     return status == ik_status::not_initialized || is_precondition_failure(status);
 }
 
-/// The failure reason a latched setup status is reported as.
-constexpr ik_failure setup_failure_reason(ik_status status)
+/// The failure reason a latched status is reported as.
+///
+/// Total over ik_status, so a caller building an error never has to invent a
+/// reason for a value it did not expect. The statuses that are not failures at
+/// all report not_initialized, which is the one reason that claims nothing
+/// about how a solve went.
+constexpr ik_failure failure_reason_for(ik_status status)
 {
-    if (status == ik_status::dimension_mismatch)
+    switch (status)
     {
-        return ik_failure::dimension_mismatch;
-    }
-    if (status == ik_status::non_finite_input)
-    {
-        return ik_failure::non_finite_input;
-    }
-    if (status == ik_status::unsupported_configuration)
-    {
-        return ik_failure::unsupported_configuration;
+    case ik_status::diverged:                  return ik_failure::diverged;
+    case ik_status::stalled:                   return ik_failure::stalled;
+    case ik_status::iteration_limit:           return ik_failure::iteration_limit;
+    case ik_status::joint_limit_hit:           return ik_failure::joint_limit_violation;
+    case ik_status::aborted:                   return ik_failure::aborted;
+    case ik_status::dimension_mismatch:        return ik_failure::dimension_mismatch;
+    case ik_status::non_finite_input:          return ik_failure::non_finite_input;
+    case ik_status::unsupported_configuration: return ik_failure::unsupported_configuration;
+    case ik_status::unreachable:               return ik_failure::unreachable;
+    case ik_status::running:
+    case ik_status::converged:
+    case ik_status::not_initialized:
+        break;
     }
     return ik_failure::not_initialized;
 }

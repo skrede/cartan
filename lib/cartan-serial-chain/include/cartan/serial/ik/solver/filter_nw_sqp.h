@@ -51,6 +51,10 @@ public:
     using chain_type = Chain;
     using scalar_type = typename Chain::scalar_type;
     static constexpr int joints = Chain::joints;
+    // The active-set QP cannot accept an infinite coordinate, so a non-finite
+    // joint bound reaches it as a substituted finite interval and this policy
+    // solves over a different set than one that box-projects.
+    static constexpr bool substitutes_unbounded_bounds = true;
     using limits_type = LimitsPolicy;
 
     using position_type = typename joint_state<scalar_type, joints>::position_type;

@@ -378,7 +378,10 @@ TEMPLATE_TEST_CASE("a refused setup leaves nothing of the previous solve readabl
     REQUIRE(runner.iterations() == 0);
     auto result = runner.solve();
     REQUIRE_FALSE(result.has_value());
-    REQUIRE(result.error().last_error_norm == std::numeric_limits<Scalar>::max());
+    // A refused setup measured no residual, so the field keeps its poison. The
+    // largest representable value that stood here before read as a measured
+    // distance and was asserted as the contract by this very line.
+    REQUIRE(std::isnan(result.error().last_error_norm));
     REQUIRE(result.error().last_q.size() == n);
     REQUIRE(result.error().last_q.isZero());
 

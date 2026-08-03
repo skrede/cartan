@@ -15,6 +15,8 @@
 
 #include "cartan/serial/ik/ik_result.h"
 #include "cartan/serial/ik/ik_status.h"
+#include "cartan/serial/ik/detail/convergence.h"
+#include "cartan/serial/ik/detail/feasible_set.h"
 #include "cartan/serial/ik/concepts/solve_concept.h"
 #include "cartan/serial/ik/detail/setup_validation.h"
 #include "cartan/serial/ik/detail/selection_metrics.h"
@@ -236,7 +238,18 @@ private:
         int iterations{};
         bool converged{false};
         ik_termination_reason termination_reason{ik_termination_reason::unknown};
+        feasible_set solved_feasible_set{feasible_set::declared};
     };
+
+    /// Recorded per policy rather than per runner: the pack may mix a policy
+    /// that substitutes a finite interval for a non-finite bound with one that
+    /// box-projects against the declared bounds, and those two race over
+    /// different feasible sets.
+    template <typename Policy>
+    feasible_set policy_feasible_set() const
+    {
+        return cartan::detail::feasible_set_solved<Policy>(m_chain->get());
+    }
 
     /// Everything setup() establishes before a policy is touched, so a rejected
     /// call leaves neither a half-configured policy nor the previous solve's
@@ -250,7 +263,27 @@ private:
         {
             return held.error();
         }
+        if (chain.num_joints() == 0 && !reaches_target_without_joints(chain, target, q0))
+        {
+            return ik_status::unreachable;
+        }
         return cartan::detail::selection_admissibility(m_objective, chain, m_length);
+    }
+
+    /// A chain with no joints has a one-point workspace, so a target away from
+    /// that point is certifiably infeasible rather than merely not found. It is
+    /// the only place on the iterative path where infeasibility is provable: an
+    /// iterative solver that has joints to move cannot conclude it from a failed
+    /// search. The test is the solver's own convergence test, so exactly the
+    /// targets a solve would have accepted are the ones not refused here.
+    bool reaches_target_without_joints(
+        const chain_type& chain,
+        const se3<scalar_type>& target,
+        const position_type& q0) const
+    {
+        auto fk = forward_kinematics_unchecked(chain, q0);
+        auto twist = (fk.end_effector.inverse() * target).log();
+        return cartan::detail::is_converged_unweighted(twist, m_criteria);
     }
 
     /// The single owner of the work-unit accumulator and of the total-budget
@@ -389,7 +422,8 @@ private:
                 .metric = candidate_metric(policy.solution(), policy.error_norm()),
                 .iterations = policy.iterations(),
                 .converged = true,
-                .termination_reason = policy_termination_reason(policy)
+                .termination_reason = policy_termination_reason(policy),
+                .solved_feasible_set = policy_feasible_set<std::tuple_element_t<I, std::tuple<Policies...>>>()
             });
             m_found_convergence = true;
 
@@ -410,7 +444,8 @@ private:
                 .error_norm = policy.error_norm(),
                 .iterations = policy.iterations(),
                 .converged = false,
-                .termination_reason = policy_termination_reason(policy)
+                .termination_reason = policy_termination_reason(policy),
+                .solved_feasible_set = policy_feasible_set<std::tuple_element_t<I, std::tuple<Policies...>>>()
             });
         }
         else
@@ -499,6 +534,7 @@ private:
                 result.solver_index = 0;
                 result.selection_metric = m_best_metric;
                 result.selection_objective = m_objective;
+                result.solved_feasible_set = policy_feasible_set<first_policy>();
                 return result;
             }
             else
@@ -554,23 +590,24 @@ private:
         result.solver_index = index;
         result.selection_metric = pr.metric;
         result.selection_objective = m_objective;
+        result.solved_feasible_set = pr.solved_feasible_set;
         return result;
     }
 
     cartan::expected<ik_result<scalar_type, joints>, ik_error<scalar_type, joints>> build_error()
     {
         ik_error<scalar_type, joints> err;
-        err.near_singular = false;
-        err.condition_number = scalar_type(0);
         err.termination_reason = ik_termination_reason::unknown;
 
         // A refused setup ran no iteration, so there is no last iterate to
         // report; reading one off a policy would hand back the previous solve's.
+        // The residual keeps the type's poison for the same reason: the largest
+        // representable value reads as a measured distance rather than as one
+        // that was never measured.
         if (cartan::detail::is_setup_failure(m_status))
         {
             err.last_q = m_best_q;
-            err.last_error_norm = std::numeric_limits<scalar_type>::max();
-            err.reason = cartan::detail::setup_failure_reason(m_status);
+            err.reason = cartan::detail::failure_reason_for(m_status);
             return cartan::unexpected(err);
         }
 
@@ -602,32 +639,10 @@ private:
             else
             {
                 err.last_q = m_best_q;
-                err.last_error_norm = std::numeric_limits<scalar_type>::max();
             }
         }
 
-        switch (m_status)
-        {
-            case ik_status::diverged:
-                err.reason = ik_failure::diverged;
-                break;
-            case ik_status::stalled:
-                err.reason = ik_failure::stalled;
-                break;
-            case ik_status::iteration_limit:
-                err.reason = ik_failure::iteration_limit;
-                break;
-            case ik_status::joint_limit_hit:
-                err.reason = ik_failure::joint_limit_violation;
-                break;
-            case ik_status::aborted:
-                err.reason = ik_failure::aborted;
-                break;
-            default:
-                err.reason = ik_failure::iteration_limit;
-                break;
-        }
-
+        err.reason = cartan::detail::failure_reason_for(m_status);
         return cartan::unexpected(err);
     }
 

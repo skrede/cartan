@@ -24,8 +24,9 @@ See [IK Methods](../background/ik-methods.md) | [IK Composition Guide](../guides
 |------|--------|
 | All IK | `#include <cartan/serial/ik.h>` |
 | `cartan::basic_ik_runner` | `#include <cartan/serial/ik/basic_ik_runner.h>` |
-| `cartan::convergence_criteria`, `cartan::ik_status`, `cartan::ik_termination_reason`, `cartan::ik_failure`, `cartan::ik_objective`, `cartan::step_metrics`, `cartan::step_result`, `cartan::solver_options` | `#include <cartan/serial/ik/ik_status.h>` |
+| `cartan::convergence_criteria`, `cartan::ik_status`, `cartan::ik_termination_reason`, `cartan::ik_failure`, `cartan::ik_objective`, `cartan::feasible_set`, `cartan::step_metrics`, `cartan::step_result`, `cartan::solver_options` | `#include <cartan/serial/ik/ik_status.h>` |
 | `cartan::ik_result`, `cartan::ik_error` | `#include <cartan/serial/ik/ik_result.h>` |
+| `cartan::singular_values`, `condition_number`, `manipulability`, `isotropy`, `is_near_singular` | `#include <cartan/serial/fk/singularity_analysis.h>` |
 | `cartan::solve_policy` concept, `cartan::step_one` | `#include <cartan/serial/ik/concepts/solve_concept.h>` |
 | `cartan::no_limits`, `cartan::clamp_limits`, `cartan::null_space_limits` | `#include <cartan/serial/ik/policy/limits_policy.h>` |
 | `cartan::error_weight` | `#include <cartan/serial/ik/policy/error_weight.h>` |
@@ -337,7 +338,8 @@ enum class ik_status
     not_initialized,
     dimension_mismatch,
     non_finite_input,
-    unsupported_configuration
+    unsupported_configuration,
+    unreachable
 };
 
 constexpr const char* message(ik_status status);
@@ -345,7 +347,8 @@ constexpr const char* message(ik_status status);
 
 Stepper-level control flow signal returned by `step()` calls.
 
-The last four are terminal before any iteration runs. Every solve policy starts
+The values from `not_initialized` onward are terminal before any iteration
+runs. Every solve policy starts
 in `not_initialized`, so stepping one that was never set up performs no iteration
 and consumes no work units instead of reading a default-constructed joint
 vector, and every policy's work loop refuses to run from a latched terminal
@@ -353,7 +356,10 @@ status.
 
 `setup()` returns `void`, so it reports a rejected seed or target by latching
 `dimension_mismatch` or `non_finite_input`, and `basic_ik_runner` reports a
-selection it cannot rank by latching `unsupported_configuration`. Every solve policy validates its
+selection it cannot rank by latching `unsupported_configuration`. It latches
+`unreachable` for a chain with no joints whose target is away from the single
+pose that chain can hold -- the one place on the iterative path where
+infeasibility is certified rather than guessed at from a failed search. Every solve policy validates its
 arguments this way, as do `basic_ik_runner`, `restart_wrapper` and
 `exhaustive_ik_runner`; the policies that require the optional numeric backend
 are no exception, so a solve driven straight through one of them, rather than
@@ -515,6 +521,26 @@ reproduces the unnormalized arithmetic exactly, so it states the unit scale
 those measures always assumed rather than changing any ranking. A zero,
 negative or non-finite value is refused at `setup()`.
 
+### feasible_set
+
+<!-- cartan:unbuilt kind=declaration -->
+```cpp
+enum class feasible_set
+{
+    declared,
+    substituted
+};
+```
+
+Which joint bounds a policy actually solved over. A backend that cannot accept
+an infinite coordinate -- the active-set QP behind `nw_sqp`, `filter_nw_sqp` and
+`augmented_lagrangian` -- receives a finite interval substituted for a
+non-finite bound, so on a chain carrying an unbounded joint it solves a
+different problem from a policy that box-projects against the declared bounds.
+Racing the two is legitimate; reporting which one produced the answer is what
+keeps the split from being silent. A fully bounded chain reports `declared` for
+every policy.
+
 ### ik_result
 
 <!-- cartan:unbuilt kind=declaration -->
@@ -528,13 +554,17 @@ struct ik_result
     int solver_index{};
     std::optional<Scalar> selection_metric{};
     ik_objective selection_objective{ik_objective::speed};
+    feasible_set solved_feasible_set{feasible_set::declared};
 };
 ```
 
 Successful IK outcome. `solver_index` identifies which policy produced
 the solution in multi-policy racing. `selection_metric` is the value that
 candidate was ranked on under `selection_objective`, and is absent where the
-objective ranks nothing.
+objective ranks nothing. `solved_feasible_set` reports whether the winning
+policy solved over the chain's declared joint bounds or over a finite interval
+substituted for a non-finite one, which a backend that cannot accept an
+infinite coordinate requires.
 
 ### ik_error
 
@@ -543,17 +573,85 @@ objective ranks nothing.
 template <typename Scalar = double, int N = dynamic>
 struct ik_error
 {
-    ik_failure reason;
+    ik_failure reason{ik_failure::iteration_limit};
     ik_termination_reason termination_reason{ik_termination_reason::unknown};
-    typename joint_state<Scalar, N>::position_type last_q;
-    Scalar last_error_norm{};
-    Scalar condition_number{};
-    bool near_singular{};
+    typename joint_state<Scalar, N>::position_type last_q{detail::poison_joint_position<Scalar, N>()};
+    Scalar last_error_norm{std::numeric_limits<Scalar>::quiet_NaN()};
 };
 ```
 
 Failure diagnostic. `last_q` is the joint configuration at the time of
-failure; `last_error_norm` is the residual at that configuration.
+failure; `last_error_norm` is the residual at that configuration. Both default
+to a NaN poison, so a refused setup -- which measured neither -- reports them as
+unmeasured rather than as a home pose at an enormous residual.
+
+Jacobian conditioning is not carried here. It is computed from `last_q` through
+[`fk/singularity_analysis.h`](#singularity-analysis), which answers the same
+question at any configuration rather than only at the one a solve failed at.
+
+## Singularity Analysis
+
+Free functions over a body Jacobian, in `cartan/serial/fk/singularity_analysis.h`.
+They need only a Jacobian, so singularity analysis and manipulability-ellipsoid
+plotting along a trajectory do not pull in the IK stack. The selection
+objectives read the same definitions.
+
+<!-- cartan:unbuilt kind=declaration -->
+```cpp
+template <typename Derived>
+singular_values_t<Derived> singular_values(
+    const Eigen::MatrixBase<Derived>& jacobian,
+    typename Derived::Scalar length = typename Derived::Scalar(1));
+
+template <typename Chain, typename Vector>
+singular_values_t<jacobian_matrix<typename Chain::scalar_type, Chain::joints>> singular_values(
+    const Chain& chain, const Vector& q, typename Chain::scalar_type length = 1);
+
+template <typename Vector> std::optional<typename Vector::Scalar> condition_number(const Vector& sigma);
+template <typename Vector> std::optional<typename Vector::Scalar> manipulability(const Vector& sigma);
+template <typename Vector> std::optional<typename Vector::Scalar> isotropy(const Vector& sigma);
+
+template <typename Scalar>
+inline constexpr Scalar default_singularity_threshold_v = Scalar(1e3);
+
+template <typename Vector>
+std::optional<bool> is_near_singular(
+    const Vector& sigma,
+    typename Vector::Scalar threshold = default_singularity_threshold_v<typename Vector::Scalar>);
+
+template <typename Chain, typename Vector>
+std::optional<bool> is_near_singular(
+    const Chain& chain, const Vector& q,
+    typename Chain::scalar_type threshold = default_singularity_threshold_v<typename Chain::scalar_type>,
+    typename Chain::scalar_type length = 1);
+```
+
+Ask for the spectrum once and read every measure off it; there is deliberately
+no per-measure `(chain, q)` form, because four of them would hide four
+decompositions behind four one-line calls.
+
+`length` divides the Jacobian's three linear rows so they are commensurable with
+the dimensionless angular rows above them. The default of one reproduces the
+unnormalized arithmetic exactly.
+
+Each measure is absent, not zero, on an empty spectrum -- a chain with no
+joints. The empty product is one, which would report such a chain as maximally
+manipulable. `condition_number` is infinite at an exactly singular Jacobian.
+
+`is_near_singular` takes the threshold as an argument because how close is too
+close is a property of the robot and the task. Note that an absent optional is
+falsy in both C++ and Python, so test the value rather than the result:
+`is_near_singular(chain, q)` answers "was the question answerable", not "is this
+configuration near a singularity".
+
+<!-- cartan:unbuilt kind=sketch reason="names a chain and a configuration the page never defines, so it shows the call shape and the optional's truth-test trap" -->
+```cpp
+auto sigma = cartan::singular_values(chain, q);
+if (auto near = cartan::is_near_singular(sigma); near && *near)
+{
+    // back off along the trajectory
+}
+```
 
 ## Limits Policies
 
