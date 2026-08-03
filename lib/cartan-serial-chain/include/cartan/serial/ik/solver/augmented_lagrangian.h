@@ -103,7 +103,7 @@ public:
         auto V_b = (target.inverse() * fk.end_effector).log();
         m_initial_error = V_b.norm();
 
-        m_problem.emplace(chain, target, m_weight);
+        m_problem.emplace(chain, target, m_weight, q0);
 
         int n = chain.num_joints();
         Eigen::VectorXd x0(n);

@@ -13,6 +13,23 @@ namespace cartan
 namespace detail
 {
 
+/// The 2*pi-equivalent of theta nearest reference, for a joint whose bounds are
+/// infinite on both sides and whose every equivalent is therefore in range.
+///
+/// A non-finite reference returns theta unchanged: the rounding below would
+/// otherwise propagate it into the result. The unconditional passthrough this
+/// replaces was immune to that by accident, not by design.
+template <typename Scalar>
+Scalar nearest_equivalent_angle(Scalar theta, Scalar reference) noexcept
+{
+    if (!std::isfinite(reference))
+    {
+        return theta;
+    }
+    constexpr Scalar full_turn = Scalar(2) * std::numbers::pi_v<Scalar>;
+    return theta + full_turn * std::round((reference - theta) / full_turn);
+}
+
 /// Reference-aware per-angle unwrap. canonical_angle_in_limits
 /// (limit_enforcement.h) supplies the arc-anchored base representative; on a
 /// multi-turn arc (span > 2*pi) several in-range representatives exist, and the
@@ -26,7 +43,7 @@ Scalar unwrap_to_range_nearest(
 {
     if (!std::isfinite(lo) && !std::isfinite(hi))
     {
-        return theta;
+        return nearest_equivalent_angle(theta, reference);
     }
     constexpr Scalar full_turn = Scalar(2) * std::numbers::pi_v<Scalar>;
     const Scalar inf = std::numeric_limits<Scalar>::infinity();

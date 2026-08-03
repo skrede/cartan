@@ -132,7 +132,8 @@ TEST_CASE("continuous joint: Halton seed generator produces finite seeds",
           "[solver_continuous_joint]")
 {
     auto chain = load_continuous_wrist_chain();
-    cartan::halton_seed_generator<chain_t> gen{chain};
+    cartan::halton_seed_generator<chain_t> gen{chain,
+        Eigen::Vector<double, Eigen::Dynamic>::Zero(chain.num_joints())};
 
     for (int i = 0; i < 100; ++i)
     {

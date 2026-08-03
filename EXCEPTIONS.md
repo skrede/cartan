@@ -119,7 +119,7 @@ that as the signal to decompose the file.
 
 | Path | Lines at registration | Why splitting would harm |
 | --- | --- | --- |
-| tests/fixtures/chain_factories.h | 1484 | a table of robot definitions reached by name; the entries are independent, but a split would make every test track which robot lives in which header, and the tests are the audience |
+| tests/fixtures/chain_factories.h | 1483 | a table of robot definitions reached by name; the entries are independent, but a split would make every test track which robot lives in which header, and the tests are the audience |
 | tests/unit/analytical_solver_6r_test.cpp | 972 | a case list over one subject whose fixtures, helpers and tolerance constants are declared once above the cases and used by all of them; splitting it duplicates that setup into each fragment, where the copies drift and two files then test against different fixtures |
 | tests/property/lie_group_axioms_test.cpp | 769 | a case list over one subject whose fixtures, helpers and tolerance constants are declared once above the cases and used by all of them; splitting it duplicates that setup into each fragment, where the copies drift and two files then test against different fixtures |
 | tests/unit/so3_test.cpp | 615 | a case list over one subject with no shared setup to scatter; the harm in splitting is to the reader, who would then have to know which fragment holds a behavior before being able to tell whether it is covered at all |

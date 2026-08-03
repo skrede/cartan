@@ -32,16 +32,15 @@ public:
     ///
     /// Positive and negative infinity are legal position bounds and must stay
     /// legal: they are this library's encoding for an unbounded continuous
-    /// joint. The URDF builder writes them, and finite_range_or,
-    /// finite_lower_or, finite_upper_or and the fallback range below exist to
-    /// consume them. The asymmetry with the dynamic bounds is therefore
-    /// deliberate: a NaN is refused everywhere, while an infinite velocity,
-    /// effort or acceleration bound is refused because no part of the library
-    /// treats one as meaningful. An infinite bound is only meaningful signed
-    /// outward, so (-inf, +inf) is the unbounded joint while (+inf, +inf) and
-    /// (-inf, -inf) are refused as reversed -- they describe no interval, and
-    /// an ordering test alone would admit them because inf is not less than
-    /// itself.
+    /// joint. The URDF builder writes them, and finite_range_or, anchor_bounds
+    /// and the fallback range below exist to consume them. The asymmetry with
+    /// the dynamic bounds is therefore deliberate: a NaN is refused everywhere,
+    /// while an infinite velocity, effort or acceleration bound is refused
+    /// because no part of the library treats one as meaningful. An infinite
+    /// bound is only meaningful signed outward, so (-inf, +inf) is the unbounded
+    /// joint while (+inf, +inf) and (-inf, -inf) are refused as reversed -- they
+    /// describe no interval, and an ordering test alone would admit them because
+    /// inf is not less than itself.
     ///
     /// Not constexpr: std::isnan and std::isfinite are not constant
     /// expressions before C++23, and the supported compiler floor is C++20.
@@ -135,6 +134,10 @@ namespace detail
 /// the unbounded joint while keeping the active-set QP's substituted bounds
 /// within numerical reach. Re-run the sweep harness when the surrounding
 /// solver code or test fixture changes; lock the winner here.
+///
+/// The unit is turns and the sweep ran on angular joints only, so an unbounded
+/// prismatic joint receives a window of 4*pi of the chain's linear unit -- an
+/// angular magnitude wearing a length's clothing.
 template <typename Scalar>
 inline constexpr Scalar k_unbounded_angular_range_v
     = Scalar(4) * std::numbers::pi_v<Scalar>;
@@ -149,22 +152,40 @@ constexpr Scalar finite_range_or(Scalar range, Scalar fallback) noexcept
     return std::isfinite(range) ? range : fallback;
 }
 
-/// Clamp a (position_min, position_max) pair to finite values, substituting
-/// the +/-half-fallback-range when either bound is non-finite. Used to feed
-/// argmin's QP active-set with finite constraint values when the underlying
-/// joint is unbounded (e.g. a URDF continuous joint with +/-infinity bounds);
-/// SQP-family inner solvers stall when constraint values are themselves
-/// infinite even though the constraint is trivially satisfied mathematically.
+/// A finite position-bound pair substituted for one that may carry an infinity.
 template <typename Scalar>
-constexpr Scalar finite_lower_or(Scalar lo, Scalar half_fallback) noexcept
+struct anchored_bounds
 {
-    return std::isfinite(lo) ? lo : -half_fallback;
-}
+    Scalar lower;
+    Scalar upper;
+};
 
+/// Substitute a finite interval of the given width for a bound pair with a
+/// non-finite side: it runs inward from whichever side is finite, and is
+/// centered on reference when neither is. Feeds argmin's QP active-set and the
+/// multistart seeder, neither of which accepts an infinite coordinate.
+///
+/// Anchoring to the finite side is load-bearing: +/-width/2 about the origin
+/// substitutes the empty interval [10, width/2] for a joint feasible from 10
+/// radians upward, handing a solvable problem to a backend as an unsolvable one.
 template <typename Scalar>
-constexpr Scalar finite_upper_or(Scalar hi, Scalar half_fallback) noexcept
+constexpr anchored_bounds<Scalar> anchor_bounds(
+    Scalar lo, Scalar hi, Scalar width, Scalar reference) noexcept
 {
-    return std::isfinite(hi) ? hi : +half_fallback;
+    if (std::isfinite(lo) && std::isfinite(hi))
+    {
+        return {lo, hi};
+    }
+    if (std::isfinite(lo))
+    {
+        return {lo, lo + width};
+    }
+    if (std::isfinite(hi))
+    {
+        return {hi - width, hi};
+    }
+    const Scalar half = width / Scalar(2);
+    return {reference - half, reference + half};
 }
 
 }

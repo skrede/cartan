@@ -106,7 +106,7 @@ void trace_pose(
     cartan::argmin_slsqp<chain_t<N>> solver;
     solver.setup(chain, target, q_seed, criteria);
 
-    cartan::halton_seed_generator<chain_t<N>> seed_gen(chain);
+    cartan::halton_seed_generator<chain_t<N>> seed_gen(chain, q_seed);
 
     constexpr int wrapper_max_restarts = 20;  // restart_wrapper default
 

@@ -104,7 +104,10 @@ cartan::basic_ik_runner solver{
 ```
 
 The first policy receives the user's `q0`; the remaining policies receive
-deterministic Halton seeds within the joint limits. For the `speed` objective
+deterministic Halton seeds within the joint limits. A joint with a non-finite
+bound is seeded from a finite window of two full turns anchored to whichever
+side is finite, or centered on `q0` when neither is, so its seeds satisfy the
+chain's declared limits too. For the `speed` objective
 (the default), the first policy to converge wins and the runner stops the rest.
 For the other objectives (`min_distance`, `max_manipulability`,
 `max_isotropy`), all policies run to completion and the best is selected.

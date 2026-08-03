@@ -115,7 +115,7 @@ public:
         m_target = target;
         m_criteria = criteria;
         m_weight.reset();
-        m_seed_gen.emplace(chain);
+        m_seed_gen.emplace(chain, q0);
         m_restart_count = 0;
         m_total_iterations = 0;
         m_best_lambda = scalar_type(0);
@@ -151,7 +151,7 @@ public:
         m_target = target;
         m_criteria = criteria;
         m_weight = weight;
-        m_seed_gen.emplace(chain);
+        m_seed_gen.emplace(chain, q0);
         m_restart_count = 0;
         m_total_iterations = 0;
         m_best_lambda = scalar_type(0);

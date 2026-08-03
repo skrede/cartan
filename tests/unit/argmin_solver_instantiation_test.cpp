@@ -131,7 +131,9 @@ void drive_every_adapter(const Chain& chain, const spp::se3<double>& target)
 
     exercise(spp::detail::argmin_ik_problem<Chain>(chain, target, weight), n);
     exercise(spp::detail::argmin_bounded_ik_problem<Chain>(chain, target, weight), n);
-    exercise(spp::detail::argmin_constrained_ik_problem<Chain>(chain, target, weight), n);
+    using position_type = typename spp::joint_state<double, Chain::joints>::position_type;
+    exercise(spp::detail::argmin_constrained_ik_problem<Chain>(
+        chain, target, weight, position_type::Zero(n)), n);
     exercise(spp::detail::argmin_unconstrained_ik_problem<Chain>(chain, target, weight), n);
 
     spp::detail::argmin_ik_least_squares_problem<Chain> squares(chain, target);

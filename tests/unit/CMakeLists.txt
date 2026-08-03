@@ -98,6 +98,7 @@ if(CARTAN_BUILD_ARGMIN)
     cartan_add_test(argmin_projected_gradient_gn_test argmin_projected_gradient_gn_test.cpp)
     cartan_add_test(solver_unit_count_test solver_unit_count_test.cpp)
     cartan_add_test(argmin_solver_instantiation_test argmin_solver_instantiation_test.cpp)
+    cartan_add_test(unbounded_joint_feasibility_test unbounded_joint_feasibility_test.cpp)
     foreach (backend_test IN ITEMS
         argmin_adapters_compile_test
         argmin_policies_test
@@ -105,6 +106,7 @@ if(CARTAN_BUILD_ARGMIN)
         argmin_projected_gn_test
         argmin_projected_gradient_gn_test
         argmin_solver_instantiation_test
+        unbounded_joint_feasibility_test
         solver_unit_count_test
         exhaustive_ik_runner_test
         solver_semantics_test)

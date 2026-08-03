@@ -91,7 +91,8 @@ TEST_CASE("argmin adapters compile and satisfy concepts", "[argmin][compile]")
 
     SECTION("constrained adapter")
     {
-        spp::detail::argmin_constrained_ik_problem<chain6> problem(chain, target, weight);
+        spp::detail::argmin_constrained_ik_problem<chain6> problem(chain, target, weight,
+            Eigen::Vector<double, 6>::Zero());
         REQUIRE(problem.dimension() == 6);
         REQUIRE(problem.num_equality() == 0);
         REQUIRE(problem.num_inequality() == 12);

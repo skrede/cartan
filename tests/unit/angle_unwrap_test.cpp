@@ -53,9 +53,18 @@ TEST_CASE("tight range with no reachable representative falls outside")
     REQUIRE((result < 0.1 || result > 0.2));
 }
 
-TEST_CASE("fully continuous joint is the identity")
+TEST_CASE("fully continuous joint tracks the reference")
 {
     const double inf = std::numeric_limits<double>::infinity();
     const double result = unwrap_to_range_nearest(42.0, -inf, inf, 0.0, tol);
-    REQUIRE(std::abs(result - 42.0) < close_tol);
+    REQUIRE(std::abs(result) <= pi);
+    REQUIRE(std::abs(std::fmod(result - 42.0, two_pi)) < close_tol);
+}
+
+TEST_CASE("fully continuous joint with a nonfinite reference is the identity")
+{
+    const double inf = std::numeric_limits<double>::infinity();
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    REQUIRE(std::abs(unwrap_to_range_nearest(42.0, -inf, inf, nan, tol) - 42.0) < close_tol);
+    REQUIRE(std::abs(unwrap_to_range_nearest(42.0, -inf, inf, inf, tol) - 42.0) < close_tol);
 }

@@ -74,7 +74,7 @@ public:
         const exhaustive_options<scalar_type>& options = {})
     {
         exhaustive_result<scalar_type, joints> result{};
-        halton_seed_generator<Chain> seed_gen{chain};
+        halton_seed_generator<Chain> seed_gen{chain, seed};
         std::vector<ik_result<scalar_type, joints>> validated;
 
         for (int restart = 0; restart < options.max_restarts; ++restart)

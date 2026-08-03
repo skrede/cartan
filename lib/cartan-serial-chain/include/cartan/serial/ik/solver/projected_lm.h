@@ -176,7 +176,7 @@ public:
 
         m_setup_joints = chain.num_joints();
 
-        m_seed_gen.emplace(chain);
+        m_seed_gen.emplace(chain, q0);
         m_restart_count = 0;
         m_total_iterations = 0;
         m_best_error = std::numeric_limits<scalar_type>::max();

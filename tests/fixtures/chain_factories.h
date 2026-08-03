@@ -809,17 +809,16 @@ auto random_joint_config(
     // Substituting the same fallback range the solvers use keeps the draw
     // inside the interval the rest of the library treats as the joint's
     // reachable span.
-    const Scalar half_fallback =
-        cartan::detail::k_unbounded_angular_range_v<Scalar> / Scalar(2);
+    const Scalar width = cartan::detail::k_unbounded_angular_range_v<Scalar>;
 
     std::uniform_real_distribution<Scalar> dist;
     const auto& limits = chain.limits();
     for (int i = 0; i < n; ++i)
     {
         auto idx = static_cast<std::size_t>(i);
-        dist = std::uniform_real_distribution<Scalar>(
-            cartan::detail::finite_lower_or(limits[idx].position_min(), half_fallback),
-            cartan::detail::finite_upper_or(limits[idx].position_max(), half_fallback));
+        const auto bounds = cartan::detail::anchor_bounds(
+            limits[idx].position_min(), limits[idx].position_max(), width, Scalar(0));
+        dist = std::uniform_real_distribution<Scalar>(bounds.lower, bounds.upper);
         q(i) = dist(rng);
     }
 

@@ -136,7 +136,7 @@ public:
 
         if constexpr (sizeof...(Policies) > 1)
         {
-            m_seed_gen.emplace(chain);
+            m_seed_gen.emplace(chain, q0);
             setup_remaining_policies(chain, target, criteria, options.halton_seed,
                 std::make_index_sequence<sizeof...(Policies) - 1>{});
         }
