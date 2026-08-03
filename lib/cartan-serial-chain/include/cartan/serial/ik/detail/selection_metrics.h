@@ -11,7 +11,6 @@
 
 #include "cartan/serial/fk/singularity_analysis.h"
 
-#include <cmath>
 #include <optional>
 
 namespace cartan::detail
@@ -48,15 +47,16 @@ bool mixes_revolute_and_prismatic(const Chain& chain)
 /// is defined on it. A joint-space displacement over a chain mixing revolute
 /// and prismatic joints would add radians to metres; the scale that would make
 /// them commensurable is a caller's to state and not this library's to assume,
-/// so the combination is refused instead. The characteristic length divides the
-/// Jacobian's linear rows, which a zero, negative or non-finite value cannot.
+/// so the combination is refused instead. The characteristic length is tested by
+/// the same predicate the analysis surface divides through, so a length this
+/// admits cannot be one that surface then refuses.
 template <typename Chain, typename Scalar>
 std::optional<ik_status> selection_admissibility(
     ik_objective objective,
     const Chain& chain,
     Scalar length)
 {
-    if (!(length > Scalar(0)) || !std::isfinite(length))
+    if (!is_valid_characteristic_length(length))
     {
         return ik_status::unsupported_configuration;
     }

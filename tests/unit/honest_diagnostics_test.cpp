@@ -6,6 +6,7 @@
 #include <cartan/serial/ik/basic_ik_runner.h>
 #include <cartan/serial/ik/detail/feasible_set.h>
 #include <cartan/serial/ik/detail/setup_validation.h>
+#include <cartan/serial/ik/detail/selection_metrics.h>
 
 #include <cartan/lie/se3.h>
 #include <cartan/lie/so3.h>
@@ -221,6 +222,53 @@ TEST_CASE("an entirely zero Jacobian is its own no-answer", "[ik][diagnostics]")
     CHECK(std::isinf(*spp::condition_number(*spectrum)));
     REQUIRE(spp::manipulability(*spectrum));
     CHECK(*spp::manipulability(*spectrum) == Approx(0.0).margin(1e-15));
+}
+
+// The length divides the Jacobian's linear rows before the decomposition, and
+// the public surface tested nothing about it. Measured on a six-joint chain at
+// (0.3, -0.5, 0.8, 0.1, -0.4, 0.7): a length of zero answered a largest singular
+// value of -0.867696 -- singular values are non-negative -- a condition number
+// of -inf, a manipulability of -0, an isotropy naming the entirely zero Jacobian
+// for a Jacobian that is not zero, and a definite "not near a singularity" off a
+// decomposition that never ran. An infinite length answered a plausible spectrum
+// and a definite "near a singularity" for the Jacobian its own linear block had
+// been annihilated in, and a negative one answered exactly as its magnitude.
+TEST_CASE("a characteristic length that cannot divide is refused", "[ik][diagnostics]")
+{
+    auto chain = make_ur5_like_chain();
+    vec6 q;
+    q << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
+
+    auto fk = spp::forward_kinematics(chain, q);
+    REQUIRE(fk.has_value());
+    auto J = spp::body_jacobian_unchecked(chain, *fk);
+
+    const double inf = std::numeric_limits<double>::infinity();
+    for (double bad : {0.0, -0.1, -inf, inf, std::numeric_limits<double>::quiet_NaN()})
+    {
+        CAPTURE(bad);
+        auto raw = spp::singular_values(J, bad);
+        REQUIRE_FALSE(raw.has_value());
+        CHECK(raw.error() == spp::singularity_failure::invalid_length);
+
+        auto sigma = spp::singular_values(chain, q, bad);
+        REQUIRE_FALSE(sigma.has_value());
+        CHECK(sigma.error() == spp::singularity_failure::invalid_length);
+
+        auto near = spp::is_near_singular(chain, q, 1e3, bad);
+        REQUIRE_FALSE(near.has_value());
+        CHECK(near.error() == spp::singularity_failure::invalid_length);
+    }
+
+    // The selection reads the same predicate, so no length one admits is one the
+    // other refuses.
+    for (double good : {1.0, 0.1, 1e-9, 1e9})
+    {
+        CAPTURE(good);
+        CHECK(spp::singular_values(chain, q, good).has_value());
+        CHECK_FALSE(spp::detail::selection_admissibility(
+            spp::ik_objective::max_manipulability, chain, good));
+    }
 }
 
 // ============================================================================

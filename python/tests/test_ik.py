@@ -441,6 +441,24 @@ def test_singularity_analysis_refuses_a_configuration_the_chain_cannot_accept(
         cartan.is_near_singular(chain, poisoned)
 
 
+def test_singularity_analysis_refuses_a_length_that_cannot_divide(
+    cartanbot_chain: cartan.KinematicChain,
+) -> None:
+    chain = cartanbot_chain
+    q = np.zeros(chain.num_joints(), dtype=np.float64)
+
+    # The length divides the Jacobian's linear rows before the decomposition, so
+    # one that cannot divide is a bad argument like a mis-sized q, not a measure
+    # that happens to be undefined. Unguarded, a zero answered a negative largest
+    # singular value and a condition number of -inf, and an infinite one a
+    # plausible spectrum for a Jacobian whose linear block it had annihilated.
+    for bad in (0.0, -0.1, np.inf, -np.inf, np.nan):
+        with pytest.raises(ValueError, match="positive finite value"):
+            cartan.singular_values(chain, q, bad)
+        with pytest.raises(ValueError, match="positive finite value"):
+            cartan.is_near_singular(chain, q, 1e3, bad)
+
+
 def test_feasible_set_enum_values() -> None:
     for name in ("declared", "substituted"):
         assert hasattr(cartan.FeasibleSet, name), f"FeasibleSet missing variant {name}"

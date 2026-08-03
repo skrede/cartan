@@ -81,7 +81,7 @@ void register_fk(nb::module_& m)
           "linear rows divided by length so they are commensurable with the "
           "angular ones. None for a chain with no joints. Raises ValueError for "
           "a q whose length disagrees with the chain or carries a non-finite "
-          "component.",
+          "component, and for a length that is not positive and finite.",
           nb::arg("chain"), nb::arg("q").noconvert(), nb::arg("length") = 1.0);
 
     m.def("condition_number",
@@ -128,7 +128,8 @@ void register_fk(nb::module_& m)
               return cartan::is_near_singular(chain, q, threshold, length);
           },
           "is_near_singular at a configuration of the chain, raising ValueError "
-          "for a q the chain cannot accept.",
+          "for a q the chain cannot accept and for a length that is not positive "
+          "and finite.",
           nb::arg("chain"), nb::arg("q").noconvert(),
           nb::arg("threshold") = cartan::default_singularity_threshold_v<double>,
           nb::arg("length") = 1.0);

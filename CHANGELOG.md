@@ -94,6 +94,26 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   value reads as a measured distance rather than as one that was never taken. In
   Python this surfaces as `IkResult.error_norm` being `nan` rather than
   `1.7976931348623157e+308` on that path.
+- **Breaking.** `singularity_failure` gains `invalid_length`, returned by
+  `singular_values` and everything reading through it -- including
+  `is_near_singular(chain, q, threshold, length)` -- for a characteristic length
+  that is not positive and finite, so a switch over the enum that was previously
+  exhaustive needs one more arm. The value divides the Jacobian's linear rows
+  and nothing on the public surface tested it, while `setup()` had refused the
+  same values for the same reason since `characteristic_length` was added.
+  Measured on a six-joint chain, a length of zero returned a spectrum whose
+  largest entry was -0.867696 -- singular values are non-negative by definition
+  -- a condition number of -inf, a manipulability of -0, an isotropy reporting
+  the entirely zero Jacobian for a Jacobian that was not zero, and a definite
+  "not near a singularity" off a decomposition that never ran. An infinite
+  length answered a plausible spectrum and a definite "near a singularity" for a
+  Jacobian whose linear block the argument itself had annihilated, and a
+  negative one answered exactly as its magnitude would, silently. In Python all
+  of these now raise `ValueError`; the split between raising and answering
+  `None` is carried by `is_invalid_argument`, a switch with no default arm, so a
+  failure added later is a compile error at the classification rather than a
+  silent `None`. `is_valid_characteristic_length` is the single predicate the
+  analysis surface and the solver setup both test through.
 - **Breaking.** `ik_error::last_q` keeps its NaN poison when `setup()` refuses
   its arguments, and `basic_ik_runner::error_norm()` and `current_q()` report
   NaN there as well. Only half of that pair was honest before: the refused path
@@ -161,7 +181,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   singular values are commensurable with the angular rows. It applies to the
   selection objectives alone and is not a library-wide scale. Its default of one
   reproduces the previous arithmetic exactly, so nothing is reranked by adopting
-  it; a zero, negative or non-finite value is refused at `setup()`. Note that on
+  it; a zero, negative or non-finite value is refused at `setup()`, through the
+  same predicate the analysis surface divides by. Note that on
   a square body Jacobian the length cannot reorder the manipulability measure at
   all — it rescales every candidate by the same factor — though it does reorder
   the isotropy measure, and reorders manipulability on a chain with fewer than

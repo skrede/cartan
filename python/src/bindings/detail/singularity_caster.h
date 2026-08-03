@@ -13,9 +13,10 @@ namespace nanobind::detail
 {
 
 /// Splits singularity_failure by kind rather than mapping the whole enum onto
-/// one Python outcome, because the three values are not the same kind of event.
+/// one Python outcome, because the values are not the same kind of event.
 ///
-/// A configuration the chain cannot accept is a bad argument, so it raises
+/// A configuration the chain cannot accept, or a characteristic length that
+/// cannot divide the Jacobian's linear rows, is a bad argument, so it raises
 /// ValueError -- the exception forward_kinematics and both Jacobians already
 /// raise for the same underlying chain_failure. An empty or entirely zero
 /// spectrum is a well-formed question whose measure is simply undefined there,
@@ -42,7 +43,7 @@ struct type_caster<cartan::expected<T, cartan::singularity_failure>>
     {
         if (!measured.has_value())
         {
-            if (measured.error() != cartan::singularity_failure::invalid_configuration)
+            if (!cartan::is_invalid_argument(measured.error()))
                 return none().release();
 
             PyErr_SetString(PyExc_ValueError, cartan::message(measured.error()));

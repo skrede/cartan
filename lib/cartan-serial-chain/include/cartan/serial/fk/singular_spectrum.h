@@ -16,6 +16,7 @@
 
 #include <Eigen/SVD>
 
+#include <cmath>
 #include <type_traits>
 
 namespace cartan
@@ -37,6 +38,18 @@ using svd_matrix_t = std::conditional_t<
 template <typename Derived>
 using singular_values_t = typename Eigen::JacobiSVD<svd_matrix_t<Derived>>::SingularValuesType;
 
+/// The characteristic length divides the Jacobian's linear rows, which only a
+/// positive finite value can do. Zero and NaN leave the decomposition reading a
+/// spectrum it never computed; an infinite one annihilates the linear block and
+/// answers a plausible spectrum for a Jacobian the caller did not ask about; a
+/// negative one negates three rows, which is an orthogonal transformation, so it
+/// answers exactly as its magnitude would without saying so.
+template <typename Scalar>
+bool is_valid_characteristic_length(Scalar length)
+{
+    return length > Scalar(0) && std::isfinite(length);
+}
+
 /// Singular values of a Jacobian, largest first, whose linear rows -- the last
 /// three, in the omega-first convention -- are divided by a characteristic
 /// length so they are commensurable with the dimensionless angular rows above
@@ -53,13 +66,17 @@ cartan::expected<singular_values_t<Derived>, singularity_failure> singular_value
     const Eigen::MatrixBase<Derived>& jacobian,
     typename Derived::Scalar length = typename Derived::Scalar(1))
 {
-    svd_matrix_t<Derived> scaled = jacobian;
-    scaled.template bottomRows<3>() /= length;
-
-    if (scaled.cols() == 0)
+    if (!is_valid_characteristic_length(length))
+    {
+        return cartan::unexpected(singularity_failure::invalid_length);
+    }
+    if (jacobian.cols() == 0)
     {
         return cartan::unexpected(singularity_failure::empty_spectrum);
     }
+
+    svd_matrix_t<Derived> scaled = jacobian;
+    scaled.template bottomRows<3>() /= length;
 
     constexpr unsigned int options = (Derived::ColsAtCompileTime == Eigen::Dynamic)
         ? (Eigen::ComputeThinU | Eigen::ComputeThinV)

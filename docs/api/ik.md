@@ -619,10 +619,15 @@ enum class singularity_failure
 {
     empty_spectrum,
     zero_spectrum,
-    invalid_configuration
+    invalid_configuration,
+    invalid_length
 };
 
 constexpr const char* message(singularity_failure failure);
+constexpr bool is_invalid_argument(singularity_failure failure);
+
+template <typename Scalar>
+bool is_valid_characteristic_length(Scalar length);
 
 template <typename Derived>
 cartan::expected<singular_values_t<Derived>, singularity_failure> singular_values(
@@ -663,7 +668,11 @@ decompositions behind four one-line calls.
 
 `length` divides the Jacobian's three linear rows so they are commensurable with
 the dimensionless angular rows above them. The default of one reproduces the
-unnormalized arithmetic exactly.
+unnormalized arithmetic exactly. Only a positive finite value can divide, and
+`is_valid_characteristic_length` is the one predicate that says so: the analysis
+surface refuses anything else with `invalid_length`, and `solver_options`'
+`characteristic_length` is admitted at `setup()` through the same test, so no
+length one accepts is a length the other rejects.
 
 Every way of having no answer carries a name. `empty_spectrum` is the chain with
 no joints: the empty product is one, which would report such a chain as
@@ -673,7 +682,12 @@ distinct from having no spectrum at all, which is why it is a separate name.
 `invalid_configuration` is a `q` whose length disagrees with the chain or which
 carries a non-finite component; the `(chain, q)` overloads run through the
 checked forward kinematics and Jacobian, so such a `q` is reported rather than
-read past.
+read past. `invalid_length` is a characteristic length that cannot divide. A
+zero or NaN one leaves the decomposition reporting a spectrum it never computed
+-- with a negative largest value, which no spectrum has -- an infinite one
+annihilates the linear rows and answers a plausible spectrum for a Jacobian the
+caller did not ask about, and a negative one negates three rows, an orthogonal
+transformation, so it answers exactly as its magnitude would without saying so.
 
 `condition_number` is infinite at an exactly singular Jacobian. That is a
 measurement and not a failure -- a singular configuration has an infinite
@@ -699,13 +713,14 @@ if (auto near = cartan::is_near_singular(*sigma); near && *near)
 }
 ```
 
-Python splits the three names by kind rather than mapping them all to one
-outcome. `invalid_configuration` raises `ValueError`, the same exception
-`forward_kinematics` and both Jacobians raise for the same underlying
-`chain_failure`: a mis-sized or non-finite `q` is a bad argument. `empty_spectrum`
-and `zero_spectrum` return `None`, because nothing was wrong with the call --
-a chain with no joints is a valid chain and an entirely zero Jacobian is a valid
-Jacobian, and the measure is simply undefined on them. The annotations are
+Python splits the names by kind rather than mapping them all to one outcome, on
+the classification `is_invalid_argument` carries. `invalid_configuration` and
+`invalid_length` raise `ValueError`, the same exception `forward_kinematics` and
+both Jacobians raise for the same underlying `chain_failure`: a mis-sized or
+non-finite `q`, and a length that cannot divide, are bad arguments.
+`empty_spectrum` and `zero_spectrum` return `None`, because nothing was wrong
+with the call -- a chain with no joints is a valid chain and an entirely zero
+Jacobian is a valid Jacobian, and the measure is simply undefined on them. The annotations are
 `float | None` and `bool | None`, and the idiom is:
 
 ```python
