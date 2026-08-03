@@ -104,6 +104,21 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   configuration would report. A runner that was never set up at all answers the
   same way, for the same reason. The poison now carries the chain's joint count,
   so `last_q.size()` still reads even though no coefficient of it was measured.
+- **Breaking.** `ik_result::final_error_norm` is the residual at the
+  configuration `ik_result::solution` carries. Making the single-policy
+  multistart real -- it re-seeds the policy after every convergence -- decoupled
+  the two: the residual was read off the policy's live state, which belongs to
+  the last restart, while the solution came from the best-ranked one. On a
+  six-joint chain under `max_manipulability` with a position tolerance of 1e-6,
+  a result reported as converged carried a residual of 8.903551e-01 for a
+  configuration whose true residual is 1.165750e-07 -- five orders of magnitude
+  apart, and on the wrong side of the tolerance the solve claimed to have met.
+  The residual is now recorded with the candidate when it is ranked, which is
+  what the racing path always did. `basic_ik_runner::error_norm()` reads the
+  same value, and on the racing path reports the residual of the candidate the
+  objective selected rather than the lowest residual among the policies: under
+  `max_manipulability` on a six-joint chain those were 1.275081e-06 and
+  1.567070e-07, two configurations' residuals reported as one.
 - **Breaking.** A race whose work budget runs out with every policy still
   running reports the lowest-residual live iterate as `last_q`, with its
   measured residual in `last_error_norm`. It previously reported the seed the

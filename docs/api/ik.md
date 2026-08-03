@@ -191,6 +191,10 @@ refused, and on one that was never set up. No iteration ran, so neither was
 measured; a policy that `setup()` never configured holds a zero residual and a
 zero iterate, which read as a converged solve at the home configuration.
 
+Once a candidate has been accepted, `error_norm()` is that candidate's residual
+and agrees with the `final_error_norm` a `solve()` returns. Before then it is
+the live policy's, which is what a caller stepping the solve is watching.
+
 ### Thread safety
 
 Different runner instances may operate concurrently on the same
@@ -565,10 +569,13 @@ struct ik_result
 };
 ```
 
-Successful IK outcome. `solver_index` identifies which policy produced
-the solution in multi-policy racing. `selection_metric` is the value that
-candidate was ranked on under `selection_objective`, and is absent where the
-objective ranks nothing. `solved_feasible_set` reports whether the winning
+Successful IK outcome. `final_error_norm` is the residual measured at
+`solution` and not at any other configuration the solve passed through: under a
+non-`speed` objective the runner restarts after every convergence, so the policy
+holding the last restart's residual is generally not the one that produced the
+winner. `solver_index` identifies which policy produced the solution in
+multi-policy racing. `selection_metric` is the value that candidate was ranked
+on under `selection_objective`, and is absent where the objective ranks nothing. `solved_feasible_set` reports whether the winning
 policy solved over the chain's declared joint bounds or over a finite interval
 substituted for a non-finite one, which a backend that cannot accept an
 infinite coordinate requires.

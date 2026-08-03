@@ -16,12 +16,15 @@
 
 #include <Eigen/SVD>
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
 #include <numbers>
 
 namespace spp = cartan;
+
+using Catch::Approx;
 
 using chain6 = spp::kinematic_chain<double, 6>;
 using chain3 = spp::kinematic_chain<double, 3>;
@@ -151,6 +154,31 @@ TEST_CASE("racing manipulability does not select the lowest-residual candidate",
     REQUIRE(chosen);
     REQUIRE(rejected);
     REQUIRE(*chosen > *rejected);
+}
+
+// The accessor scanned the parked candidates for the lowest residual whatever
+// the objective ranked on, so on this fixture -- where the two disagree -- it
+// reported one candidate's residual beside another candidate's configuration.
+TEST_CASE("a race reports the winner's residual, not the lowest one", "[ik][selection]")
+{
+    auto chain = make_ur5_like_chain();
+    auto target = reachable_target(chain, joints(0.2, -1.5, 2.0, 0.7, -0.2, 1.1));
+
+    spp::basic_ik_runner solver{
+        spp::speed_ik_runner<chain6>{}, spp::robust_ik_runner<chain6>{}};
+    spp::convergence_criteria<double> criteria{1e-6, 1e-6, 200, 400};
+    spp::solver_options<double> opts{.objective = spp::ik_objective::max_manipulability};
+    solver.setup(chain, target, vec6::Zero(), criteria, opts);
+
+    auto result = solver.solve();
+    REQUIRE(result.has_value());
+
+    auto fk = spp::forward_kinematics(chain, result->solution.position);
+    REQUIRE(fk.has_value());
+    const double measured = (fk->end_effector.inverse() * target).log().norm();
+
+    CHECK(result->final_error_norm == Approx(measured).margin(1e-12));
+    CHECK(solver.error_norm() == Approx(measured).margin(1e-12));
 }
 
 TEST_CASE("racing isotropy does not select the lowest-residual candidate", "[ik][selection]")
@@ -459,4 +487,31 @@ TEST_CASE("a single-policy continuation restarts somewhere new", "[ik][selection
         spp::ik_objective::max_manipulability, chain, seed, 1.0);
     REQUIRE(at_seed);
     REQUIRE(*result->selection_metric > *at_seed);
+}
+
+// The residual reported beside a solution used to be the live policy's, and the
+// multistart moved the policy on after every convergence: the residual then
+// belonged to the last restart, the solution to the best-ranked one. Measured on
+// this fixture, a result reported converged carried 8.903551e-01 against a true
+// residual of 1.165750e-07 at the configuration it returned.
+TEST_CASE("the reported residual is measured at the returned solution", "[ik][selection]")
+{
+    auto chain = make_ur5_like_chain();
+    auto target = reachable_target(chain, joints(0.3, -0.5, 0.8, 0.1, -0.4, 0.7));
+
+    spp::basic_ik_runner<spp::lm<chain6>> solver;
+    spp::convergence_criteria<double> criteria{1e-6, 1e-6, 200, 3000};
+    spp::solver_options<double> opts{.objective = spp::ik_objective::max_manipulability};
+    solver.setup(chain, target, vec6::Zero(), criteria, opts);
+
+    auto result = solver.solve();
+    REQUIRE(result.has_value());
+
+    auto fk = spp::forward_kinematics(chain, result->solution.position);
+    REQUIRE(fk.has_value());
+    const double measured = (fk->end_effector.inverse() * target).log().norm();
+
+    CHECK(result->final_error_norm == Approx(measured).margin(1e-12));
+    CHECK(result->final_error_norm < criteria.position_tol);
+    CHECK(solver.error_norm() == Approx(measured).margin(1e-12));
 }

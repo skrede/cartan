@@ -323,13 +323,14 @@ TEST_CASE("min_error_norm objective picks the lowest-error solution", "[ik][vari
     auto result = solver.solve();
     REQUIRE(result.has_value());
 
-    // The racing selection returns the converged policy with the lowest pose
-    // residual, which is exactly what error_norm() reports as best.
-    REQUIRE(result->final_error_norm == solver.error_norm());
-
+    // Two readings of one stored value agree whatever that value is, so the
+    // residual is checked against the configuration returned beside it,
+    // recomputed here rather than read back off the solver.
     auto fk_sol = spp::testing::fk_at(chain, result->solution.position);
     auto err = (fk_sol.end_effector.inverse() * target).log();
     REQUIRE(err.norm() < 1e-4);
+    REQUIRE(std::abs(result->final_error_norm - err.norm()) < 1e-12);
+    REQUIRE(result->final_error_norm == solver.error_norm());
 }
 
 // ============================================================================

@@ -205,15 +205,14 @@ public:
         }
         if constexpr (sizeof...(Policies) == 1)
         {
-            return std::get<0>(m_policies).error_norm();
+            return m_best_error_norm.value_or(std::get<0>(m_policies).error_norm());
         }
         else
         {
-            if (m_best_solver_index >= 0)
+            const int selected = selected_index(std::index_sequence_for<Policies...>{});
+            if (selected >= 0)
             {
-                scalar_type best = std::numeric_limits<scalar_type>::max();
-                find_best_error(best, std::index_sequence_for<Policies...>{});
-                return best;
+                return m_results[static_cast<std::size_t>(selected)]->error_norm;
             }
             return lowest_error_norm(std::index_sequence_for<Policies...>{});
         }
@@ -343,6 +342,7 @@ private:
     {
         m_status = ik_status::running;
         m_best_metric = std::nullopt;
+        m_best_error_norm = std::nullopt;
         m_total_iterations = 0;
         m_found_convergence = false;
         m_best_q = detail::poison_joint_position<scalar_type, joints>(chain.num_joints());
@@ -361,15 +361,17 @@ private:
         if (policy_status == ik_status::converged)
         {
             m_found_convergence = true;
+            const scalar_type err = std::get<0>(m_policies).error_norm();
 
             if (m_objective == ik_objective::speed)
             {
                 m_status = ik_status::converged;
                 m_best_q = q;
+                m_best_error_norm = err;
                 return inner;
             }
 
-            update_best(q);
+            update_best(q, err);
             std::get<0>(m_policies).setup(m_chain->get(), m_target, restart_seed(), m_criteria);
             return {ik_status::running, inner.metrics};
         }
@@ -508,13 +510,19 @@ private:
             m_objective, m_chain->get(), q, m_reference_q, error_norm, m_length);
     }
 
-    void update_best(const position_type& q)
+    /// The residual is recorded with the configuration it was measured at. The
+    /// policy is re-seeded after every convergence, so its live residual belongs
+    /// to the last restart while the winner comes from the best-ranked one, and
+    /// reading the two from different places reports a converged solve at a
+    /// residual its own tolerance rejects.
+    void update_best(const position_type& q, scalar_type error_norm)
     {
-        auto metric = candidate_metric(q, std::get<0>(m_policies).error_norm());
+        auto metric = candidate_metric(q, error_norm);
 
         if (cartan::detail::improves_on(m_objective, metric, m_best_metric))
         {
             m_best_metric = metric;
+            m_best_error_norm = error_norm;
             m_best_q = q;
         }
     }
@@ -537,7 +545,8 @@ private:
                 ik_result<scalar_type, joints> result;
                 result.solution = joint_state<scalar_type, joints>::from_position(m_best_q);
                 result.iterations = m_total_iterations;
-                result.final_error_norm = std::get<0>(m_policies).error_norm();
+                result.final_error_norm =
+                    m_best_error_norm.value_or(std::numeric_limits<scalar_type>::quiet_NaN());
                 result.solver_index = 0;
                 result.selection_metric = m_best_metric;
                 result.selection_objective = m_objective;
@@ -558,9 +567,27 @@ private:
     select_best_result(std::index_sequence<Is...>)
         requires (sizeof...(Policies) > 1)
     {
-        if (m_objective == ik_objective::speed && m_best_solver_index >= 0)
+        const int selected = selected_index(std::index_sequence_for<Policies...>{});
+        if (selected >= 0)
         {
-            return make_result_from_parked(m_best_solver_index);
+            return make_result_from_parked(selected);
+        }
+
+        return build_error();
+    }
+
+    /// The parked candidate the objective ranks highest, and the single answer
+    /// to which policy won: the result and the runner's error norm both read it,
+    /// so the residual an accessor reports is the residual of the configuration
+    /// the result carries. `speed` ranks nothing and accepts the first to
+    /// converge, which the racing tick records as it parks the rest.
+    template <std::size_t... Is>
+    int selected_index(std::index_sequence<Is...>) const
+        requires (sizeof...(Policies) > 1)
+    {
+        if (m_objective == ik_objective::speed)
+        {
+            return m_best_solver_index;
         }
 
         int best_index = -1;
@@ -576,13 +603,7 @@ private:
             }
         };
         (check.template operator()<Is>(), ...);
-
-        if (best_index >= 0)
-        {
-            return make_result_from_parked(best_index);
-        }
-
-        return build_error();
+        return best_index;
     }
 
     cartan::expected<ik_result<scalar_type, joints>, ik_error<scalar_type, joints>>
@@ -678,21 +699,6 @@ private:
     }
 
     template <std::size_t... Is>
-    void find_best_error(scalar_type& best, std::index_sequence<Is...>) const
-        requires (sizeof...(Policies) > 1)
-    {
-        auto check = [&]<std::size_t I>()
-        {
-            if (m_results[I] && m_results[I]->converged)
-            {
-                if (m_results[I]->error_norm < best)
-                    best = m_results[I]->error_norm;
-            }
-        };
-        (check.template operator()<Is>(), ...);
-    }
-
-    template <std::size_t... Is>
     scalar_type lowest_error_norm(std::index_sequence<Is...>) const
         requires (sizeof...(Policies) > 1)
     {
@@ -720,6 +726,7 @@ private:
     position_type m_best_q;
     position_type m_reference_q;
     std::optional<scalar_type> m_best_metric{};
+    std::optional<scalar_type> m_best_error_norm{};
     ik_objective m_objective{ik_objective::speed};
     ik_status m_status{ik_status::not_initialized};
     scalar_type m_length{1};
