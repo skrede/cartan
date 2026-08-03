@@ -182,9 +182,12 @@ policy observes that at its next step boundary and consumes no further work, and
 a `solve()` afterwards fails with `ik_failure::aborted`. To run again, call
 `setup()` afresh — that is what clears the abort; there is no resume.
 
-`abort()` does not clear a `setup()` that was refused: the arguments are still
-the ones that were rejected, and there is no configured policy behind them, so
-the setup-failure status stands.
+`abort()` acts only on a solve that is running. On a runner that has already
+converged, given up, or had its `setup()` refused it does nothing: there is no
+solve to interrupt, and latching would replace a result, or the reason a search
+actually stopped, with a claim that the caller stopped it. A refused setup also
+still holds the arguments that were rejected and no configured policy behind
+them, so clearing that latch would let the next `solve()` run against nothing.
 
 `error_norm()` and `current_q()` report NaN on a runner whose `setup()` was
 refused, and on one that was never set up. No iteration ran, so neither was

@@ -222,12 +222,16 @@ public:
     const position_type& current_q() const { return m_best_q; }
     ik_status status() const { return m_status; }
 
-    /// A refused setup is not a state a caller can abort out of: the arguments
-    /// are still the ones setup() rejected, so clearing the latch here would
-    /// let the next solve() run against a policy that was never configured.
+    /// Abort interrupts a solve that is running and nothing else. There is no
+    /// terminal state a caller can abort out of: latching over one would replace
+    /// a converged result, or the reason a search actually gave up, with a claim
+    /// that the caller stopped it. A refused setup is the same case -- the
+    /// arguments are still the ones setup() rejected, so clearing the latch
+    /// would let the next solve() run against a policy that was never
+    /// configured. Call setup() again to start over.
     void abort()
     {
-        if (cartan::detail::is_setup_failure(m_status))
+        if (m_status != ik_status::running)
         {
             return;
         }
@@ -463,16 +467,12 @@ private:
         }
     }
 
+    /// Total by construction: an enumeration of the terminal statuses would read
+    /// a status added later as still running, and the policy holding it would
+    /// never be parked.
     static bool is_terminal(ik_status s)
     {
-        return s == ik_status::diverged
-            || s == ik_status::stalled
-            || s == ik_status::iteration_limit
-            || s == ik_status::joint_limit_hit
-            || s == ik_status::aborted
-            || s == ik_status::not_initialized
-            || s == ik_status::dimension_mismatch
-            || s == ik_status::non_finite_input;
+        return s != ik_status::running && s != ik_status::converged;
     }
 
     void park_all()

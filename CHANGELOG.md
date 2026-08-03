@@ -94,6 +94,13 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   value reads as a measured distance rather than as one that was never taken. In
   Python this surfaces as `IkResult.error_norm` being `nan` rather than
   `1.7976931348623157e+308` on that path.
+- **Breaking.** `basic_ik_runner::abort()` acts only on a solve that is running.
+  Its guard excluded a refused setup alone, so a call on a runner that had
+  already converged latched `aborted` over the result and the following
+  `solve()` failed -- converting a successful outcome into a failure a caller
+  could not tell from a genuine mid-solve abort, for a solve that was not
+  running to be interrupted. The same held for a solve that had given up, whose
+  real reason was replaced by the caller's.
 - **Breaking.** `singularity_failure` gains `invalid_length`, returned by
   `singular_values` and everything reading through it -- including
   `is_near_singular(chain, q, threshold, length)` -- for a characteristic length

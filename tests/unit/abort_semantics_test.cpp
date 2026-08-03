@@ -106,6 +106,25 @@ TEST_CASE("a fresh setup clears an aborted runner", "[ik][abort]")
     REQUIRE(runner.solve().has_value());
 }
 
+// Abort interrupts a solve that is running. It used to latch over any status but
+// a refused setup, so a call after a solve had already converged replaced a
+// successful outcome with a failure indistinguishable from a genuine mid-solve
+// abort -- and there was no solve to interrupt.
+TEST_CASE("abort does not overwrite a solve that already finished", "[ik][abort]")
+{
+    auto chain = fixture_chain();
+    auto target = reachable_target(chain);
+    spp::basic_ik_runner<spp::lm<chain_t>> runner;
+
+    runner.setup(chain, target, seed(), criteria());
+    REQUIRE(runner.solve().has_value());
+    REQUIRE(runner.converged());
+
+    runner.abort();
+    CHECK(runner.status() == spp::ik_status::converged);
+    CHECK(runner.solve().has_value());
+}
+
 TEST_CASE("an aborted Newton-Raphson policy is terminal at the step boundary", "[ik][abort]")
 {
     spp::newton_raphson<chain_t> policy;
