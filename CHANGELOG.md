@@ -58,12 +58,16 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   configuration that produced no Jacobian. The first two were previously the
   same empty optional and a caller could not tell them apart. `condition_number`
   is unchanged in answering infinity at a singular configuration: that is a
-  measurement, not a failure. In Python `singular_values` and the four measures
-  raise, with the same message, where they returned `None`, so the reason
-  survives the crossing instead of collapsing into a falsy value. In C++ the
-  truth-test trap survives the change -- an errored `expected` is falsy exactly
-  as an empty optional was -- and is still called out in the header and the
-  reference page.
+  measurement, not a failure. Python splits the three names by kind rather than
+  mapping them all to one outcome: `invalid_configuration` raises `ValueError`,
+  the exception `forward_kinematics` and both Jacobians already raise for the
+  same underlying failure, while `empty_spectrum` and `zero_spectrum` return
+  `None` -- nothing was wrong with the call, and forcing a `try`/`except` around
+  a jointless chain or a zero Jacobian would say otherwise. The annotations are
+  `float | None` and `bool | None`, and the idiom is
+  `if (k := condition_number(sigma)) is not None:`. In C++ the truth-test trap
+  survives the change -- an errored `expected` is falsy exactly as an empty
+  optional was -- and is still called out in the header and the reference page.
 - **Breaking.** `ik_error::condition_number` and `ik_error::near_singular` are
   removed, along with `IkResult.condition_number` and `IkResult.near_singular` in
   Python and both fields in the result's `__repr__`. Neither was ever measured:

@@ -169,11 +169,11 @@ ik_failure_reason: str = ik_result.failure_reason
 ik_termination: cartan.IkTerminationReason = ik_result.termination_reason
 ik_feasible_set: cartan.FeasibleSet = ik_result.solved_feasible_set
 
-ik_sigma = cartan.singular_values(ik_chain, ik_result.q)
-ik_condition_number: float = cartan.condition_number(ik_sigma)
-ik_manipulability: float = cartan.manipulability(ik_sigma)
-ik_isotropy: float = cartan.isotropy(ik_sigma)
-ik_near_singular: bool = cartan.is_near_singular(ik_sigma)
+if (ik_sigma := cartan.singular_values(ik_chain, ik_result.q)) is not None:
+    ik_condition_number: float | None = cartan.condition_number(ik_sigma)
+    ik_manipulability: float | None = cartan.manipulability(ik_sigma)
+    ik_isotropy: float | None = cartan.isotropy(ik_sigma)
+    ik_near_singular: bool | None = cartan.is_near_singular(ik_sigma)
 
 ik_result_speed: cartan.IkResult = cartan.solve_ik_speed(ik_chain, ik_target, ik_q_seed)
 ik_result_robust: cartan.IkResult = cartan.solve_ik_robust(ik_chain, ik_target, ik_q_seed)

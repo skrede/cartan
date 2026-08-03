@@ -5,7 +5,7 @@
 #include "cartan/serial/fk/singularity_analysis.h"
 #include "cartan/serial/fk/singularity_failure.h"
 
-#include "detail/expected_caster.h"
+#include "detail/singularity_caster.h"
 #include "registrations.h"
 
 #include <nanobind/eigen/dense.h>
@@ -66,8 +66,11 @@ void register_fk(nb::module_& m)
 
     // Spectrum first, then the measures read off it: one decomposition answers
     // all four questions, and a per-measure (chain, q) form would hide four.
-    // Each of them raises rather than returning None where it has no answer, so
-    // the reason survives the crossing instead of collapsing into a falsy value.
+    // Each returns None where its measure is undefined and raises ValueError
+    // where the configuration is the caller's mistake, the same exception the
+    // three functions above raise for the same failure; the split lives in
+    // detail/singularity_caster.h, so the return types below read Optional in
+    // Python.
     m.def("singular_values",
           [](const KinematicChaind& chain,
              const nb::DRef<const VectorXd>& q,
@@ -76,8 +79,9 @@ void register_fk(nb::module_& m)
           },
           "Singular values of the body Jacobian at q, largest first, with the "
           "linear rows divided by length so they are commensurable with the "
-          "angular ones. Raises for a chain with no joints, and for a q whose "
-          "length disagrees with the chain or carries a non-finite component.",
+          "angular ones. None for a chain with no joints. Raises ValueError for "
+          "a q whose length disagrees with the chain or carries a non-finite "
+          "component.",
           nb::arg("chain"), nb::arg("q").noconvert(), nb::arg("length") = 1.0);
 
     m.def("condition_number",
@@ -85,7 +89,7 @@ void register_fk(nb::module_& m)
               return cartan::condition_number(sigma);
           },
           "Ratio of largest to smallest singular value: one at an isotropic "
-          "Jacobian, infinite at a singular one. Raises on an empty spectrum.",
+          "Jacobian, infinite at a singular one. None on an empty spectrum.",
           nb::arg("singular_values").noconvert());
 
     m.def("manipulability",
@@ -94,7 +98,7 @@ void register_fk(nb::module_& m)
           },
           "Yoshikawa's manipulability, the product of the singular values -- "
           "the manipulability ellipsoid's volume up to a constant factor. "
-          "Raises on an empty spectrum, since the empty product of one would "
+          "None on an empty spectrum, since the empty product of one would "
           "read as maximally manipulable.",
           nb::arg("singular_values").noconvert());
 
@@ -103,7 +107,7 @@ void register_fk(nb::module_& m)
               return cartan::isotropy(sigma);
           },
           "Salisbury's isotropy index, the inverse condition number: one where "
-          "the ellipsoid is a sphere, zero at a singularity. Raises on an empty "
+          "the ellipsoid is a sphere, zero at a singularity. None on an empty "
           "spectrum, and on an entirely zero Jacobian, which has no ratio.",
           nb::arg("singular_values").noconvert());
 
@@ -111,8 +115,8 @@ void register_fk(nb::module_& m)
           [](const nb::DRef<const VectorXd>& sigma, double threshold) -> Measured<bool> {
               return cartan::is_near_singular(sigma, threshold);
           },
-          "Whether the condition number is at or above threshold. Raises on an "
-          "empty spectrum rather than answering a falsy None.",
+          "Whether the condition number is at or above threshold. None on an "
+          "empty spectrum, which is neither near a singularity nor far from one.",
           nb::arg("singular_values").noconvert(),
           nb::arg("threshold") = cartan::default_singularity_threshold_v<double>);
 
@@ -123,7 +127,8 @@ void register_fk(nb::module_& m)
              double length) -> Measured<bool> {
               return cartan::is_near_singular(chain, q, threshold, length);
           },
-          "is_near_singular at a configuration of the chain.",
+          "is_near_singular at a configuration of the chain, raising ValueError "
+          "for a q the chain cannot accept.",
           nb::arg("chain"), nb::arg("q").noconvert(),
           nb::arg("threshold") = cartan::default_singularity_threshold_v<double>,
           nb::arg("length") = 1.0);

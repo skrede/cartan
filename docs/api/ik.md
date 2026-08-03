@@ -684,9 +684,19 @@ if (auto near = cartan::is_near_singular(*sigma); near && *near)
 }
 ```
 
-In Python each of these raises where it has no answer, carrying the same message,
-rather than returning a falsy `None` that a truth test would read as
-"well conditioned".
+Python splits the three names by kind rather than mapping them all to one
+outcome. `invalid_configuration` raises `ValueError`, the same exception
+`forward_kinematics` and both Jacobians raise for the same underlying
+`chain_failure`: a mis-sized or non-finite `q` is a bad argument. `empty_spectrum`
+and `zero_spectrum` return `None`, because nothing was wrong with the call --
+a chain with no joints is a valid chain and an entirely zero Jacobian is a valid
+Jacobian, and the measure is simply undefined on them. The annotations are
+`float | None` and `bool | None`, and the idiom is:
+
+```python
+if (kappa := cartan.condition_number(sigma)) is not None:
+    ...
+```
 
 ## Limits Policies
 

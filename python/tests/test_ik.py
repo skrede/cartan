@@ -387,10 +387,12 @@ def test_singularity_analysis_reads_one_spectrum(
     q = _random_q_within_limits(chain, rng)
 
     sigma = cartan.singular_values(chain, q)
+    assert sigma is not None
     assert sigma.shape == (min(6, chain.num_joints()),)
     assert np.all(np.diff(sigma) <= 0.0), "singular values are largest first"
 
     kappa = cartan.condition_number(sigma)
+    assert kappa is not None
     assert kappa == pytest.approx(sigma[0] / sigma[-1])
     assert cartan.manipulability(sigma) == pytest.approx(float(np.prod(sigma)))
     assert cartan.isotropy(sigma) == pytest.approx(1.0 / kappa)
@@ -402,24 +404,25 @@ def test_singularity_analysis_reads_one_spectrum(
     assert cartan.is_near_singular(chain, q, kappa * 0.5) is True
 
 
-def test_singularity_analysis_names_the_reason_it_cannot_answer() -> None:
+def test_singularity_analysis_is_undefined_rather_than_wrong_without_a_spectrum() -> None:
     empty = np.zeros(0, dtype=np.float64)
 
-    # A falsy None would conflate "no answer" with "not near a singularity", so
-    # each measure raises and says which of them it is instead.
+    # A chain with no joints is a valid chain and an entirely zero Jacobian is a
+    # valid Jacobian; the caller did nothing wrong, so the measure is absent
+    # rather than an error to be caught.
     for measure in (
         cartan.condition_number,
         cartan.manipulability,
         cartan.isotropy,
         cartan.is_near_singular,
     ):
-        with pytest.raises(RuntimeError, match="no joints"):
-            measure(empty)
+        assert measure(empty) is None
 
-    # An entirely zero Jacobian has a spectrum, and no ratio to take against it.
-    # That is a different absence, and it says so.
-    with pytest.raises(RuntimeError, match="entirely zero"):
-        cartan.isotropy(np.zeros(3, dtype=np.float64))
+    assert cartan.isotropy(np.zeros(3, dtype=np.float64)) is None
+
+    jointless = cartan.KinematicChain(cartan.SE3.identity(), [], [])
+    assert cartan.singular_values(jointless, empty) is None
+    assert cartan.is_near_singular(jointless, empty) is None
 
 
 def test_singularity_analysis_refuses_a_configuration_the_chain_cannot_accept(
@@ -427,12 +430,14 @@ def test_singularity_analysis_refuses_a_configuration_the_chain_cannot_accept(
 ) -> None:
     chain = cartanbot_chain
 
-    with pytest.raises(RuntimeError, match="does not produce a Jacobian"):
+    # A mis-sized or non-finite q is a bad argument, so it raises the same
+    # ValueError body_jacobian raises for it rather than answering None.
+    with pytest.raises(ValueError, match="does not produce a Jacobian"):
         cartan.singular_values(chain, np.zeros(chain.num_joints() - 1, dtype=np.float64))
 
     poisoned = np.zeros(chain.num_joints(), dtype=np.float64)
     poisoned[0] = np.nan
-    with pytest.raises(RuntimeError, match="does not produce a Jacobian"):
+    with pytest.raises(ValueError, match="does not produce a Jacobian"):
         cartan.is_near_singular(chain, poisoned)
 
 
