@@ -3,10 +3,11 @@
 #include "cartan/serial/fk/jacobian.h"
 #include "cartan/serial/fk/forward_kinematics.h"
 #include "cartan/serial/fk/singularity_analysis.h"
+#include "cartan/serial/fk/singularity_failure.h"
 
+#include "detail/expected_caster.h"
 #include "registrations.h"
 
-#include <nanobind/stl/optional.h>
 #include <nanobind/eigen/dense.h>
 #include <nanobind/nanobind.h>
 
@@ -19,6 +20,9 @@ using SE3d = cartan::se3<double>;
 using KinematicChaind = cartan::kinematic_chain<double, cartan::dynamic>;
 using VectorXd = Eigen::Matrix<double, Eigen::Dynamic, 1>;
 using JacobianMatrixd = cartan::jacobian_matrix<double, cartan::dynamic>;
+
+template <typename T>
+using Measured = cartan::expected<T, cartan::singularity_failure>;
 
 }
 
@@ -62,53 +66,53 @@ void register_fk(nb::module_& m)
 
     // Spectrum first, then the measures read off it: one decomposition answers
     // all four questions, and a per-measure (chain, q) form would hide four.
+    // Each of them raises rather than returning None where it has no answer, so
+    // the reason survives the crossing instead of collapsing into a falsy value.
     m.def("singular_values",
           [](const KinematicChaind& chain,
              const nb::DRef<const VectorXd>& q,
-             double length) -> VectorXd {
-              auto fk = cartan::forward_kinematics(chain, q);
-              if (!fk) throw nb::value_error(cartan::message(fk.error()));
-              return cartan::singular_values(
-                  cartan::body_jacobian_unchecked(chain, *fk), length);
+             double length) -> Measured<VectorXd> {
+              return cartan::singular_values(chain, q, length);
           },
           "Singular values of the body Jacobian at q, largest first, with the "
           "linear rows divided by length so they are commensurable with the "
-          "angular ones. Empty for a chain with no joints.",
+          "angular ones. Raises for a chain with no joints, and for a q whose "
+          "length disagrees with the chain or carries a non-finite component.",
           nb::arg("chain"), nb::arg("q").noconvert(), nb::arg("length") = 1.0);
 
     m.def("condition_number",
-          [](const nb::DRef<const VectorXd>& sigma) -> std::optional<double> {
+          [](const nb::DRef<const VectorXd>& sigma) -> Measured<double> {
               return cartan::condition_number(sigma);
           },
           "Ratio of largest to smallest singular value: one at an isotropic "
-          "Jacobian, infinite at a singular one, None on an empty spectrum.",
+          "Jacobian, infinite at a singular one. Raises on an empty spectrum.",
           nb::arg("singular_values").noconvert());
 
     m.def("manipulability",
-          [](const nb::DRef<const VectorXd>& sigma) -> std::optional<double> {
+          [](const nb::DRef<const VectorXd>& sigma) -> Measured<double> {
               return cartan::manipulability(sigma);
           },
           "Yoshikawa's manipulability, the product of the singular values -- "
-          "the manipulability ellipsoid's volume up to a constant factor. None "
-          "on an empty spectrum, since the empty product of one would read as "
-          "maximally manipulable.",
+          "the manipulability ellipsoid's volume up to a constant factor. "
+          "Raises on an empty spectrum, since the empty product of one would "
+          "read as maximally manipulable.",
           nb::arg("singular_values").noconvert());
 
     m.def("isotropy",
-          [](const nb::DRef<const VectorXd>& sigma) -> std::optional<double> {
+          [](const nb::DRef<const VectorXd>& sigma) -> Measured<double> {
               return cartan::isotropy(sigma);
           },
           "Salisbury's isotropy index, the inverse condition number: one where "
-          "the ellipsoid is a sphere, zero at a singularity.",
+          "the ellipsoid is a sphere, zero at a singularity. Raises on an empty "
+          "spectrum, and on an entirely zero Jacobian, which has no ratio.",
           nb::arg("singular_values").noconvert());
 
     m.def("is_near_singular",
-          [](const nb::DRef<const VectorXd>& sigma, double threshold) -> std::optional<bool> {
+          [](const nb::DRef<const VectorXd>& sigma, double threshold) -> Measured<bool> {
               return cartan::is_near_singular(sigma, threshold);
           },
-          "Whether the condition number is at or above threshold. None on an "
-          "empty spectrum. Note that None is falsy, so test the value rather "
-          "than the result.",
+          "Whether the condition number is at or above threshold. Raises on an "
+          "empty spectrum rather than answering a falsy None.",
           nb::arg("singular_values").noconvert(),
           nb::arg("threshold") = cartan::default_singularity_threshold_v<double>);
 
@@ -116,12 +120,8 @@ void register_fk(nb::module_& m)
           [](const KinematicChaind& chain,
              const nb::DRef<const VectorXd>& q,
              double threshold,
-             double length) -> std::optional<bool> {
-              auto fk = cartan::forward_kinematics(chain, q);
-              if (!fk) throw nb::value_error(cartan::message(fk.error()));
-              return cartan::is_near_singular(
-                  cartan::singular_values(cartan::body_jacobian_unchecked(chain, *fk), length),
-                  threshold);
+             double length) -> Measured<bool> {
+              return cartan::is_near_singular(chain, q, threshold, length);
           },
           "is_near_singular at a configuration of the chain.",
           nb::arg("chain"), nb::arg("q").noconvert(),

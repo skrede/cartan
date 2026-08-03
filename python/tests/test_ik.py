@@ -391,7 +391,6 @@ def test_singularity_analysis_reads_one_spectrum(
     assert np.all(np.diff(sigma) <= 0.0), "singular values are largest first"
 
     kappa = cartan.condition_number(sigma)
-    assert kappa is not None
     assert kappa == pytest.approx(sigma[0] / sigma[-1])
     assert cartan.manipulability(sigma) == pytest.approx(float(np.prod(sigma)))
     assert cartan.isotropy(sigma) == pytest.approx(1.0 / kappa)
@@ -403,15 +402,38 @@ def test_singularity_analysis_reads_one_spectrum(
     assert cartan.is_near_singular(chain, q, kappa * 0.5) is True
 
 
-def test_singularity_analysis_is_absent_rather_than_false_without_a_spectrum() -> None:
+def test_singularity_analysis_names_the_reason_it_cannot_answer() -> None:
     empty = np.zeros(0, dtype=np.float64)
 
-    # None is falsy, so a truth test conflates "no answer" with "not near a
-    # singularity". Each of these must be checked against None, not for truth.
-    assert cartan.condition_number(empty) is None
-    assert cartan.manipulability(empty) is None
-    assert cartan.isotropy(empty) is None
-    assert cartan.is_near_singular(empty) is None
+    # A falsy None would conflate "no answer" with "not near a singularity", so
+    # each measure raises and says which of them it is instead.
+    for measure in (
+        cartan.condition_number,
+        cartan.manipulability,
+        cartan.isotropy,
+        cartan.is_near_singular,
+    ):
+        with pytest.raises(RuntimeError, match="no joints"):
+            measure(empty)
+
+    # An entirely zero Jacobian has a spectrum, and no ratio to take against it.
+    # That is a different absence, and it says so.
+    with pytest.raises(RuntimeError, match="entirely zero"):
+        cartan.isotropy(np.zeros(3, dtype=np.float64))
+
+
+def test_singularity_analysis_refuses_a_configuration_the_chain_cannot_accept(
+    cartanbot_chain: cartan.KinematicChain,
+) -> None:
+    chain = cartanbot_chain
+
+    with pytest.raises(RuntimeError, match="does not produce a Jacobian"):
+        cartan.singular_values(chain, np.zeros(chain.num_joints() - 1, dtype=np.float64))
+
+    poisoned = np.zeros(chain.num_joints(), dtype=np.float64)
+    poisoned[0] = np.nan
+    with pytest.raises(RuntimeError, match="does not produce a Jacobian"):
+        cartan.is_near_singular(chain, poisoned)
 
 
 def test_feasible_set_enum_values() -> None:

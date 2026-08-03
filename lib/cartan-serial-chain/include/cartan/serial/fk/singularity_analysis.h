@@ -1,99 +1,35 @@
 #ifndef HPP_GUARD_CARTAN_SERIAL_FK_SINGULARITY_ANALYSIS_H
 #define HPP_GUARD_CARTAN_SERIAL_FK_SINGULARITY_ANALYSIS_H
 
-/// Singularity analysis of a body Jacobian: its spectrum, and the four measures
-/// read off that spectrum.
+/// The four measures of distance to a singularity, read off one spectrum.
 ///
-/// One decomposition feeds every measure, so a caller who wants more than one
-/// asks for the singular values once and passes them around. That is why there
-/// is no per-measure (chain, q) overload: four of them would hide four
-/// decompositions behind four one-line calls.
+/// Every no-answer case carries a name from singularity_failure rather than
+/// collapsing into a single absence, so a caller can tell a chain with no
+/// joints from a configuration that produced no Jacobian.
 
-#include "cartan/serial/fk/jacobian.h"
-#include "cartan/serial/fk/forward_kinematics.h"
+#include "cartan/expected.h"
 
-#include <Eigen/SVD>
+#include "cartan/serial/fk/singular_spectrum.h"
+#include "cartan/serial/fk/singularity_failure.h"
 
 #include <limits>
-#include <optional>
-#include <type_traits>
 
 namespace cartan
 {
 
-/// The matrix type the decomposition runs through.
-///
-/// Eigen takes a decomposition's diagonal size from the fixed dimension when
-/// only one of the two is fixed, so JacobiSVD over a 6-by-dynamic Jacobian
-/// declares a fixed six singular values and aborts resizing them for a chain
-/// that does not have exactly six joints. Decomposing a fully dynamic copy
-/// costs one allocation on an analysis path and answers for every joint count.
-template <typename Derived>
-using svd_matrix_t = std::conditional_t<
-    Derived::ColsAtCompileTime == Eigen::Dynamic,
-    Eigen::Matrix<typename Derived::Scalar, Eigen::Dynamic, Eigen::Dynamic>,
-    typename Derived::PlainObject>;
-
-template <typename Derived>
-using singular_values_t = typename Eigen::JacobiSVD<svd_matrix_t<Derived>>::SingularValuesType;
-
-/// Singular values of a Jacobian, largest first, whose linear rows -- the last
-/// three, in the omega-first convention -- are divided by a characteristic
-/// length so they are commensurable with the dimensionless angular rows above
-/// them. Without that division the product below has no coherent unit and the
-/// ratio compares incommensurables. The default of one reproduces the
-/// unnormalized arithmetic exactly.
-///
-/// Empty where the Jacobian has no columns. The guard precedes the
-/// decomposition because constructing one over an empty matrix is itself the
-/// fault: Eigen's preconditioner resizes a fixed-size vector to zero, which
-/// trips an assertion in a checked build and faults in one without.
-template <typename Derived>
-singular_values_t<Derived> singular_values(
-    const Eigen::MatrixBase<Derived>& jacobian,
-    typename Derived::Scalar length = typename Derived::Scalar(1))
-{
-    svd_matrix_t<Derived> scaled = jacobian;
-    scaled.template bottomRows<3>() /= length;
-
-    if (scaled.cols() == 0)
-    {
-        return singular_values_t<Derived>{};
-    }
-
-    constexpr unsigned int options = (Derived::ColsAtCompileTime == Eigen::Dynamic)
-        ? (Eigen::ComputeThinU | Eigen::ComputeThinV)
-        : (Eigen::ComputeFullU | Eigen::ComputeFullV);
-    return Eigen::JacobiSVD<svd_matrix_t<Derived>>(scaled, options).singularValues();
-}
-
-/// singular_values of the chain's body Jacobian at q.
-///
-/// This is the spelling to reach for. The measures below are defined on the
-/// body Jacobian, and handing the space Jacobian to the overload above compiles
-/// and answers a different question.
-template <typename Chain, typename Vector>
-singular_values_t<jacobian_matrix<typename Chain::scalar_type, Chain::joints>> singular_values(
-    const Chain& chain,
-    const Vector& q,
-    typename Chain::scalar_type length = typename Chain::scalar_type(1))
-{
-    return singular_values(
-        body_jacobian_unchecked(chain, forward_kinematics_unchecked(chain, q)), length);
-}
-
 /// Ratio of the largest singular value to the smallest: one at an isotropic
 /// Jacobian, growing without bound towards a singularity and infinite at one.
-///
-/// Absent where the spectrum is empty, which is the chain with no joints.
+/// That infinity is a measurement and not a failure -- a singular configuration
+/// has an infinite condition number.
 template <typename Vector>
-std::optional<typename Vector::Scalar> condition_number(const Vector& sigma)
+cartan::expected<typename Vector::Scalar, singularity_failure>
+condition_number(const Vector& sigma)
 {
     using scalar = typename Vector::Scalar;
 
     if (sigma.size() == 0)
     {
-        return std::nullopt;
+        return cartan::unexpected(singularity_failure::empty_spectrum);
     }
     const scalar smallest = sigma(sigma.size() - 1);
     if (!(smallest > scalar(0)))
@@ -113,11 +49,12 @@ std::optional<typename Vector::Scalar> condition_number(const Vector& sigma)
 /// set is one, which would report a chain with no joints as maximally
 /// manipulable.
 template <typename Vector>
-std::optional<typename Vector::Scalar> manipulability(const Vector& sigma)
+cartan::expected<typename Vector::Scalar, singularity_failure>
+manipulability(const Vector& sigma)
 {
     if (sigma.size() == 0)
     {
-        return std::nullopt;
+        return cartan::unexpected(singularity_failure::empty_spectrum);
     }
     return sigma.prod();
 }
@@ -128,13 +65,18 @@ std::optional<typename Vector::Scalar> manipulability(const Vector& sigma)
 /// Salisbury & Craig, Articulated Hands: Force Control and Kinematic Issues,
 /// International Journal of Robotics Research 1(1), 1982.
 template <typename Vector>
-std::optional<typename Vector::Scalar> isotropy(const Vector& sigma)
+cartan::expected<typename Vector::Scalar, singularity_failure>
+isotropy(const Vector& sigma)
 {
     using scalar = typename Vector::Scalar;
 
-    if (sigma.size() == 0 || !(sigma(0) > scalar(0)))
+    if (sigma.size() == 0)
     {
-        return std::nullopt;
+        return cartan::unexpected(singularity_failure::empty_spectrum);
+    }
+    if (!(sigma(0) > scalar(0)))
+    {
+        return cartan::unexpected(singularity_failure::zero_spectrum);
     }
     return sigma(sigma.size() - 1) / sigma(0);
 }
@@ -149,10 +91,14 @@ std::optional<typename Vector::Scalar> isotropy(const Vector& sigma)
 template <typename Scalar>
 inline constexpr Scalar default_singularity_threshold_v = Scalar(1e3);
 
-/// Whether the configuration is within threshold of a singularity, or nullopt
-/// where the spectrum is empty and the question has no answer.
+/// Whether the configuration is within threshold of a singularity.
+///
+/// Writing `if (is_near_singular(sigma))` asks whether the question was
+/// answerable, not whether the configuration is near a singularity: an errored
+/// expected is falsy exactly as an empty optional was. Test the value, or
+/// answer the unanswerable case explicitly.
 template <typename Vector>
-std::optional<bool> is_near_singular(
+cartan::expected<bool, singularity_failure> is_near_singular(
     const Vector& sigma,
     typename Vector::Scalar threshold =
         default_singularity_threshold_v<typename Vector::Scalar>)
@@ -160,26 +106,27 @@ std::optional<bool> is_near_singular(
     auto kappa = condition_number(sigma);
     if (!kappa)
     {
-        return std::nullopt;
+        return cartan::unexpected(kappa.error());
     }
     return *kappa >= threshold;
 }
 
-/// is_near_singular at a configuration of the chain.
-///
-/// Writing `if (is_near_singular(chain, q))` on the optional compiles and asks
-/// whether the question was answerable, not whether the configuration is near a
-/// singularity. Test the value, or pass the answer for the unanswerable case
-/// explicitly.
+/// is_near_singular at a configuration of the chain, carrying the same
+/// truth-test trap as the overload above.
 template <typename Chain, typename Vector>
-std::optional<bool> is_near_singular(
+cartan::expected<bool, singularity_failure> is_near_singular(
     const Chain& chain,
     const Vector& q,
     typename Chain::scalar_type threshold =
         default_singularity_threshold_v<typename Chain::scalar_type>,
     typename Chain::scalar_type length = typename Chain::scalar_type(1))
 {
-    return is_near_singular(singular_values(chain, q, length), threshold);
+    auto sigma = singular_values(chain, q, length);
+    if (!sigma)
+    {
+        return cartan::unexpected(sigma.error());
+    }
+    return is_near_singular(*sigma, threshold);
 }
 
 }

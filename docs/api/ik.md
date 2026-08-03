@@ -26,7 +26,9 @@ See [IK Methods](../background/ik-methods.md) | [IK Composition Guide](../guides
 | `cartan::basic_ik_runner` | `#include <cartan/serial/ik/basic_ik_runner.h>` |
 | `cartan::convergence_criteria`, `cartan::ik_status`, `cartan::ik_termination_reason`, `cartan::ik_failure`, `cartan::ik_objective`, `cartan::feasible_set`, `cartan::step_metrics`, `cartan::step_result`, `cartan::solver_options` | `#include <cartan/serial/ik/ik_status.h>` |
 | `cartan::ik_result`, `cartan::ik_error` | `#include <cartan/serial/ik/ik_result.h>` |
-| `cartan::singular_values`, `condition_number`, `manipulability`, `isotropy`, `is_near_singular` | `#include <cartan/serial/fk/singularity_analysis.h>` |
+| `cartan::condition_number`, `manipulability`, `isotropy`, `is_near_singular` | `#include <cartan/serial/fk/singularity_analysis.h>` |
+| `cartan::singular_values` | `#include <cartan/serial/fk/singular_spectrum.h>` |
+| `cartan::singularity_failure` | `#include <cartan/serial/fk/singularity_failure.h>` |
 | `cartan::solve_policy` concept, `cartan::step_one` | `#include <cartan/serial/ik/concepts/solve_concept.h>` |
 | `cartan::no_limits`, `cartan::clamp_limits`, `cartan::null_space_limits` | `#include <cartan/serial/ik/policy/limits_policy.h>` |
 | `cartan::error_weight` | `#include <cartan/serial/ik/policy/error_weight.h>` |
@@ -598,29 +600,43 @@ objectives read the same definitions.
 
 <!-- cartan:unbuilt kind=declaration -->
 ```cpp
+enum class singularity_failure
+{
+    empty_spectrum,
+    zero_spectrum,
+    invalid_configuration
+};
+
+constexpr const char* message(singularity_failure failure);
+
 template <typename Derived>
-singular_values_t<Derived> singular_values(
+cartan::expected<singular_values_t<Derived>, singularity_failure> singular_values(
     const Eigen::MatrixBase<Derived>& jacobian,
     typename Derived::Scalar length = typename Derived::Scalar(1));
 
 template <typename Chain, typename Vector>
-singular_values_t<jacobian_matrix<typename Chain::scalar_type, Chain::joints>> singular_values(
-    const Chain& chain, const Vector& q, typename Chain::scalar_type length = 1);
+cartan::expected<
+    singular_values_t<jacobian_matrix<typename Chain::scalar_type, Chain::joints>>,
+    singularity_failure>
+singular_values(const Chain& chain, const Vector& q, typename Chain::scalar_type length = 1);
 
-template <typename Vector> std::optional<typename Vector::Scalar> condition_number(const Vector& sigma);
-template <typename Vector> std::optional<typename Vector::Scalar> manipulability(const Vector& sigma);
-template <typename Vector> std::optional<typename Vector::Scalar> isotropy(const Vector& sigma);
+template <typename Vector>
+cartan::expected<typename Vector::Scalar, singularity_failure> condition_number(const Vector& sigma);
+template <typename Vector>
+cartan::expected<typename Vector::Scalar, singularity_failure> manipulability(const Vector& sigma);
+template <typename Vector>
+cartan::expected<typename Vector::Scalar, singularity_failure> isotropy(const Vector& sigma);
 
 template <typename Scalar>
 inline constexpr Scalar default_singularity_threshold_v = Scalar(1e3);
 
 template <typename Vector>
-std::optional<bool> is_near_singular(
+cartan::expected<bool, singularity_failure> is_near_singular(
     const Vector& sigma,
     typename Vector::Scalar threshold = default_singularity_threshold_v<typename Vector::Scalar>);
 
 template <typename Chain, typename Vector>
-std::optional<bool> is_near_singular(
+cartan::expected<bool, singularity_failure> is_near_singular(
     const Chain& chain, const Vector& q,
     typename Chain::scalar_type threshold = default_singularity_threshold_v<typename Chain::scalar_type>,
     typename Chain::scalar_type length = 1);
@@ -634,24 +650,43 @@ decompositions behind four one-line calls.
 the dimensionless angular rows above them. The default of one reproduces the
 unnormalized arithmetic exactly.
 
-Each measure is absent, not zero, on an empty spectrum -- a chain with no
-joints. The empty product is one, which would report such a chain as maximally
-manipulable. `condition_number` is infinite at an exactly singular Jacobian.
+Every way of having no answer carries a name. `empty_spectrum` is the chain with
+no joints: the empty product is one, which would report such a chain as
+maximally manipulable, so no measure answers on it. `zero_spectrum` is the
+entirely zero Jacobian, where the isotropy ratio has nothing to divide by --
+distinct from having no spectrum at all, which is why it is a separate name.
+`invalid_configuration` is a `q` whose length disagrees with the chain or which
+carries a non-finite component; the `(chain, q)` overloads run through the
+checked forward kinematics and Jacobian, so such a `q` is reported rather than
+read past.
+
+`condition_number` is infinite at an exactly singular Jacobian. That is a
+measurement and not a failure -- a singular configuration has an infinite
+condition number.
 
 `is_near_singular` takes the threshold as an argument because how close is too
-close is a property of the robot and the task. Note that an absent optional is
-falsy in both C++ and Python, so test the value rather than the result:
-`is_near_singular(chain, q)` answers "was the question answerable", not "is this
-configuration near a singularity".
+close is a property of the robot and the task. Note that an errored `expected`
+is falsy exactly as an empty optional was, so test the value rather than the
+result: `is_near_singular(chain, q)` answers "was the question answerable", not
+"is this configuration near a singularity".
 
-<!-- cartan:unbuilt kind=sketch reason="names a chain and a configuration the page never defines, so it shows the call shape and the optional's truth-test trap" -->
+<!-- cartan:unbuilt kind=sketch reason="names a chain and a configuration the page never defines, so it shows the call shape and the expected's truth-test trap" -->
 ```cpp
 auto sigma = cartan::singular_values(chain, q);
-if (auto near = cartan::is_near_singular(sigma); near && *near)
+if (!sigma)
+{
+    log(cartan::message(sigma.error()));
+    return;
+}
+if (auto near = cartan::is_near_singular(*sigma); near && *near)
 {
     // back off along the trajectory
 }
 ```
+
+In Python each of these raises where it has no answer, carrying the same message,
+rather than returning a falsy `None` that a truth test would read as
+"well conditioned".
 
 ## Limits Policies
 

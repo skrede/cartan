@@ -15,10 +15,10 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   singularity analysis and manipulability-ellipsoid plotting along a trajectory
   do not pull in the solver stack. Ask for the spectrum once and read every
   measure off it; there is deliberately no per-measure `(chain, q)` form, which
-  would hide four decompositions behind four one-line calls. Each measure is
-  absent rather than zero on an empty spectrum, and `is_near_singular` takes its
-  threshold as an argument with a documented default of `1e3`, because how close
-  is too close is a property of the robot and the task. The selection objectives
+  would hide four decompositions behind four one-line calls. Each measure names
+  why it has no answer rather than reporting a zero, and `is_near_singular` takes
+  its threshold as an argument with a documented default of `1e3`, because how
+  close is too close is a property of the robot and the task. The selection objectives
   read these same definitions, so a caller analyzing a configuration and the
   racing selection ranking it cannot drift apart.
 - `cartan::feasible_set` and `ik_result::solved_feasible_set` (Python:
@@ -45,6 +45,25 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   comparison that is false for a NaN.
 
 ### Changed
+- **Breaking.** The singularity-analysis surface returns
+  `cartan::expected<T, cartan::singularity_failure>` where it first returned
+  `std::optional<T>`, and its `(chain, q)` overloads run through the checked
+  forward kinematics and Jacobian rather than the unchecked ones. That second
+  half is the defect: a joint vector whose length disagreed with the chain was
+  read past the end of, which is an assertion failure in a checked build and a
+  plausible spectrum computed from adjacent memory in one built with `NDEBUG`.
+  Every way of having no answer now carries a name -- `empty_spectrum` for a
+  chain with no joints, `zero_spectrum` for the entirely zero Jacobian whose
+  isotropy ratio has nothing to divide by, and `invalid_configuration` for a
+  configuration that produced no Jacobian. The first two were previously the
+  same empty optional and a caller could not tell them apart. `condition_number`
+  is unchanged in answering infinity at a singular configuration: that is a
+  measurement, not a failure. In Python `singular_values` and the four measures
+  raise, with the same message, where they returned `None`, so the reason
+  survives the crossing instead of collapsing into a falsy value. In C++ the
+  truth-test trap survives the change -- an errored `expected` is falsy exactly
+  as an empty optional was -- and is still called out in the header and the
+  reference page.
 - **Breaking.** `ik_error::condition_number` and `ik_error::near_singular` are
   removed, along with `IkResult.condition_number` and `IkResult.near_singular` in
   Python and both fields in the result's `__repr__`. Neither was ever measured:

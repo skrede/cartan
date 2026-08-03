@@ -77,7 +77,9 @@ std::optional<ik_status> selection_admissibility(
 /// The measures, the characteristic-length normalization they are read through
 /// and the empty-spectrum guard all live once, in fk/singularity_analysis.h, so
 /// a caller analyzing a configuration and the selection ranking it cannot drift
-/// apart.
+/// apart. The named reason for an absent measure is dropped here rather than
+/// propagated: a ranking only needs to know that a candidate cannot be ranked,
+/// and improves_on below is what acts on that.
 template <typename Chain, typename Vector>
 std::optional<typename Chain::scalar_type> jacobian_metric(
     ik_objective objective,
@@ -85,10 +87,17 @@ std::optional<typename Chain::scalar_type> jacobian_metric(
     const Vector& q,
     typename Chain::scalar_type length)
 {
+    using scalar = typename Chain::scalar_type;
+
     auto sigma = singular_values(chain, q, length);
-    return objective == ik_objective::max_manipulability
-        ? manipulability(sigma)
-        : isotropy(sigma);
+    if (!sigma)
+    {
+        return std::nullopt;
+    }
+    auto measure = objective == ik_objective::max_manipulability
+        ? manipulability(*sigma)
+        : isotropy(*sigma);
+    return measure ? std::optional<scalar>(*measure) : std::nullopt;
 }
 
 /// The metric a candidate is ranked on, absent where the objective defines

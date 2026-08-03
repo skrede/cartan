@@ -11,6 +11,7 @@
 
 #include <cartan/serial/fk/forward_kinematics.h>
 #include <cartan/serial/fk/singularity_analysis.h>
+#include <cartan/serial/fk/singularity_failure.h>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -119,9 +120,12 @@ TEST_CASE("a chain with no joints is still refused under a Jacobian objective", 
         CHECK(result.error().reason == spp::ik_failure::unsupported_configuration);
     }
 
-    auto sigma = spp::singular_values(chain, Eigen::VectorXd::Zero(0));
-    CHECK(sigma.size() == 0);
-    CHECK_FALSE(spp::manipulability(sigma));
-    CHECK_FALSE(spp::isotropy(sigma));
-    CHECK_FALSE(spp::condition_number(sigma));
+    auto spectrum = spp::singular_values(chain, Eigen::VectorXd::Zero(0));
+    REQUIRE_FALSE(spectrum.has_value());
+    CHECK(spectrum.error() == spp::singularity_failure::empty_spectrum);
+
+    Eigen::VectorXd empty(0);
+    CHECK_FALSE(spp::manipulability(empty));
+    CHECK_FALSE(spp::isotropy(empty));
+    CHECK_FALSE(spp::condition_number(empty));
 }

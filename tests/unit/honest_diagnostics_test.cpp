@@ -17,6 +17,7 @@
 #include <cartan/serial/fk/jacobian.h>
 #include <cartan/serial/fk/forward_kinematics.h>
 #include <cartan/serial/fk/singularity_analysis.h>
+#include <cartan/serial/fk/singularity_failure.h>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -78,7 +79,9 @@ TEST_CASE("the singularity measures are read off one spectrum", "[ik][diagnostic
         J, Eigen::ComputeFullU | Eigen::ComputeFullV);
     const auto& raw = svd.singularValues();
 
-    auto sigma = spp::singular_values(chain, q);
+    auto spectrum = spp::singular_values(chain, q);
+    REQUIRE(spectrum);
+    const auto& sigma = *spectrum;
     REQUIRE(sigma.size() == raw.size());
     CHECK((sigma - raw).norm() < 1e-15);
 
@@ -99,12 +102,16 @@ TEST_CASE("the characteristic length still scales the linear rows", "[ik][diagno
     vec6 q;
     q << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
 
-    auto unit = spp::manipulability(spp::singular_values(chain, q, 1.0));
+    auto unit_spectrum = spp::singular_values(chain, q, 1.0);
+    REQUIRE(unit_spectrum);
+    auto unit = spp::manipulability(*unit_spectrum);
     REQUIRE(unit);
 
     for (double length : {0.5, 0.1, 0.01})
     {
-        auto scaled = spp::manipulability(spp::singular_values(chain, q, length));
+        auto spectrum = spp::singular_values(chain, q, length);
+        REQUIRE(spectrum);
+        auto scaled = spp::manipulability(*spectrum);
         REQUIRE(scaled);
         CHECK(*scaled == Approx(*unit / (length * length * length)).epsilon(1e-12));
     }
@@ -116,7 +123,9 @@ TEST_CASE("an exactly singular Jacobian reports an infinite condition number", "
     Eigen::VectorXd q(2);
     q << 0.4, -0.7;
 
-    auto sigma = spp::singular_values(chain, q);
+    auto spectrum = spp::singular_values(chain, q);
+    REQUIRE(spectrum);
+    const auto& sigma = *spectrum;
     REQUIRE(sigma.size() == 2);
 
     REQUIRE(spp::condition_number(sigma));
@@ -140,7 +149,9 @@ TEST_CASE("the near-singularity threshold is the caller's", "[ik][diagnostics]")
     vec6 q;
     q << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
 
-    auto sigma = spp::singular_values(chain, q);
+    auto spectrum = spp::singular_values(chain, q);
+    REQUIRE(spectrum);
+    const auto& sigma = *spectrum;
     auto kappa = spp::condition_number(sigma);
     REQUIRE(kappa);
     REQUIRE(std::isfinite(*kappa));
@@ -154,14 +165,62 @@ TEST_CASE("the near-singularity threshold is the caller's", "[ik][diagnostics]")
     CHECK(spp::default_singularity_threshold_v<double> == 1e3);
 }
 
-TEST_CASE("an unmeasurable spectrum answers nothing rather than false", "[ik][diagnostics]")
+// Each way of having no answer carries its own name, which a single shared
+// absence could not say.
+TEST_CASE("an unmeasurable spectrum names why rather than answering false", "[ik][diagnostics]")
 {
     chain_dyn chain(spp::se3<double>::identity(), {}, {});
-    auto sigma = spp::singular_values(chain, Eigen::VectorXd::Zero(0));
 
-    CHECK(sigma.size() == 0);
-    CHECK_FALSE(spp::is_near_singular(sigma).has_value());
-    CHECK_FALSE(spp::is_near_singular(chain, Eigen::VectorXd::Zero(0)).has_value());
+    auto spectrum = spp::singular_values(chain, Eigen::VectorXd::Zero(0));
+    REQUIRE_FALSE(spectrum.has_value());
+    CHECK(spectrum.error() == spp::singularity_failure::empty_spectrum);
+
+    auto near = spp::is_near_singular(chain, Eigen::VectorXd::Zero(0));
+    REQUIRE_FALSE(near.has_value());
+    CHECK(near.error() == spp::singularity_failure::empty_spectrum);
+}
+
+// A joint vector the chain cannot accept used to be read past the end of: an
+// assertion failure in a checked build, and a plausible spectrum computed from
+// whatever followed the vector in memory in one built with NDEBUG.
+TEST_CASE("a configuration the chain cannot accept is reported, not read past", "[ik][diagnostics]")
+{
+    auto shorter_than_the_chain = make_duplicated_axis_chain();
+    Eigen::VectorXd one(1);
+    one << 0.3;
+
+    auto mismatched = spp::singular_values(shorter_than_the_chain, one);
+    REQUIRE_FALSE(mismatched.has_value());
+    CHECK(mismatched.error() == spp::singularity_failure::invalid_configuration);
+
+    auto chain = make_ur5_like_chain();
+    vec6 poisoned = vec6::Zero();
+    poisoned(3) = std::numeric_limits<double>::quiet_NaN();
+
+    auto near = spp::is_near_singular(chain, poisoned);
+    REQUIRE_FALSE(near.has_value());
+    CHECK(near.error() == spp::singularity_failure::invalid_configuration);
+}
+
+// An entirely zero Jacobian has a spectrum, and none of it is positive. That is
+// a different absence from having no spectrum at all, and the isotropy ratio is
+// the one measure that cannot be taken against it.
+TEST_CASE("an entirely zero Jacobian is its own no-answer", "[ik][diagnostics]")
+{
+    auto spectrum = spp::singular_values(Eigen::Matrix<double, 6, 3>::Zero());
+    REQUIRE(spectrum);
+    REQUIRE(spectrum->size() == 3);
+    CHECK(spectrum->isZero());
+
+    auto ratio = spp::isotropy(*spectrum);
+    REQUIRE_FALSE(ratio.has_value());
+    CHECK(ratio.error() == spp::singularity_failure::zero_spectrum);
+    CHECK_FALSE(ratio.error() == spp::singularity_failure::empty_spectrum);
+
+    REQUIRE(spp::condition_number(*spectrum));
+    CHECK(std::isinf(*spp::condition_number(*spectrum)));
+    REQUIRE(spp::manipulability(*spectrum));
+    CHECK(*spp::manipulability(*spectrum) == Approx(0.0).margin(1e-15));
 }
 
 // ============================================================================
