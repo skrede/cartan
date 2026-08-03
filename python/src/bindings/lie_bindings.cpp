@@ -3,7 +3,6 @@
 #include "cartan/lie/lie_failure.h"
 
 #include "registrations.h"
-#include "detail/expected_caster.h"
 
 #include <nanobind/eigen/dense.h>
 #include <nanobind/nanobind.h>

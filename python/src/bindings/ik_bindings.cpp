@@ -15,7 +15,6 @@
 
 #include "registrations.h"
 #include "detail/ik_python_helpers.h"
-#include "detail/expected_caster.h"
 #include "detail/format_double.h"
 
 #include <nanobind/eigen/dense.h>

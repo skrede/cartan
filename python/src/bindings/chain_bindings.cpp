@@ -4,7 +4,6 @@
 #include "cartan/lie/se3.h"
 
 #include "registrations.h"
-#include "detail/expected_caster.h"
 
 #include <nanobind/eigen/dense.h>
 #include <nanobind/stl/vector.h>

@@ -21,7 +21,6 @@
 
 #include "registrations.h"
 
-#include "detail/expected_caster.h"
 #include "detail/format_double.h"
 #include "detail/analytical_python_helpers.h"
 
