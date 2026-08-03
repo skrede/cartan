@@ -129,24 +129,42 @@ TEST_CASE("newton_raphson leaves the configuration untouched when nothing is acc
     REQUIRE((stepper.solution() - before).norm() == 0.0);
 }
 
-// The control: with the box wide enough that the projection never binds, the
-// trajectory is the one the uncorrected line search produced, iteration for
-// iteration. This is what confines the correction to the projection interaction.
+// The control: the correction lives entirely in the projection, so where the
+// projection does not bind it must change nothing.
+//
+// Stated as an invariance rather than as a remembered trajectory. The line
+// search clips each trial to the box unconditionally -- q_trial is
+// (q + alpha*dq) clamped to the chain's limits -- so a box no iterate reaches
+// leaves q_trial equal to the raw step and the projected Armijo quantity equal
+// to the classical one. Two such boxes must therefore produce the same run, and
+// the same run here means bit for bit: both are evaluated by one build on one
+// machine, so any difference is the projection binding and not the arithmetic
+// drifting. An earlier version pinned a converged error captured from the
+// pre-correction build to seventeen decimal places, which is a fact about the
+// machine that captured it -- it failed on AppleClang and MSVC while passing on
+// x86-64 Linux, and no toolchain owed it.
 TEST_CASE("newton_raphson converges unchanged when the limits never bind",
     "[ik][newton_raphson][line_search]")
 {
-    constexpr int k_control_steps = 6;
-    constexpr double k_control_error = 9.7627407778e-07;
+    auto narrow = bounded_ur3e(2 * std::numbers::pi);
+    policy_type narrow_stepper;
+    narrow_stepper.setup(
+        narrow, walked_target(narrow), Eigen::Vector<double, 6>::Zero(), budget(60));
+    auto narrow_walk = walk(narrow_stepper, narrow, 60);
 
-    auto chain = bounded_ur3e(2 * std::numbers::pi);
-    policy_type stepper;
-    stepper.setup(chain, walked_target(chain), Eigen::Vector<double, 6>::Zero(), budget(60));
+    auto wide = bounded_ur3e(8 * std::numbers::pi);
+    policy_type wide_stepper;
+    wide_stepper.setup(wide, walked_target(wide), Eigen::Vector<double, 6>::Zero(), budget(60));
+    auto wide_walk = walk(wide_stepper, wide, 60);
 
-    auto walked = walk(stepper, chain, 60);
+    INFO("converged in " << narrow_walk.steps << " steps at error " << narrow_walk.final_error
+        << "; the four-times-wider box took " << wide_walk.steps << " steps at error "
+        << wide_walk.final_error);
 
-    INFO("converged in " << walked.steps << " steps at error " << walked.final_error);
-    REQUIRE(walked.status == cartan::ik_status::converged);
-    REQUIRE(walked.rises == 0);
-    REQUIRE(walked.steps == k_control_steps);
-    REQUIRE(std::abs(walked.final_error - k_control_error) < 1e-17);
+    REQUIRE(narrow_walk.status == cartan::ik_status::converged);
+    REQUIRE(narrow_walk.rises == 0);
+
+    REQUIRE(wide_walk.status == narrow_walk.status);
+    REQUIRE(wide_walk.steps == narrow_walk.steps);
+    REQUIRE(wide_walk.final_error == narrow_walk.final_error);
 }
