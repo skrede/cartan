@@ -97,6 +97,7 @@ public:
         m_iterations = 0;
         m_error_norm = std::numeric_limits<scalar_type>::max();
         m_status = ik_status::running;
+        m_termination_reason = ik_termination_reason::unknown;
         m_error_history.clear();
 
         auto fk = forward_kinematics_unchecked(chain, q0);
@@ -207,7 +208,12 @@ public:
     scalar_type error_norm() const { return m_error_norm; }
     int iterations() const { return m_iterations; }
     ik_status status() const { return m_status; }
-    void abort() { m_status = ik_status::stalled; }
+    ik_termination_reason termination_reason() const { return m_termination_reason; }
+    void abort()
+    {
+        m_status = ik_status::aborted;
+        m_termination_reason = ik_termination_reason::solver_aborted;
+    }
 
 private:
     using argmin_solver = argmin::step_budget_solver<
@@ -238,6 +244,7 @@ private:
     int m_iterations{};
     int m_setup_joints{-1};
     ik_status m_status{ik_status::not_initialized};
+    ik_termination_reason m_termination_reason{ik_termination_reason::unknown};
     std::optional<cartan::detail::argmin_ik_least_squares_problem<Chain>> m_problem;
     std::optional<argmin_solver> m_solver;
 };

@@ -441,15 +441,16 @@ TEST_CASE("multi-policy abort resets status to running", "[ik][variadic_solver]"
     solver.setup(chain, target, q0, criteria);
 
     solver.abort();
-    REQUIRE(solver.status() == spp::ik_status::running);
+    REQUIRE(solver.status() == spp::ik_status::aborted);
 
-    // A subsequent step after abort must not crash and returns a valid status.
+    // A step after the abort is terminal and free, and the whole solve that
+    // follows reports the abort rather than a stall or a spent budget.
     auto s = solver.step();
-    REQUIRE((s == spp::ik_status::running
-             || s == spp::ik_status::converged
-             || s == spp::ik_status::iteration_limit
-             || s == spp::ik_status::stalled
-             || s == spp::ik_status::diverged));
+    REQUIRE(s == spp::ik_status::aborted);
+
+    auto result = solver.solve();
+    REQUIRE_FALSE(result.has_value());
+    REQUIRE(result.error().reason == spp::ik_failure::aborted);
 }
 
 // ============================================================================

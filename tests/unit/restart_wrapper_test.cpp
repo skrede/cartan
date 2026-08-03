@@ -328,7 +328,7 @@ TEST_CASE("restart_wrapper step after abort short-circuits", "[ik][restart]")
     stepper.abort();
 
     auto r = stepper.step(chain, 5);
-    REQUIRE(r.status == spp::ik_status::stalled);
+    REQUIRE(r.status == spp::ik_status::aborted);
     REQUIRE(r.metrics.units_consumed == 0);
 }
 

@@ -16,6 +16,22 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   comparison that is false for a NaN.
 
 ### Changed
+- **Breaking.** `abort()` is now terminal for the solve it interrupts. The runner
+  previously assigned itself `running` immediately after aborting its policies,
+  so `status()` reported `running` and the caller's instruction left no trace on
+  the runner at all; with a policy whose `abort()` body was empty — `dls`, `lm`,
+  `newton_raphson`, `lbfgsb` — the abort was ignored outright and the whole
+  `solve()` that followed still returned a solution. Every other policy did stop,
+  but reported the abort as `ik_status::stalled`, indistinguishable from a solve
+  that ran out of progress on its own. `abort()` now latches a new
+  `ik_status::aborted`; every policy, the restart wrapper and the runner report
+  that one state; a step taken after an abort consumes no work; and a `solve()`
+  after an abort fails with `ik_failure::aborted`, a reason that was declared,
+  given a message and bound to Python but never produced until now. There is no
+  resume: code that aborted and then re-solved must call `setup()` again, which
+  is what clears the abort. `ik_status` gains a value, so a switch over it that
+  was previously exhaustive now needs an `aborted` arm. There is no deprecation
+  path and no compatibility shim.
 - **Breaking.** `basic_ik_runner::step()` and `step_n()` now charge the work they
   consume against `convergence_criteria::max_total_work_units` and stop once it
   is spent. Previously neither touched the runner's accumulator and neither read

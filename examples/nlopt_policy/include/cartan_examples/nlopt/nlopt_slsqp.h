@@ -229,7 +229,7 @@ public:
     void abort()
     {
         m_opt.force_stop();
-        m_status = ik_status::stalled;
+        m_status = ik_status::aborted;
     }
 
     ik_status status() const { return m_status; }

@@ -27,6 +27,7 @@ enum class ik_status
     stalled,
     joint_limit_hit,
     iteration_limit,
+    aborted,
     not_initialized,
     dimension_mismatch,
     non_finite_input
@@ -50,6 +51,8 @@ constexpr const char* message(ik_status status)
         return "Solution lies outside the joint limits";
     case ik_status::iteration_limit:
         return "Iteration budget exhausted before convergence";
+    case ik_status::aborted:
+        return "Solve was aborted by the caller";
     case ik_status::not_initialized:
         return "Solver was stepped before setup";
     case ik_status::dimension_mismatch:

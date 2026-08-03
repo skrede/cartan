@@ -174,9 +174,14 @@ ik_status status() const;
 void abort();
 ```
 
-`abort()` returns the runner to `running` so a later `solve()` resumes, but it
-does not clear a `setup()` that was refused: the arguments are still the ones
-that were rejected, and there is no configured policy behind them.
+`abort()` is terminal for the solve it interrupts. It latches `aborted`, every
+policy observes that at its next step boundary and consumes no further work, and
+a `solve()` afterwards fails with `ik_failure::aborted`. To run again, call
+`setup()` afresh — that is what clears the abort; there is no resume.
+
+`abort()` does not clear a `setup()` that was refused: the arguments are still
+the ones that were rejected, and there is no configured policy behind them, so
+the setup-failure status stands.
 
 ### Thread safety
 
@@ -328,6 +333,7 @@ enum class ik_status
     stalled,
     joint_limit_hit,
     iteration_limit,
+    aborted,
     not_initialized,
     dimension_mismatch,
     non_finite_input

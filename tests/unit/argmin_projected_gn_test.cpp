@@ -174,7 +174,7 @@ TEST_CASE("argmin_projected_gn abort from running state transitions to stalled",
 
     REQUIRE(solver.status() == cartan::ik_status::running);
     solver.abort();
-    REQUIRE(solver.status() == cartan::ik_status::stalled);
+    REQUIRE(solver.status() == cartan::ik_status::aborted);
     REQUIRE(solver.termination_reason() == cartan::ik_termination_reason::solver_aborted);
 }
 

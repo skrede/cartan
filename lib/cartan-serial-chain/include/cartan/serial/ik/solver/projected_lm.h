@@ -202,7 +202,7 @@ public:
         int units = 0;
         if (m_aborted)
         {
-            return {ik_status::stalled, {0, m_error_norm}};
+            return {ik_status::aborted, {0, m_error_norm}};
         }
         while (units < N && m_status != ik_status::converged)
         {
@@ -247,7 +247,13 @@ public:
     const position_type& solution() const { return m_best_valid ? m_best_q : m_q; }
     scalar_type error_norm() const { return m_best_valid ? m_best_error : m_error_norm; }
     int iterations() const { return m_total_iterations; }
-    void abort() { m_aborted = true; }
+    // The step loop admits any non-converged status, so the latch rather than
+    // the status is what stops it; the status is set so status() agrees.
+    void abort()
+    {
+        m_aborted = true;
+        m_status = ik_status::aborted;
+    }
     scalar_type lambda() const { return m_lambda; }
     void set_lambda(scalar_type l) { m_lambda = l; }
     ik_status status() const { return m_status; }

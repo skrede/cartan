@@ -225,7 +225,7 @@ public:
             return;
         }
         abort_all(std::index_sequence_for<Policies...>{});
-        m_status = ik_status::running;
+        m_status = ik_status::aborted;
     }
 
 private:
@@ -411,6 +411,7 @@ private:
             || s == ik_status::stalled
             || s == ik_status::iteration_limit
             || s == ik_status::joint_limit_hit
+            || s == ik_status::aborted
             || s == ik_status::not_initialized
             || s == ik_status::dimension_mismatch
             || s == ik_status::non_finite_input;
@@ -652,6 +653,9 @@ private:
                 break;
             case ik_status::joint_limit_hit:
                 err.reason = ik_failure::joint_limit_violation;
+                break;
+            case ik_status::aborted:
+                err.reason = ik_failure::aborted;
                 break;
             default:
                 err.reason = ik_failure::iteration_limit;

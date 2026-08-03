@@ -204,7 +204,7 @@ public:
     void abort()
     {
         m_opt.force_stop();
-        m_status = ik_status::stalled;
+        m_status = ik_status::aborted;
     }
 
     /// Current solve policy status.

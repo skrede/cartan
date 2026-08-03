@@ -287,7 +287,7 @@ public:
 
     void abort()
     {
-        m_status = ik_status::stalled;
+        m_status = ik_status::aborted;
         m_termination_reason = ik_termination_reason::solver_aborted;
     }
 

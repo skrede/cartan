@@ -205,7 +205,7 @@ public:
     const position_type& solution() const { return m_q; }
     scalar_type error_norm() const { return m_error_norm; }
     int iterations() const { return m_iterations; }
-    void abort() {}
+    void abort() { m_status = ik_status::aborted; }
     ik_status status() const { return m_status; }
 
 private:

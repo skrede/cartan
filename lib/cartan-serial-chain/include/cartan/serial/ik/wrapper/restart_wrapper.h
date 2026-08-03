@@ -226,7 +226,7 @@ public:
 
         if (m_aborted)
         {
-            return {ik_status::stalled, {0, m_inner.error_norm()}};
+            return {ik_status::aborted, {0, m_inner.error_norm()}};
         }
 
         auto inner_result = m_inner.step(chain, N);
