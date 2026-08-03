@@ -18,6 +18,7 @@
 #include <array>
 #include <cmath>
 #include <numbers>
+#include <utility>
 
 namespace cartan
 {
@@ -101,9 +102,9 @@ public:
 
     /// Construct from a chain (borrows reference; chain must outlive generator)
     /// and the configuration a joint unbounded on both sides is seeded around.
-    halton_seed_generator(const Chain& chain, const position_type& reference)
+    halton_seed_generator(const Chain& chain, position_type reference)
         : m_chain(&chain)
-        , m_reference(reference)
+        , m_reference(std::move(reference))
     {
     }
 
