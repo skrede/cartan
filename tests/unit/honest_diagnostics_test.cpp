@@ -241,6 +241,42 @@ TEST_CASE("a refused setup leaves the residual poison in place", "[ik][diagnosti
     REQUIRE_FALSE(result.has_value());
     CHECK(result.error().reason == spp::ik_failure::non_finite_input);
     CHECK(std::isnan(result.error().last_error_norm));
+    CHECK(result.error().last_q.array().isNaN().all());
+
+    // The accessor reads the same state. It used to delegate to a policy setup()
+    // never configured, whose accumulator is zero -- the residual of a converged
+    // solve -- for a runner that ran nothing.
+    CHECK(std::isnan(solver.error_norm()));
+    CHECK(std::isnan(spp::basic_ik_runner<spp::lm<chain6>>{}.error_norm()));
+}
+
+// The budget can run out with every policy still running, so nothing parked and
+// no candidate was ever accepted. The seed reported here before is where the
+// solve started, not where it failed, and it stood beside a residual poison
+// saying the very same pair had not been measured.
+TEST_CASE("a race the budget cuts off reports a live iterate", "[ik][diagnostics]")
+{
+    auto chain = make_ur5_like_chain();
+    spp::basic_ik_runner solver{spp::lm<chain6>{}, spp::lm<chain6>{}};
+    spp::convergence_criteria<double> criteria{1e-9, 1e-9, 100, 3};
+
+    vec6 seed;
+    seed << 0.11, 0.22, 0.33, 0.44, 0.55, 0.66;
+    spp::vector3<double> far_trans;
+    far_trans << 100.0, 100.0, 100.0;
+    solver.setup(chain, spp::se3<double>(spp::so3<double>::identity(), far_trans), seed, criteria);
+
+    auto result = solver.solve();
+    REQUIRE_FALSE(result.has_value());
+    CHECK(result.error().reason == spp::ik_failure::iteration_limit);
+    REQUIRE(std::isfinite(result.error().last_error_norm));
+    CHECK_FALSE(result.error().last_q.isApprox(seed));
+
+    auto fk = spp::forward_kinematics(chain, result.error().last_q);
+    REQUIRE(fk.has_value());
+    auto twist = (fk->end_effector.inverse()
+        * spp::se3<double>(spp::so3<double>::identity(), far_trans)).log();
+    CHECK(twist.norm() == Approx(result.error().last_error_norm));
 }
 
 // ============================================================================

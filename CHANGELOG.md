@@ -94,6 +94,22 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   value reads as a measured distance rather than as one that was never taken. In
   Python this surfaces as `IkResult.error_norm` being `nan` rather than
   `1.7976931348623157e+308` on that path.
+- **Breaking.** `ik_error::last_q` keeps its NaN poison when `setup()` refuses
+  its arguments, and `basic_ik_runner::error_norm()` and `current_q()` report
+  NaN there as well. Only half of that pair was honest before: the refused path
+  reported an all-zero configuration, which reads as the home pose and is
+  exactly the fabrication the type's own documentation names, while the runner's
+  accessors read a residual of zero and an iterate of zero off a policy `setup()`
+  never configured -- the values a solve that converged at the home
+  configuration would report. A runner that was never set up at all answers the
+  same way, for the same reason. The poison now carries the chain's joint count,
+  so `last_q.size()` still reads even though no coefficient of it was measured.
+- **Breaking.** A race whose work budget runs out with every policy still
+  running reports the lowest-residual live iterate as `last_q`, with its
+  measured residual in `last_error_norm`. It previously reported the seed the
+  solve started from beside a residual poison saying nothing had been measured
+  -- two fields disagreeing about the same event, one of them naming the
+  starting configuration as the failing one.
 - **Breaking.** `ik_objective::min_distance` is removed and replaced by
   `ik_objective::min_error_norm`. The old name promised a distance and selected
   on the pose residual; the name was the untruth, so the name changed and the

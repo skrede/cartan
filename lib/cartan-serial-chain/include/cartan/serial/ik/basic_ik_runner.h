@@ -194,8 +194,15 @@ public:
 
     bool converged() const { return m_status == ik_status::converged; }
 
+    /// A runner whose setup was refused, or never called, has no policy behind
+    /// it that measured anything; a policy's own accumulator reads zero there,
+    /// which is the value a converged solve reports.
     scalar_type error_norm() const
     {
+        if (cartan::detail::is_setup_failure(m_status))
+        {
+            return std::numeric_limits<scalar_type>::quiet_NaN();
+        }
         if constexpr (sizeof...(Policies) == 1)
         {
             return std::get<0>(m_policies).error_norm();
@@ -338,7 +345,7 @@ private:
         m_best_metric = std::nullopt;
         m_total_iterations = 0;
         m_found_convergence = false;
-        m_best_q = position_type::Zero(chain.num_joints());
+        m_best_q = detail::poison_joint_position<scalar_type, joints>(chain.num_joints());
         m_early_stop = false;
         m_parked = {};
         m_results = {};
@@ -599,11 +606,12 @@ private:
         ik_error<scalar_type, joints> err;
         err.termination_reason = ik_termination_reason::unknown;
 
-        // A refused setup ran no iteration, so there is no last iterate to
-        // report; reading one off a policy would hand back the previous solve's.
-        // The residual keeps the type's poison for the same reason: the largest
-        // representable value reads as a measured distance rather than as one
-        // that was never measured.
+        // A refused setup ran no iteration, so neither field was measured and
+        // both keep the poison: reading an iterate off a policy would hand back
+        // the previous solve's, a zero vector reads as the home configuration,
+        // and the largest representable residual reads as a measured distance.
+        // The iterate carries the chain's joint count so its size stays
+        // readable, which the type's own default cannot supply.
         if (cartan::detail::is_setup_failure(m_status))
         {
             err.last_q = m_best_q;
@@ -638,12 +646,35 @@ private:
             }
             else
             {
-                err.last_q = m_best_q;
+                report_live_iterate(err, std::index_sequence_for<Policies...>{});
             }
         }
 
         err.reason = cartan::detail::failure_reason_for(m_status);
         return cartan::unexpected(err);
+    }
+
+    /// The lowest-residual live iterate, for a budget exhausted with every
+    /// policy still running: no policy parked, so those iterates are the only
+    /// configurations the solve measured. Reporting the seed instead would name
+    /// the configuration the solve started at as the one it failed at.
+    template <std::size_t... Is>
+    void report_live_iterate(ik_error<scalar_type, joints>& err, std::index_sequence<Is...>) const
+        requires (sizeof...(Policies) > 1)
+    {
+        scalar_type best = std::numeric_limits<scalar_type>::max();
+        auto check = [&]<std::size_t I>()
+        {
+            const auto& policy = std::get<I>(m_policies);
+            if (policy.error_norm() < best)
+            {
+                best = policy.error_norm();
+                err.last_q = policy.solution();
+                err.last_error_norm = best;
+                err.termination_reason = policy_termination_reason(policy);
+            }
+        };
+        (check.template operator()<Is>(), ...);
     }
 
     template <std::size_t... Is>

@@ -75,6 +75,15 @@ typename joint_state<Scalar, N>::position_type poison_joint_position()
     }
 }
 
+/// The same poison over a known joint count, for a dynamic vector whose size a
+/// caller reads even where its coefficients were never measured.
+template <typename Scalar, int N>
+typename joint_state<Scalar, N>::position_type poison_joint_position(int joints)
+{
+    return joint_state<Scalar, N>::position_type::Constant(
+        joints, std::numeric_limits<Scalar>::quiet_NaN());
+}
+
 }
 
 }

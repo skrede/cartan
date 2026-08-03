@@ -186,6 +186,11 @@ a `solve()` afterwards fails with `ik_failure::aborted`. To run again, call
 the ones that were rejected, and there is no configured policy behind them, so
 the setup-failure status stands.
 
+`error_norm()` and `current_q()` report NaN on a runner whose `setup()` was
+refused, and on one that was never set up. No iteration ran, so neither was
+measured; a policy that `setup()` never configured holds a zero residual and a
+zero iterate, which read as a converged solve at the home configuration.
+
 ### Thread safety
 
 Different runner instances may operate concurrently on the same
@@ -585,7 +590,10 @@ struct ik_error
 Failure diagnostic. `last_q` is the joint configuration at the time of
 failure; `last_error_norm` is the residual at that configuration. Both default
 to a NaN poison, so a refused setup -- which measured neither -- reports them as
-unmeasured rather than as a home pose at an enormous residual.
+unmeasured rather than as a home pose at an enormous residual. The two are
+always read from the same configuration: a race the budget cuts off with every
+policy still running reports the best of the live iterates and its residual, not
+the seed the solve started from.
 
 Jacobian conditioning is not carried here. It is computed from `last_q` through
 [`fk/singularity_analysis.h`](#singularity-analysis), which answers the same
