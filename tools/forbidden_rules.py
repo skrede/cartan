@@ -3,11 +3,19 @@
 
 Separated from the driver because the two families span two languages and two
 file sets; one flat pattern list would read as if the build rules were bolted
-onto a C++ tool.
+onto a C++ tool. The supplier-pin, attribute, sink-detail and doc-text rules
+each live in their own module for the same reason and are re-exported here so
+the driver keeps a single import line.
 """
 
 import re
 from pathlib import Path
+
+from forbidden_rules_attributes import attribute_findings
+from forbidden_rules_detail import URDF_DETAIL_AREA, detail_findings
+from forbidden_rules_docs import DOCS_PATH, doc_findings
+from forbidden_rules_supplier import (find_package_findings, meios_link_findings,
+                                      pugixml_findings, revision_findings)
 
 CXX_EXTENSIONS = frozenset({".h", ".hh", ".hpp", ".hxx", ".inl", ".ipp",
                             ".c", ".cc", ".cpp", ".cxx"})
@@ -50,6 +58,14 @@ def in_cxx_scope(path: str) -> bool:
 def in_build_scope(path: str) -> bool:
     name = Path(path)
     return name.name in BUILD_NAMES or name.suffix == BUILD_SUFFIX
+
+
+def in_urdf_detail_scope(path: str) -> bool:
+    return in_cxx_scope(path) and path.startswith(URDF_DETAIL_AREA)
+
+
+def in_docs_scope(path: str) -> bool:
+    return path == DOCS_PATH
 
 
 def blanked(match: re.Match) -> str:
@@ -116,6 +132,7 @@ def cxx_findings(text: str):
         if arity <= 2:
             yield line_of(body, match.start()), f"{match.group()} with {arity} argument(s)", \
                 SINKLESS_LOAD
+    yield from attribute_findings(body)
 
 
 def assigned_value(remainder: str) -> str | None:
@@ -140,9 +157,14 @@ def option_assignments(text: str):
 
 
 def build_findings(text: str):
+    body = strip_hash_comments(text)
     for line, tail, value in option_assignments(text):
         if value == "true":
             yield line, f"{EVAL_OPTION}{tail}".strip(), EVAL_ENABLED
+    yield from find_package_findings(body)
+    yield from revision_findings(body)
+    yield from pugixml_findings(body)
+    yield from meios_link_findings(body)
 
 
 def pins_option(text: str) -> bool:

@@ -87,6 +87,78 @@ CASES = [
       "profiling/probe.cpp": "meios::load_into(path, opts, sink, log);\n"}, 0, "no forbidden call"),
     ("a tree holding neither a C++ nor a build file",
      {"README.md": "meios::load_into(path, opts, sink, log)\n"}, 6, "no tracked C++ or build file"),
+
+    ("a version argument on the supplier's find_package call",
+     {"lib/urdf.h": GOOD_CALL,
+      "cmake/Supplier.cmake": PIN + "find_package(meios 1.2.3 CONFIG QUIET GLOBAL)\n"},
+     1, "a version argument on the supplier's find_package call"),
+    ("the revision pin naming a branch instead of a full SHA",
+     {"lib/urdf.h": GOOD_CALL,
+      "cmake/Supplier.cmake": PIN + "set(CARTAN_MEIOS_REVISION master)\n"},
+     1, "is not a full 40-character hex commit SHA"),
+    ("pugixml re-entering the direct dependency set",
+     {"lib/urdf.h": GOOD_CALL, "cmake/Supplier.cmake": PIN,
+      "lib/cartan-urdf/CMakeLists.txt": "find_package(pugixml CONFIG REQUIRED)\n"},
+     1, "pugixml enters cartan only transitively"),
+    ("a target other than cartan_urdf linking the supplier",
+     {"lib/urdf.h": GOOD_CALL, "cmake/Supplier.cmake": PIN,
+      "lib/cartan-lie/CMakeLists.txt": "target_link_libraries(cartan_lie INTERFACE meios::urdf)\n"},
+     1, "only cartan_urdf may name the supplier"),
+    ("cartan_urdf itself linking the supplier is the one allowed target",
+     {"lib/urdf.h": GOOD_CALL, "cmake/Supplier.cmake": PIN,
+      "lib/cartan-urdf/CMakeLists.txt": "target_link_libraries(cartan_urdf INTERFACE meios::urdf)\n"},
+     0, "no forbidden call"),
+
+    ("a decorative attribute", {"lib/attr.h": "[[nodiscard]] int f();\n", "cmake/Supplier.cmake": PIN},
+     1, "[[nodiscard]] is a decorative attribute"),
+    ("a compiler-required attribute is accepted",
+     {"lib/attr.h": "[[noreturn]] void die();\n", "cmake/Supplier.cmake": PIN},
+     0, "no forbidden call"),
+
+    ("axis squaredNorm re-derived in the model sink",
+     {"lib/cartan-urdf/include/cartan/urdf/detail/model_sink.h": "auto n = axis.squaredNorm();\n",
+      "cmake/Supplier.cmake": PIN}, 1, "the axis gate lives in build.h"),
+    ("axis isfinite re-derived in the model sink",
+     {"lib/cartan-urdf/include/cartan/urdf/detail/model_sink.h":
+      "if (!std::isfinite(axis_sq)) { return; }\n", "cmake/Supplier.cmake": PIN},
+     1, "the axis gate lives in build.h"),
+    ("screw_axis::revolute called from the model sink",
+     {"lib/cartan-urdf/include/cartan/urdf/detail/model_sink.h":
+      "auto a = screw_axis<double>::revolute(axis, point);\n", "cmake/Supplier.cmake": PIN},
+     1, "bypasses the axis gate in build.h"),
+    ("squaredNorm in build.h itself is not scanned",
+     {"lib/cartan-urdf/include/cartan/urdf/build.h": "auto n = axis.squaredNorm();\n",
+      "cmake/Supplier.cmake": PIN}, 0, "no forbidden call"),
+    ("isfinite on an unrelated scalar in the detail directory is not axis re-derivation",
+     {"lib/cartan-urdf/include/cartan/urdf/detail/narrowing.h":
+      "if (!std::isfinite(value)) { return; }\n", "cmake/Supplier.cmake": PIN},
+     0, "no forbidden call"),
+
+    ("the process-authority sentence missing from the guide",
+     {"lib/urdf.h": GOOD_CALL, "cmake/Supplier.cmake": PIN,
+      "docs/guides/robot-descriptions.md":
+      "### The unrestricted Python backend\nNo warning here.\n"},
+     1, "does not appear in the unrestricted-backend section verbatim"),
+    ("the process-authority sentence present but outside its section",
+     {"lib/urdf.h": GOOD_CALL, "cmake/Supplier.cmake": PIN,
+      "docs/guides/robot-descriptions.md":
+      "### The restricted Python backend\n"
+      "An expression inside a description evaluates with the process's own authority.\n\n"
+      "### The unrestricted Python backend\nNothing here.\n"},
+     1, "appears outside the unrestricted-backend section"),
+    ("the guide recommending the unrestricted backend",
+     {"lib/urdf.h": GOOD_CALL, "cmake/Supplier.cmake": PIN,
+      "docs/guides/robot-descriptions.md":
+      "### The unrestricted Python backend\n"
+      "An expression inside a description evaluates with the process's own authority.\n\n"
+      "We recommend the unrestricted backend.\n"},
+     1, "recommends or prefers the unrestricted evaluator"),
+    ("the guide with the sentence correctly placed and no endorsement",
+     {"lib/urdf.h": GOOD_CALL, "cmake/Supplier.cmake": PIN,
+      "docs/guides/robot-descriptions.md":
+      "### The unrestricted Python backend\n"
+      "An expression inside a description evaluates with the process's own authority.\n"},
+     0, "no forbidden call"),
 ]
 
 

@@ -19,7 +19,8 @@ import sys
 from pathlib import Path
 
 from forbidden_rules import (EVAL_OPTION, EVAL_UNPINNED, build_findings, cxx_findings,
-                             in_build_scope, in_cxx_scope, pins_option)
+                             doc_findings, detail_findings, in_build_scope, in_cxx_scope,
+                             in_docs_scope, in_urdf_detail_scope, pins_option)
 
 EXIT_FORBIDDEN = 1
 EXIT_UNPINNED = 3
@@ -76,11 +77,13 @@ def run(args: argparse.Namespace) -> int:
         return EXIT_NO_INPUT
     sources, calls = scan(root, names, in_cxx_scope, cxx_findings)
     builds, settings = scan(root, names, in_build_scope, build_findings)
+    _, detail = scan(root, names, in_urdf_detail_scope, detail_findings)
+    _, docs = scan(root, names, in_docs_scope, doc_findings)
     if not sources and not builds:
         print(f"error: no tracked C++ or build file was found under {root}", file=sys.stderr)
         return EXIT_NO_INPUT
-    report(calls + settings)
-    if calls or settings:
+    report(calls + settings + detail + docs)
+    if calls or settings or detail or docs:
         return EXIT_FORBIDDEN
     pins = pinning_files(root, builds)
     if not pins:
