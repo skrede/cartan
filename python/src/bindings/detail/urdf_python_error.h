@@ -22,7 +22,7 @@ struct urdf_python_error : std::exception
     urdf_python_error(cartan::urdf_failure k, std::string d)
         : kind(k), detail(std::move(d)) {}
 
-    [[nodiscard]] const char* what() const noexcept override
+    const char* what() const noexcept override
     {
         return detail.c_str();
     }
