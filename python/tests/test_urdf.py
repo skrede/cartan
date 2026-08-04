@@ -13,6 +13,8 @@ import cartan
 URDF_NOT_AVAILABLE = not hasattr(cartan, "load_urdf")
 pytestmark = pytest.mark.skipif(URDF_NOT_AVAILABLE, reason="cartan built without URDF")
 
+FIXTURES = Path(__file__).resolve().parent.parent.parent / "tests" / "fixtures" / "urdf"
+
 
 def test_cartanbot_loads_with_expected_topology(cartanbot_chain: cartan.KinematicChain) -> None:
     assert cartanbot_chain.num_joints() == 6
@@ -81,3 +83,74 @@ def test_ur3e_loads_and_fk_is_reproducible(ur3e_chain: cartan.KinematicChain) ->
     T1 = cartan.forward_kinematics(ur3e_chain, q).matrix()
     T2 = cartan.forward_kinematics(ur3e_chain, q).matrix()
     assert np.array_equal(T1, T2)
+
+
+def test_urdf_failure_names_every_kind_the_loader_can_produce() -> None:
+    # 18 is the number of enumerators in cartan/urdf/error.h. A kind added there
+    # and left unregistered reaches a caller as a value this enum cannot name,
+    # which the translator surfaces as a bare ValueError rather than UrdfError.
+    assert len(cartan.UrdfFailure.__members__) == 18
+
+
+@pytest.mark.parametrize(
+    ("fixture", "expected"),
+    [
+        ("adversarial_zero_axis.urdf", "zero_axis"),
+        ("adversarial_revolute_no_limit.urdf", "missing_joint_limit"),
+        ("adversarial_duplicate_name.urdf", "duplicate_name"),
+        ("adversarial_non_finite.urdf", "non_finite_value"),
+        ("adversarial_multi_parent.urdf", "multi_parent_link"),
+        ("reversed_limit.urdf", "invalid_joint_limit"),
+    ],
+)
+def test_load_urdf_reports_the_expected_failure_kind(fixture: str, expected: str) -> None:
+    with pytest.raises(cartan.UrdfError) as excinfo:
+        cartan.load_urdf(str(FIXTURES / fixture))
+    assert excinfo.value.kind == getattr(cartan.UrdfFailure, expected)
+
+
+def test_urdf_error_carries_the_readers_code_for_a_parse_failure() -> None:
+    with pytest.raises(cartan.UrdfError) as excinfo:
+        cartan.load_urdf(str(FIXTURES / "parser_unclosed.urdf"))
+    assert excinfo.value.kind == cartan.UrdfFailure.malformed_xml
+    assert excinfo.value.meios_code == "xml_parse_error"
+
+
+def test_urdf_error_has_no_readers_code_for_a_post_read_failure() -> None:
+    with pytest.raises(cartan.UrdfError) as excinfo:
+        cartan.load_urdf(str(FIXTURES / "extractor_branched.urdf"))
+    assert excinfo.value.kind == cartan.UrdfFailure.branched_kinematic_tree
+    assert excinfo.value.meios_code is None
+
+
+def test_xacro_document_loads_and_yields_its_expanded_joints() -> None:
+    result = cartan.load_urdf(str(FIXTURES / "xacro_minimal.urdf.xacro"))
+    assert result.metadata.joint_names == ["link_1_joint", "tool_joint"]
+    assert result.chain.num_joints() == 2
+
+
+def test_a_clean_description_reports_no_diagnostics() -> None:
+    result = cartan.load_urdf(str(FIXTURES / "cartanbot.urdf"))
+    assert result.diagnostics == []
+
+
+def test_an_unresolvable_mesh_is_reported_at_the_warn_tier() -> None:
+    urdf = FIXTURES / "extended" / "irb120.urdf"
+    if not urdf.exists():
+        pytest.skip("IRB120 URDF fixture not available")
+    result = cartan.load_urdf(str(urdf))
+    unresolved = [d for d in result.diagnostics if d.meios_code == "unresolved_asset"]
+    assert unresolved != []
+    assert all(d.severity == "warn" for d in unresolved)
+    assert all(d.message != "" for d in unresolved)
+    assert unresolved[0].location is not None
+    assert unresolved[0].location.line > 0
+
+
+def test_diagnostic_types_are_named_by_the_package_namespace() -> None:
+    urdf = FIXTURES / "extended" / "irb120.urdf"
+    if not urdf.exists():
+        pytest.skip("IRB120 URDF fixture not available")
+    diagnostic = cartan.load_urdf(str(urdf)).diagnostics[0]
+    assert isinstance(diagnostic, cartan.UrdfDiagnostic)
+    assert isinstance(diagnostic.location, cartan.UrdfSourceLocation)

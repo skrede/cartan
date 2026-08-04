@@ -210,6 +210,7 @@ that as the signal to decompose the file.
 | --- | --- | --- |
 | python/src/bindings/analytical_bindings.cpp | 742 | one extension module's binding surface, where a type must be registered before any signature that mentions it; a split would spread that ordering constraint across files with nothing left to enforce it |
 | python/src/bindings/ik_bindings.cpp | 428 | one extension module's binding surface, where a type must be registered before any signature that mentions it; a split would spread that ordering constraint across files with nothing left to enforce it |
+| python/src/bindings/urdf_bindings.cpp | 211 | one extension module's binding surface, where a type must be registered before any signature that mentions it; a split would spread that ordering constraint across files with nothing left to enforce it |
 | python/src/bindings/exhaustive_bindings.cpp | 204 | one extension module's binding surface, where a type must be registered before any signature that mentions it; a split would spread that ordering constraint across files with nothing left to enforce it |
 
 ### Profiling

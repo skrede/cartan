@@ -77,18 +77,22 @@ __all__ = [
 
 try:
     from ._core import (
+        UrdfDiagnostic,
         UrdfError,
         UrdfFailure,
         UrdfLoadResult,
         UrdfMetadata,
+        UrdfSourceLocation,
         load_urdf,
     )
 
     __all__ += [
+        "UrdfDiagnostic",
         "UrdfError",
         "UrdfFailure",
         "UrdfLoadResult",
         "UrdfMetadata",
+        "UrdfSourceLocation",
         "load_urdf",
     ]
 except ImportError:
