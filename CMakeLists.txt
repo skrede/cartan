@@ -65,6 +65,7 @@ set(CARTAN_ARGMIN_SOURCE_DIR "" CACHE PATH "Path to local argmin source checkout
 include(FetchContent)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/CartanMeios.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/CartanOptionalBackends.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/CartanBackendContract.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/CartanInstallSurface.cmake)

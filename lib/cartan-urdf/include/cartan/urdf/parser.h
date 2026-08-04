@@ -14,6 +14,7 @@
 
 #include "cartan/urdf/error.h"
 #include "cartan/urdf/schema.h"
+#include "cartan/urdf/rotation.h"
 
 #include "cartan/lie/se3.h"
 #include "cartan/lie/so3.h"
@@ -195,18 +196,6 @@ std::optional<urdf_failure> parse_triple(std::string_view s, vector3<Scalar>& ou
     }
     out << values[0], values[1], values[2];
     return std::nullopt;
-}
-
-/// Build an SO(3) rotation from URDF roll-pitch-yaw angles. URDF convention:
-/// R = Rz(yaw) * Ry(pitch) * Rx(roll). Each axis rotation is built via
-/// so3::exp so the implementation reuses the validated cartan exponential map.
-template <typename Scalar>
-so3<Scalar> rotation_from_rpy(Scalar roll, Scalar pitch, Scalar yaw)
-{
-    auto rx = so3<Scalar>::exp(vector3<Scalar>(roll, Scalar(0), Scalar(0)));
-    auto ry = so3<Scalar>::exp(vector3<Scalar>(Scalar(0), pitch, Scalar(0)));
-    auto rz = so3<Scalar>::exp(vector3<Scalar>(Scalar(0), Scalar(0), yaw));
-    return rz * ry * rx;
 }
 
 /// Parse a URDF <origin xyz="..." rpy="..."/> sub-element into an se3 pose.

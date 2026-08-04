@@ -1,3 +1,9 @@
+# Acquired before the pugixml row below because the supplier declares pugixml
+# against a higher minimum than cartan does, and the first declaration of a
+# dependency is the one that wins: acquiring cartan's first would compile the
+# supplier against a version it refuses.
+cartan_acquire_meios()
+
 # A parent project may already provide pugixml; honor it and skip our own
 # acquisition so dependency sourcing stays the integrator's decision.
 if (NOT TARGET pugixml::pugixml)
@@ -34,6 +40,7 @@ target_link_libraries(cartan_urdf
     INTERFACE
     cartan::serial_chain
     pugixml::pugixml
+    meios::urdf
 )
 
 target_compile_features(cartan_urdf INTERFACE cxx_std_20)

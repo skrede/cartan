@@ -34,7 +34,7 @@ enum class urdf_failure
     unsupported_joint_type,    ///< Joint type token is not one of fixed, revolute, continuous, prismatic.
     unknown_link_reference,    ///< Joint references a link name that was not declared.
     unknown_parent_link,       ///< Joint's parent link is not in the link set.
-    branched_kinematic_tree,   ///< More than one leaf after fixed-joint merge; no single chain extractable.
+    branched_kinematic_tree,   ///< The tree does not reduce to one serial chain: more than one root, or more than one leaf after fixed-joint merge.
     link_not_found,            ///< A load_options-requested base or tool link is missing from the URDF.
     mimic_joint_unsupported,   ///< Joint declares a mimic relation; coupled-joint kinematics is deferred.
     inertial_singular,         ///< Inertial declares a non-physical mass or inertia matrix.

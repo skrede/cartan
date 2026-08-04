@@ -15,6 +15,8 @@
 
 #include "cartan/serial/chain/kinematic_chain.h"
 
+#include <meios/urdf/load.h>
+
 #include <string>
 #include <vector>
 #include <optional>
@@ -22,15 +24,37 @@
 namespace cartan
 {
 
+/// Reading policy for a robot description consumed as kinematics. It differs
+/// from the description reader's own default in one place: an unresolvable
+/// package:// asset is reported and the load continues, because a kinematic
+/// chain reads no meshes and refusing over one would reject descriptions that
+/// ship without them.
+inline meios::load_options kinematics_description_defaults()
+{
+    meios::load_options opts{};
+    opts.on_missing = meios::missing_asset::warn;
+    return opts;
+}
+
 /// Optional overrides for the chain extraction step. When base_link or
 /// tool_link is empty, the extractor auto-detects the unique root or leaf
 /// in the post-fixed-joint-merge tree. When both are non-empty, the
 /// extractor extracts the chain bounded by the named links; missing names
-/// produce urdf_failure::link_not_found.
+/// produce urdf_failure::link_not_found. description is the reader's own
+/// options carried through rather than mirrored, so a caller fills args,
+/// package_roots and the evaluation policy directly.
 struct load_options
 {
-    std::string base_link{};
-    std::string tool_link{};
+    load_options()
+        : base_link()
+        , tool_link()
+        , description(kinematics_description_defaults())
+    {
+    }
+
+    std::string base_link;
+    std::string tool_link;
+    meios::load_options description;
 };
 
 /// Inertial properties of a link, paired with the link's name for cross-
