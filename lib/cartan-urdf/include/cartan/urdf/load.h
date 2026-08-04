@@ -30,6 +30,11 @@ static_assert(meios::model_sink<detail::model_sink<>>);
 /// push order reproduces the reader's own, which is the order its sink
 /// protocol is specified in; the reader's emitter is not called, because it
 /// is a private name of that library.
+///
+/// The result's diagnostics stay empty and its claims stay none: this entry
+/// point performs no read, so it has nothing to report on and inventing
+/// values would put the caller's own model behind assertions this function
+/// never checked.
 template <typename Scalar = double>
 inline cartan::expected<urdf_load_result<Scalar>, urdf_error>
 chain_from_model(const meios::model<>& robot, const load_options& opts = {})

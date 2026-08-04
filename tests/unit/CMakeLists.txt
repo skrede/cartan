@@ -147,6 +147,14 @@ if (CARTAN_BUILD_URDF)
     target_compile_definitions(urdf_sink_test PRIVATE
         CARTAN_TESTS_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures")
 
+    cartan_add_test(urdf_diagnostic_test urdf_diagnostic_test.cpp)
+    target_link_libraries(urdf_diagnostic_test PRIVATE cartan::urdf)
+    target_compile_definitions(urdf_diagnostic_test PRIVATE
+        CARTAN_TESTS_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures")
+    if (CARTAN_BUILD_URDF_EXTENDED_TESTS)
+        target_compile_definitions(urdf_diagnostic_test PRIVATE CARTAN_URDF_EXTENDED_TESTS)
+    endif ()
+
     cartan_add_test(urdf_chain_extractor_test urdf_chain_extractor_test.cpp)
     target_link_libraries(urdf_chain_extractor_test PRIVATE cartan::urdf)
     target_compile_definitions(urdf_chain_extractor_test PRIVATE

@@ -8,6 +8,8 @@
 /// string, and an optional source location populated by the parser when the
 /// failure can be tied to a specific element in the input XML.
 
+#include <meios/diagnostic/diagnostic_code.h>
+
 #include <string>
 #include <optional>
 
@@ -16,13 +18,14 @@ namespace cartan
 
 /// Failure modes for the URDF loader.
 ///
-/// Parse-time failures (malformed_xml, unsupported_joint_type,
-/// unknown_link_reference, unknown_parent_link, mimic_joint_unsupported,
-/// inertial_singular, cyclic_kinematic_tree, non_finite_value, duplicate_name,
-/// multi_parent_link) fill urdf_error::location when they can be tied to a
-/// specific element. Post-parse failures (branched_kinematic_tree,
-/// link_not_found, sdf_not_supported, missing_joint_limit, zero_axis,
-/// invalid_joint_limit, tool_link_unreachable) leave location unset.
+/// A failure raised while the description is being read carries both a source
+/// location and the reader's own diagnostic code, which rides alongside kind
+/// so a condition this taxonomy has no name for still reaches the caller as
+/// what the reader actually reported. A failure raised afterwards by the chain
+/// extractor (branched_kinematic_tree, link_not_found, sdf_not_supported,
+/// missing_joint_limit, zero_axis, invalid_joint_limit, tool_link_unreachable)
+/// carries neither: there is no element left to point at and no reader code to
+/// quote.
 ///
 /// The loader is the library's only untrusted-input surface, so every spec
 /// violation is a strict rejection whose detail names the offending joint or
@@ -30,7 +33,7 @@ namespace cartan
 /// unbounded by definition) and loads normally.
 enum class urdf_failure
 {
-    malformed_xml,             ///< XML was not well-formed; pugixml reports the offset.
+    malformed_xml,             ///< XML was not well-formed; the reader reports the offset.
     unsupported_joint_type,    ///< Joint type token is not one of fixed, revolute, continuous, prismatic.
     unknown_link_reference,    ///< Joint references a link name that was not declared.
     unknown_parent_link,       ///< Joint's parent link is not in the link set.
@@ -53,10 +56,9 @@ enum class urdf_failure
 /// Location of a URDF failure inside the source XML.
 ///
 /// file is the absolute path passed to the parser (or empty for string-based
-/// entry points). line is one-based, computed from the byte offset returned
-/// by pugixml's xml_parse_result. element names the URDF element the failure
-/// applies to (e.g. "joint", "link", "inertial"); it is empty when no
-/// specific element can be identified.
+/// entry points). line is one-based, as the reader reports it. element names
+/// the URDF element the failure applies to (e.g. "joint", "link",
+/// "inertial"); it is empty when no specific element can be identified.
 struct urdf_source_location
 {
     std::string file{};
@@ -73,6 +75,7 @@ struct urdf_error
     urdf_failure kind{urdf_failure::unknown_error};
     std::string detail{};
     std::optional<urdf_source_location> location{};
+    std::optional<meios::diagnostic_code> meios_code{};
 };
 
 }

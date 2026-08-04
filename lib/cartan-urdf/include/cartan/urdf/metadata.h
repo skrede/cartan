@@ -11,11 +11,15 @@
 /// declared so downstream code can compose against the final shape, but the
 /// chain extractor that fills it lands in a separate step.
 
+#include "cartan/urdf/diagnostic.h"
+
 #include "cartan/types.h"
 
 #include "cartan/serial/chain/kinematic_chain.h"
 
 #include <meios/urdf/load.h>
+
+#include <meios/diagnostic/completeness.h>
 
 #include <string>
 #include <vector>
@@ -90,12 +94,23 @@ struct urdf_metadata
 
 /// Success type for the top-level URDF loader. chain is the strictly-serial
 /// kinematic_chain extracted from the URDF; metadata is the accompanying
-/// side-table. Aggregate-initializable.
+/// side-table; diagnostics are everything the description reader reported
+/// along the way, tiered; claims are the reader's completeness assertions
+/// about the model it produced. Aggregate-initializable, and the last two
+/// members are appended rather than inserted so a positional initialization of
+/// the first two keeps compiling.
+///
+/// Nothing in the loader branches on claims. A description that yields a
+/// bit-exact chain can still fail to claim completeness::parsed -- irb120.urdf
+/// does, over a <material> the reader does not recognize under <collision> --
+/// so gating on a claim would refuse a correct robot over bookkeeping.
 template <typename Scalar = double>
 struct urdf_load_result
 {
     kinematic_chain<Scalar, dynamic> chain;
     urdf_metadata<Scalar> metadata;
+    std::vector<urdf_diagnostic> diagnostics{};
+    meios::completeness claims{meios::completeness::none};
 };
 
 }

@@ -116,7 +116,8 @@ inline urdf_error failure_from(const meios::load_error& err)
     return urdf_error{
         .kind = kind,
         .detail = std::move(detail),
-        .location = location_of(err.loc, "document")};
+        .location = location_of(err.loc, "document"),
+        .meios_code = err.code};
 }
 
 }
