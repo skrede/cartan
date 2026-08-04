@@ -46,7 +46,7 @@ enum class urdf_failure
     missing_joint_limit,       ///< A revolute or prismatic joint omits the required <limit lower upper>.
     invalid_joint_limit,       ///< A joint <limit> is self-contradictory: reversed bounds, or a negative velocity or effort.
     zero_axis,                 ///< A joint <axis> has zero magnitude and cannot be normalized.
-    non_finite_value,          ///< A numeric attribute parsed to NaN or infinity, or overflowed the chain's scalar type.
+    non_finite_value,          ///< A numeric attribute parsed to NaN or infinity, or is not representable in the chain's scalar type.
     duplicate_name,            ///< A link or joint name is declared more than once.
     multi_parent_link,         ///< A link is the child of more than one joint (non-tree topology).
     tool_link_unreachable,     ///< The requested tool link is not reached by the serial walk.

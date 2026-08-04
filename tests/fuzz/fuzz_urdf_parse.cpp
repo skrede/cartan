@@ -1,7 +1,6 @@
 #include "harness.h"
 
-#include <cartan/urdf/build.h>
-#include <cartan/urdf/parser.h>
+#include <cartan/urdf.h>
 
 #include <span>
 #include <string>
@@ -65,7 +64,7 @@ private:
     std::filesystem::path m_path;
 };
 
-/// The parser's only entry point takes a filesystem path, so the input has to
+/// The loader's only entry point takes a filesystem path, so the input has to
 /// reach it as a file.
 const std::filesystem::path& scratch_document()
 {
@@ -80,8 +79,8 @@ bool write_scratch(std::span<const std::uint8_t> input)
     out.write(reinterpret_cast<const char*>(input.data()),
         static_cast<std::streamsize>(input.size()));
     // Closed before the state is read: a flush failure surfaces at close, and a
-    // half-written document parsed as though it were whole would be reported
-    // against the parser.
+    // half-written document read as though it were whole would be reported
+    // against the loader.
     out.close();
     return out.good();
 }
@@ -94,16 +93,11 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
     {
         return 0;
     }
-    auto model = cartan::parse_urdf_file<double>(scratch_document());
-    if (!model.has_value())
+    auto loaded = cartan::load_urdf<double>(scratch_document());
+    if (!loaded.has_value())
     {
         return 0;
     }
-    auto built = cartan::build_chain<double>(model.value());
-    if (!built.has_value())
-    {
-        return 0;
-    }
-    cartan::fuzzing::consume(built.value().chain);
+    cartan::fuzzing::consume(loaded.value().chain);
     return 0;
 }

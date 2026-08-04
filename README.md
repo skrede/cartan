@@ -25,7 +25,7 @@ using `FetchContent` (see below). Python bindings are available on PyPI: `pip in
 ## Features
 
 - **Lie groups:** SO(2), SE(2), SO(3), SE(3) with exp/log, adjoint, coadjoint, left/right Jacobians.
-- **Header-only:** depends on no compiled library artifacts, Eigen as the sole required dependency. Use the system-install or have CMake fetch it automatically.
+- **Header-only:** the Lie-group and serial-chain modules depend on no compiled library artifacts, with Eigen as their only required dependency. Use the system-install or have CMake fetch it automatically. The optional robot-description loader is the one exception &mdash; see Requirements.
 - **Compile-time frame safety:** Transforms and rotations are templated on frames, `transform<From_frame, To_frame>` and `rotation<From_frame, To_frame>`.
 - **Product of Exponentials kinematics:** Screw-theory-based FK through Product of Exponentials (PoE), either runtime-specified or compile-time (templated) for 1-7 DOF chains.
 - **Policy-based IK solvers:** Damped Least Squares (DLS), Levenberg-Marquardt (LM), and Sequential Quadratic Programming (SQP) &mdash; or roll your own.
@@ -58,7 +58,12 @@ cartan owns kinematics and stays out of everything else.
 
 - C++20 compiler &mdash; CI builds and tests GCC 14, Clang 18, and MSVC 2022 (VS 17.x); older C++20 toolchains are untested
 - CMake 3.28+
-- Eigen 3.4+ (auto-fetched via FetchContent)
+- Eigen 3.4+ (auto-fetched via FetchContent) &mdash; the only dependency of the
+  Lie-group and serial-chain modules
+- For the robot-description loader (`CARTAN_BUILD_URDF`, off by default): a
+  robot-description reader that handles URDF and xacro, which brings its own XML
+  library with it. Enabling the loader is what makes cartan depend on more than
+  Eigen; the rest of the library, including every embedded configuration, does not.
 - For embedded targets: an exceptions-off C++20 GCC backend &mdash; ESP-IDF 5.1+ / 6.x
   (esp32, esp32c3) or arm-none-eabi (cortex-m7, cortex-m4f).
 

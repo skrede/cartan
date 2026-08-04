@@ -21,7 +21,12 @@ macro(cartan_acquire_meios)
         # No version constraint anywhere: the revision below declares 0.2.0,
         # so a constraint written from the branch it sits on refuses a correct
         # installation at configure time. The revision is the only authority.
-        find_package(${CARTAN_MEIOS_PACKAGE} CONFIG QUIET)
+        #
+        # GLOBAL, because acquisition happens in the URDF module's directory and
+        # the install-surface feasibility gate runs at the top level: without it
+        # the imported targets are scoped to this directory, the gate sees no
+        # target at all, and an installed supplier is reported as unexportable.
+        find_package(${CARTAN_MEIOS_PACKAGE} CONFIG QUIET GLOBAL)
         if (${CARTAN_MEIOS_PACKAGE}_FOUND OR TARGET ${CARTAN_MEIOS_TARGET})
             set(CARTAN_MEIOS_PROVIDER found)
         else ()

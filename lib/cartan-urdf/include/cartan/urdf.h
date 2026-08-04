@@ -3,15 +3,14 @@
 
 /// Umbrella header for the cartan URDF loader.
 ///
-/// Includes the diagnostic, schema, metadata, parser, and chain-extractor
-/// entry points, all of which declare their user-facing names directly under
-/// namespace cartan so callers can write cartan::urdf_error, cartan::load_options,
-/// and cartan::load_urdf.
+/// Includes the diagnostic, schema, metadata, and chain-extractor entry points,
+/// all of which declare their user-facing names directly under namespace cartan
+/// so callers can write cartan::urdf_error, cartan::load_options, and
+/// cartan::load_urdf.
 
 #include "cartan/urdf/load.h"
 #include "cartan/urdf/build.h"
 #include "cartan/urdf/error.h"
-#include "cartan/urdf/parser.h"
 #include "cartan/urdf/schema.h"
 #include "cartan/urdf/metadata.h"
 #include "cartan/urdf/diagnostic.h"

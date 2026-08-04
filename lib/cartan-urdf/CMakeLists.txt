@@ -1,31 +1,4 @@
-# Acquired before the pugixml row below because the supplier declares pugixml
-# against a higher minimum than cartan does, and the first declaration of a
-# dependency is the one that wins: acquiring cartan's first would compile the
-# supplier against a version it refuses.
 cartan_acquire_meios()
-
-# A parent project may already provide pugixml; honor it and skip our own
-# acquisition so dependency sourcing stays the integrator's decision.
-if (NOT TARGET pugixml::pugixml)
-    if (CARTAN_CMAKE_FETCH_DEPS)
-        FetchContent_Declare(
-            pugixml
-            GIT_REPOSITORY https://github.com/zeux/pugixml.git
-            GIT_TAG v1.15
-            GIT_SHALLOW TRUE
-            EXCLUDE_FROM_ALL
-            SYSTEM
-        )
-        set(PUGIXML_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-        set(PUGIXML_INSTALL OFF CACHE BOOL "" FORCE)
-        FetchContent_MakeAvailable(pugixml)
-    else ()
-        find_package(pugixml CONFIG REQUIRED GLOBAL)
-        if (pugixml_VERSION VERSION_LESS "1.14")
-            message(FATAL_ERROR "cartan-urdf requires pugixml >= 1.14, found ${pugixml_VERSION}")
-        endif ()
-    endif ()
-endif ()
 
 add_library(cartan_urdf INTERFACE)
 add_library(cartan::urdf ALIAS cartan_urdf)
@@ -39,7 +12,6 @@ target_include_directories(cartan_urdf
 target_link_libraries(cartan_urdf
     INTERFACE
     cartan::serial_chain
-    pugixml::pugixml
     meios::urdf
 )
 

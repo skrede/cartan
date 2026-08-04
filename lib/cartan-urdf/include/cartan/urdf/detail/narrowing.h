@@ -23,7 +23,11 @@ namespace cartan::detail
 
 /// nullopt means accepted. A double outside the target type's range converts by
 /// an implementation-defined rule rather than reliably to an infinity, so the
-/// magnitude is tested before the cast instead of the result after it.
+/// magnitude is tested before the cast instead of the result after it. The
+/// mirrored direction is tested after it, because underflow to zero is a
+/// defined conversion: a nonzero value that collapses to exactly zero is as
+/// unrecoverable as one that overflows, and it pins the joint whose bound it
+/// was rather than unbounding it.
 template <typename Scalar>
 std::optional<urdf_failure> narrow_into(double value, Scalar& out) noexcept
 {
@@ -32,7 +36,9 @@ std::optional<urdf_failure> narrow_into(double value, Scalar& out) noexcept
     {
         return urdf_failure::non_finite_value;
     }
-    out = static_cast<Scalar>(value);
+    const Scalar narrowed = static_cast<Scalar>(value);
+    if (narrowed == Scalar(0) && value != 0.0) { return urdf_failure::non_finite_value; }
+    out = narrowed;
     return std::nullopt;
 }
 

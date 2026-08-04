@@ -137,14 +137,19 @@ endif()
 # benchmarks/, not here: tests/ verify cartan using only cartan.
 
 if (CARTAN_BUILD_URDF)
-    cartan_add_test(urdf_parser_test urdf_parser_test.cpp)
-    target_link_libraries(urdf_parser_test PRIVATE cartan::urdf)
-    target_compile_definitions(urdf_parser_test PRIVATE
-        CARTAN_TESTS_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures")
-
     cartan_add_test(urdf_sink_test urdf_sink_test.cpp)
     target_link_libraries(urdf_sink_test PRIVATE cartan::urdf)
     target_compile_definitions(urdf_sink_test PRIVATE
+        CARTAN_TESTS_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures")
+
+    cartan_add_test(urdf_document_test urdf_document_test.cpp)
+    target_link_libraries(urdf_document_test PRIVATE cartan::urdf)
+    target_compile_definitions(urdf_document_test PRIVATE
+        CARTAN_TESTS_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures")
+
+    cartan_add_test(urdf_adversarial_test urdf_adversarial_test.cpp)
+    target_link_libraries(urdf_adversarial_test PRIVATE cartan::urdf)
+    target_compile_definitions(urdf_adversarial_test PRIVATE
         CARTAN_TESTS_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures")
 
     cartan_add_test(urdf_evaluator_test urdf_evaluator_test.cpp)
@@ -166,15 +171,12 @@ if (CARTAN_BUILD_URDF)
         CARTAN_TESTS_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures")
 
     cartan_add_test(urdf_parity_test urdf_parity_test.cpp)
-    cartan_add_test(urdf_stage_parity_test urdf_stage_parity_test.cpp)
-    foreach (parity_test urdf_parity_test urdf_stage_parity_test)
-        target_link_libraries(${parity_test} PRIVATE cartan::urdf)
-        target_compile_definitions(${parity_test} PRIVATE
-            CARTAN_TESTS_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures")
-        if (CARTAN_BUILD_URDF_EXTENDED_TESTS)
-            target_compile_definitions(${parity_test} PRIVATE CARTAN_URDF_EXTENDED_TESTS)
-        endif ()
-    endforeach ()
+    target_link_libraries(urdf_parity_test PRIVATE cartan::urdf)
+    target_compile_definitions(urdf_parity_test PRIVATE
+        CARTAN_TESTS_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures")
+    if (CARTAN_BUILD_URDF_EXTENDED_TESTS)
+        target_compile_definitions(urdf_parity_test PRIVATE CARTAN_URDF_EXTENDED_TESTS)
+    endif ()
 
     cartan_add_test(solver_continuous_joint_test solver_continuous_joint_test.cpp)
     target_link_libraries(solver_continuous_joint_test PRIVATE cartan::urdf)

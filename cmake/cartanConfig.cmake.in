@@ -6,9 +6,13 @@ if (Eigen3_VERSION VERSION_LESS "3.4")
     message(FATAL_ERROR "cartan requires Eigen >= 3.4, found ${Eigen3_VERSION}")
 endif ()
 
+# No version constraint: cartan tracks the description reader by revision, and
+# a constraint here would be a second, independently drifting claim about which
+# revisions work. The reader's own config package resolves the XML library it
+# links, so cartan neither names nor pins it.
 set(CARTAN_WITH_URDF @CARTAN_BUILD_URDF@)
 if (CARTAN_WITH_URDF)
-    find_dependency(pugixml 1.14)
+    find_dependency(meios)
 endif ()
 
 set(CARTAN_WITH_ARGMIN @CARTAN_BUILD_ARGMIN@)
