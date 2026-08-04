@@ -79,6 +79,17 @@ TEST_CASE("diagnostics: the relaxed asset policy leaves a structural failure har
     CHECK(*loaded.error().meios_code == meios::diagnostic_code::unresolved_include);
 }
 
+TEST_CASE("diagnostics: an unmapped reader code surfaces as unknown_error carrying that code",
+          "[urdf_diagnostic]")
+{
+    auto loaded = cartan::load_urdf<double>(fixture_path("xacro_unresolved_include.urdf.xacro"));
+
+    REQUIRE_FALSE(loaded.has_value());
+    CHECK(loaded.error().kind == cartan::urdf_failure::unknown_error);
+    REQUIRE(loaded.error().meios_code.has_value());
+    CHECK(*loaded.error().meios_code == meios::diagnostic_code::unresolved_include);
+}
+
 TEST_CASE("diagnostics: every arm the reader can log through is captured", "[urdf_diagnostic]")
 {
     cartan::detail::diagnostic_sink sink;
