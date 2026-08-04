@@ -1,4 +1,5 @@
 #include <cartan/urdf.h>
+#include <cartan/urdf/detail/code_map.h>
 #include <cartan/urdf/detail/diagnostic_sink.h>
 
 #include <catch2/catch_test_macros.hpp>
@@ -88,6 +89,17 @@ TEST_CASE("diagnostics: an unmapped reader code surfaces as unknown_error carryi
     CHECK(loaded.error().kind == cartan::urdf_failure::unknown_error);
     REQUIRE(loaded.error().meios_code.has_value());
     CHECK(*loaded.error().meios_code == meios::diagnostic_code::unresolved_include);
+}
+
+/// Asserted against the table rather than through a load: at the pinned reader
+/// revision the identity pass reports an undeclared link for every undeclared
+/// reference, and it runs before the topology pass, so no load can deliver
+/// invalid_topology. The arm stands for the day that ordering changes.
+TEST_CASE("diagnostics: the reader's topology code maps to the link-reference kind",
+          "[urdf_diagnostic]")
+{
+    CHECK(cartan::detail::failure_from_code(meios::diagnostic_code::invalid_topology)
+          == cartan::urdf_failure::unknown_link_reference);
 }
 
 TEST_CASE("diagnostics: every arm the reader can log through is captured", "[urdf_diagnostic]")
