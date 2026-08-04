@@ -252,6 +252,30 @@ jobs:
       - name: Test
         run: cd build && ctest --output-on-failure
 
+  core-only:
+    runs-on: ubuntu-24.04
+    name: core only (URDF module off)
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Every other Linux job builds with -DCARTAN_BUILD_URDF=ON, so this is
+      # the only automated check that the kinematics core still builds and
+      # tests against Eigen alone with the description module compiled out.
+      - name: Configure
+        run: |
+          cmake . -B build -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_FLAGS="-Werror" \
+            -DCARTAN_BUILD_TESTS=ON \
+            -DCARTAN_BUILD_URDF=OFF \
+            -DCARTAN_CMAKE_FETCH_DEPS=ON
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        run: cd build && ctest --output-on-failure --no-tests=error
+
   install-test:
     runs-on: ubuntu-24.04
 
