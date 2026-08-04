@@ -8,6 +8,12 @@
 /// latched and reported from finish(). finish() is also what builds the chain,
 /// so after a push the sink holds either a chain or a typed error and no
 /// half-built state is representable.
+///
+/// The refusals here are the ones only this library can make. The reader
+/// accepts a wider set of descriptions than a serial chain can carry, and
+/// topology, duplicate names, limit ordering and axis magnitude are each
+/// already answered elsewhere; a second answer to any of them is an answer that
+/// can disagree with the first.
 
 #include "cartan/urdf/detail/code_map.h"
 #include "cartan/urdf/detail/model_stage.h"
@@ -24,8 +30,12 @@
 #include <meios/records/material.h>
 #include <meios/records/robot_info.h>
 
+#include <meios/diagnostic/source_location.h>
+
 #include <string>
+#include <utility>
 #include <optional>
+#include <string_view>
 
 namespace cartan::detail
 {
@@ -60,19 +70,28 @@ public:
     void on_link(const meios::link<double>& node)
     {
         if (m_failure) { return; }
-        m_model.links.push_back(staged_link<Scalar>(node));
+        parsed_link<Scalar> staged{};
+        if (const auto field = stage_link(node, staged))
+        {
+            m_failure = overflow_failure("link", node.name, *field, node.origin_loc);
+            return;
+        }
+        m_model.links.push_back(std::move(staged));
     }
 
     void on_joint(const meios::joint<double>& edge)
     {
         if (m_failure) { return; }
         const std::optional<parsed_joint_kind> kind = staged_kind(edge.kind);
-        if (!kind)
+        m_failure = unsupported_construct(edge, kind);
+        if (m_failure) { return; }
+        parsed_joint<Scalar> staged{};
+        if (const auto field = stage_joint(edge, *kind, staged))
         {
-            m_failure = unsupported_kind_failure(edge);
+            m_failure = overflow_failure("joint", edge.name, *field, edge.origin_loc);
             return;
         }
-        m_model.joints.push_back(staged_joint<Scalar>(edge, *kind));
+        m_model.joints.push_back(std::move(staged));
     }
 
     void finish()
@@ -101,17 +120,49 @@ private:
     std::optional<urdf_error> m_failure;
     cartan::expected<urdf_load_result<Scalar>, urdf_error> m_result;
 
-    static urdf_error unsupported_kind_failure(const meios::joint<double>& edge)
+    /// The order is the contract: a joint that both declares a mimic relation
+    /// and carries a kind no serial chain has is reported as the mimic.
+    static std::optional<urdf_error> unsupported_construct(
+        const meios::joint<double>& edge, const std::optional<parsed_joint_kind>& kind)
     {
-        std::optional<urdf_source_location> at;
-        if (edge.origin_loc)
+        if (edge.couple)
         {
-            at = location_of(*edge.origin_loc, "joint");
+            return construct_failure(edge, urdf_failure::mimic_joint_unsupported,
+                                     "declares a mimic relation");
         }
+        if (!kind)
+        {
+            return construct_failure(edge, urdf_failure::unsupported_joint_type,
+                                     "moves in a way a serial chain cannot carry");
+        }
+        return std::nullopt;
+    }
+
+    static urdf_error construct_failure(const meios::joint<double>& edge, urdf_failure kind,
+                                        std::string_view what)
+    {
         return urdf_error{
-            .kind = urdf_failure::unsupported_joint_type,
-            .detail = "joint '" + edge.name + "' moves in a way a serial chain cannot carry",
-            .location = at};
+            .kind = kind,
+            .detail = "joint '" + edge.name + "' " + std::string(what),
+            .location = located(edge.origin_loc, "joint")};
+    }
+
+    static urdf_error overflow_failure(std::string_view element, const std::string& name,
+                                       std::string_view field,
+                                       const std::optional<meios::source_location>& at)
+    {
+        return urdf_error{
+            .kind = urdf_failure::non_finite_value,
+            .detail = std::string(element) + " '" + name + "' declares a " + std::string(field)
+                + " the chain's scalar type cannot represent",
+            .location = located(at, element)};
+    }
+
+    static std::optional<urdf_source_location> located(
+        const std::optional<meios::source_location>& at, std::string_view element)
+    {
+        if (!at) { return std::nullopt; }
+        return location_of(*at, element);
     }
 };
 

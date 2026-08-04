@@ -16,6 +16,11 @@
 /// only on the success arm, because the failure arm returns before a sink is
 /// constructed. A runtime case cannot witness a call that does not happen, so
 /// the assertion for it is made at source level by a separate gate.
+///
+/// The refusal cases below cover the three constructs the description reader
+/// accepts and a serial chain cannot carry. Each fixture is chosen so that it
+/// clears every refusal except the one under test: a fixture that trips two
+/// gates proves neither.
 
 using Catch::Approx;
 
@@ -83,4 +88,53 @@ TEST_CASE("sink: finishing an empty push cannot manufacture a chain", "[urdf_sin
     CHECK_FALSE(sink.result().has_value());
     CHECK(sink.staged().links.empty());
     CHECK(sink.staged().joints.empty());
+}
+
+TEST_CASE("sink: a mimic relation is refused with the follower joint named", "[urdf_sink]")
+{
+    auto result = cartan::load_urdf<double>(fixture_path("parser_mimic.urdf"));
+
+    REQUIRE_FALSE(result.has_value());
+    CHECK(result.error().kind == cartan::urdf_failure::mimic_joint_unsupported);
+    CHECK(result.error().detail.find("joint_follower") != std::string::npos);
+    REQUIRE(result.error().location.has_value());
+    CHECK(result.error().location->line == 16);
+    CHECK(result.error().location->element == "joint");
+}
+
+TEST_CASE("sink: a joint kind no serial chain has is refused by name", "[urdf_sink]")
+{
+    auto result = cartan::load_urdf<double>(fixture_path("unsupported_joint_kind.urdf"));
+
+    REQUIRE_FALSE(result.has_value());
+    CHECK(result.error().kind == cartan::urdf_failure::unsupported_joint_type);
+    CHECK(result.error().detail.find("floating_joint") != std::string::npos);
+    REQUIRE(result.error().location.has_value());
+    CHECK(result.error().location->line == 10);
+    CHECK(result.error().location->element == "joint");
+}
+
+TEST_CASE("sink: a bound the narrower scalar cannot hold is refused only there", "[urdf_sink]")
+{
+    const auto path = fixture_path("narrowing_overflow.urdf");
+
+    auto wide = cartan::load_urdf<double>(path);
+    auto narrow = cartan::load_urdf<float>(path);
+
+    REQUIRE(wide.has_value());
+    REQUIRE_FALSE(narrow.has_value());
+    CHECK(narrow.error().kind == cartan::urdf_failure::non_finite_value);
+    CHECK(narrow.error().detail.find("overflow_joint") != std::string::npos);
+    CHECK(narrow.error().detail.find("<limit lower>") != std::string::npos);
+    REQUIRE(narrow.error().location.has_value());
+    CHECK(narrow.error().location->line == 10);
+}
+
+TEST_CASE("sink: the mimic refusal is applied before the joint kind", "[urdf_sink]")
+{
+    auto result = cartan::load_urdf<double>(fixture_path("unsupported_joint_kind_mimic.urdf"));
+
+    REQUIRE_FALSE(result.has_value());
+    CHECK(result.error().kind == cartan::urdf_failure::mimic_joint_unsupported);
+    CHECK(result.error().detail.find("floating_follower") != std::string::npos);
 }

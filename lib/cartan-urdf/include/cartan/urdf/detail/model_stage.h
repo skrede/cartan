@@ -3,7 +3,11 @@
 
 /// Translation of the description reader's records into the parsed model the
 /// chain extractor walks. The reader is fixed at double, so every value the
-/// chain consumes is narrowed here.
+/// chain consumes is narrowed here, and every narrowing is checked: a staging
+/// function returns the name of the first field the chain's scalar type cannot
+/// hold, or nullopt when the whole record was representable.
+
+#include "cartan/urdf/detail/narrowing.h"
 
 #include "cartan/urdf/schema.h"
 #include "cartan/urdf/rotation.h"
@@ -20,6 +24,7 @@
 #include <meios/math/transform.h>
 
 #include <optional>
+#include <string_view>
 
 namespace cartan::detail
 {
@@ -44,67 +49,86 @@ inline std::optional<parsed_joint_kind> staged_kind(meios::joint_kind kind)
 }
 
 template <typename Scalar>
-vector3<Scalar> staged_vector(const meios::vector3<double>& v)
+std::optional<std::string_view> stage_origin(const meios::transform<double>& origin,
+                                             se3<Scalar>& out)
 {
-    return vector3<Scalar>(static_cast<Scalar>(v.x),
-                           static_cast<Scalar>(v.y),
-                           static_cast<Scalar>(v.z));
-}
-
-template <typename Scalar>
-se3<Scalar> staged_origin(const meios::transform<double>& origin)
-{
-    const so3<Scalar> rotation =
-        rotation_from_rpy<Scalar>(static_cast<Scalar>(origin.rotation.roll),
-                                  static_cast<Scalar>(origin.rotation.pitch),
-                                  static_cast<Scalar>(origin.rotation.yaw));
-    return se3<Scalar>(rotation, staged_vector<Scalar>(origin.translation));
-}
-
-template <typename Scalar>
-matrix3<Scalar> staged_inertia(const meios::inertia<double>& tensor)
-{
-    matrix3<Scalar> out;
-    out << static_cast<Scalar>(tensor.ixx), static_cast<Scalar>(tensor.ixy),
-        static_cast<Scalar>(tensor.ixz), static_cast<Scalar>(tensor.ixy),
-        static_cast<Scalar>(tensor.iyy), static_cast<Scalar>(tensor.iyz),
-        static_cast<Scalar>(tensor.ixz), static_cast<Scalar>(tensor.iyz),
-        static_cast<Scalar>(tensor.izz);
-    return out;
-}
-
-template <typename Scalar>
-parsed_link<Scalar> staged_link(const meios::link<double>& node)
-{
-    parsed_link<Scalar> out{};
-    out.name = node.name;
-    if (node.body)
+    vector3<Scalar> translation;
+    if (narrow_vector(origin.translation, translation)) { return "<origin xyz>"; }
+    Scalar roll{};
+    Scalar pitch{};
+    Scalar yaw{};
+    if (narrow_into(origin.rotation.roll, roll) || narrow_into(origin.rotation.pitch, pitch)
+        || narrow_into(origin.rotation.yaw, yaw))
     {
-        out.inertial = parsed_inertial<Scalar>{static_cast<Scalar>(node.body->mass),
-                                               staged_vector<Scalar>(node.body->origin.translation),
-                                               staged_inertia<Scalar>(node.body->tensor)};
+        return "<origin rpy>";
     }
-    return out;
+    out = se3<Scalar>(rotation_from_rpy<Scalar>(roll, pitch, yaw), translation);
+    return std::nullopt;
 }
 
 template <typename Scalar>
-parsed_joint<Scalar> staged_joint(const meios::joint<double>& edge, parsed_joint_kind kind)
+std::optional<std::string_view> stage_inertia(const meios::inertia<double>& tensor,
+                                              matrix3<Scalar>& out)
 {
-    parsed_joint<Scalar> out{};
+    matrix3<double> wide;
+    wide << tensor.ixx, tensor.ixy, tensor.ixz,
+        tensor.ixy, tensor.iyy, tensor.iyz,
+        tensor.ixz, tensor.iyz, tensor.izz;
+    for (Eigen::Index i = 0; i < wide.size(); ++i)
+    {
+        if (narrow_into(wide(i), out(i))) { return "<inertia>"; }
+    }
+    return std::nullopt;
+}
+
+template <typename Scalar>
+std::optional<std::string_view> stage_link(const meios::link<double>& node,
+                                           parsed_link<Scalar>& out)
+{
+    out.name = node.name;
+    if (!node.body) { return std::nullopt; }
+    parsed_inertial<Scalar> body{};
+    if (narrow_into(node.body->mass, body.mass)) { return "<inertial mass>"; }
+    if (narrow_vector(node.body->origin.translation, body.com)) { return "<inertial origin>"; }
+    if (const auto field = stage_inertia(node.body->tensor, body.inertia)) { return field; }
+    out.inertial = body;
+    return std::nullopt;
+}
+
+template <typename Scalar>
+std::optional<std::string_view> stage_limit(double value, std::optional<Scalar>& out,
+                                            std::string_view field)
+{
+    Scalar narrowed{};
+    if (narrow_into(value, narrowed)) { return field; }
+    out = narrowed;
+    return std::nullopt;
+}
+
+template <typename Scalar>
+std::optional<std::string_view> stage_limits(const meios::joint_limits<double>& limits,
+                                             parsed_joint<Scalar>& out)
+{
+    if (const auto f = stage_limit(limits.lower, out.position_min, "<limit lower>")) { return f; }
+    if (const auto f = stage_limit(limits.upper, out.position_max, "<limit upper>")) { return f; }
+    if (const auto f = stage_limit(limits.velocity, out.velocity_max, "<limit velocity>")) { return f; }
+    if (const auto f = stage_limit(limits.effort, out.effort_max, "<limit effort>")) { return f; }
+    return std::nullopt;
+}
+
+template <typename Scalar>
+std::optional<std::string_view> stage_joint(const meios::joint<double>& edge,
+                                            parsed_joint_kind kind,
+                                            parsed_joint<Scalar>& out)
+{
     out.name = edge.name;
     out.kind = kind;
     out.parent_link = edge.parent;
     out.child_link = edge.child;
-    out.axis = staged_vector<Scalar>(edge.axis);
-    out.origin = staged_origin<Scalar>(edge.origin);
-    if (edge.limits)
-    {
-        out.position_min = static_cast<Scalar>(edge.limits->lower);
-        out.position_max = static_cast<Scalar>(edge.limits->upper);
-        out.velocity_max = static_cast<Scalar>(edge.limits->velocity);
-        out.effort_max = static_cast<Scalar>(edge.limits->effort);
-    }
-    return out;
+    if (narrow_vector(edge.axis, out.axis)) { return "<axis>"; }
+    if (const auto field = stage_origin(edge.origin, out.origin)) { return field; }
+    if (!edge.limits) { return std::nullopt; }
+    return stage_limits(*edge.limits, out);
 }
 
 }
