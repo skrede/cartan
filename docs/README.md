@@ -37,6 +37,7 @@ Task-oriented walkthroughs with worked examples.
 - [PoE Walkthrough](guides/poe-walkthrough.md) &mdash; forward kinematics from scratch
 - [IK Composition](guides/ik-composition.md) &mdash; variadic-policy racing via `basic_ik_runner` + `restart_wrapper`
 - [Frame Tags Guide](guides/frame-tags-guide.md) &mdash; using frame tags for compile-time safety
+- [Loading Robot Descriptions](guides/robot-descriptions.md) &mdash; xacro, `package://` resolution, evaluation backends and their trust boundaries
 
 ## Examples
 

@@ -33,6 +33,17 @@ jobs:
       - name: File sizes against the exception register
         run: python3 tools/check_file_size.py
 
+      # Same ordering, same reason: the fixtures prove the gate still goes red on
+      # each construct, and only then is a green tree worth anything. The build
+      # configuration is scanned alongside the sources because the switch that
+      # would make an untrusted description executable is reached by editing
+      # CMake, not C++.
+      - name: Forbidden-call fixtures
+        run: python3 tools/check_forbidden_calls_test.py
+
+      - name: Forbidden calls and build settings
+        run: python3 tools/check_forbidden_calls.py
+
   # The linter needs a compile database and therefore a compiler, so it is its own
   # job: the checks above stay build-free and finish while this one is still
   # configuring.
