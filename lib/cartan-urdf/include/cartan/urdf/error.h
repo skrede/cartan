@@ -50,7 +50,7 @@ enum class urdf_failure
     duplicate_name,            ///< A link or joint name is declared more than once.
     multi_parent_link,         ///< A link is the child of more than one joint (non-tree topology).
     tool_link_unreachable,     ///< The requested tool link is not reached by the serial walk.
-    unknown_error              ///< Catch-all default; should not occur in normal operation.
+    unknown_error              ///< Reader code has no cartan kind; meios_code carries it verbatim.
 };
 
 /// Location of a URDF failure inside the source XML.
