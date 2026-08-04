@@ -1,7 +1,7 @@
 set(CARTAN_MEIOS_PACKAGE meios)
 set(CARTAN_MEIOS_TARGET meios::urdf)
 set(CARTAN_MEIOS_REPOSITORY https://github.com/skrede/meios.git)
-set(CARTAN_MEIOS_REVISION 5626542b01b9f141cbf2aa1bde0912ab96810a8b)
+set(CARTAN_MEIOS_REVISION 890cf38e07c93384b41f14129b4551005cc7e8ed)
 
 set(CARTAN_MEIOS_SOURCE_DIR "" CACHE PATH "Path to local meios source checkout")
 
