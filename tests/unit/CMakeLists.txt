@@ -166,12 +166,15 @@ if (CARTAN_BUILD_URDF)
         CARTAN_TESTS_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures")
 
     cartan_add_test(urdf_parity_test urdf_parity_test.cpp)
-    target_link_libraries(urdf_parity_test PRIVATE cartan::urdf)
-    target_compile_definitions(urdf_parity_test PRIVATE
-        CARTAN_TESTS_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures")
-    if (CARTAN_BUILD_URDF_EXTENDED_TESTS)
-        target_compile_definitions(urdf_parity_test PRIVATE CARTAN_URDF_EXTENDED_TESTS)
-    endif ()
+    cartan_add_test(urdf_stage_parity_test urdf_stage_parity_test.cpp)
+    foreach (parity_test urdf_parity_test urdf_stage_parity_test)
+        target_link_libraries(${parity_test} PRIVATE cartan::urdf)
+        target_compile_definitions(${parity_test} PRIVATE
+            CARTAN_TESTS_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures")
+        if (CARTAN_BUILD_URDF_EXTENDED_TESTS)
+            target_compile_definitions(${parity_test} PRIVATE CARTAN_URDF_EXTENDED_TESTS)
+        endif ()
+    endforeach ()
 
     cartan_add_test(solver_continuous_joint_test solver_continuous_joint_test.cpp)
     target_link_libraries(solver_continuous_joint_test PRIVATE cartan::urdf)

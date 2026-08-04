@@ -16,8 +16,12 @@
 /// Parity tests asserting that the URDF loader and the hand-coded ground-truth
 /// kinematic_chain factories agree on forward kinematics to within 1e-12 across
 /// 100 random reachable joint configurations. The synthetic cartanbot fixture
-/// is always exercised; the vendored real-world fixtures (UR3e / UR5e / UR10 /
-/// UR16 / iiwa14) compile in only under CARTAN_URDF_EXTENDED_TESTS.
+/// is always exercised; the vendored real-world fixtures compile in only under
+/// CARTAN_URDF_EXTENDED_TESTS.
+///
+/// This is the end-to-end backstop, not the primary evidence that the loader's
+/// front half is correct: it compares the end of the pipeline within a
+/// tolerance, and urdf_stage_parity_test.cpp compares the middle of it exactly.
 
 namespace
 {

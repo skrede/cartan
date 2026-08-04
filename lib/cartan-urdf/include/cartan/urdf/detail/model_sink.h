@@ -109,6 +109,14 @@ public:
         return m_model;
     }
 
+    /// The latched staging refusal, separate from result(), which also carries
+    /// the extractor's. A caller comparing what reaches the extractor needs to
+    /// tell a document this sink refused from one the extractor refused.
+    const std::optional<urdf_error>& failure() const
+    {
+        return m_failure;
+    }
+
     const cartan::expected<urdf_load_result<Scalar>, urdf_error>& result() const
     {
         return m_result;

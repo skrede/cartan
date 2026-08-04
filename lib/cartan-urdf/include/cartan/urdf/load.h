@@ -26,10 +26,28 @@ namespace cartan
 
 static_assert(meios::model_sink<detail::model_sink<>>);
 
-/// Build a kinematic chain from an already-evaluated robot description. The
-/// push order reproduces the reader's own, which is the order its sink
-/// protocol is specified in; the reader's emitter is not called, because it
-/// is a private name of that library.
+namespace detail
+{
+
+/// The push order reproduces the reader's own, which is the order its sink
+/// protocol is specified in; the reader's emitter is not called, because it is
+/// a private name of that library. It is a named function so that anything
+/// asserting what the sink stages drives this push rather than a copy of it.
+template <typename Scalar>
+void push_model(const meios::model<>& robot, model_sink<Scalar>& sink)
+{
+    meios::robot_info info;
+    info.name = robot.name;
+    sink.on_robot(info);
+    for (const meios::material<double>& mat : robot.materials) { sink.on_material(mat); }
+    for (const meios::link<double>& node : robot.links) { sink.on_link(node); }
+    for (const meios::joint<double>& edge : robot.joints) { sink.on_joint(edge); }
+    sink.finish();
+}
+
+}
+
+/// Build a kinematic chain from an already-evaluated robot description.
 ///
 /// The result's diagnostics stay empty and its claims stay none: this entry
 /// point performs no read, so it has nothing to report on and inventing
@@ -40,13 +58,7 @@ inline cartan::expected<urdf_load_result<Scalar>, urdf_error>
 chain_from_model(const meios::model<>& robot, const load_options& opts = {})
 {
     detail::model_sink<Scalar> sink(opts);
-    meios::robot_info info;
-    info.name = robot.name;
-    sink.on_robot(info);
-    for (const meios::material<double>& mat : robot.materials) { sink.on_material(mat); }
-    for (const meios::link<double>& node : robot.links) { sink.on_link(node); }
-    for (const meios::joint<double>& edge : robot.joints) { sink.on_joint(edge); }
-    sink.finish();
+    detail::push_model(robot, sink);
     return sink.result();
 }
 
