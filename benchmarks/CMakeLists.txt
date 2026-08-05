@@ -276,6 +276,33 @@ else ()
         "Install pinocchio to enable them.")
 endif ()
 
+# --- The study's two passes over one target pool. The timed program registers
+# cells and links the harness's default main; the untimed capture program owns
+# its own main and carries every counter, adjudication and file write, which is
+# how those stay out of a measured block. Both are defined whether or not the
+# peer comparator is present: a build that resolves fewer participants than the
+# capture declares must say so at run start rather than emit a smaller table. ---
+add_executable(ik_study_benchmarks ik_study_benchmarks.cpp)
+target_link_libraries(ik_study_benchmarks PRIVATE benchmark::benchmark_main)
+
+add_executable(ik_study_capture ik_study_capture.cpp)
+
+foreach (_study_program ik_study_benchmarks ik_study_capture)
+    target_link_libraries(${_study_program}
+        PRIVATE
+        cartan::cartan
+        benchmark::benchmark
+        orocos-kdl
+    )
+    target_compile_definitions(${_study_program} PRIVATE
+        CARTAN_BENCH_DESCRIPTION_ROOT="${CARTAN_BENCH_DESCRIPTION_ROOT}")
+    target_compile_options(${_study_program} PRIVATE ${CARTAN_WARNING_FLAGS})
+    if (TARGET pinocchio::pinocchio)
+        target_link_libraries(${_study_program} PRIVATE pinocchio::pinocchio)
+        target_compile_definitions(${_study_program} PRIVATE CARTAN_BENCH_STUDY_HAS_PINOCCHIO)
+    endif ()
+endforeach ()
+
 # --- OPW closed-form comparison benchmark: opw_kinematics (ROS-Industrial,
 # Apache-2.0) is an external reference implementation for the ortho-parallel 6R
 # closed-form solve. Its own CMake calls
