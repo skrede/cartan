@@ -33,15 +33,15 @@ below before quoting any IK comparison.
 > reproduced against the harness source:
 >
 > 1. **The compared problems are not the same feasible set.** The highlighted `cartan_restart_lm`
->    row runs with `no_limits` (`benchmarks/ik_comparison_benchmarks.cpp:174`), while TRAC-IK is
+>    row runs with `no_limits`, while TRAC-IK is
 >    constructed with explicit `q_min`/`q_max`. cartan is solving an unconstrained problem and
 >    TRAC-IK a box-constrained one. The paired `cartan_restart_lm_clamped` row (47.8–70.4%
 >    success, 5–8× slower) shows that limit treatment is material, so the two cannot be read as
 >    like-for-like. Post-step clamping is not cartan's best bounded method, but no bound-aware
 >    cartan variant has been measured against TRAC-IK yet.
 > 2. **Success is verified asymmetrically.** TRAC-IK success is gated on an independently
->    recomputed pose error (`:424-430`). cartan success is taken from `result.has_value()`
->    (`:205`); the recomputed errors are accumulated into the accuracy columns but never gate
+>    recomputed pose error. cartan success is taken from `result.has_value()`;
+>    the recomputed errors are accumulated into the accuracy columns but never gate
 >    the success count. cartan's convergence criteria are set to the same gate, so the two
 >    definitions may agree closely — but that agreement is unmeasured, and it is not the
 >    independent verification claimed here previously.
@@ -215,8 +215,8 @@ accuracy-gate sweep below shows how far.
 
 ## Accuracy gate (QoS) sweep
 
-The gate is a single knob: one value (`CARTAN_BENCH_TOL`) sets cartan's convergence tolerance,
-TRAC-IK's `eps = gate/√3`, and the FK verification threshold, so both solvers are driven and
+The gate was a single knob: one value (`CARTAN_BENCH_TOL`) set cartan's convergence tolerance,
+TRAC-IK's `eps = gate/√3`, and the FK verification threshold, so both solvers were driven and
 scored at the same accuracy. Sweeping it from 1e-4 to 1e-7 answers *how much* time, iterations,
 and success move with precision. Ranges are min–max across the nine robots; `cartan_restart_lm`
 and TRAC-IK are the two solvers held to the matched gate.
@@ -249,8 +249,10 @@ and TRAC-IK are the two solvers held to the matched gate.
   back for more solve time.
 
 Absolute times here come from the gate sweep and agree with the fixed-gate tables above to
-within run-to-run noise; the cross-gate trends are the point. Reproduce with
-`tools/ik_accuracy_sweep.py` (see [Reproducing](#reproducing)).
+within run-to-run noise; the cross-gate trends are the point. **This sweep is no longer
+reproducible from this tree**: the harness it drove, and the script that drove it, were retired
+with the two defects recorded above. The figures are left as measured, and driving every
+participant at one accuracy is now the study's own calibrated iso-accuracy mode.
 
 ## Forward kinematics
 
@@ -334,11 +336,8 @@ warning when its dependency is unavailable. Success rates are FK-verified in the
 cells themselves, not read from a solver's own return code, and each cross-library cell is
 constructed so both sides do equal end-effector work.
 
-The accuracy gate is set with the `CARTAN_BENCH_TOL` environment variable (default 1e-5); it
-drives cartan's convergence criteria, TRAC-IK's `eps`, and the verifier together. To regenerate
-the accuracy-gate sweep across a series of gates:
-
-```
-python3 tools/ik_accuracy_sweep.py <build>/benchmarks/ik_comparison_benchmarks \
-    --tolerances 1e-4,1e-5,1e-6,1e-7 --taskset-core 4 --out-dir sweep_out
-```
+The harness that carried the two defects recorded above has been retired, along with the script
+that swept its accuracy gate; the tables it produced are left in place as measured, and marked.
+Driving every participant at one *achieved* accuracy is now `ik_study_calibrate` plus the study
+capture's `--iso-accuracy` mode, which calibrates each solver's own requested tolerance against
+the error the harness recomputes. `benchmarks/README.md` records what was retired and why.

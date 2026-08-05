@@ -1,4 +1,5 @@
-#pragma once
+#ifndef HPP_GUARD_CARTAN_BENCHMARKS_BENCHMARK_UTILS_H
+#define HPP_GUARD_CARTAN_BENCHMARKS_BENCHMARK_UTILS_H
 
 /// @file benchmark_utils.h
 /// @brief Standalone benchmark utilities: robot chain factories, random target
@@ -7,6 +8,8 @@
 /// All robot geometries expressed as Product of Exponentials screw parameters.
 /// This file is standalone from test infrastructure.
 /// Chain factories cover ~10 robots in both cartan PoE and KDL representations.
+
+#include "study/kdl_chain.h"
 
 #include "../tests/fixtures/chain_factories.h"
 
@@ -94,18 +97,19 @@ inline KDL::Segment make_kdl_revolute_neg_y(
         KDL::Frame(KDL::Rotation::Identity(), offset));
 }
 
-/// Set all joint limits to [-pi, pi].
-inline void set_symmetric_pi_limits(KDL::JntArray& q_min, KDL::JntArray& q_max, unsigned int n)
-{
-    q_min.resize(n);
-    q_max.resize(n);
-    for (unsigned int i = 0; i < n; ++i)
-    {
-        q_min(i) = -M_PI;
-        q_max(i) = M_PI;
-    }
 }
 
+/// The comparator takes its bounds as arrays rather than reading them off a
+/// chain. Writing those arrays beside the chain describes one robot twice, and
+/// two descriptions agree only until one of them is edited, so they are derived
+/// here from the chain every other participant solves.
+template <int N>
+void kdl_bounds_from(
+    const cartan::kinematic_chain<double, N>& chain, KDL::JntArray& q_min, KDL::JntArray& q_max)
+{
+    auto derived = cartan::bench::derive_comparator_bounds<N>(chain);
+    q_min = std::move(derived.lower);
+    q_max = std::move(derived.upper);
 }
 
 /// 3R planar chain as KDL (3-DOF). All joints about Z, unit link lengths.
@@ -116,11 +120,6 @@ inline KDL::Chain make_3r_planar_kdl_chain()
     chain.addSegment(KDL::Segment(KDL::Joint(KDL::Joint::RotZ), KDL::Frame(KDL::Vector(1, 0, 0))));
     chain.addSegment(KDL::Segment(KDL::Joint(KDL::Joint::RotZ), KDL::Frame(KDL::Vector(1, 0, 0))));
     return chain;
-}
-
-inline void make_3r_planar_kdl_limits(KDL::JntArray& q_min, KDL::JntArray& q_max)
-{
-    detail::set_symmetric_pi_limits(q_min, q_max, 3);
 }
 
 /// UR3e as KDL (6-DOF).
@@ -144,11 +143,6 @@ inline KDL::Chain make_ur3e_kdl_chain()
     return chain;
 }
 
-inline void make_ur3e_kdl_limits(KDL::JntArray& q_min, KDL::JntArray& q_max)
-{
-    detail::set_symmetric_pi_limits(q_min, q_max, 6);
-}
-
 /// LBR Med 14 as KDL (7-DOF).
 inline KDL::Chain make_lbr_med14_kdl_chain()
 {
@@ -170,11 +164,6 @@ inline KDL::Chain make_lbr_med14_kdl_chain()
     return chain;
 }
 
-inline void make_lbr_med14_kdl_limits(KDL::JntArray& q_min, KDL::JntArray& q_max)
-{
-    detail::set_symmetric_pi_limits(q_min, q_max, 7);
-}
-
 /// KR 6 SIXX as KDL (6-DOF).
 inline KDL::Chain make_kr6_sixx_kdl_chain()
 {
@@ -186,11 +175,6 @@ inline KDL::Chain make_kr6_sixx_kdl_chain()
     chain.addSegment(KDL::Segment(KDL::Joint(KDL::Joint::RotY), KDL::Frame(KDL::Vector(0.060, 0, 0))));
     chain.addSegment(KDL::Segment(KDL::Joint(KDL::Joint::RotX), KDL::Frame(KDL::Vector(0, 0, 0))));
     return chain;
-}
-
-inline void make_kr6_sixx_kdl_limits(KDL::JntArray& q_min, KDL::JntArray& q_max)
-{
-    detail::set_symmetric_pi_limits(q_min, q_max, 6);
 }
 
 /// Panda as KDL (7-DOF).
@@ -205,11 +189,6 @@ inline KDL::Chain make_panda_kdl_chain()
     chain.addSegment(KDL::Segment(KDL::Joint(KDL::Joint::RotY), KDL::Frame(KDL::Vector(0.088, 0, 0))));
     chain.addSegment(KDL::Segment(KDL::Joint(KDL::Joint::RotZ), KDL::Frame(KDL::Vector(0, 0, 0.107))));
     return chain;
-}
-
-inline void make_panda_kdl_limits(KDL::JntArray& q_min, KDL::JntArray& q_max)
-{
-    detail::set_symmetric_pi_limits(q_min, q_max, 7);
 }
 
 /// ABB IRB 120 as KDL (6-DOF).
@@ -228,11 +207,6 @@ inline KDL::Chain make_abb_irb120_kdl_chain()
     return chain;
 }
 
-inline void make_abb_irb120_kdl_limits(KDL::JntArray& q_min, KDL::JntArray& q_max)
-{
-    detail::set_symmetric_pi_limits(q_min, q_max, 6);
-}
-
 /// Kinova Jaco2 as KDL (6-DOF).
 inline KDL::Chain make_jaco2_kdl_chain()
 {
@@ -244,11 +218,6 @@ inline KDL::Chain make_jaco2_kdl_chain()
     chain.addSegment(KDL::Segment(KDL::Joint(KDL::Joint::RotY), KDL::Frame(KDL::Vector(0, 0.0743, 0))));
     chain.addSegment(KDL::Segment(KDL::Joint(KDL::Joint::RotX), KDL::Frame(KDL::Vector(0, 0.1687, 0))));
     return chain;
-}
-
-inline void make_jaco2_kdl_limits(KDL::JntArray& q_min, KDL::JntArray& q_max)
-{
-    detail::set_symmetric_pi_limits(q_min, q_max, 6);
 }
 
 /// Fetch arm as KDL (7-DOF).
@@ -265,11 +234,6 @@ inline KDL::Chain make_fetch_kdl_chain()
     return chain;
 }
 
-inline void make_fetch_kdl_limits(KDL::JntArray& q_min, KDL::JntArray& q_max)
-{
-    detail::set_symmetric_pi_limits(q_min, q_max, 7);
-}
-
 /// Baxter single arm as KDL (7-DOF).
 inline KDL::Chain make_baxter_kdl_chain()
 {
@@ -284,11 +248,6 @@ inline KDL::Chain make_baxter_kdl_chain()
     return chain;
 }
 
-inline void make_baxter_kdl_limits(KDL::JntArray& q_min, KDL::JntArray& q_max)
-{
-    detail::set_symmetric_pi_limits(q_min, q_max, 7);
-}
-
 /// KUKA LWR 4+ as KDL (7-DOF).
 inline KDL::Chain make_kuka_lwr4_kdl_chain()
 {
@@ -301,11 +260,6 @@ inline KDL::Chain make_kuka_lwr4_kdl_chain()
     chain.addSegment(KDL::Segment(KDL::Joint(KDL::Joint::RotY), KDL::Frame(KDL::Vector(0, 0, 0))));
     chain.addSegment(KDL::Segment(KDL::Joint(KDL::Joint::RotZ), KDL::Frame(KDL::Vector(0, 0, 0.078))));
     return chain;
-}
-
-inline void make_kuka_lwr4_kdl_limits(KDL::JntArray& q_min, KDL::JntArray& q_max)
-{
-    detail::set_symmetric_pi_limits(q_min, q_max, 7);
 }
 
 // ===========================================================================
@@ -326,3 +280,5 @@ inline KDL::Frame se3_to_kdl_frame(const cartan::se3<double>& pose)
 }
 
 }
+
+#endif

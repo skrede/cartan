@@ -804,15 +804,14 @@ static void bm_full_##ROBOT##_cartan_racing(benchmark::State& state)            
 BENCHMARK(bm_full_##ROBOT##_cartan_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 // Register TRAC-IK baseline for a 6-DOF robot.
-// ROBOT: lowercase name, KDL_FN: KDL chain factory, LIMITS_FN: KDL limits factory
-#define REGISTER_6DOF_TRAC_IK(ROBOT, CHAIN_FN, KDL_FN, LIMITS_FN)                                   \
+#define REGISTER_6DOF_TRAC_IK(ROBOT, CHAIN_FN, KDL_FN)                                              \
                                                                                                      \
 static void bm_full_##ROBOT##_trac_ik(benchmark::State& state)                                    \
 {                                                                                                    \
     auto cartan_chain = cartan::fixtures::CHAIN_FN<double>();                                        \
     auto kdl_chain = cartan::fixtures::KDL_FN();                                                    \
     KDL::JntArray q_min(6), q_max(6);                                                                \
-    cartan::fixtures::LIMITS_FN(q_min, q_max);                                                      \
+    cartan::fixtures::kdl_bounds_from<6>(cartan_chain, q_min, q_max);                                \
     static const target_set<double, 6> ts(cartan_chain, num_targets, 42);                             \
     bm_trac_ik_baseline<6>(state, cartan_chain, kdl_chain, q_min, q_max, ts);                         \
 }                                                                                                    \
@@ -1014,14 +1013,14 @@ static void bm_full_##ROBOT##_cartan_racing(benchmark::State& state)            
 BENCHMARK(bm_full_##ROBOT##_cartan_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 // Register TRAC-IK baseline for a 7-DOF robot.
-#define REGISTER_7DOF_TRAC_IK(ROBOT, CHAIN_FN, KDL_FN, LIMITS_FN)                                   \
+#define REGISTER_7DOF_TRAC_IK(ROBOT, CHAIN_FN, KDL_FN)                                              \
                                                                                                      \
 static void bm_full_##ROBOT##_trac_ik(benchmark::State& state)                                    \
 {                                                                                                    \
     auto cartan_chain = cartan::fixtures::CHAIN_FN<double>();                                        \
     auto kdl_chain = cartan::fixtures::KDL_FN();                                                    \
     KDL::JntArray q_min(7), q_max(7);                                                                \
-    cartan::fixtures::LIMITS_FN(q_min, q_max);                                                      \
+    cartan::fixtures::kdl_bounds_from<7>(cartan_chain, q_min, q_max);                                \
     static const target_set<double, 7> ts(cartan_chain, num_targets, 42);                             \
     bm_trac_ik_baseline<7>(state, cartan_chain, kdl_chain, q_min, q_max, ts);                         \
 }                                                                                                    \
@@ -1136,22 +1135,22 @@ BENCHMARK(bm_full_##ROBOT##_argmin_projected_gradient_gn)->Iterations(1000)->Uni
 // ============================================================================
 
 REGISTER_6DOF_BENCHMARKS(ur3e,       make_ur3e_chain)
-REGISTER_6DOF_TRAC_IK(ur3e,         make_ur3e_chain, make_ur3e_kdl_chain, make_ur3e_kdl_limits)
+REGISTER_6DOF_TRAC_IK(ur3e,         make_ur3e_chain, make_ur3e_kdl_chain)
 REGISTER_6DOF_NLOPT(ur3e,           make_ur3e_chain)
 REGISTER_6DOF_ARGMIN(ur3e,         make_ur3e_chain)
 
 REGISTER_6DOF_BENCHMARKS(kr6_sixx,   make_kr6_sixx_chain)
-REGISTER_6DOF_TRAC_IK(kr6_sixx,     make_kr6_sixx_chain, make_kr6_sixx_kdl_chain, make_kr6_sixx_kdl_limits)
+REGISTER_6DOF_TRAC_IK(kr6_sixx,     make_kr6_sixx_chain, make_kr6_sixx_kdl_chain)
 REGISTER_6DOF_NLOPT(kr6_sixx,       make_kr6_sixx_chain)
 REGISTER_6DOF_ARGMIN(kr6_sixx,     make_kr6_sixx_chain)
 
 REGISTER_6DOF_BENCHMARKS(abb_irb120, make_abb_irb120_chain)
-REGISTER_6DOF_TRAC_IK(abb_irb120,   make_abb_irb120_chain, make_abb_irb120_kdl_chain, make_abb_irb120_kdl_limits)
+REGISTER_6DOF_TRAC_IK(abb_irb120,   make_abb_irb120_chain, make_abb_irb120_kdl_chain)
 REGISTER_6DOF_NLOPT(abb_irb120,     make_abb_irb120_chain)
 REGISTER_6DOF_ARGMIN(abb_irb120,   make_abb_irb120_chain)
 
 REGISTER_6DOF_BENCHMARKS(jaco2,      make_jaco2_chain)
-REGISTER_6DOF_TRAC_IK(jaco2,        make_jaco2_chain, make_jaco2_kdl_chain, make_jaco2_kdl_limits)
+REGISTER_6DOF_TRAC_IK(jaco2,        make_jaco2_chain, make_jaco2_kdl_chain)
 REGISTER_6DOF_NLOPT(jaco2,          make_jaco2_chain)
 REGISTER_6DOF_ARGMIN(jaco2,        make_jaco2_chain)
 
@@ -1160,27 +1159,27 @@ REGISTER_6DOF_ARGMIN(jaco2,        make_jaco2_chain)
 // ============================================================================
 
 REGISTER_7DOF_BENCHMARKS(lbr_med14,  make_lbr_med14_chain)
-REGISTER_7DOF_TRAC_IK(lbr_med14,    make_lbr_med14_chain, make_lbr_med14_kdl_chain, make_lbr_med14_kdl_limits)
+REGISTER_7DOF_TRAC_IK(lbr_med14,    make_lbr_med14_chain, make_lbr_med14_kdl_chain)
 REGISTER_7DOF_NLOPT(lbr_med14,      make_lbr_med14_chain)
 REGISTER_7DOF_ARGMIN(lbr_med14,    make_lbr_med14_chain)
 
 REGISTER_7DOF_BENCHMARKS(panda,      make_panda_chain)
-REGISTER_7DOF_TRAC_IK(panda,        make_panda_chain, make_panda_kdl_chain, make_panda_kdl_limits)
+REGISTER_7DOF_TRAC_IK(panda,        make_panda_chain, make_panda_kdl_chain)
 REGISTER_7DOF_NLOPT(panda,          make_panda_chain)
 REGISTER_7DOF_ARGMIN(panda,        make_panda_chain)
 
 REGISTER_7DOF_BENCHMARKS(fetch,      make_fetch_chain)
-REGISTER_7DOF_TRAC_IK(fetch,        make_fetch_chain, make_fetch_kdl_chain, make_fetch_kdl_limits)
+REGISTER_7DOF_TRAC_IK(fetch,        make_fetch_chain, make_fetch_kdl_chain)
 REGISTER_7DOF_NLOPT(fetch,          make_fetch_chain)
 REGISTER_7DOF_ARGMIN(fetch,        make_fetch_chain)
 
 REGISTER_7DOF_BENCHMARKS(baxter,     make_baxter_chain)
-REGISTER_7DOF_TRAC_IK(baxter,       make_baxter_chain, make_baxter_kdl_chain, make_baxter_kdl_limits)
+REGISTER_7DOF_TRAC_IK(baxter,       make_baxter_chain, make_baxter_kdl_chain)
 REGISTER_7DOF_NLOPT(baxter,         make_baxter_chain)
 REGISTER_7DOF_ARGMIN(baxter,       make_baxter_chain)
 
 REGISTER_7DOF_BENCHMARKS(kuka_lwr4,  make_kuka_lwr4_chain)
-REGISTER_7DOF_TRAC_IK(kuka_lwr4,    make_kuka_lwr4_chain, make_kuka_lwr4_kdl_chain, make_kuka_lwr4_kdl_limits)
+REGISTER_7DOF_TRAC_IK(kuka_lwr4,    make_kuka_lwr4_chain, make_kuka_lwr4_kdl_chain)
 REGISTER_7DOF_NLOPT(kuka_lwr4,      make_kuka_lwr4_chain)
 REGISTER_7DOF_ARGMIN(kuka_lwr4,    make_kuka_lwr4_chain)
 

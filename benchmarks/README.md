@@ -75,6 +75,66 @@ the axis, which is a stronger and wronger claim than an acknowledged gap. No
 kernel count is ever derived, modelled or back-derived from a wall-clock
 measurement.
 
+## What the comparison harnesses are, and what they are not
+
+`ik_comparison_pinocchio_benchmarks` and `basic_ik_full_benchmarks` build their chains from
+the hand-coded fixtures in `tests/fixtures/chain_factories.h`, whose joint limits are a
+synthetic symmetric box of ±π on every joint. They are a **cartan-internal solver-family
+comparison over synthetic bounds**, useful for ranking cartan's own solvers against each other
+and for keeping an eye on a regression, and they are **not a source of any cross-library claim**.
+The study harness (`ik_study_capture`, `benchmarks/study/`) is: it takes its bounds from
+revision-pinned upstream robot descriptions, hands one feasible set to every participant, and
+adjudicates every solve itself. Quote the study, not these.
+
+The distinction is measured rather than stylistic. On the symmetric box every joint's arc is
+exactly one full turn, so canonicalization always succeeds and a limits check cannot fail: 0 of
+1500 adjudicated rows fail it on the box, against 410 of 1500 on the manufacturer's declared
+bounds. A comparison whose feasibility question has only one possible answer is not measuring
+feasibility.
+
+### Retired cells and why
+
+A cell that vanished from a table with no recorded reason is indistinguishable from a cell that
+was inconvenient, so each retirement is written down here.
+
+- **The cartan-versus-TRAC-IK head-to-head harness (54 cells).** Retired outright. Its cartan
+  rows solved an unconstrained problem while the comparator solved a box-constrained one, and
+  its cartan success column reported the solver's own status rather than an independently
+  recomputed verdict. Both defects are structural, and the study replaces the harness with one
+  feasible set no cell can opt out of and a verdict the harness computes for every participant.
+- **`cartan_restart_lm_clamped`, `argmin_mma` and `argmin_gcmma`.** Retired with that file: they
+  were benchmarked nowhere else, and the study does not declare them as participants. `mma` and
+  `gcmma` keep their compile coverage in `tests/unit/argmin_solver_instantiation_test.cpp` but
+  now have no measured cell at all.
+- **Every `_no_limits` method variant (136 cells).** Retired: 136 of 136 limited-versus-unbounded
+  pairs produced identical success rates, because the default cells clamp while the variant cells
+  run unbounded and every target is drawn from inside the box, so no bound ever binds. The
+  deliberate unbounded measurement now lives in the study as its own table over
+  description-sourced bounds, where a bound can actually bind.
+- **The multiplier-re-estimation sweep (108 cells).** Retired: the optimization backend's own
+  test suite asserts, at the revision this build pins, that the parameter is not consumed at any
+  call site by the sequential-programming policy cartan resolves through, and that two different
+  values must produce bit-identical iteration counts and objectives. cartan forwards the field
+  correctly; the knob is inert by upstream design, so the cells measured nothing.
+- **`tools/ik_accuracy_sweep.py`.** Retired: it drove the deleted harness through an environment
+  variable. Driving every participant at one accuracy is now `ik_study_calibrate` plus the
+  capture's `--iso-accuracy` mode, which calibrates against achieved rather than requested error.
+
+### The BOBYQA cell reads near zero, and that is a budget statement
+
+`argmin_bobyqa` reports 0.00–0.05% success in this harness while genuinely spending 350–450 µs.
+That is not a wiring defect. Measured on UR3e, IRB 120 and LBR Med 14 at 2000 targets each: the
+harness caps a solver attempt at 100 iterations, and BOBYQA's accepted solves need 220–305 at
+the median on these chains. Lifting the cap alone takes the three cells to 9.30 / 14.80 / 21.15%.
+A derivative-free method needs an order of magnitude more objective evaluations than a
+Jacobian-driven one, and this harness gives every family the same per-attempt allowance; the
+near-zero row is what that allowance buys BOBYQA, not evidence that it is broken.
+
+A separate, real defect was found alongside it and fixed: cartan's generic stall detector aborted
+BOBYQA during normal trust-region contraction. With the cap lifted, that fix moves the same three
+cells from 9.30 / 14.80 / 21.15% to 22.30 / 35.70 / 58.75%. It changes nothing at the published
+cap, where the iteration limit binds first.
+
 ## Building
 
 From the repository root:
@@ -112,7 +172,7 @@ cmake --preset=dev \
 ./benchmarks/ik_sqp_benchmarks        # requires NLopt
 ./benchmarks/ik_racing_benchmarks
 ./benchmarks/ik_fallback_benchmarks
-./benchmarks/ik_comparison_benchmarks  # requires orocos-kdl + NLopt
+./benchmarks/ik_comparison_pinocchio_benchmarks  # requires orocos-kdl + Pinocchio
 ```
 
 ### Filtered execution
@@ -122,16 +182,16 @@ cmake --preset=dev \
 ./benchmarks/lie_group_benchmarks --benchmark_filter="bm_so3"
 
 # Run only UR3e comparison
-./benchmarks/ik_comparison_benchmarks --benchmark_filter="ur3e"
+./benchmarks/ik_comparison_pinocchio_benchmarks --benchmark_filter="ur3e"
 
 # Run only Panda comparison
-./benchmarks/ik_comparison_benchmarks --benchmark_filter="panda"
+./benchmarks/ik_comparison_pinocchio_benchmarks --benchmark_filter="panda"
 ```
 
 ### JSON output (for post-processing)
 
 ```bash
-./benchmarks/ik_comparison_benchmarks \
+./benchmarks/ik_comparison_pinocchio_benchmarks \
     --benchmark_format=json \
     --benchmark_out=comparison_results.json
 ```
@@ -141,7 +201,7 @@ cmake --preset=dev \
 To obtain p95 and other statistical aggregates beyond the single-run mean:
 
 ```bash
-./benchmarks/ik_comparison_benchmarks \
+./benchmarks/ik_comparison_pinocchio_benchmarks \
     --benchmark_repetitions=10 \
     --benchmark_report_aggregates_only=true
 ```
@@ -160,7 +220,7 @@ This runs the full 10,000-iteration benchmark 10 times and reports mean, median,
 | `ik_sqp_benchmarks.cpp` | SQP stepper IK for 3/6/7-DOF (NLopt) | 3R, UR3e, LBR Med 14 |
 | `ik_racing_benchmarks.cpp` | Racing scheduler IK for 6/7-DOF | UR3e, LBR Med 14 |
 | `ik_fallback_benchmarks.cpp` | Fallback scheduler IK for 6/7-DOF | UR3e, LBR Med 14 |
-| `ik_comparison_benchmarks.cpp` | Cartan vs TRAC-IK head-to-head | UR3e, KR6, IRB120, Jaco2, LBR Med 14, Panda, Fetch, Baxter, LWR 4+ |
+| `ik_comparison_pinocchio_benchmarks.cpp` | cartan's own solver families side by side, with TRAC-IK and a Pinocchio-primitive LM alongside them, over synthetic bounds | UR3e, KR6, IRB120, Jaco2, LBR Med 14, Panda, Fetch, Baxter, LWR 4+ |
 | `opw_comparison_benchmarks.cpp` | Cartan `opw_6r_solver` vs `opw_kinematics` reference (same OPW formulation -> bit-identical): branch-for-branch parity + solve timing | KR6 R900 |
 | `ikfast_comparison_benchmarks.cpp` | Cartan `opw_6r_solver` vs an OpenRAVE-generated IKFast solver (independent derivation -> ~1e-10 agreement): branch-for-branch parity + solve timing | KR6 R900 |
 | `ikgeo_comparison_benchmarks.cpp` | Cartan `opw_6r_solver` vs the ik-geo crate (Elias & Wen subproblem method, through this project's own foreign-function shim; independent formulation -> ~1e-13 agreement): branch-for-branch parity + solve timing | KR6 R900 |
@@ -171,11 +231,10 @@ This runs the full 10,000-iteration benchmark 10 times and reports mean, median,
 - **Random seed:** 42 (fixed for reproducibility)
 - **IK iterations:** 10,000 solves per configuration
 - **Targets:** FK-generated from random joint configurations (guaranteed reachable)
-- **Convergence:** position and orientation tolerance default 1e-5, max 100 iterations. In
-  `ik_comparison_benchmarks` the gate is one shared value set by the `CARTAN_BENCH_TOL`
-  environment variable (default 1e-5), driving cartan's convergence, TRAC-IK's `eps = gate/√3`,
-  and the FK verifier together; `tools/ik_accuracy_sweep.py` sweeps it to produce the
-  speed-vs-accuracy curve.
+- **Convergence:** position and orientation tolerance default 1e-5, max 100 iterations. A run
+  that needs every participant driven at one *achieved* accuracy rather than one requested
+  tolerance uses `ik_study_calibrate` and the study capture's `--iso-accuracy` mode, which
+  calibrates each solver's own tolerance against the accuracy the harness recomputes.
 - **TRAC-IK cap:** 50 ms per solve (bounds a rare non-converging target; a timed-out solve
   counts as a failure)
 - **Reported metrics:** solve time, success rate, avg iterations, avg position error, avg orientation error
@@ -187,7 +246,7 @@ This runs the full 10,000-iteration benchmark 10 times and reports mean, median,
 |---------|-------|--------------------|-------------|
 | Google Benchmark | mainstream | installed package, or fetched at a pinned commit under `CARTAN_FETCH_BENCHMARK_DEPS` | all benchmarks |
 | orocos-kdl | mainstream | installed package | all benchmarks |
-| NLopt | mainstream | installed package | comparison + SQP benchmarks |
+| NLopt | mainstream | installed package | SQP and full-matrix benchmarks |
 | Pinocchio | mainstream | installed package | peer comparison benchmarks and the study |
 | TRAC-IK | mainstream | `cmake/FindTracIK.cmake`, or `CARTAN_TRAC_IK_SOURCE_DIR` | comparison benchmarks and the study |
 | LAPACK | mainstream | installed package | IKFast comparison benchmark (polynomial roots) |

@@ -62,9 +62,16 @@ public:
 
     struct options
     {
-        scalar_type stall_threshold{scalar_type(1e-10)};
+        /// A trust-region contraction phase leaves the incumbent point unmoved for a
+        /// run of iterations, so the error norm repeats exactly while the method is
+        /// working normally. The five-iteration window the gradient steppers use
+        /// reads that as a stall and aborts. Twenty is the smallest window measured
+        /// that never fires on six- and seven-joint chains -- bit-identical results
+        /// to forty -- and it raises the solved fraction by a factor of 2.4 to 2.8
+        /// wherever the iteration budget is large enough to reach convergence.
+        scalar_type stall_threshold{scalar_type(1e-14)};
         scalar_type divergence_factor{scalar_type(10)};
-        int stall_window{5};
+        int stall_window{20};
     };
 
     argmin_bobyqa()
