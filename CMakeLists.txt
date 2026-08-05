@@ -143,10 +143,11 @@ endif ()
 # per-subdirectory CTestTestfile.cmake needed for ctest discovery. The gate is
 # widened to include CARTAN_BUILD_EXAMPLES so the tutorial smoke tests
 # registered under examples/tutorials/ are discoverable without also turning on
-# CARTAN_BUILD_TESTS. The tests/ subdirectory itself stays gated on the test
-# flags only.
+# CARTAN_BUILD_TESTS, and CARTAN_BUILD_BENCHMARKS so the suite's own correctness
+# gates are. The tests/ subdirectory itself stays gated on the test flags only.
 if (CARTAN_BUILD_TESTS OR CARTAN_BUILD_FUZZ_TESTS OR CARTAN_BUILD_PROPERTY_TESTS
-        OR CARTAN_BUILD_PACKAGING_TESTS OR CARTAN_BUILD_EXAMPLES)
+        OR CARTAN_BUILD_PACKAGING_TESTS OR CARTAN_BUILD_EXAMPLES
+        OR CARTAN_BUILD_BENCHMARKS)
     enable_testing()
 endif ()
 

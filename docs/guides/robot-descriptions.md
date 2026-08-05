@@ -112,9 +112,11 @@ explicit assignment:
 <!-- cartan:unbuilt kind=illustration reason="constructs a type from the optional meios evaluation component, which no cartan configuration builds" -->
 ```cpp
 #include <meios/eval/python_evaluator.h>
+#include <meios/xacro/evaluator_handle.h>
 
 cartan::load_options opts;
-opts.description.backend = std::make_shared<meios::python_evaluator>();
+opts.description.backend =
+    std::make_shared<meios::evaluator_handle>(meios::python_evaluator{});
 ```
 
 This is the route for the Universal Robots family: with it the UR3e
@@ -140,9 +142,11 @@ include pulls in, including ones from packages you did not write.
 <!-- cartan:unbuilt kind=illustration reason="constructs a type from the optional meios evaluation component, which no cartan configuration builds" -->
 ```cpp
 #include <meios/eval/unrestricted_python_evaluator.h>
+#include <meios/xacro/evaluator_handle.h>
 
 cartan::load_options opts;
-opts.description.backend = std::make_shared<meios::unrestricted_python_evaluator>();
+opts.description.backend =
+    std::make_shared<meios::evaluator_handle>(meios::unrestricted_python_evaluator{});
 ```
 
 Reach for it only for a particular description file you would be willing to run

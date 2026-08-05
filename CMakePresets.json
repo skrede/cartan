@@ -102,6 +102,7 @@
             "binaryDir": "${sourceDir}/build/bench",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
+                "CARTAN_BUILD_URDF": "ON",
                 "CARTAN_BUILD_BENCHMARKS": "ON",
                 "CARTAN_FETCH_BENCHMARK_DEPS": "ON",
                 "CARTAN_BUILD_ARGMIN": "ON",
@@ -117,6 +118,7 @@
                 "CMAKE_BUILD_TYPE": "Release",
                 "CMAKE_CXX_FLAGS": "-g -fno-omit-frame-pointer",
                 "CMAKE_C_FLAGS": "-g -fno-omit-frame-pointer",
+                "CARTAN_BUILD_URDF": "ON",
                 "CARTAN_BUILD_BENCHMARKS": "ON",
                 "CARTAN_FETCH_BENCHMARK_DEPS": "ON",
                 "CARTAN_BUILD_PROFILING": "ON",

@@ -15,6 +15,13 @@ target_link_libraries(cartan_urdf
     meios::urdf
 )
 
+# The optional evaluation component enters through this module and nowhere else:
+# it is part of the same supplier boundary the module exists to hold, and a
+# consumer that reaches it directly widens that boundary.
+if (CARTAN_MEIOS_ENABLE_PYTHON_EVAL)
+    target_link_libraries(cartan_urdf INTERFACE meios::eval-python)
+endif ()
+
 target_compile_features(cartan_urdf INTERFACE cxx_std_20)
 
 set_target_properties(cartan_urdf PROPERTIES EXPORT_NAME urdf)

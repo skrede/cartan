@@ -45,6 +45,33 @@ file(GLOB _measured_region_sources CONFIGURE_DEPENDS
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     ${CMAKE_SOURCE_DIR}/tools/check_measured_regions.py ${_measured_region_sources})
 
+# Manufacturer joint limits are the one dependency of this suite that is NOT
+# find-then-fetch-then-omit-with-a-warning. Every other block below degrades to
+# a skipped benchmark; this one refuses the configure, because a study whose
+# feasible set silently fell back to a synthetic box is worse than no study --
+# it publishes numbers measured on a different problem under the same names.
+# The gate sits ahead of the dependency detection so a missing comparator cannot
+# take an early return past it.
+if (NOT CARTAN_BUILD_URDF)
+    message(FATAL_ERROR
+        "cartan benchmarks: CARTAN_BUILD_URDF is OFF, so no robot description can be read and "
+        "the suite has no source for manufacturer joint limits. Configure with "
+        "-DCARTAN_BUILD_URDF=ON.")
+endif ()
+
+include(${CMAKE_SOURCE_DIR}/cmake/CartanBenchDescriptions.cmake)
+
+# The limit source's own correctness gate. It measures nothing and needs neither
+# a timing harness nor a comparator, so it is defined ahead of the detection
+# below and survives a configure in which every comparison benchmark is omitted.
+add_executable(study_description_gate study_description_gate.cpp)
+target_link_libraries(study_description_gate PRIVATE cartan::cartan)
+target_compile_definitions(study_description_gate PRIVATE
+    CARTAN_BENCH_DESCRIPTION_ROOT="${CARTAN_BENCH_DESCRIPTION_ROOT}"
+    CARTAN_URDF_EXTENDED_TESTS)
+target_compile_options(study_description_gate PRIVATE ${CARTAN_WARNING_FLAGS})
+add_test(NAME study_description_gate COMMAND study_description_gate)
+
 # Benchmark dependencies are detected here, not hard-required. Under
 # CARTAN_BUILD_BENCHMARKS each third-party dependency is looked for (and, when
 # CARTAN_FETCH_BENCHMARK_DEPS is ON, fetched via FetchContent if missing); any
