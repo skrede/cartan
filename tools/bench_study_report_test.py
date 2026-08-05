@@ -43,6 +43,8 @@ CASES = [
      "unbalanced_fields", TARGETS, 1, "line 10: carries a different number of fields"),
     ("a row standing on bounds no description declared is excluded and counted",
      "synthetic_provenance", TARGETS, 0, "Excluded from every figure here: 2 record rows"),
+    ("a tier carrying no rows is refused as empty rather than as excluded",
+     "empty_strata_tier", AGGREGATES, 1, "carries no rows"),
     ("the two tiers rebuilding one table agree figure for figure",
      "good_capture", AGGREGATES + ["--cross-check"], 0, "published figures agree"),
     ("an aggregate tier disagreeing with its per-target rows fails the cross-check",

@@ -114,6 +114,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             libeigen3-dev liborocos-kdl-dev ninja-build
+          # One of the descriptions reads its joint bounds out of a YAML sidecar
+          # through an expression the host language evaluates, so the reader needs
+          # a YAML module in the interpreter the build resolved.
+          python3 -m pip install --disable-pip-version-check pyyaml
 
       - name: Configure
         run: cmake --preset bench
@@ -133,20 +137,35 @@ jobs:
 
       # The script is what the reproducibility claim rests on: a reader is
       # offered these records and this file and nothing else. So it runs against
-      # the rows the capture has just written, from both tiers, and its own
-      # cross-check refuses if the two disagree on any published figure.
+      # the rows the capture has just written.
+      #
+      # The aggregate tier holds paired per-target differences, which are defined
+      # only where two participants accepted the same target. A runner that
+      # resolves one solver therefore has no pairs to rebuild from, and demanding
+      # a paired table there would assert a quantity with no subject. The
+      # per-target tier is rebuilt and checked non-empty either way; the
+      # cross-check between the two tiers runs only where both exist.
       - name: Rebuild the table from the records just written
         run: |
+          resolved=$(echo $EXPECTED_RESOLVED | wc -w)
           for stratum in $STRATA; do
             python3 tools/bench_study_report.py \
               --root "smoke/$stratum" --table "$TABLE" --from targets \
               --out "smoke/$stratum/from-targets.md" \
               --strata-out "smoke/$stratum/records/table_${TABLE}_strata.csv"
+            if [ ! -s "smoke/$stratum/from-targets.md" ]; then
+              echo "the table rebuilt for the $stratum stratum is empty"
+              exit 1
+            fi
+            if [ "$resolved" -lt 2 ]; then
+              echo "$stratum: $resolved participant resolved, so no paired tier to rebuild"
+              continue
+            fi
             python3 tools/bench_study_report.py \
               --root "smoke/$stratum" --table "$TABLE" --from aggregates \
               --out "smoke/$stratum/rebuilt.md" --cross-check
             if [ ! -s "smoke/$stratum/rebuilt.md" ]; then
-              echo "the table rebuilt for the $stratum stratum is empty"
+              echo "the paired table rebuilt for the $stratum stratum is empty"
               exit 1
             fi
           done

@@ -71,9 +71,11 @@ def load_tier(root, table, tier, explicit):
                            "strata": STRATA_COLUMNS}[tier])
     one_table(path, rows, table)
     kept, excluded = without_synthetic(rows)
-    if not kept:
+    if not kept and excluded:
         raise Refusal(f"{path}: every row was excluded for standing on bounds no description "
                       f"declared, so there is nothing left to summarize")
+    if not kept:
+        raise Refusal(f"{path}: carries no rows, so there is nothing to summarize")
     return path, kept, excluded
 
 
