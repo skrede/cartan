@@ -45,11 +45,11 @@ std::pair<target_record, typename target_entry<N>::position_type> solve_one(
     const feasible_set<N>& feasible,
     const capture_options& options,
     const participant_entry<N>& entry,
-    const solve_budget& budget,
     const target_entry<N>& target,
     const typename target_entry<N>::position_type& seed,
     int seed_id)
 {
+    const auto& budget = entry.budget;
     const auto started = std::chrono::steady_clock::now();
     const auto outcome = entry.solve(target.pose, seed);
     const auto elapsed = std::chrono::steady_clock::now() - started;
@@ -61,7 +61,8 @@ std::pair<target_record, typename target_entry<N>::position_type> solve_one(
         entry.name, budget.axis, budget.index, budget.requested,
         achieved_on_axis(outcome.counts, wall, entry.kernel_countable), target.target_id, seed_id,
         outcome.iterations, budget.tolerance, wall, outcome.counts, seen, entry.kernel_countable,
-        stratum_from_name(options.stratum) != stratum::unreachable},
+        stratum_from_name(options.stratum) != stratum::unreachable, entry.accuracy.target,
+        entry.accuracy.met},
         outcome.q};
 }
 
@@ -77,13 +78,12 @@ void capture_rung(
 {
     for (const auto& entry : group.entries())
     {
-        const auto& budget = group.budget_for(entry.kernel_countable);
         auto warm = target_entry<N>::position_type::Zero().eval();
         int warm_from = -1;
         for (int i = 0; i < pool.size(); ++i)
         {
             const bool warmed = pool.ordered() && warm_from >= 0;
-            const auto [row, solution] = detail::solve_one<N>(feasible, options, entry, budget,
+            const auto [row, solution] = detail::solve_one<N>(feasible, options, entry,
                 pool.entry(i), warmed ? warm : pool.seed(i), warmed ? warm_from : i);
             writer.write(row);
             if (pool.ordered() && row.adjudication.accepted)
@@ -110,8 +110,8 @@ inline capture_parameters study_parameters(const capture_options& options)
     {
         rungs.push_back(rung.kernel_evaluations);
     }
-    return capture_parameters{targets, caps, rungs, {}, k_repetitions, options.targets,
-        options.command};
+    return capture_parameters{targets, caps, rungs, options.accuracy_targets(), k_repetitions,
+        options.targets, options.command};
 }
 
 template <int N>

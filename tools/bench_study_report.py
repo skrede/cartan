@@ -10,6 +10,9 @@ the shipped aggregates is the figure the full-resolution rows produce. Order
 statistics are nearest rank over the whole target set, and a non-finite error
 sorts to the worst end rather than being dropped: a distribution reported only
 over the targets a solver survived is conditioned on that solver's own success.
+The one figure that is so conditioned says so in its name -- the accuracy mode
+matches solvers on the accuracy of the solves that succeeded, since a failed
+solve has no accuracy -- and it is rendered beside the unconditioned median.
 
 Nothing here combines two tables. Each periodic rule is its own experiment, and
 a reader who wants to compare them has to do it deliberately.
@@ -29,14 +32,15 @@ IDENTITY = (
 TARGET_COLUMNS = IDENTITY + (
     "budget_value", "target_id", "seed_id", "self_reported", "accepted", "pose_ok", "limits_ok",
     "pos_err_m", "ori_err_rad", "worst_limit_violation_rad", "fk_evals", "jac_evals",
-    "iterations", "solver_tolerance", "wall_ns",
+    "iterations", "solver_tolerance", "wall_ns", "accuracy_target", "accuracy_target_met",
 )
 
 CELL_COLUMNS = IDENTITY + (
     "n_targets", "n_accepted", "n_self_reported", "n_false_success", "n_false_failure",
     "accept_rate", "budget_value_median", "pos_err_median_m", "pos_err_p95_m", "pos_err_p99_m",
     "ori_err_median_rad", "fk_evals_median", "jac_evals_median", "wall_ns_median", "wall_ns_cv",
-    "solver_tolerance", "kernel_countable",
+    "solver_tolerance", "kernel_countable", "accuracy_target", "accuracy_target_met",
+    "pos_err_median_accepted_m",
 )
 
 NO_SUCCESS_RATE = "unreachable"
@@ -137,12 +141,17 @@ def summarize_rows(rows, table):
             raise Refusal(f"a record names table {row['table']!r} in a report about {table!r}")
         cell = cells.setdefault(tuple(row[name] for name in IDENTITY), {
             "pos": [], "ori": [], "wall": [], "fk": [], "jac": [], "achieved": [],
-            "accepted": 0, "reported": 0, "false_success": 0, "false_failure": 0,
+            "accepted_pos": [], "accepted": 0, "reported": 0, "false_success": 0,
+            "false_failure": 0,
             "tolerance": number(row["solver_tolerance"]),
             "rate": row["stratum"] != NO_SUCCESS_RATE,
+            "accuracy_target": counted(row["accuracy_target"]),
+            "accuracy_target_met": counted(row["accuracy_target_met"]),
         })
         cell["achieved"].append(number(row["budget_value"]))
         cell["pos"].append(number(row["pos_err_m"]))
+        if flag(row["accepted"]):
+            cell["accepted_pos"].append(number(row["pos_err_m"]))
         cell["ori"].append(number(row["ori_err_rad"]))
         cell["wall"].append(number(row["wall_ns"]))
         for name, key in (("fk_evals", "fk"), ("jac_evals", "jac")):
@@ -177,6 +186,10 @@ def finalize(cell):
         "wall_ns_cv": variation(cell["wall"]),
         "solver_tolerance": cell["tolerance"],
         "kernel_countable": 1.0 if cell["fk"] else 0.0,
+        "accuracy_target": cell["accuracy_target"],
+        "accuracy_target_met": cell["accuracy_target_met"],
+        "pos_err_median_accepted_m": (
+            order_statistic(cell["accepted_pos"], 0.5) if cell["accepted_pos"] else None),
     }
 
 
@@ -213,7 +226,15 @@ HEADINGS = (
     "solver", "targets", "accepted", "self-reported", "false success", "false failure",
     "budget achieved median", "pos err median (m)", "pos err p95 (m)", "pos err p99 (m)",
     "ori err median (rad)", "fk evals median", "jac evals median", "wall median (ns)",
-    "wall cv", "solver tolerance",
+    "wall cv", "solver tolerance", "accuracy target", "pos err median accepted (m)",
+)
+
+ACCURACY_CLAUSE = (
+    "Under the accuracy mode each solver is asked for its own calibrated tolerance so that the "
+    "accuracies they achieve match, and both numbers are in the table: the accuracy target beside "
+    "the tolerance it took to reach it. The accuracy every figure reports is the one the harness "
+    "recomputed, never the one a solver was asked for. A target whose calibration did not converge "
+    "is marked *unmet* rather than published as reached."
 )
 
 KERNEL_CLAUSE = (
@@ -229,6 +250,14 @@ STRATUM_CLAUSE = (
 )
 
 
+def accuracy_figure(summary):
+    """The mode a cell ran under, and whether its target was actually reached."""
+    target = summary["accuracy_target"]
+    if target is None:
+        return "budget mode"
+    return f"{target:.6g}" + ("" if summary["accuracy_target_met"] else " (unmet)")
+
+
 def solver_row(key, summary):
     targets = summary["n_targets"]
     counted = ("n_accepted", "n_self_reported", "n_false_success", "n_false_failure")
@@ -239,6 +268,8 @@ def solver_row(key, summary):
     cells += [share(summary[name], targets) for name in counted]
     cells += [figure(summary[name], int(targets)) for name in measured]
     cells.append(f"{summary['solver_tolerance']:.6g}")
+    cells.append(accuracy_figure(summary))
+    cells.append(figure(summary["pos_err_median_accepted_m"], int(summary["n_accepted"])))
     return "| " + " | ".join(cells) + " |"
 
 
@@ -251,6 +282,8 @@ def render(source, table, summaries, tier):
              "the harness's own verdict, recomputed from the returned joint vector; the solver's",
              "own claim is the separate self-reported column. No figure combines this table with",
              "another.", "", KERNEL_CLAUSE, ""]
+    if any(summary["accuracy_target"] is not None for summary in summaries.values()):
+        lines += [ACCURACY_CLAUSE, ""]
     if any(key[IDENTITY.index("stratum")] == NO_SUCCESS_RATE for key in summaries):
         lines += [STRATUM_CLAUSE, ""]
     grouped = {}

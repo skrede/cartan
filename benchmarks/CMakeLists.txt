@@ -233,12 +233,18 @@ target_link_libraries(ik_study_benchmarks PRIVATE benchmark::benchmark_main)
 
 add_executable(ik_study_capture ik_study_capture.cpp)
 
+# The accuracy mode's tolerances are measured before the study runs, by a third
+# program with its own main and no timing harness at all: an offline search is
+# re-runnable evidence a reader can inspect, and it keeps a search loop out of
+# every pass that reports a number.
+add_executable(ik_study_calibrate ik_study_calibrate.cpp)
+
 cartan_bench_join("${CARTAN_BENCH_DEPENDENCY_RECORDS}" CARTAN_BENCH_DEPENDENCY_MANIFEST)
 cartan_bench_join("${CARTAN_BENCH_ABSENT_COMPARATORS}" CARTAN_BENCH_ABSENCE_MANIFEST)
 cartan_bench_join("${CARTAN_BENCH_DESCRIPTION_PINS}" CARTAN_BENCH_DESCRIPTION_MANIFEST)
 cartan_bench_configure_command(CARTAN_BENCH_CONFIGURE_COMMAND)
 
-foreach (_study_program ik_study_benchmarks ik_study_capture)
+foreach (_study_program ik_study_benchmarks ik_study_capture ik_study_calibrate)
     target_link_libraries(${_study_program}
         PRIVATE
         cartan::cartan

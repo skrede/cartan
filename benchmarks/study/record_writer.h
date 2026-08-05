@@ -33,15 +33,13 @@ namespace cartan::bench
 namespace detail
 {
 
-inline std::ofstream open_tier(
-    const std::filesystem::path& directory,
-    std::string_view table,
-    std::string_view tier,
-    std::string_view header)
+inline std::ofstream open_with_header(
+    const std::filesystem::path& path, std::string_view header)
 {
-    std::filesystem::create_directories(directory);
-    const auto path =
-        directory / ("table_" + std::string{table} + "_" + std::string{tier} + ".csv");
+    if (path.has_parent_path())
+    {
+        std::filesystem::create_directories(path.parent_path());
+    }
     std::ofstream out(path);
     if (!out)
     {
@@ -49,6 +47,16 @@ inline std::ofstream open_tier(
     }
     out << header << '\n';
     return out;
+}
+
+inline std::ofstream open_tier(
+    const std::filesystem::path& directory,
+    std::string_view table,
+    std::string_view tier,
+    std::string_view header)
+{
+    return open_with_header(
+        directory / ("table_" + std::string{table} + "_" + std::string{tier} + ".csv"), header);
 }
 
 }
@@ -73,7 +81,8 @@ public:
         m_targets << csv_row(row) << '\n';
         auto identity = cell_identity(row);
         m_cells
-            .try_emplace(identity, identity, row.solver_tolerance, row.kernel_countable,
+            .try_emplace(identity, identity, std::string{row.accuracy_target},
+                std::string{row.accuracy_target_met}, row.solver_tolerance, row.kernel_countable,
                 row.success_rate_reportable)
             .first->second.add(row);
         if (!row.success_rate_reportable)

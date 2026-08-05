@@ -12,6 +12,7 @@
 /// by name instead of being inferred from a smaller table.
 
 #include "strata_entry.h"
+#include "iso_accuracy.h"
 #include "solve_outcome.h"
 #include "build_manifest.h"
 
@@ -33,12 +34,17 @@ template <int N>
 using solve_call = std::function<solve_outcome<N>(
     const cartan::se3<double>&, const typename target_entry<N>::position_type&)>;
 
+/// The budget travels on the entry rather than beside the group, because under
+/// the accuracy mode the participants of one rung are asked for different
+/// tolerances and a budget shared by the group could not say so.
 template <int N>
 struct participant_entry
 {
     std::string name;
     bool kernel_countable;
     solve_call<N> solve;
+    solve_budget budget;
+    accuracy_claim accuracy;
 };
 
 /// `supplier` names the dependency the participant needs, so an absence can

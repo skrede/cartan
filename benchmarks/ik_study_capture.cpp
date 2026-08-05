@@ -20,6 +20,7 @@
 #include "study/capture_options.h"
 #include "study/participant_list.h"
 #include "study/strata_selfcheck.h"
+#include "study/tolerance_policy.h"
 #include "study/instrumentation_gate.h"
 
 #include <cstdio>
@@ -43,6 +44,22 @@ std::vector<cartan::bench::budget> rungs_for(const cartan::bench::capture_option
     return {ladder[static_cast<std::size_t>(options.budget_index)]};
 }
 
+/// The budget mode's one shared gate, or the calibrated tolerance each
+/// participant needs to deliver the requested accuracy. There is no third
+/// source: a participant with no calibrated row stops the run rather than
+/// falling back to the shared value, since a matched-accuracy table containing
+/// one solver that was never matched says the opposite of what happened.
+cartan::bench::tolerance_policy tolerances_for(const cartan::bench::capture_options& options)
+{
+    if (!options.iso_accuracy())
+    {
+        return cartan::bench::tolerance_policy(budget_tolerance);
+    }
+    return cartan::bench::tolerance_policy(
+        cartan::bench::calibration_table::load(options.calibration), options.table, options.robot,
+        options.accuracy_target, options.include_unconverged);
+}
+
 /// Measured for the robot this capture ran on, not asserted: the deviation
 /// between the description-loaded chain and the hand-coded chain it replaced is
 /// the evidence that the robot measured is the robot named.
@@ -60,6 +77,7 @@ template <int N>
 void capture_every_rung(
     const cartan::bench::feasible_set<N>& feasible,
     const cartan::bench::capture_options& options,
+    const cartan::bench::tolerance_policy& tolerances,
     const cartan::bench::target_pool<N>& pool)
 {
     cartan::bench::write_target_fixture<N>(
@@ -67,8 +85,7 @@ void capture_every_rung(
     cartan::bench::record_writer writer(options.out_dir, options.sidecar_dir, options.table);
     for (const auto& rung : rungs_for(options))
     {
-        const cartan::bench::solver_group<N> group(
-            feasible, rung, pool.which(), budget_tolerance);
+        const cartan::bench::solver_group<N> group(feasible, rung, pool.which(), tolerances);
         cartan::bench::capture_rung<N>(feasible, options, group, pool, writer);
     }
     writer.finish();
@@ -97,8 +114,9 @@ int run_for(
             options.stratum.c_str(), options.table.c_str(), excluded.front().reason.c_str());
     }
 
+    const auto tolerances = tolerances_for(options);
     const cartan::bench::solver_group<N> announced(
-        feasible, rungs_for(options).front(), which, budget_tolerance);
+        feasible, rungs_for(options).front(), which, tolerances);
     cartan::bench::print_participants<N>(announced.entries());
     const auto absent = cartan::bench::absent_participants<N>(announced.entries());
     cartan::bench::report_absent_participants(absent);
@@ -110,9 +128,9 @@ int run_for(
         if (options.gate)
         {
             return cartan::bench::run_instrumentation_gate<N>(
-                feasible, announced.entries(), pool, announced.budget_for(true));
+                feasible, announced.entries(), pool, announced.cartan_budget());
         }
-        capture_every_rung<N>(feasible, options, pool);
+        capture_every_rung<N>(feasible, options, tolerances, pool);
     }
     cartan::bench::write_manifest(options.out_dir, cartan::bench::study_parameters(options),
         absent, loaded_chain_deviation<N>(feasible, spec),
@@ -123,17 +141,8 @@ int run_for(
 int run(const cartan::bench::capture_options& options)
 {
     const auto& spec = cartan::bench::description_for(options.robot);
-    if (spec.joints == 6)
-    {
-        return run_for<6>(options, spec);
-    }
-    if (spec.joints == 7)
-    {
-        return run_for<7>(options, spec);
-    }
-    throw std::runtime_error(std::string{spec.robot_key} + ": the study measures six- and "
-        "seven-axis arms, and this description declares "
-        + std::to_string(spec.joints) + " joints");
+    return cartan::bench::dispatch_on_joints(spec, [&spec, &options](auto joints)
+        { return run_for<decltype(joints)::value>(options, spec); });
 }
 
 }

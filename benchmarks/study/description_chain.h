@@ -23,6 +23,7 @@
 #include <stdexcept>
 #include <filesystem>
 #include <string_view>
+#include <type_traits>
 
 namespace cartan::bench
 {
@@ -143,6 +144,25 @@ cartan::kinematic_chain<double, N> chain_from_description(const description_spec
     }
     return detail::fixed_from_dynamic<N>(
         loaded->chain, std::make_index_sequence<static_cast<std::size_t>(N)>{});
+}
+
+/// Which joint count a program instantiates is the description's own declared
+/// one rather than a flag, so a run cannot be pointed at a robot and measured as
+/// though it were a different shape.
+template <typename Run>
+int dispatch_on_joints(const description_spec& spec, Run&& run)
+{
+    if (spec.joints == 6)
+    {
+        return run(std::integral_constant<int, 6>{});
+    }
+    if (spec.joints == 7)
+    {
+        return run(std::integral_constant<int, 7>{});
+    }
+    throw std::runtime_error(std::string{spec.robot_key}
+        + ": the study measures six- and seven-axis arms, and this description declares "
+        + std::to_string(spec.joints) + " joints");
 }
 
 }
