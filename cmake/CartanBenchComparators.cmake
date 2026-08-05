@@ -65,6 +65,24 @@ endif ()
 
 # --- The kinematics-and-dynamics library, which every benchmark target links ---
 find_package(orocos_kdl CONFIG QUIET)
+
+# Debian and its derivatives install the package configuration without the
+# target file it includes, so the configuration resolves while the imported
+# target it is supposed to define never appears. Its pkg-config module carries
+# the same include path, library and version, so the import is rebuilt from
+# there rather than from the configuration's own variables -- those name the
+# absent target, and consuming them would make the replacement refer to itself.
+if (NOT TARGET orocos-kdl)
+    find_package(PkgConfig QUIET)
+    if (PkgConfig_FOUND)
+        pkg_check_modules(CARTAN_OROCOS_KDL QUIET IMPORTED_TARGET GLOBAL orocos-kdl)
+        if (TARGET PkgConfig::CARTAN_OROCOS_KDL)
+            add_library(orocos-kdl ALIAS PkgConfig::CARTAN_OROCOS_KDL)
+            set(orocos_kdl_VERSION "${CARTAN_OROCOS_KDL_VERSION}")
+        endif ()
+    endif ()
+endif ()
+
 if (TARGET orocos-kdl)
     cartan_bench_refuse_unversioned(orocos_kdl "${orocos_kdl_VERSION}"
         "the version exported by its package configuration")
