@@ -82,5 +82,4 @@ lib/cartan-serial-chain/include/cartan/serial/ik/solver/mma.h                   
 lib/cartan-serial-chain/include/cartan/serial/ik/solver/nw_sqp.h                        backend-not-built CARTAN_BUILD_ARGMIN
 lib/cartan-serial-chain/include/cartan/serial_chain.h                                   declaration-only
 lib/cartan-urdf/include/cartan/urdf/error.h                                             declaration-only
-lib/cartan-urdf/include/cartan/urdf/metadata.h                                          declaration-only
 lib/cartan-urdf/include/cartan/urdf/schema.h                                            declaration-only
