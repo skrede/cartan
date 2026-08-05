@@ -152,8 +152,12 @@ TEST_CASE("adversarial: a value the narrower scalar cannot carry is refused in e
           "direction", "[urdf_adversarial]")
 {
     float narrow = 42.0f;
-    CHECK(cartan::detail::narrow_into<float>(1e300, narrow).has_value());
-    CHECK(cartan::detail::narrow_into<float>(-1e300, narrow).has_value());
+    // Passed as a literal, MSVC's constant folder evaluates the cast inside
+    // narrow_into on the branch the magnitude guard makes unreachable and
+    // reports the overflow as C4756; a volatile read is not foldable.
+    const volatile double beyond_float = 1e300;
+    CHECK(cartan::detail::narrow_into<float>(beyond_float, narrow).has_value());
+    CHECK(cartan::detail::narrow_into<float>(-beyond_float, narrow).has_value());
     CHECK(cartan::detail::narrow_into<float>(1e-320, narrow).has_value());
     CHECK(narrow == 42.0f);
 

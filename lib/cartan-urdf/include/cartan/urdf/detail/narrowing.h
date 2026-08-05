@@ -36,17 +36,7 @@ std::optional<urdf_failure> narrow_into(double value, Scalar& out) noexcept
     {
         return urdf_failure::non_finite_value;
     }
-#if defined(_MSC_VER)
-// MSVC constant-folds this cast at call sites that pass a literal beyond the
-// target's range and reports C4756, even though the magnitude check above makes
-// that path unreachable.
-#pragma warning(push)
-#pragma warning(disable : 4756)
-#endif
     const Scalar narrowed = static_cast<Scalar>(value);
-#if defined(_MSC_VER)
-#pragma warning(pop)
-#endif
     if (narrowed == Scalar(0) && value != 0.0) { return urdf_failure::non_finite_value; }
     out = narrowed;
     return std::nullopt;
