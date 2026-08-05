@@ -24,6 +24,8 @@ std::filesystem::path fixture_path(const char* name)
     return std::filesystem::path{CARTAN_TESTS_FIXTURE_DIR} / "urdf" / name;
 }
 
+#ifdef CARTAN_URDF_EXTENDED_TESTS
+
 bool is_warn(const cartan::urdf_diagnostic& record)
 {
     return record.severity == cartan::urdf_severity::warn;
@@ -33,6 +35,8 @@ bool is_error(const cartan::urdf_diagnostic& record)
 {
     return record.severity == cartan::urdf_severity::error;
 }
+
+#endif
 
 }
 
