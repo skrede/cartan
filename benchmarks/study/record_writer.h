@@ -2,13 +2,21 @@
 #define HPP_GUARD_CARTAN_BENCH_STUDY_RECORD_WRITER_H
 
 /// @file record_writer.h
-/// @brief Two output tiers for one run, written from one stream of rows.
+/// @brief Three output tiers for one run, written from one stream of rows.
 ///
 /// The per-target rows are the full-resolution evidence and go to a sidecar
-/// directory; the aggregates go beside the report. Both come from the same rows
-/// in the untimed pass, so the two can be cross-checked against each other
-/// rather than merely being different sizes of the same claim.
+/// directory; the aggregates go beside the report; the reachability breakdown
+/// is its own artifact because it is not a success rate and must not be read as
+/// one. All three come from the same rows in the untimed pass, so the two
+/// smaller tiers can be cross-checked against the largest rather than merely
+/// being different sizes of the same claim.
+///
+/// Every filename carries its table's key. A statistic spanning two periodic
+/// rules is not a comparison -- the solves themselves differ -- and one file per
+/// table is what makes constructing one a deliberate act rather than a column
+/// read off an artifact that already holds both.
 
+#include "reachability.h"
 #include "target_record.h"
 #include "cell_aggregate.h"
 
@@ -25,11 +33,15 @@ namespace cartan::bench
 namespace detail
 {
 
-inline std::ofstream open_table(
-    const std::filesystem::path& directory, std::string_view table, std::string_view header)
+inline std::ofstream open_tier(
+    const std::filesystem::path& directory,
+    std::string_view table,
+    std::string_view tier,
+    std::string_view header)
 {
     std::filesystem::create_directories(directory);
-    const auto path = directory / ("table_" + std::string{table} + ".csv");
+    const auto path =
+        directory / ("table_" + std::string{table} + "_" + std::string{tier} + ".csv");
     std::ofstream out(path);
     if (!out)
     {
@@ -49,9 +61,10 @@ public:
         const std::filesystem::path& sidecar,
         std::string_view table)
         : m_table(table)
-        , m_targets(detail::open_table(sidecar, table, target_record_header()))
+        , m_targets(detail::open_tier(sidecar, table, "targets", target_record_header()))
         , m_cell_dir(cells)
         , m_cells()
+        , m_reach()
     {
     }
 
@@ -59,18 +72,30 @@ public:
     {
         m_targets << csv_row(row) << '\n';
         auto identity = cell_identity(row);
-        m_cells.try_emplace(identity, identity, row.solver_tolerance, row.kernel_countable)
+        m_cells
+            .try_emplace(identity, identity, row.solver_tolerance, row.kernel_countable,
+                row.success_rate_reportable)
             .first->second.add(row);
+        if (!row.success_rate_reportable)
+        {
+            m_reach.add(row);
+        }
     }
 
     void finish()
     {
         m_targets.flush();
-        auto out = detail::open_table(m_cell_dir, m_table, cell_header());
+        auto out = detail::open_tier(m_cell_dir, m_table, "cells", cell_header());
         for (const auto& [identity, cell] : m_cells)
         {
             out << cell_row(cell) << '\n';
         }
+        if (m_reach.empty())
+        {
+            return;
+        }
+        auto claims = detail::open_tier(m_cell_dir, m_table, "reachability", reachability_header());
+        m_reach.write(claims);
     }
 
 private:
@@ -78,6 +103,7 @@ private:
     std::ofstream m_targets;
     std::filesystem::path m_cell_dir;
     std::map<std::string, cell_accumulator> m_cells;
+    reachability_ledger m_reach;
 };
 
 }

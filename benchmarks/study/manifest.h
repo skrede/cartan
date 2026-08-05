@@ -31,7 +31,8 @@ inline void write_manifest(
     const std::filesystem::path& directory,
     const capture_parameters& parameters,
     const std::vector<absent_participant>& absent,
-    const description_deviation& measured)
+    const description_deviation& measured,
+    const study_notes& notes)
 {
     std::filesystem::create_directories(directory);
     const auto path = directory / "environment.json";
@@ -71,6 +72,7 @@ inline void write_manifest(
     fields.push_back(json_string("descriptions") + ": " + detail::descriptions_array());
     fields.push_back(
         json_string("capture_parameters") + ": " + detail::parameters_object(parameters));
+    fields.push_back(json_string("study_notes") + ": " + detail::notes_object(notes));
     fields.push_back(json_string("description_fk_max_deviation") + ": "
         + json_object({json_field("robot", measured.robot),
                           json_string("value") + ": " + std::format("{:.17g}", measured.value)},

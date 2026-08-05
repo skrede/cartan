@@ -23,21 +23,23 @@ from pathlib import Path
 
 IDENTITY = (
     "table", "robot", "limits_provenance", "stratum",
-    "solver", "budget_index", "budget_value", "budget_axis",
+    "solver", "budget_index", "budget_requested", "budget_axis",
 )
 
 TARGET_COLUMNS = IDENTITY + (
-    "target_id", "seed_id", "self_reported", "accepted", "pose_ok", "limits_ok",
+    "budget_value", "target_id", "seed_id", "self_reported", "accepted", "pose_ok", "limits_ok",
     "pos_err_m", "ori_err_rad", "worst_limit_violation_rad", "fk_evals", "jac_evals",
     "iterations", "solver_tolerance", "wall_ns",
 )
 
 CELL_COLUMNS = IDENTITY + (
     "n_targets", "n_accepted", "n_self_reported", "n_false_success", "n_false_failure",
-    "accept_rate", "pos_err_median_m", "pos_err_p95_m", "pos_err_p99_m", "ori_err_median_rad",
-    "fk_evals_median", "jac_evals_median", "wall_ns_median", "wall_ns_cv", "solver_tolerance",
-    "kernel_countable",
+    "accept_rate", "budget_value_median", "pos_err_median_m", "pos_err_p95_m", "pos_err_p99_m",
+    "ori_err_median_rad", "fk_evals_median", "jac_evals_median", "wall_ns_median", "wall_ns_cv",
+    "solver_tolerance", "kernel_countable",
 )
+
+NO_SUCCESS_RATE = "unreachable"
 
 SUMMARY_FIELDS = CELL_COLUMNS[len(IDENTITY):]
 
@@ -118,7 +120,8 @@ def discover(root, table, columns, explicit):
     if explicit:
         return [contained(name, root) for name in explicit]
     found = []
-    for candidate in sorted(root.rglob(f"table_{table}.csv")):
+    tier = "targets" if columns is TARGET_COLUMNS else "cells"
+    for candidate in sorted(root.rglob(f"table_{table}_{tier}.csv")):
         resolved = contained(candidate, root)
         with resolved.open(newline="", encoding="utf-8") as handle:
             header = tuple(next(csv.reader(handle), []))
@@ -133,10 +136,12 @@ def summarize_rows(rows, table):
         if row["table"] != table:
             raise Refusal(f"a record names table {row['table']!r} in a report about {table!r}")
         cell = cells.setdefault(tuple(row[name] for name in IDENTITY), {
-            "pos": [], "ori": [], "wall": [], "fk": [], "jac": [],
+            "pos": [], "ori": [], "wall": [], "fk": [], "jac": [], "achieved": [],
             "accepted": 0, "reported": 0, "false_success": 0, "false_failure": 0,
             "tolerance": number(row["solver_tolerance"]),
+            "rate": row["stratum"] != NO_SUCCESS_RATE,
         })
+        cell["achieved"].append(number(row["budget_value"]))
         cell["pos"].append(number(row["pos_err_m"]))
         cell["ori"].append(number(row["ori_err_rad"]))
         cell["wall"].append(number(row["wall_ns"]))
@@ -160,7 +165,8 @@ def finalize(cell):
         "n_self_reported": float(cell["reported"]),
         "n_false_success": float(cell["false_success"]),
         "n_false_failure": float(cell["false_failure"]),
-        "accept_rate": cell["accepted"] / targets if targets else 0.0,
+        "accept_rate": (cell["accepted"] / targets if targets and cell["rate"] else None),
+        "budget_value_median": order_statistic(cell["achieved"], 0.5),
         "pos_err_median_m": order_statistic(cell["pos"], 0.5),
         "pos_err_p95_m": order_statistic(cell["pos"], 0.95),
         "pos_err_p99_m": order_statistic(cell["pos"], 0.99),
@@ -205,8 +211,9 @@ def share(count, targets):
 
 HEADINGS = (
     "solver", "targets", "accepted", "self-reported", "false success", "false failure",
-    "pos err median (m)", "pos err p95 (m)", "pos err p99 (m)", "ori err median (rad)",
-    "fk evals median", "jac evals median", "wall median (ns)", "wall cv", "solver tolerance",
+    "budget achieved median", "pos err median (m)", "pos err p95 (m)", "pos err p99 (m)",
+    "ori err median (rad)", "fk evals median", "jac evals median", "wall median (ns)",
+    "wall cv", "solver tolerance",
 )
 
 KERNEL_CLAUSE = (
@@ -215,12 +222,19 @@ KERNEL_CLAUSE = (
     "never derived from the wall-clock column beside it."
 )
 
+STRATUM_CLAUSE = (
+    "The unreachable stratum has no success rate. Its targets are not known to be reachable, so a "
+    "solver reporting failure there is right rather than unsuccessful, and what it is scored on "
+    "is the three-outcome breakdown in the reachability artifact beside this one."
+)
+
 
 def solver_row(key, summary):
     targets = summary["n_targets"]
     counted = ("n_accepted", "n_self_reported", "n_false_success", "n_false_failure")
-    measured = ("pos_err_median_m", "pos_err_p95_m", "pos_err_p99_m", "ori_err_median_rad",
-                "fk_evals_median", "jac_evals_median", "wall_ns_median", "wall_ns_cv")
+    measured = ("budget_value_median", "pos_err_median_m", "pos_err_p95_m", "pos_err_p99_m",
+                "ori_err_median_rad", "fk_evals_median", "jac_evals_median", "wall_ns_median",
+                "wall_ns_cv")
     cells = [markdown(key[IDENTITY.index("solver")]), f"{int(targets)}"]
     cells += [share(summary[name], targets) for name in counted]
     cells += [figure(summary[name], int(targets)) for name in measured]
@@ -237,6 +251,8 @@ def render(source, table, summaries, tier):
              "the harness's own verdict, recomputed from the returned joint vector; the solver's",
              "own claim is the separate self-reported column. No figure combines this table with",
              "another.", "", KERNEL_CLAUSE, ""]
+    if any(key[IDENTITY.index("stratum")] == NO_SUCCESS_RATE for key in summaries):
+        lines += [STRATUM_CLAUSE, ""]
     grouped = {}
     for key, summary in summaries.items():
         grouped.setdefault(tuple(key[i] for i in (1, 2, 3, 5, 6, 7)), []).append((key, summary))

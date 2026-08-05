@@ -9,6 +9,12 @@
 /// branch and was therefore structurally unable to see a solver that solved the
 /// problem and did not notice. `accepted` is the only field a published success
 /// figure may be built from; `self_reported` travels beside it as data.
+///
+/// This is the one place the periodic rule is applied, and it is applied by
+/// which chain the canonicalization targets. A joint the rule treats as
+/// unbounded has no arc to wrap into, so it passes through untouched while
+/// every other joint is wrapped into its declared one -- the rule is a
+/// statement about a joint, not a switch that turns wrapping off.
 
 #include "feasible_set.h"
 
@@ -77,16 +83,14 @@ verdict adjudicate(
     double gate)
 {
     const double tol = cartan::detail::default_feasibility_tol<double>();
+    const auto& against = feasible.verification_chain();
     auto compared = q;
-    if (feasible.rule() != periodic_rule::unbounded)
-    {
-        cartan::detail::canonicalize_into_limits(compared, feasible.chain(), tol);
-    }
+    cartan::detail::canonicalize_into_limits(compared, against, tol);
 
     const auto [pos_err, ori_err] =
-        cartan::fixtures::compute_pose_errors(feasible.chain(), compared, target);
+        cartan::fixtures::compute_pose_errors(against, compared, target);
     const bool pose_ok = pos_err < gate && ori_err < gate;
-    const bool limits_ok = cartan::detail::within_limits(compared, feasible.chain(), tol);
+    const bool limits_ok = cartan::detail::within_limits(compared, against, tol);
 
     return verdict{
         self_reported,
@@ -95,7 +99,7 @@ verdict adjudicate(
         pose_ok && limits_ok,
         pos_err,
         ori_err,
-        detail::worst_violation<N>(feasible.chain(), compared)};
+        detail::worst_violation<N>(against, compared)};
 }
 
 }

@@ -45,8 +45,9 @@ bool identical(
     return true;
 }
 
-inline bool counts_are_positive(
-    const std::vector<participant_entry>& resolved, const target_pool& pool)
+template <int N>
+bool counts_are_positive(
+    const std::vector<participant_entry<N>>& resolved, const target_pool<N>& pool)
 {
     bool held = true;
     for (const auto& entry : resolved)
@@ -74,7 +75,7 @@ inline bool counts_are_positive(
 
 template <int N>
 bool adaptor_preserves_solutions(
-    const feasible_set<N>& feasible, const target_pool& pool, const solve_budget& budget)
+    const feasible_set<N>& feasible, const target_pool<N>& pool, const solve_budget& budget)
 {
     cartan_lm_solver counted;
     for (int i = 0; i < pool.size(); ++i)
@@ -99,11 +100,11 @@ bool adaptor_preserves_solutions(
 template <int N>
 int run_instrumentation_gate(
     const feasible_set<N>& feasible,
-    const std::vector<participant_entry>& resolved,
-    const target_pool& pool,
+    const std::vector<participant_entry<N>>& resolved,
+    const target_pool<N>& pool,
     const solve_budget& budget)
 {
-    const bool positive = detail::counts_are_positive(resolved, pool);
+    const bool positive = detail::counts_are_positive<N>(resolved, pool);
     return positive && detail::adaptor_preserves_solutions<N>(feasible, pool, budget) ? 0 : 1;
 }
 

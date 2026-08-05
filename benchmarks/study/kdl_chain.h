@@ -17,10 +17,12 @@
 
 #include <cartan/lie/se3.h>
 #include <cartan/serial/chain/screw_axis.h>
+#include <cartan/serial/chain/joint_limits.h>
 #include <cartan/serial/chain/kinematic_chain.h>
 
-#include <kdl/frames.hpp>
 #include <kdl/chain.hpp>
+#include <kdl/frames.hpp>
+#include <kdl/jntarray.hpp>
 
 #include <Eigen/Dense>
 
@@ -29,6 +31,32 @@
 
 namespace cartan::bench
 {
+
+struct comparator_bounds
+{
+    KDL::JntArray lower;
+    KDL::JntArray upper;
+};
+
+/// The comparator reads bounds as arrays rather than off a chain, so these are
+/// derived from the chain the study solves rather than written beside it. A
+/// joint declaring no bound reaches the comparator through the library's own
+/// substituted interval, which is the interval four of its solvers already use.
+template <int N>
+comparator_bounds derive_comparator_bounds(const cartan::kinematic_chain<double, N>& chain)
+{
+    const auto width = ::cartan::detail::k_unbounded_angular_range_v<double>;
+    comparator_bounds derived{KDL::JntArray(N), KDL::JntArray(N)};
+    const auto& limits = chain.limits();
+    for (unsigned int i = 0; i < static_cast<unsigned int>(N); ++i)
+    {
+        const auto anchored = ::cartan::detail::anchor_bounds(
+            limits[i].position_min(), limits[i].position_max(), width, 0.0);
+        derived.lower(i) = anchored.lower;
+        derived.upper(i) = anchored.upper;
+    }
+    return derived;
+}
 
 inline KDL::Vector to_kdl(const Eigen::Vector3d& value)
 {

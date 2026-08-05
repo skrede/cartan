@@ -7,7 +7,11 @@
 /// The configure-time gate over this directory catches a checked kinematics
 /// entry point in a measured block; it cannot catch a counter, so that half of
 /// the discipline has to live in the shape of this file.
+///
+/// One cell per rung of the ladder. A single cell would time one budget and
+/// leave a reader to assume the curve through it.
 
+#include "study/budget.h"
 #include "study/target_pool.h"
 #include "study/feasible_set.h"
 #include "study/participants.h"
@@ -16,41 +20,45 @@
 
 #include <benchmark/benchmark.h>
 
+#include <cstddef>
+
 namespace
 {
 
-using cartan::bench::study_joints;
+constexpr int study_joints = 6;
 using feasible_type = cartan::bench::feasible_set<study_joints>;
 
-constexpr unsigned int pool_seed = 42;
+constexpr std::uint64_t pool_seed = 42;
 constexpr int pool_targets = 200;
-constexpr int budget_units = 800;
 constexpr double budget_tolerance = 1e-5;
 
 const feasible_type& study_feasible_set()
 {
     static const feasible_type feasible = cartan::bench::load_feasible_set<study_joints>(
-        cartan::bench::description_for("irb120"), cartan::bench::periodic_rule::canonical);
+        cartan::bench::description_for("irb120"), cartan::bench::periodic_rule::canonical,
+        cartan::bench::limits_provenance::description);
     return feasible;
 }
 
-const cartan::bench::target_pool& study_target_pool()
+const cartan::bench::target_pool<study_joints>& study_target_pool()
 {
-    static const cartan::bench::target_pool pool(
-        study_feasible_set(), "reachable", pool_targets, pool_seed);
+    static const cartan::bench::target_pool<study_joints> pool(
+        study_feasible_set(), cartan::bench::stratum::reachable, pool_targets, pool_seed);
     return pool;
 }
 
-cartan::bench::solve_budget study_budget()
+cartan::bench::solve_budget rung_budget(int index)
 {
-    return cartan::bench::solve_budget{0, budget_units, budget_tolerance, "work_units"};
+    return cartan::bench::solve_budget_for(
+        cartan::bench::budget_ladder()[static_cast<std::size_t>(index)],
+        cartan::bench::stratum::reachable, budget_tolerance, true);
 }
 
 void bm_study_cartan_lm(benchmark::State& state)
 {
     const auto& feasible = study_feasible_set();
     const auto& pool = study_target_pool();
-    const auto budget = study_budget();
+    const auto budget = rung_budget(static_cast<int>(state.range(0)));
     int index = 0;
 
     for (auto _ : state)
@@ -67,7 +75,7 @@ void bm_study_pinocchio_lm(benchmark::State& state)
 {
     const auto& feasible = study_feasible_set();
     const auto& pool = study_target_pool();
-    const auto budget = study_budget();
+    const auto budget = rung_budget(static_cast<int>(state.range(0)));
     cartan::bench::pinocchio_lm_solver<study_joints> peer(feasible);
     int index = 0;
 
@@ -82,7 +90,7 @@ void bm_study_pinocchio_lm(benchmark::State& state)
 
 }
 
-BENCHMARK(bm_study_cartan_lm);
+BENCHMARK(bm_study_cartan_lm)->DenseRange(0, cartan::bench::k_budget_points - 1);
 #ifdef CARTAN_BENCH_STUDY_HAS_PINOCCHIO
-BENCHMARK(bm_study_pinocchio_lm);
+BENCHMARK(bm_study_pinocchio_lm)->DenseRange(0, cartan::bench::k_budget_points - 1);
 #endif

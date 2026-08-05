@@ -40,11 +40,10 @@ class trac_ik_solver
 public:
     using position_type = typename cartan::joint_state<double, N>::position_type;
 
-    trac_ik_solver(const feasible_set<N>& feasible, double tolerance)
+    trac_ik_solver(const feasible_set<N>& feasible, double tolerance, double time_cap_ms)
         : m_solver(
               feasible.comparator(), feasible.bounds().lower, feasible.bounds().upper,
-              static_cast<double>(comparator_time_cap_ms) / 1000.0,
-              tolerance / std::sqrt(3.0), TRAC_IK::Speed)
+              time_cap_ms / 1000.0, tolerance / std::sqrt(3.0), TRAC_IK::Speed)
     {
         // Speed mode seeds its internal random restarts from rand().
         std::srand(42);

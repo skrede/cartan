@@ -11,7 +11,7 @@
 /// the difference between it and the resolved list is carried into the manifest
 /// by name instead of being inferred from a smaller table.
 
-#include "target_pool.h"
+#include "strata_entry.h"
 #include "solve_outcome.h"
 #include "build_manifest.h"
 
@@ -29,14 +29,16 @@
 namespace cartan::bench
 {
 
-using solve_call = std::function<solve_outcome<study_joints>(
-    const cartan::se3<double>&, const typename target_pool::position_type&)>;
+template <int N>
+using solve_call = std::function<solve_outcome<N>(
+    const cartan::se3<double>&, const typename target_entry<N>::position_type&)>;
 
+template <int N>
 struct participant_entry
 {
     std::string name;
     bool kernel_countable;
-    solve_call solve;
+    solve_call<N> solve;
 };
 
 /// `supplier` names the dependency the participant needs, so an absence can
@@ -58,7 +60,8 @@ inline const std::array<declared_participant, 3>& declared_participants()
     return declared;
 }
 
-inline void print_participants(const std::vector<participant_entry>& resolved)
+template <int N>
+void print_participants(const std::vector<participant_entry<N>>& resolved)
 {
     std::printf("declared participants: %zu, resolved: %zu\n",
         declared_participants().size(), resolved.size());
@@ -69,15 +72,16 @@ inline void print_participants(const std::vector<participant_entry>& resolved)
     }
 }
 
-inline std::vector<absent_participant> absent_participants(
-    const std::vector<participant_entry>& resolved)
+template <int N>
+std::vector<absent_participant> absent_participants(
+    const std::vector<participant_entry<N>>& resolved)
 {
     std::vector<absent_participant> absent;
     const auto reasons = build_absences();
     for (const auto& declared : declared_participants())
     {
         const bool present = std::any_of(resolved.begin(), resolved.end(),
-            [declared](const participant_entry& entry) { return entry.name == declared.name; });
+            [declared](const participant_entry<N>& entry) { return entry.name == declared.name; });
         if (present)
         {
             continue;
@@ -104,7 +108,8 @@ inline void report_absent_participants(const std::vector<absent_participant>& ab
     }
 }
 
-inline void refuse_empty_participants(const std::vector<participant_entry>& resolved)
+template <int N>
+void refuse_empty_participants(const std::vector<participant_entry<N>>& resolved)
 {
     if (resolved.empty())
     {

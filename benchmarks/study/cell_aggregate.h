@@ -71,6 +71,8 @@ struct cell_accumulator
     std::string identity;
     double tolerance;
     bool kernel_countable;
+    bool success_rate_reportable;
+    std::vector<double> achieved;
     std::vector<double> pos_err;
     std::vector<double> ori_err;
     std::vector<double> wall_ns;
@@ -81,10 +83,12 @@ struct cell_accumulator
     int false_success;
     int false_failure;
 
-    cell_accumulator(std::string cell, double gate, bool countable)
+    cell_accumulator(std::string cell, double gate, bool countable, bool reportable)
         : identity(std::move(cell))
         , tolerance(gate)
         , kernel_countable(countable)
+        , success_rate_reportable(reportable)
+        , achieved()
         , pos_err()
         , ori_err()
         , wall_ns()
@@ -99,6 +103,7 @@ struct cell_accumulator
 
     void add(const target_record& row)
     {
+        achieved.push_back(static_cast<double>(row.budget_value));
         pos_err.push_back(row.adjudication.pos_err);
         ori_err.push_back(row.adjudication.ori_err);
         wall_ns.push_back(static_cast<double>(row.wall_ns));
@@ -118,16 +123,17 @@ inline std::string cell_identity(const target_record& row)
 {
     return std::format("{},{},{},{},{},{},{},{}",
         csv_field(row.table), csv_field(row.robot), csv_field(row.provenance),
-        csv_field(row.stratum), csv_field(row.solver), row.budget_index, row.budget_value,
+        csv_field(row.stratum), csv_field(row.solver), row.budget_index, row.budget_requested,
         csv_field(row.budget_axis));
 }
 
 inline std::string_view cell_header()
 {
-    return "table,robot,limits_provenance,stratum,solver,budget_index,budget_value,budget_axis,"
-           "n_targets,n_accepted,n_self_reported,n_false_success,n_false_failure,accept_rate,"
-           "pos_err_median_m,pos_err_p95_m,pos_err_p99_m,ori_err_median_rad,fk_evals_median,"
-           "jac_evals_median,wall_ns_median,wall_ns_cv,solver_tolerance,kernel_countable";
+    return "table,robot,limits_provenance,stratum,solver,budget_index,budget_requested,"
+           "budget_axis,n_targets,n_accepted,n_self_reported,n_false_success,n_false_failure,"
+           "accept_rate,budget_value_median,pos_err_median_m,pos_err_p95_m,pos_err_p99_m,"
+           "ori_err_median_rad,fk_evals_median,jac_evals_median,wall_ns_median,wall_ns_cv,"
+           "solver_tolerance,kernel_countable";
 }
 
 /// An order statistic over nothing is written empty rather than as a number, so
@@ -142,19 +148,31 @@ inline std::string statistic_field(const std::vector<double>& values, double qua
     return std::format("{:.17g}", detail::order_statistic(values, quantile));
 }
 
+/// A stratum whose targets are not known to be reachable has no success rate to
+/// report, and an empty column is how the tooling says so. A number there would
+/// be a failure count for problems the solver was right to refuse.
+inline std::string accept_rate_field(const cell_accumulator& cell)
+{
+    const auto targets = static_cast<double>(cell.pos_err.size());
+    if (!cell.success_rate_reportable || targets == 0.0)
+    {
+        return std::string{};
+    }
+    return std::format("{:.17g}", static_cast<double>(cell.accepted) / targets);
+}
+
 inline std::string cell_row(const cell_accumulator& cell)
 {
     const auto targets = static_cast<int>(cell.pos_err.size());
-    return std::format("{},{},{},{},{},{},{:.17g},{:.17g},{:.17g},{:.17g},{:.17g},{},{},"
+    return std::format("{},{},{},{},{},{},{},{:.17g},{:.17g},{:.17g},{:.17g},{:.17g},{},{},"
                        "{:.17g},{:.17g},{:.17g},{:d}",
         cell.identity, targets, cell.accepted, cell.self_reported, cell.false_success,
-        cell.false_failure,
-        targets == 0 ? 0.0 : static_cast<double>(cell.accepted) / static_cast<double>(targets),
-        detail::order_statistic(cell.pos_err, 0.5), detail::order_statistic(cell.pos_err, 0.95),
-        detail::order_statistic(cell.pos_err, 0.99), detail::order_statistic(cell.ori_err, 0.5),
-        statistic_field(cell.fk_evals, 0.5), statistic_field(cell.jac_evals, 0.5),
-        detail::order_statistic(cell.wall_ns, 0.5), detail::variation(cell.wall_ns),
-        cell.tolerance, cell.kernel_countable);
+        cell.false_failure, accept_rate_field(cell),
+        detail::order_statistic(cell.achieved, 0.5), detail::order_statistic(cell.pos_err, 0.5),
+        detail::order_statistic(cell.pos_err, 0.95), detail::order_statistic(cell.pos_err, 0.99),
+        detail::order_statistic(cell.ori_err, 0.5), statistic_field(cell.fk_evals, 0.5),
+        statistic_field(cell.jac_evals, 0.5), detail::order_statistic(cell.wall_ns, 0.5),
+        detail::variation(cell.wall_ns), cell.tolerance, cell.kernel_countable);
 }
 
 }

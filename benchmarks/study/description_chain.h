@@ -63,6 +63,27 @@ inline const std::array<description_spec, 5>& description_specs()
     return specs;
 }
 
+inline const description_spec& description_for(std::string_view robot)
+{
+    const description_spec* found = nullptr;
+    for (const auto& spec : description_specs())
+    {
+        if (spec.robot_key == robot || spec.robot_key.ends_with(robot))
+        {
+            if (found != nullptr)
+            {
+                throw std::runtime_error(std::string{robot} + ": names more than one description");
+            }
+            found = &spec;
+        }
+    }
+    if (found == nullptr)
+    {
+        throw std::runtime_error(std::string{robot} + ": the study carries no such description");
+    }
+    return *found;
+}
+
 /// The restricted evaluator is the widest authority anything under benchmarks/
 /// grants a description. The UR and Franka documents read their joint limits
 /// with a host-language call, so an evaluator is unavoidable; the backend that

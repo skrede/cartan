@@ -12,27 +12,29 @@
 
 #include <cartan/serial/chain/joint_state.h>
 
+#include <cstdint>
 #include <string_view>
 
 namespace cartan::bench
 {
 
+/// `requested` is what the rung asked for in the axis's own unit -- kernel
+/// evaluations, or nanoseconds for a participant budgeted by the clock. What a
+/// run reports on that axis is the value it achieved, which is a different
+/// number: the study has already published a requested figure once.
+///
+/// A wall-clock-budgeted solve and a work-budgeted one are not comparable under
+/// contention, which is why the cap travels with every figure it produced
+/// whether or not that participant resolved.
 struct solve_budget
 {
     int index;
     int units;
     double tolerance;
     std::string_view axis;
+    double time_cap_ms;
+    std::int64_t requested;
 };
-
-/// The one participant whose budget is wall-clock rather than work gets this
-/// cap: generous for a single reachable-target solve and an order of magnitude
-/// above the real-time budget, yet bounded, so a rare non-convergence stops
-/// instead of dominating the run. A wall-clock-budgeted solve and a
-/// work-budgeted one are not comparable under contention, which is why the cap
-/// is recorded beside every figure it produced whether or not that participant
-/// resolved.
-constexpr int comparator_time_cap_ms = 50;
 
 template <int N>
 struct solve_outcome

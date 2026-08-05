@@ -10,8 +10,13 @@
 /// because both were hard-coded to the same symmetric box. Here they are
 /// derived from the chain in the member initialization list, and no
 /// constructor, setter or factory accepts bounds.
+///
+/// The periodic rule is applied in exactly two places: the solve chain built
+/// here, and the canonicalization step inside the adjudication. Two application
+/// sites would be two rules.
 
 #include "kdl_chain.h"
+#include "rule_chain.h"
 #include "description_chain.h"
 
 #include <cartan/serial/chain/joint_state.h>
@@ -22,6 +27,7 @@
 #include <kdl/jntarray.hpp>
 
 #include <string>
+#include <vector>
 #include <utility>
 #include <stdexcept>
 #include <string_view>
@@ -42,29 +48,16 @@ enum class limits_provenance
     synthetic
 };
 
-struct comparator_bounds
-{
-    KDL::JntArray lower;
-    KDL::JntArray upper;
-};
-
 namespace detail
 {
 
 template <int N>
-comparator_bounds derive_comparator_bounds(const cartan::kinematic_chain<double, N>& chain)
+cartan::kinematic_chain<double, N> solve_chain_for(
+    const cartan::kinematic_chain<double, N>& declared,
+    periodic_rule rule,
+    const std::vector<int>& qualifying)
 {
-    const auto width = ::cartan::detail::k_unbounded_angular_range_v<double>;
-    comparator_bounds derived{KDL::JntArray(N), KDL::JntArray(N)};
-    const auto& limits = chain.limits();
-    for (unsigned int i = 0; i < static_cast<unsigned int>(N); ++i)
-    {
-        const auto anchored = ::cartan::detail::anchor_bounds(
-            limits[i].position_min(), limits[i].position_max(), width, 0.0);
-        derived.lower(i) = anchored.lower;
-        derived.upper(i) = anchored.upper;
-    }
-    return derived;
+    return rule == periodic_rule::canonical ? declared : relax_joints<N>(declared, qualifying);
 }
 
 }
@@ -77,21 +70,33 @@ public:
     using position_type = typename cartan::joint_state<double, N>::position_type;
 
     feasible_set(
-        chain_type chain,
+        chain_type declared,
         KDL::Chain comparator,
         periodic_rule rule,
         limits_provenance provenance,
         std::string source)
-        : m_chain(std::move(chain))
+        : m_declared(std::move(declared))
+        , m_qualifying(full_turn_joints<N>(m_declared))
+        , m_chain(detail::solve_chain_for<N>(m_declared, rule, m_qualifying))
         , m_rule(rule)
         , m_source(std::move(source))
         , m_comparator(std::move(comparator))
-        , m_bounds(detail::derive_comparator_bounds<N>(m_chain))
+        , m_bounds(derive_comparator_bounds<N>(m_chain))
         , m_provenance(provenance)
     {
     }
 
+    /// What every participant solves against.
     const chain_type& chain() const { return m_chain; }
+
+    /// The description's own bounds, which every target is drawn from and which
+    /// two of the three rules verify against.
+    const chain_type& declared() const { return m_declared; }
+
+    const chain_type& verification_chain() const
+    {
+        return m_rule == periodic_rule::unbounded ? m_chain : m_declared;
+    }
 
     periodic_rule rule() const { return m_rule; }
 
@@ -103,7 +108,13 @@ public:
 
     limits_provenance provenance() const { return m_provenance; }
 
+    /// Empty where the three rules coincide, which is a publishable finding
+    /// about the robot rather than a defect in the tables that agree.
+    const std::vector<int>& qualifying_joints() const { return m_qualifying; }
+
 private:
+    chain_type m_declared;
+    std::vector<int> m_qualifying;
     chain_type m_chain;
     periodic_rule m_rule;
     std::string m_source;
@@ -112,52 +123,75 @@ private:
     limits_provenance m_provenance;
 };
 
-inline const description_spec& description_for(std::string_view robot)
+inline std::string_view table_key(periodic_rule rule)
 {
-    const description_spec* found = nullptr;
-    for (const auto& spec : description_specs())
+    switch (rule)
     {
-        if (spec.robot_key == robot || spec.robot_key.ends_with(robot))
+        case periodic_rule::unbounded: return "a";
+        case periodic_rule::unbounded_solve_canonical_compare: return "b";
+        case periodic_rule::canonical: return "c";
+    }
+    throw std::runtime_error("the periodic rule enumeration gained a value with no table");
+}
+
+inline std::string_view rule_name(periodic_rule rule)
+{
+    switch (rule)
+    {
+        case periodic_rule::unbounded: return "unbounded";
+        case periodic_rule::unbounded_solve_canonical_compare:
+            return "unbounded_solve_canonical_compare";
+        case periodic_rule::canonical: return "canonical";
+    }
+    throw std::runtime_error("the periodic rule enumeration gained a value with no name");
+}
+
+inline periodic_rule rule_from_name(std::string_view name)
+{
+    for (const auto rule : {periodic_rule::unbounded,
+             periodic_rule::unbounded_solve_canonical_compare, periodic_rule::canonical})
+    {
+        if (rule_name(rule) == name)
         {
-            if (found != nullptr)
-            {
-                throw std::runtime_error(std::string{robot} + ": names more than one description");
-            }
-            found = &spec;
+            return rule;
         }
     }
-    if (found == nullptr)
-    {
-        throw std::runtime_error(std::string{robot} + ": the study carries no such description");
-    }
-    return *found;
+    throw std::runtime_error(std::string{name} + ": the study measures no such periodic rule");
+}
+
+/// Whether the rule leaves the description's declared bounds standing. A row
+/// about adjacency to a bound the rule then relaxes is a claim about two
+/// different bounds at once.
+inline bool rule_preserves_declared_bounds(periodic_rule rule)
+{
+    return rule == periodic_rule::canonical;
 }
 
 inline periodic_rule rule_for_table(std::string_view table)
 {
-    if (table == "c")
+    for (const auto rule : {periodic_rule::unbounded,
+             periodic_rule::unbounded_solve_canonical_compare, periodic_rule::canonical})
     {
-        return periodic_rule::canonical;
+        if (table_key(rule) == table)
+        {
+            return rule;
+        }
     }
-    throw std::runtime_error(
-        std::string{table} + ": only the canonical-throughout table is measured here");
+    throw std::runtime_error(std::string{table} + ": the study publishes tables a, b and c");
 }
-
-/// The one joint count this spine measures.
-constexpr int study_joints = 6;
 
 /// Both the comparator's geometry and its bounds come from the chain the
 /// description produced. Nothing here names a second description of the robot.
 template <int N>
-feasible_set<N> load_feasible_set(const description_spec& spec, periodic_rule rule)
+feasible_set<N> load_feasible_set(
+    const description_spec& spec, periodic_rule rule, limits_provenance provenance)
 {
     auto loaded = chain_from_description<N>(spec);
-    auto comparator = build_kdl_chain<N>(loaded);
-    return feasible_set<N>(
-        std::move(loaded),
-        std::move(comparator),
-        rule,
-        limits_provenance::description,
+    auto declared = provenance == limits_provenance::synthetic
+        ? symmetric_box<N>(loaded)
+        : std::move(loaded);
+    auto comparator = build_kdl_chain<N>(declared);
+    return feasible_set<N>(std::move(declared), std::move(comparator), rule, provenance,
         std::string{spec.relative_path});
 }
 
