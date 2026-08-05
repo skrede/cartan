@@ -4,318 +4,156 @@
 Standard library only, so a reader who clones the repository needs python3 and
 nothing else to reproduce every figure in the report.
 
-The two record tiers -- per-target rows and per-cell aggregates -- are read by
-the same code path and rendered by the same formatter, so a figure taken from
-the shipped aggregates is the figure the full-resolution rows produce. Order
-statistics are nearest rank over the whole target set, and a non-finite error
-sorts to the worst end rather than being dropped: a distribution reported only
-over the targets a solver survived is conditioned on that solver's own success.
-The one figure that is so conditioned says so in its name -- the accuracy mode
-matches solvers on the accuracy of the solves that succeeded, since a failed
-solve has no accuracy -- and it is rendered beside the unconditioned median.
+Two input tiers rebuild the same table. The per-cell aggregates and the
+per-stratum paired differences ship in the repository; the per-target rows are a
+sidecar an order of magnitude larger and ship as a release asset. `--cross-check`
+rebuilds from both and refuses on any published figure that differs, which is
+what makes the smaller shipped tier evidence rather than a summary of evidence.
 
-Nothing here combines two tables. Each periodic rule is its own experiment, and
-a reader who wants to compare them has to do it deliberately.
+Order statistics are nearest rank over the whole target set, and a non-finite
+error sorts to the worst end rather than being dropped: a distribution reported
+only over the targets a solver survived is conditioned on that solver's own
+success. The figures that are so conditioned say so in their names -- the
+accuracy the iso-accuracy mode matches, and every paired difference, which exists
+only where both solvers were accepted on the same target.
+
+Nothing here combines two tables, and nothing here emits a ratio summarizing a
+table, a robot or the study. Each periodic rule is its own experiment, and a
+reader who wants to compare them has to do it deliberately.
 """
 
 import argparse
-import csv
-import math
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
-IDENTITY = (
-    "table", "robot", "limits_provenance", "stratum",
-    "solver", "budget_index", "budget_requested", "budget_axis",
+from bench_study_clauses import HEADINGS, PAIRED_HEADINGS
+from bench_study_manifest import check_kernel_values, check_participants, one_manifest
+from bench_study_records import (
+    CELL_COLUMNS, CELL_KERNEL_FIELDS, KERNEL_FIELDS, STRATA_COLUMNS, TARGET_COLUMNS, Refusal,
+    one_file, one_table, read_csv, without_synthetic,
 )
-
-TARGET_COLUMNS = IDENTITY + (
-    "budget_value", "target_id", "seed_id", "self_reported", "accepted", "pose_ok", "limits_ok",
-    "pos_err_m", "ori_err_rad", "worst_limit_violation_rad", "fk_evals", "jac_evals",
-    "iterations", "solver_tolerance", "wall_ns", "accuracy_target", "accuracy_target_met",
+from bench_study_render import render, table_row
+from bench_study_summary import (
+    paired_from_strata, paired_from_targets, strata_text, summarize_cells, summarize_rows,
 )
-
-CELL_COLUMNS = IDENTITY + (
-    "n_targets", "n_accepted", "n_self_reported", "n_false_success", "n_false_failure",
-    "accept_rate", "budget_value_median", "pos_err_median_m", "pos_err_p95_m", "pos_err_p99_m",
-    "ori_err_median_rad", "fk_evals_median", "jac_evals_median", "wall_ns_median", "wall_ns_cv",
-    "solver_tolerance", "kernel_countable", "accuracy_target", "accuracy_target_met",
-    "pos_err_median_accepted_m",
-)
-
-NO_SUCCESS_RATE = "unreachable"
-
-SUMMARY_FIELDS = CELL_COLUMNS[len(IDENTITY):]
 
 EXIT_REFUSED = 1
 
 EXIT_HELP = """exit codes:
   0  the table was rebuilt
-  1  no records resolve below the root, an input escapes it, or a column is missing
+  1  a record, a path, a participant list or a cross-check was refused; the message says which
   2  the arguments are wrong (argparse)
 """
 
+HEADING_LINES = frozenset({table_row(HEADINGS), table_row(PAIRED_HEADINGS)})
 
-class Refusal(Exception):
-    pass
-
-
-def order_statistic(values, quantile):
-    """Nearest rank over every value, non-finite sorted to the worst end."""
-    if not values:
-        return math.nan
-    ordered = sorted(value if math.isfinite(value) else math.inf for value in values)
-    rank = int(quantile * len(ordered))
-    return ordered[min(rank, len(ordered) - 1)]
+SOURCE_LINES = ("Records:", "Paired differences:")
 
 
-def variation(values):
-    if len(values) < 2:
-        return math.nan
-    count = len(values)
-    mean = sum(values) / count
-    squares = 0.0
-    for value in values:
-        squares += (value - mean) * (value - mean)
-    return math.sqrt(squares / (count - 1)) / mean
+@dataclass
+class Study:
+    table: str
+    tier: str
+    records: Path
+    paired_source: str
+    manifest: object
+    summaries: dict
+    paired: dict
+    absences: list
+    uncountable: list
+    excluded: int
 
 
-def number(text):
-    try:
-        return float(text)
-    except (TypeError, ValueError) as bad:
-        raise Refusal(f"{text!r} is not a number") from bad
+def load_tier(root, table, tier, explicit):
+    path = one_file(root, table, tier, explicit)
+    rows = read_csv(path, {"targets": TARGET_COLUMNS, "cells": CELL_COLUMNS,
+                           "strata": STRATA_COLUMNS}[tier])
+    one_table(path, rows, table)
+    kept, excluded = without_synthetic(rows)
+    if not kept:
+        raise Refusal(f"{path}: every row was excluded for standing on bounds no description "
+                      f"declared, so there is nothing left to summarize")
+    return path, kept, excluded
 
 
-def counted(text):
-    """An empty count is unknown, not zero: the harness did not drive that solver."""
-    return None if text == "" else number(text)
+def load_paired(root, table, manifest):
+    path, rows, _ = load_tier(root, table, "strata", [])
+    present = set()
+    for column in ("solver_a", "solver_b"):
+        check_kernel_values(path, rows, manifest, ("delta_kernel_evals_median",), column)
+        present |= {row[column] for _, row in rows}
+    check_participants(manifest, present)
+    return f"`{path}`", paired_from_strata(rows)
 
 
-def flag(text):
-    return text not in ("0", "", None)
+def analyse(root, table, source, explicit, manifest):
+    tier = "targets" if source == "targets" else "cells"
+    path, rows, excluded = load_tier(root, table, tier, explicit)
+    present = {row["solver"] for _, row in rows}
+    absences = check_participants(manifest, present)
+    check_kernel_values(path, rows, manifest,
+                        KERNEL_FIELDS if tier == "targets" else CELL_KERNEL_FIELDS)
+    if tier == "targets":
+        paired_source, paired = "computed from the per-target rows", paired_from_targets(rows)
+        summaries = summarize_rows(rows)
+    else:
+        paired_source, paired = load_paired(root, table, manifest)
+        summaries = summarize_cells(rows)
+    uncountable = [name for name in manifest.uncountable() if name in present]
+    return Study(table, tier, path, paired_source, manifest, summaries, paired, absences,
+                 uncountable, excluded)
 
 
-def contained(path, root):
-    """Resolve before testing containment: a symlink is a path that escapes later."""
-    resolved = Path(path).resolve()
-    if not resolved.is_relative_to(root):
-        raise Refusal(f"{resolved} resolves outside the declared root {root}")
-    return resolved
+def comparable(text):
+    return [line for line in text.splitlines() if not line.startswith(SOURCE_LINES)]
 
 
-def read_csv(path, columns):
-    with path.open(newline="", encoding="utf-8") as handle:
-        reader = csv.DictReader(handle)
-        header = tuple(reader.fieldnames or ())
-        if header != columns:
-            missing = [name for name in columns if name not in header]
-            raise Refusal(f"{path}: expected the {len(columns)} declared columns, "
-                          f"missing {missing or 'none'}, header was {list(header)}")
-        rows = list(reader)
-    for line, row in enumerate(rows, start=2):
-        if None in row or None in row.values():
-            raise Refusal(f"{path} line {line}: carries {len(row)} fields against "
-                          f"{len(columns)} columns")
-    return rows
+def counted_figures(lines):
+    return sum(len(line.split("|")) - 2 for line in lines
+               if line.startswith("| ") and line not in HEADING_LINES)
 
 
-def discover(root, table, columns, explicit):
-    if explicit:
-        return [contained(name, root) for name in explicit]
-    found = []
-    tier = "targets" if columns is TARGET_COLUMNS else "cells"
-    for candidate in sorted(root.rglob(f"table_{table}_{tier}.csv")):
-        resolved = contained(candidate, root)
-        with resolved.open(newline="", encoding="utf-8") as handle:
-            header = tuple(next(csv.reader(handle), []))
-        if header == columns:
-            found.append(resolved)
-    return found
+def cross_check(document, other):
+    ours, theirs = comparable(document), comparable(render(other))
+    for line, (mine, yours) in enumerate(zip(ours, theirs), start=1):
+        if mine != yours:
+            raise Refusal(f"the two record tiers disagree at rendered line {line}:\n"
+                          f"  {other.tier} tier: {yours}\n  this tier:    {mine}")
+    if len(ours) != len(theirs):
+        raise Refusal(f"the {other.tier} tier renders {len(theirs)} lines against {len(ours)}, so "
+                      f"one tier carries a cell the other does not")
+    return counted_figures(ours)
 
 
-def summarize_rows(rows, table):
-    cells = {}
-    for row in rows:
-        if row["table"] != table:
-            raise Refusal(f"a record names table {row['table']!r} in a report about {table!r}")
-        cell = cells.setdefault(tuple(row[name] for name in IDENTITY), {
-            "pos": [], "ori": [], "wall": [], "fk": [], "jac": [], "achieved": [],
-            "accepted_pos": [], "accepted": 0, "reported": 0, "false_success": 0,
-            "false_failure": 0,
-            "tolerance": number(row["solver_tolerance"]),
-            "rate": row["stratum"] != NO_SUCCESS_RATE,
-            "accuracy_target": counted(row["accuracy_target"]),
-            "accuracy_target_met": counted(row["accuracy_target_met"]),
-        })
-        cell["achieved"].append(number(row["budget_value"]))
-        cell["pos"].append(number(row["pos_err_m"]))
-        if flag(row["accepted"]):
-            cell["accepted_pos"].append(number(row["pos_err_m"]))
-        cell["ori"].append(number(row["ori_err_rad"]))
-        cell["wall"].append(number(row["wall_ns"]))
-        for name, key in (("fk_evals", "fk"), ("jac_evals", "jac")):
-            value = counted(row[name])
-            if value is not None:
-                cell[key].append(value)
-        accepted, reported = flag(row["accepted"]), flag(row["self_reported"])
-        cell["accepted"] += 1 if accepted else 0
-        cell["reported"] += 1 if reported else 0
-        cell["false_success"] += 1 if reported and not accepted else 0
-        cell["false_failure"] += 1 if accepted and not reported else 0
-    return {key: finalize(cell) for key, cell in cells.items()}
-
-
-def finalize(cell):
-    targets = len(cell["pos"])
-    return {
-        "n_targets": float(targets),
-        "n_accepted": float(cell["accepted"]),
-        "n_self_reported": float(cell["reported"]),
-        "n_false_success": float(cell["false_success"]),
-        "n_false_failure": float(cell["false_failure"]),
-        "accept_rate": (cell["accepted"] / targets if targets and cell["rate"] else None),
-        "budget_value_median": order_statistic(cell["achieved"], 0.5),
-        "pos_err_median_m": order_statistic(cell["pos"], 0.5),
-        "pos_err_p95_m": order_statistic(cell["pos"], 0.95),
-        "pos_err_p99_m": order_statistic(cell["pos"], 0.99),
-        "ori_err_median_rad": order_statistic(cell["ori"], 0.5),
-        "fk_evals_median": order_statistic(cell["fk"], 0.5) if cell["fk"] else None,
-        "jac_evals_median": order_statistic(cell["jac"], 0.5) if cell["jac"] else None,
-        "wall_ns_median": order_statistic(cell["wall"], 0.5),
-        "wall_ns_cv": variation(cell["wall"]),
-        "solver_tolerance": cell["tolerance"],
-        "kernel_countable": 1.0 if cell["fk"] else 0.0,
-        "accuracy_target": cell["accuracy_target"],
-        "accuracy_target_met": cell["accuracy_target_met"],
-        "pos_err_median_accepted_m": (
-            order_statistic(cell["accepted_pos"], 0.5) if cell["accepted_pos"] else None),
-    }
-
-
-def summarize_cells(rows, table):
-    summaries = {}
-    for row in rows:
-        if row["table"] != table:
-            raise Refusal(f"a record names table {row['table']!r} in a report about {table!r}")
-        key = tuple(row[name] for name in IDENTITY)
-        summaries[key] = {name: counted(row[name]) for name in SUMMARY_FIELDS}
-    return summaries
-
-
-def markdown(text):
-    """A record field is data; it must not be able to close a cell or open code."""
-    return str(text).replace("|", r"\|").replace("`", r"\`").replace("\n", " ").replace("\r", " ")
-
-
-def figure(value, targets):
-    if value is None:
-        return "not counted"
-    if not math.isfinite(value):
-        return f"non-finite (n = {targets})"
-    return f"{value:.6g} (n = {targets})"
-
-
-def share(count, targets):
-    if targets == 0:
-        return "0 / 0"
-    return f"{int(count)} / {int(targets)} ({100.0 * count / targets:.2f}%)"
-
-
-HEADINGS = (
-    "solver", "targets", "accepted", "self-reported", "false success", "false failure",
-    "budget achieved median", "pos err median (m)", "pos err p95 (m)", "pos err p99 (m)",
-    "ori err median (rad)", "fk evals median", "jac evals median", "wall median (ns)",
-    "wall cv", "solver tolerance", "accuracy target", "pos err median accepted (m)",
-)
-
-ACCURACY_CLAUSE = (
-    "Under the accuracy mode each solver is asked for its own calibrated tolerance so that the "
-    "accuracies they achieve match, and both numbers are in the table: the accuracy target beside "
-    "the tolerance it took to reach it. The accuracy every figure reports is the one the harness "
-    "recomputed, never the one a solver was asked for. A target whose calibration did not converge "
-    "is marked *unmet* rather than published as reached."
-)
-
-KERNEL_CLAUSE = (
-    "A kernel-evaluation count exists only where the harness drives the solver's own iteration. "
-    "Where it does not, the column reads *not counted*: the count is absent, not zero, and it is "
-    "never derived from the wall-clock column beside it."
-)
-
-STRATUM_CLAUSE = (
-    "The unreachable stratum has no success rate. Its targets are not known to be reachable, so a "
-    "solver reporting failure there is right rather than unsuccessful, and what it is scored on "
-    "is the three-outcome breakdown in the reachability artifact beside this one."
-)
-
-
-def accuracy_figure(summary):
-    """The mode a cell ran under, and whether its target was actually reached."""
-    target = summary["accuracy_target"]
-    if target is None:
-        return "budget mode"
-    return f"{target:.6g}" + ("" if summary["accuracy_target_met"] else " (unmet)")
-
-
-def solver_row(key, summary):
-    targets = summary["n_targets"]
-    counted = ("n_accepted", "n_self_reported", "n_false_success", "n_false_failure")
-    measured = ("budget_value_median", "pos_err_median_m", "pos_err_p95_m", "pos_err_p99_m",
-                "ori_err_median_rad", "fk_evals_median", "jac_evals_median", "wall_ns_median",
-                "wall_ns_cv")
-    cells = [markdown(key[IDENTITY.index("solver")]), f"{int(targets)}"]
-    cells += [share(summary[name], targets) for name in counted]
-    cells += [figure(summary[name], int(targets)) for name in measured]
-    cells.append(f"{summary['solver_tolerance']:.6g}")
-    cells.append(accuracy_figure(summary))
-    cells.append(figure(summary["pos_err_median_accepted_m"], int(summary["n_accepted"])))
-    return "| " + " | ".join(cells) + " |"
-
-
-def render(source, table, summaries, tier):
-    lines = [f"# Study table {markdown(table)}", "",
-             f"Records: `{markdown(source)}` ({tier} tier).", "",
-             "Every figure carries the number of targets it was computed over. Order statistics",
-             "are nearest rank over the whole target set, with a non-finite error sorted to the",
-             "worst end, so no column is conditioned on a solver's own success. Success means",
-             "the harness's own verdict, recomputed from the returned joint vector; the solver's",
-             "own claim is the separate self-reported column. No figure combines this table with",
-             "another.", "", KERNEL_CLAUSE, ""]
-    if any(summary["accuracy_target"] is not None for summary in summaries.values()):
-        lines += [ACCURACY_CLAUSE, ""]
-    if any(key[IDENTITY.index("stratum")] == NO_SUCCESS_RATE for key in summaries):
-        lines += [STRATUM_CLAUSE, ""]
-    grouped = {}
-    for key, summary in summaries.items():
-        grouped.setdefault(tuple(key[i] for i in (1, 2, 3, 5, 6, 7)), []).append((key, summary))
-    for section in sorted(grouped):
-        robot, provenance, stratum, index, value, axis = (markdown(part) for part in section)
-        lines += [f"## {robot} -- {stratum} stratum, {provenance} limits, "
-                  f"budget {index} = {value} {axis}", "",
-                  "| " + " | ".join(HEADINGS) + " |",
-                  "|" + "|".join(["---"] * len(HEADINGS)) + "|"]
-        ordered = sorted(grouped[section], key=lambda pair: pair[0])
-        lines += [solver_row(key, summary) for key, summary in ordered]
-        lines.append("")
-    return "\n".join(lines) + "\n"
+def emit_strata(arguments, study):
+    if study.tier != "targets":
+        raise Refusal("--strata-out writes the paired differences the per-target rows define; "
+                      "run it with --from targets")
+    Path(arguments.strata_out).write_text(strata_text(study.paired), encoding="utf-8")
+    print(f"bench_study_report: {len(study.paired)} paired rows written to "
+          f"{arguments.strata_out}")
 
 
 def build(arguments):
     root = Path(arguments.root).resolve()
     if not root.is_dir():
         raise Refusal(f"{root} is not a directory")
-    targets_tier = arguments.source == "targets"
-    columns = TARGET_COLUMNS if targets_tier else CELL_COLUMNS
-    paths = discover(root, arguments.table, columns, arguments.input)
-    if not paths:
-        raise Refusal(f"no {arguments.source} records for table {arguments.table} resolve "
-                      f"below {root}")
-    if len(paths) > 1:
-        raise Refusal(f"{len(paths)} candidate record files resolve below {root}: {paths}")
-    rows = read_csv(paths[0], columns)
-    summaries = (summarize_rows if targets_tier else summarize_cells)(rows, arguments.table)
-    return render(paths[0], arguments.table, summaries, arguments.source)
+    manifest = one_manifest(root, arguments.manifest)
+    study = analyse(root, arguments.table, arguments.source, arguments.input, manifest)
+    document = render(study)
+    Path(arguments.out).write_text(document, encoding="utf-8")
+    if arguments.strata_out:
+        emit_strata(arguments, study)
+    print(f"bench_study_report: table {arguments.table} rebuilt from the {study.tier} tier of "
+          f"{study.records} into {arguments.out}")
+    if arguments.cross_check is None:
+        return
+    other_root = Path(arguments.cross_check or root).resolve()
+    other = analyse(other_root, arguments.table,
+                    "aggregates" if study.tier == "targets" else "targets", [], manifest)
+    print(f"bench_study_report: {cross_check(document, other)} published figures agree between "
+          f"the {study.tier} and {other.tier} tiers")
 
 
 def main(argv=None):
@@ -328,11 +166,19 @@ def main(argv=None):
     parser.add_argument("--from", dest="source", required=True,
                         choices=("aggregates", "targets"), help="which record tier to read")
     parser.add_argument("--out", required=True, help="where the markdown table is written")
+    parser.add_argument("--manifest", default="",
+                        help="the capture's environment record, instead of discovery below "
+                             "the root")
+    parser.add_argument("--cross-check", nargs="?", const="", default=None,
+                        help="rebuild from the other tier as well and refuse on any published "
+                             "figure that differs; takes the root that tier resolves below")
+    parser.add_argument("--strata-out", default="",
+                        help="write the per-stratum paired differences the per-target rows define")
     parser.add_argument("--input", action="append", default=[],
                         help="an explicit record file, instead of discovery below the root")
     arguments = parser.parse_args(argv)
     try:
-        Path(arguments.out).write_text(build(arguments), encoding="utf-8")
+        build(arguments)
     except Refusal as refused:
         print(f"bench_study_report: {refused}", file=sys.stderr)
         return EXIT_REFUSED

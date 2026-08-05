@@ -44,6 +44,15 @@ jobs:
       - name: Forbidden calls and build settings
         run: python3 tools/check_forbidden_calls.py
 
+      # The study's analysis script is what its reproducibility claim rests on: a
+      # reader is offered the records, that script and nothing else. Its refusals
+      # are what stop a rebuilt table from quietly losing a participant, mixing two
+      # experiments or publishing a survivor-conditioned mean with no denominator,
+      # so each fixture is a record set built to hit one refusal and each has been
+      # seen to go red without it.
+      - name: Study report fixtures
+        run: python3 tools/bench_study_report_test.py
+
   # The linter needs a compile database and therefore a compiler, so it is its own
   # job: the checks above stay build-free and finish while this one is still
   # configuring.

@@ -12,6 +12,7 @@
 /// nothing is asserted.
 
 #include "manifest_fields.h"
+#include "participant_list.h"
 
 #include <format>
 #include <string>
@@ -23,6 +24,28 @@
 
 namespace cartan::bench
 {
+
+namespace detail
+{
+
+/// The declared list travels with the records because a table missing a solver
+/// reads exactly like a table that never declared one. Nothing downstream can
+/// tell the two apart from the rows alone, so the authority is written here.
+inline std::string declared_array()
+{
+    std::vector<std::string> entries;
+    for (const auto& declared : declared_participants())
+    {
+        entries.push_back(json_object({json_field("name", declared.name),
+                                          json_field("supplier", declared.supplier),
+                                          json_string("kernel_countable") + ": "
+                                              + (declared.kernel_countable ? "true" : "false")},
+            "    "));
+    }
+    return json_array(entries, "  ");
+}
+
+}
 
 /// The absence list is the study's own, not the build's: a comparator the build
 /// did not resolve and a participant the study declared are different lists, and
@@ -68,6 +91,7 @@ inline void write_manifest(
     fields.push_back(json_field("configure_command", CARTAN_BENCH_CONFIGURE_COMMAND));
     fields.push_back(json_field("run_command", parameters.run_command));
     fields.push_back(json_string("dependencies") + ": " + json_array(dependencies, "  "));
+    fields.push_back(json_string("declared_participants") + ": " + detail::declared_array());
     fields.push_back(json_string("absent_participants") + ": " + json_array(absences, "  "));
     fields.push_back(json_string("descriptions") + ": " + detail::descriptions_array());
     fields.push_back(
