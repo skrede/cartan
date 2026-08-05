@@ -35,7 +35,6 @@ inline urdf_failure failure_from_code(meios::diagnostic_code code)
     case meios::diagnostic_code::multiple_parents:
         return urdf_failure::multi_parent_link;
     case meios::diagnostic_code::no_root_cycle:
-        return urdf_failure::cyclic_kinematic_tree;
     case meios::diagnostic_code::link_on_cycle:
         return urdf_failure::cyclic_kinematic_tree;
     case meios::diagnostic_code::additional_root:

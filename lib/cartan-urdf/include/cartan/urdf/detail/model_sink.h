@@ -44,8 +44,8 @@ template <typename Scalar = double>
 class model_sink
 {
 public:
-    explicit model_sink(const load_options& opts)
-        : m_opts(opts)
+    explicit model_sink(load_options opts)
+        : m_opts(std::move(opts))
         , m_model()
         , m_failure()
         , m_result(cartan::unexpected(urdf_error{
