@@ -82,8 +82,23 @@ fk_matrix_result<Scalar, N> forward_kinematics_matrix_unchecked(
 
     for (int i = 0; i < n; ++i)
     {
-        detail::exp_joint_matrix_runtime(
-            chain.kind(i), q(i), chain.axis(i), R_step, t_step);
+        switch (chain.kind(i))
+        {
+            case joint_kind::revolute_x:  detail::exp_joint_matrix<revolute_x>(q(i), chain.axis(i), R_step, t_step); break;
+            case joint_kind::revolute_y:  detail::exp_joint_matrix<revolute_y>(q(i), chain.axis(i), R_step, t_step); break;
+            case joint_kind::revolute_z:  detail::exp_joint_matrix<revolute_z>(q(i), chain.axis(i), R_step, t_step); break;
+            case joint_kind::prismatic_x: detail::exp_joint_matrix<prismatic_x>(q(i), chain.axis(i), R_step, t_step); break;
+            case joint_kind::prismatic_y: detail::exp_joint_matrix<prismatic_y>(q(i), chain.axis(i), R_step, t_step); break;
+            case joint_kind::prismatic_z: detail::exp_joint_matrix<prismatic_z>(q(i), chain.axis(i), R_step, t_step); break;
+            case joint_kind::general:
+            default:
+            {
+                se3<Scalar> step = detail::exp_joint_runtime(chain.kind(i), q(i), chain.axis(i));
+                R_step = step.rotation().matrix();
+                t_step = step.translation();
+                break;
+            }
+        }
         vector3<Scalar> p_new;
         p_new.noalias() = R * t_step + p;
         matrix3<Scalar> R_new;

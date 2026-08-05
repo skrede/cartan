@@ -1,8 +1,10 @@
 #include "../support/kinematics_helpers.h"
 #include "../support/joint_limits_helpers.h"
+#include "../support/static_chain_factories.h"
 
 #include "cartan/serial_chain.h"
 
+#include "../fixtures/chain_factories.h"
 #include "../fixtures/prismatic_chains.h"
 
 #include <catch2/catch_approx.hpp>
@@ -257,4 +259,67 @@ TEST_CASE("FK signed prismatic chain matches se3::exp oracle",
                      * fk_oracle.end_effector).log();
         REQUIRE(diff.norm() < 1e-12);
     }
+}
+
+// ============================================================================
+// Matrix FK: runtime-dispatched chain against its compile-time-tagged twin
+//
+// Both overloads run the same per-tag exp_joint_matrix bodies in the same
+// accumulation order, so the two agree to the last bit and the margin below is
+// a representation bound rather than a modelling tolerance. The static twin is
+// built from this chain's own axes, home and bounds, so a difference can only
+// come from the dispatch.
+//
+// The general-kind case is the one that carries risk: a chain kind the switch
+// does not name must reach the se3::exp fallback, not leave the previous
+// joint's step in place.
+// ============================================================================
+
+TEST_CASE("Matrix FK runtime dispatch matches the compile-time-tagged path",
+          "[forward_kinematics][matrix]")
+{
+    auto kc = spp::fixtures::make_ur3e_chain<double>();
+    auto sc = spp::testing::make_ur3e_static<double>();
+
+    std::mt19937 rng(20260805);
+    for (int c = 0; c < 256; ++c)
+    {
+        auto q = spp::fixtures::random_joint_config(kc, rng);
+
+        auto runtime = spp::testing::fk_matrix_at(kc, q);
+        auto tagged = spp::testing::fk_matrix_at(sc, q);
+
+        REQUIRE((runtime.end_effector.R - tagged.end_effector.R).norm() < 1e-15);
+        REQUIRE((runtime.end_effector.p - tagged.end_effector.p).norm() < 1e-15);
+
+        for (std::size_t i = 0; i < runtime.intermediates.size(); ++i)
+        {
+            REQUIRE((runtime.intermediates[i].R - tagged.intermediates[i].R).norm() < 1e-15);
+            REQUIRE((runtime.intermediates[i].p - tagged.intermediates[i].p).norm() < 1e-15);
+        }
+    }
+}
+
+TEST_CASE("Matrix FK runtime dispatch takes the general-kind fallback",
+          "[forward_kinematics][matrix]")
+{
+    auto skew = spp::screw_axis<double>::revolute({1, 1, 1}, {0.1, -0.2, 0.3});
+    auto s2 = spp::screw_axis<double>::revolute({0, 0, 1}, {0, 0, 0.4});
+    REQUIRE(spp::detect_joint_kind(skew) == spp::joint_kind::general);
+
+    auto lim = spp::testing::limits(-std::numbers::pi, std::numbers::pi);
+    spp::vector3<double> home_trans(0.0, 0.0, 0.8);
+    auto home = spp::se3<double>(spp::so3<double>::identity(), home_trans);
+    spp::kinematic_chain<double, 2> chain(home, {skew, s2}, {lim, lim});
+
+    Eigen::Vector2d q;
+    q << 0.37, -0.94;
+
+    auto fk = spp::testing::fk_matrix_at(chain, q);
+
+    auto expected = spp::se3<double>::exp(skew.to_vector() * q(0))
+                    * spp::se3<double>::exp(s2.to_vector() * q(1)) * home;
+
+    REQUIRE((fk.end_effector.R - expected.rotation().matrix()).norm() < 1e-14);
+    REQUIRE((fk.end_effector.p - expected.translation()).norm() < 1e-14);
 }

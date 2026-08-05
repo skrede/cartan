@@ -377,34 +377,6 @@ inline void exp_joint_matrix(
     }
 }
 
-/// Runtime dispatch for matrix-form per-joint SE(3) exponential.
-template <typename Scalar>
-inline void exp_joint_matrix_runtime(
-    joint_kind kind,
-    Scalar q,
-    const screw_axis<Scalar>& axis,
-    matrix3<Scalar>& R,
-    vector3<Scalar>& t)
-{
-    switch (kind)
-    {
-        case joint_kind::revolute_x:  exp_joint_matrix<revolute_x>(q, axis, R, t); return;
-        case joint_kind::revolute_y:  exp_joint_matrix<revolute_y>(q, axis, R, t); return;
-        case joint_kind::revolute_z:  exp_joint_matrix<revolute_z>(q, axis, R, t); return;
-        case joint_kind::prismatic_x: exp_joint_matrix<prismatic_x>(q, axis, R, t); return;
-        case joint_kind::prismatic_y: exp_joint_matrix<prismatic_y>(q, axis, R, t); return;
-        case joint_kind::prismatic_z: exp_joint_matrix<prismatic_z>(q, axis, R, t); return;
-        case joint_kind::general:
-        default:
-        {
-            auto se = exp_joint_runtime(kind, q, axis);
-            R = se.rotation().matrix();
-            t = se.translation();
-            return;
-        }
-    }
-}
-
 /// Runtime dispatch for the first space-Jacobian column at identity.
 template <typename Scalar, typename ColExpr>
 void jacobian_column_identity_runtime(
