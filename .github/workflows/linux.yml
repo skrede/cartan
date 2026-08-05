@@ -262,7 +262,16 @@ jobs:
       # Every other Linux job builds with -DCARTAN_BUILD_URDF=ON, so this is
       # the only automated check that the kinematics core still builds and
       # tests against Eigen alone with the description module compiled out.
+      #
+      # The compiler is pinned for the same reason every other job here pins
+      # one: an unpinned compiler is an unpinned verdict, and this job promotes
+      # every diagnostic to an error. GCC 13 loses std::optional's engaged flag
+      # when it inlines the payload move at -O3 and reports the empty payload's
+      # members as maybe-uninitialized; GCC 14, 15 and 16 do not.
       - name: Configure
+        env:
+          CC: gcc-14
+          CXX: g++-14
         run: |
           cmake . -B build -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_FLAGS="-Werror" \
