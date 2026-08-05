@@ -59,7 +59,8 @@ public:
     {
         m_targets << csv_row(row) << '\n';
         auto identity = cell_identity(row);
-        m_cells.try_emplace(identity, identity, row.solver_tolerance).first->second.add(row);
+        m_cells.try_emplace(identity, identity, row.solver_tolerance, row.kernel_countable)
+            .first->second.add(row);
     }
 
     void finish()

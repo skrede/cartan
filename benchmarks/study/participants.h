@@ -17,6 +17,9 @@
 #ifdef CARTAN_BENCH_STUDY_HAS_PINOCCHIO
 #include "pinocchio_participant.h"
 #endif
+#ifdef CARTAN_BENCH_STUDY_HAS_TRAC_IK
+#include "trac_ik_participant.h"
+#endif
 
 #include <cartan/lie/se3.h>
 #include <cartan/serial/ik/solver/lm.h>
@@ -103,6 +106,11 @@ static_assert(participant<cartan_lm_solver, 6>,
 #ifdef CARTAN_BENCH_STUDY_HAS_PINOCCHIO
 static_assert(participant<pinocchio_lm_solver<6>, 6>,
     "the peer adapter must satisfy the one call signature every participant has");
+#endif
+
+#ifdef CARTAN_BENCH_STUDY_HAS_TRAC_IK
+static_assert(participant<trac_ik_solver<6>, 6>,
+    "the comparator adapter must satisfy the one call signature every participant has");
 #endif
 
 }

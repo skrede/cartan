@@ -25,6 +25,15 @@ struct solve_budget
     std::string_view axis;
 };
 
+/// The one participant whose budget is wall-clock rather than work gets this
+/// cap: generous for a single reachable-target solve and an order of magnitude
+/// above the real-time budget, yet bounded, so a rare non-convergence stops
+/// instead of dominating the run. A wall-clock-budgeted solve and a
+/// work-budgeted one are not comparable under contention, which is why the cap
+/// is recorded beside every figure it produced whether or not that participant
+/// resolved.
+constexpr int comparator_time_cap_ms = 50;
+
 template <int N>
 struct solve_outcome
 {

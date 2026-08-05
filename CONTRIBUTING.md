@@ -74,11 +74,14 @@ Apple's toolchain reports `AppleClang`, which the guard does not accept.
 On macOS, and with GCC, build the other targets with `dev` and set the
 fuzz option separately under an LLVM Clang.
 
-The benchmark suite is gated behind `CARTAN_BUILD_BENCHMARKS`; each
-third-party comparison dependency (orocos-kdl, TRAC-IK, pinocchio) is
-auto-detected, and any benchmark whose dependency is missing is omitted with
-a warning. Set `CARTAN_FETCH_BENCHMARK_DEPS=ON` to fetch missing benchmark
-dependencies instead of only using installed ones.
+The benchmark suite is gated behind `CARTAN_BUILD_BENCHMARKS`. Each
+third-party comparison dependency (orocos-kdl, TRAC-IK, pinocchio and the
+rest) is discovered on your machine and never downloaded by this build; any
+benchmark whose dependency is missing is omitted, and the omission is
+announced at configure time, at the start of a capture, and in the record
+the capture writes. `CARTAN_FETCH_BENCHMARK_DEPS=ON` fetches the measurement
+harness and nothing else. `benchmarks/README.md` states the acquisition
+policy in full.
 
 ## Coding Conventions
 

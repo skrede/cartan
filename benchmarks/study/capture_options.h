@@ -18,6 +18,7 @@ struct capture_options
     std::string table;
     std::string robot;
     std::string stratum;
+    std::string command;
     int targets;
     bool gate;
     std::filesystem::path out_dir;
@@ -27,6 +28,7 @@ struct capture_options
         : table("c")
         , robot("irb120")
         , stratum("reachable")
+        , command()
         , targets(200)
         , gate(false)
         , out_dir("study-cells")
@@ -65,6 +67,11 @@ inline bool apply_option(capture_options& options, std::string_view flag, std::s
 inline capture_options parse_capture_options(int argc, char** argv)
 {
     capture_options options;
+    for (int i = 0; i < argc; ++i)
+    {
+        options.command += (i == 0 ? "" : " ");
+        options.command += argv[i];
+    }
     for (int i = 1; i < argc; ++i)
     {
         const std::string_view flag{argv[i]};

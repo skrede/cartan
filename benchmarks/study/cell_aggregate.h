@@ -70,6 +70,7 @@ struct cell_accumulator
 {
     std::string identity;
     double tolerance;
+    bool kernel_countable;
     std::vector<double> pos_err;
     std::vector<double> ori_err;
     std::vector<double> wall_ns;
@@ -80,9 +81,10 @@ struct cell_accumulator
     int false_success;
     int false_failure;
 
-    cell_accumulator(std::string cell, double gate)
+    cell_accumulator(std::string cell, double gate, bool countable)
         : identity(std::move(cell))
         , tolerance(gate)
+        , kernel_countable(countable)
         , pos_err()
         , ori_err()
         , wall_ns()
@@ -100,8 +102,11 @@ struct cell_accumulator
         pos_err.push_back(row.adjudication.pos_err);
         ori_err.push_back(row.adjudication.ori_err);
         wall_ns.push_back(static_cast<double>(row.wall_ns));
-        fk_evals.push_back(static_cast<double>(row.counts.fk));
-        jac_evals.push_back(static_cast<double>(row.counts.jac));
+        if (row.kernel_countable)
+        {
+            fk_evals.push_back(static_cast<double>(row.counts.fk));
+            jac_evals.push_back(static_cast<double>(row.counts.jac));
+        }
         accepted += row.adjudication.accepted ? 1 : 0;
         self_reported += row.adjudication.self_reported ? 1 : 0;
         false_success += (row.adjudication.self_reported && !row.adjudication.accepted) ? 1 : 0;
@@ -122,22 +127,34 @@ inline std::string_view cell_header()
     return "table,robot,limits_provenance,stratum,solver,budget_index,budget_value,budget_axis,"
            "n_targets,n_accepted,n_self_reported,n_false_success,n_false_failure,accept_rate,"
            "pos_err_median_m,pos_err_p95_m,pos_err_p99_m,ori_err_median_rad,fk_evals_median,"
-           "jac_evals_median,wall_ns_median,wall_ns_cv,solver_tolerance";
+           "jac_evals_median,wall_ns_median,wall_ns_cv,solver_tolerance,kernel_countable";
+}
+
+/// An order statistic over nothing is written empty rather than as a number, so
+/// a participant whose kernel evaluations the harness cannot count is visibly
+/// uncounted in the shipped tier as well as in the per-target rows.
+inline std::string statistic_field(const std::vector<double>& values, double quantile)
+{
+    if (values.empty())
+    {
+        return std::string{};
+    }
+    return std::format("{:.17g}", detail::order_statistic(values, quantile));
 }
 
 inline std::string cell_row(const cell_accumulator& cell)
 {
     const auto targets = static_cast<int>(cell.pos_err.size());
-    return std::format("{},{},{},{},{},{},{:.17g},{:.17g},{:.17g},{:.17g},{:.17g},{:.17g},"
-                       "{:.17g},{:.17g},{:.17g},{:.17g}",
+    return std::format("{},{},{},{},{},{},{:.17g},{:.17g},{:.17g},{:.17g},{:.17g},{},{},"
+                       "{:.17g},{:.17g},{:.17g},{:d}",
         cell.identity, targets, cell.accepted, cell.self_reported, cell.false_success,
         cell.false_failure,
         targets == 0 ? 0.0 : static_cast<double>(cell.accepted) / static_cast<double>(targets),
         detail::order_statistic(cell.pos_err, 0.5), detail::order_statistic(cell.pos_err, 0.95),
         detail::order_statistic(cell.pos_err, 0.99), detail::order_statistic(cell.ori_err, 0.5),
-        detail::order_statistic(cell.fk_evals, 0.5), detail::order_statistic(cell.jac_evals, 0.5),
+        statistic_field(cell.fk_evals, 0.5), statistic_field(cell.jac_evals, 0.5),
         detail::order_statistic(cell.wall_ns, 0.5), detail::variation(cell.wall_ns),
-        cell.tolerance);
+        cell.tolerance, cell.kernel_countable);
 }
 
 }

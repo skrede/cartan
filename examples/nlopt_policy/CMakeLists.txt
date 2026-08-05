@@ -10,32 +10,15 @@ if (NOT CARTAN_EXAMPLE_NLOPT_POLICY)
     return ()
 endif ()
 
-include(FetchContent)
-
+# Discovered, never downloaded. This is a comparator's optimizer as well as this
+# example's, and a benchmark suite that provisions the libraries it measures
+# against decides which revision of them a published number describes.
 find_package(NLopt CONFIG QUIET)
 if (NOT NLopt_FOUND AND NOT TARGET NLopt::nlopt)
-    FetchContent_Declare(nlopt
-        GIT_REPOSITORY https://github.com/stevengj/nlopt.git
-        GIT_TAG v2.10.1
-        EXCLUDE_FROM_ALL
-        SYSTEM
-    )
-    # NLOPT_SWIG and NLOPT_JAVA default on, and leaving them so makes the
-    # fallback probe for SWIG, Java and JNI at configure time for bindings
-    # nothing here consumes.
-    block()
-        set(NLOPT_PYTHON OFF)
-        set(NLOPT_OCTAVE OFF)
-        set(NLOPT_GUILE OFF)
-        set(NLOPT_JAVA OFF)
-        set(NLOPT_SWIG OFF)
-        set(NLOPT_TESTS OFF)
-        set(BUILD_SHARED_LIBS OFF)
-        FetchContent_MakeAvailable(nlopt)
-    endblock()
-    if (NOT TARGET NLopt::nlopt)
-        add_library(NLopt::nlopt ALIAS nlopt)
-    endif ()
+    message(WARNING
+        "cartan examples: NLopt is not installed -- the NLopt solve-policy example is omitted. "
+        "Install it, or add its prefix to CMAKE_PREFIX_PATH.")
+    return ()
 endif ()
 
 add_library(cartan_example_nlopt_policy INTERFACE)

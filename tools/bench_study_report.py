@@ -36,6 +36,7 @@ CELL_COLUMNS = IDENTITY + (
     "n_targets", "n_accepted", "n_self_reported", "n_false_success", "n_false_failure",
     "accept_rate", "pos_err_median_m", "pos_err_p95_m", "pos_err_p99_m", "ori_err_median_rad",
     "fk_evals_median", "jac_evals_median", "wall_ns_median", "wall_ns_cv", "solver_tolerance",
+    "kernel_countable",
 )
 
 SUMMARY_FIELDS = CELL_COLUMNS[len(IDENTITY):]
@@ -78,6 +79,11 @@ def number(text):
         return float(text)
     except (TypeError, ValueError) as bad:
         raise Refusal(f"{text!r} is not a number") from bad
+
+
+def counted(text):
+    """An empty count is unknown, not zero: the harness did not drive that solver."""
+    return None if text == "" else number(text)
 
 
 def flag(text):
@@ -134,8 +140,10 @@ def summarize_rows(rows, table):
         cell["pos"].append(number(row["pos_err_m"]))
         cell["ori"].append(number(row["ori_err_rad"]))
         cell["wall"].append(number(row["wall_ns"]))
-        cell["fk"].append(number(row["fk_evals"]))
-        cell["jac"].append(number(row["jac_evals"]))
+        for name, key in (("fk_evals", "fk"), ("jac_evals", "jac")):
+            value = counted(row[name])
+            if value is not None:
+                cell[key].append(value)
         accepted, reported = flag(row["accepted"]), flag(row["self_reported"])
         cell["accepted"] += 1 if accepted else 0
         cell["reported"] += 1 if reported else 0
@@ -157,11 +165,12 @@ def finalize(cell):
         "pos_err_p95_m": order_statistic(cell["pos"], 0.95),
         "pos_err_p99_m": order_statistic(cell["pos"], 0.99),
         "ori_err_median_rad": order_statistic(cell["ori"], 0.5),
-        "fk_evals_median": order_statistic(cell["fk"], 0.5),
-        "jac_evals_median": order_statistic(cell["jac"], 0.5),
+        "fk_evals_median": order_statistic(cell["fk"], 0.5) if cell["fk"] else None,
+        "jac_evals_median": order_statistic(cell["jac"], 0.5) if cell["jac"] else None,
         "wall_ns_median": order_statistic(cell["wall"], 0.5),
         "wall_ns_cv": variation(cell["wall"]),
         "solver_tolerance": cell["tolerance"],
+        "kernel_countable": 1.0 if cell["fk"] else 0.0,
     }
 
 
@@ -171,7 +180,7 @@ def summarize_cells(rows, table):
         if row["table"] != table:
             raise Refusal(f"a record names table {row['table']!r} in a report about {table!r}")
         key = tuple(row[name] for name in IDENTITY)
-        summaries[key] = {name: number(row[name]) for name in SUMMARY_FIELDS}
+        summaries[key] = {name: counted(row[name]) for name in SUMMARY_FIELDS}
     return summaries
 
 
@@ -181,6 +190,8 @@ def markdown(text):
 
 
 def figure(value, targets):
+    if value is None:
+        return "not counted"
     if not math.isfinite(value):
         return f"non-finite (n = {targets})"
     return f"{value:.6g} (n = {targets})"
@@ -196,6 +207,12 @@ HEADINGS = (
     "solver", "targets", "accepted", "self-reported", "false success", "false failure",
     "pos err median (m)", "pos err p95 (m)", "pos err p99 (m)", "ori err median (rad)",
     "fk evals median", "jac evals median", "wall median (ns)", "wall cv", "solver tolerance",
+)
+
+KERNEL_CLAUSE = (
+    "A kernel-evaluation count exists only where the harness drives the solver's own iteration. "
+    "Where it does not, the column reads *not counted*: the count is absent, not zero, and it is "
+    "never derived from the wall-clock column beside it."
 )
 
 
@@ -219,7 +236,7 @@ def render(source, table, summaries, tier):
              "worst end, so no column is conditioned on a solver's own success. Success means",
              "the harness's own verdict, recomputed from the returned joint vector; the solver's",
              "own claim is the separate self-reported column. No figure combines this table with",
-             "another.", ""]
+             "another.", "", KERNEL_CLAUSE, ""]
     grouped = {}
     for key, summary in summaries.items():
         grouped.setdefault(tuple(key[i] for i in (1, 2, 3, 5, 6, 7)), []).append((key, summary))

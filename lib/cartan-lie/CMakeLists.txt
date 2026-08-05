@@ -6,8 +6,10 @@ if (NOT TARGET Eigen3::Eigen)
         FetchContent_Declare(
             Eigen3
             GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
-            GIT_TAG 3.4.0
-            GIT_SHALLOW TRUE
+            # 3.4.0, written as the commit that tag names: a tag can be moved,
+            # and a build that resolves a different linear-algebra library under
+            # the same name changes results without changing anything visible.
+            GIT_TAG 3147391d946bb4b6c68edd901f2add6ac1f31f8c
             EXCLUDE_FROM_ALL
             SOURCE_SUBDIR this-directory-does-not-exist
         )

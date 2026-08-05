@@ -67,16 +67,27 @@ FetchContent_Declare(
 
 # Writing a commit above once is not what keeps it a commit; this re-reads the
 # declarations on every configure so an edit that swaps one for a branch is
-# refused where it was made.
-function(cartan_bench_assert_commit_pins)
-    file(STRINGS "${CMAKE_CURRENT_FUNCTION_LIST_FILE}" declarations REGEX "^ +GIT_(REPOSITORY|TAG) ")
+# refused where it was made. The same parse yields the pin list the study writes
+# beside its records, so what is checked and what is published cannot drift.
+function(cartan_bench_record_description_pins OUTPUT)
+    file(STRINGS "${CMAKE_CURRENT_FUNCTION_LIST_FILE}" declarations
+        REGEX "^ +(GIT_REPOSITORY|GIT_TAG|SOURCE_DIR) ")
+    set(pins "")
     set(repository "")
+    set(revision "")
     foreach (declaration IN LISTS declarations)
-        string(REGEX REPLACE "^ +GIT_[A-Z]+ +" "" value "${declaration}")
+        string(REGEX REPLACE "^ +[A-Z_]+ +" "" value "${declaration}")
+        string(REPLACE "\"" "" value "${value}")
         if (declaration MATCHES "GIT_REPOSITORY")
             set(repository "${value}")
             continue()
         endif ()
+        if (declaration MATCHES "SOURCE_DIR")
+            get_filename_component(directory "${value}" NAME)
+            list(APPEND pins "${directory}|${repository}|${revision}")
+            continue()
+        endif ()
+        set(revision "${value}")
         string(LENGTH "${value}" width)
         if (NOT width EQUAL 40 OR NOT value MATCHES "^[0-9a-f]+$")
             message(FATAL_ERROR
@@ -85,9 +96,10 @@ function(cartan_bench_assert_commit_pins)
                 "moves, and the study's joint bounds would then have no fixed referent.")
         endif ()
     endforeach ()
+    set(${OUTPUT} "${pins}" PARENT_SCOPE)
 endfunction()
 
-cartan_bench_assert_commit_pins()
+cartan_bench_record_description_pins(CARTAN_BENCH_DESCRIPTION_PINS)
 
 FetchContent_MakeAvailable(
     abb_descriptions kuka_descriptions franka_descriptions universal_robots_descriptions)

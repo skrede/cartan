@@ -11,9 +11,8 @@
 /// derived from the chain in the member initialization list, and no
 /// constructor, setter or factory accepts bounds.
 
+#include "kdl_chain.h"
 #include "description_chain.h"
-
-#include "../benchmark_utils.h"
 
 #include <cartan/serial/chain/joint_state.h>
 #include <cartan/serial/chain/joint_limits.h>
@@ -144,26 +143,19 @@ inline periodic_rule rule_for_table(std::string_view table)
         std::string{table} + ": only the canonical-throughout table is measured here");
 }
 
-/// The one robot this spine measures, and the only one a comparator chain is
-/// registered for below.
+/// The one joint count this spine measures.
 constexpr int study_joints = 6;
 
-inline KDL::Chain comparator_chain_for(std::string_view robot_key)
-{
-    if (robot_key == "abb_irb120")
-    {
-        return cartan::fixtures::make_abb_irb120_kdl_chain();
-    }
-    throw std::runtime_error(
-        std::string{robot_key} + ": no comparator chain is registered for this robot");
-}
-
+/// Both the comparator's geometry and its bounds come from the chain the
+/// description produced. Nothing here names a second description of the robot.
 template <int N>
 feasible_set<N> load_feasible_set(const description_spec& spec, periodic_rule rule)
 {
+    auto loaded = chain_from_description<N>(spec);
+    auto comparator = build_kdl_chain<N>(loaded);
     return feasible_set<N>(
-        chain_from_description<N>(spec),
-        comparator_chain_for(spec.robot_key),
+        std::move(loaded),
+        std::move(comparator),
         rule,
         limits_provenance::description,
         std::string{spec.relative_path});

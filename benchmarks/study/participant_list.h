@@ -4,13 +4,16 @@
 /// @file participant_list.h
 /// @brief What the run expected to solve with, and what it actually resolved.
 ///
-/// A configuration that produced zero cells and read exactly like a disabled
-/// one has already happened twice in this suite, and neither occurrence warned.
-/// The declared list is written down here so the difference between it and the
-/// resolved list can be named rather than inferred from an empty table.
+/// A configuration that produced zero cells and read exactly like a disabled one
+/// has already happened twice in this suite, and neither occurrence warned.
+/// Under system-provided comparators a partial participant set is the ordinary
+/// path rather than an error path, so the declared list is written down here and
+/// the difference between it and the resolved list is carried into the manifest
+/// by name instead of being inferred from a smaller table.
 
 #include "target_pool.h"
 #include "solve_outcome.h"
+#include "build_manifest.h"
 
 #include <cartan/lie/se3.h>
 
@@ -32,12 +35,26 @@ using solve_call = std::function<solve_outcome<study_joints>(
 struct participant_entry
 {
     std::string name;
+    bool kernel_countable;
     solve_call solve;
 };
 
-inline const std::array<std::string_view, 2>& declared_participants()
+/// `supplier` names the dependency the participant needs, so an absence can
+/// carry the reason the configure already recorded rather than a second
+/// explanation written here.
+struct declared_participant
 {
-    static const std::array<std::string_view, 2> declared{"cartan_lm", "pinocchio_lm"};
+    std::string_view name;
+    std::string_view supplier;
+    bool kernel_countable;
+};
+
+inline const std::array<declared_participant, 3>& declared_participants()
+{
+    static const std::array<declared_participant, 3> declared{
+        declared_participant{"cartan_lm", "", true},
+        declared_participant{"pinocchio_lm", "pinocchio", true},
+        declared_participant{"trac_ik", "trac_ik", false}};
     return declared;
 }
 
@@ -47,29 +64,52 @@ inline void print_participants(const std::vector<participant_entry>& resolved)
         declared_participants().size(), resolved.size());
     for (const auto& entry : resolved)
     {
-        std::printf("  resolved participant: %s\n", entry.name.c_str());
+        std::printf("  resolved participant: %s (kernel evaluations %s)\n", entry.name.c_str(),
+            entry.kernel_countable ? "counted by the harness" : "not countable");
     }
 }
 
-inline void refuse_incomplete_participants(const std::vector<participant_entry>& resolved)
+inline std::vector<absent_participant> absent_participants(
+    const std::vector<participant_entry>& resolved)
 {
-    std::string absent;
-    for (const auto declared : declared_participants())
+    std::vector<absent_participant> absent;
+    const auto reasons = build_absences();
+    for (const auto& declared : declared_participants())
     {
         const bool present = std::any_of(resolved.begin(), resolved.end(),
-            [declared](const participant_entry& entry) { return entry.name == declared; });
-        if (!present)
+            [declared](const participant_entry& entry) { return entry.name == declared.name; });
+        if (present)
         {
-            absent += absent.empty() ? "" : ", ";
-            absent += declared;
+            continue;
         }
+        std::string reason{"absent from this build"};
+        for (const auto& recorded : reasons)
+        {
+            if (recorded.name == declared.supplier)
+            {
+                reason = recorded.reason;
+            }
+        }
+        absent.push_back(absent_participant{std::string{declared.name}, reason});
     }
-    if (!absent.empty())
+    return absent;
+}
+
+inline void report_absent_participants(const std::vector<absent_participant>& absent)
+{
+    for (const auto& entry : absent)
+    {
+        std::printf("  declared but unresolved: %s -- %s\n", entry.name.c_str(),
+            entry.reason.c_str());
+    }
+}
+
+inline void refuse_empty_participants(const std::vector<participant_entry>& resolved)
+{
+    if (resolved.empty())
     {
         throw std::runtime_error(
-            "the participant group resolved to " + std::to_string(resolved.size()) + " of "
-            + std::to_string(declared_participants().size())
-            + " declared solvers; absent from this build: " + absent);
+            "the participant group resolved to no solvers at all, so there is nothing to measure");
     }
 }
 

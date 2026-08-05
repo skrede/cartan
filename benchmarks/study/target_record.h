@@ -36,7 +36,17 @@ struct target_record
     std::int64_t wall_ns;
     kernel_counts counts;
     verdict adjudication;
+    bool kernel_countable;
 };
+
+/// A count the harness did not take is written empty, never zero. Zero would
+/// place the participant at the origin of the kernel-evaluation axis, which is a
+/// stronger and wronger claim than an acknowledged gap -- and no count may ever
+/// be derived from a duration to fill it.
+inline std::string count_field(std::int64_t count, bool countable)
+{
+    return countable ? std::to_string(count) : std::string{};
+}
 
 inline std::string_view target_record_header()
 {
@@ -76,7 +86,9 @@ inline std::string csv_row(const target_record& row)
         csv_field(row.stratum), csv_field(row.solver), row.budget_index, row.budget_value,
         csv_field(row.budget_axis), row.target_id, row.seed_id, seen.self_reported, seen.accepted,
         seen.pose_ok, seen.limits_ok, seen.pos_err, seen.ori_err, seen.worst_limit_violation,
-        row.counts.fk, row.counts.jac, row.iterations, row.solver_tolerance, row.wall_ns);
+        count_field(row.counts.fk, row.kernel_countable),
+        count_field(row.counts.jac, row.kernel_countable),
+        count_field(row.iterations, row.kernel_countable), row.solver_tolerance, row.wall_ns);
 }
 
 }
