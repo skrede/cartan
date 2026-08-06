@@ -46,10 +46,14 @@ cartan_add_test(projected_lm_metric_test projected_lm_metric_test.cpp)
 cartan_add_test(projected_lm_bit_identity_test projected_lm_bit_identity_test.cpp)
 target_compile_definitions(projected_lm_bit_identity_test
     PRIVATE CARTAN_PLM_GOLDEN_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+cartan_add_test(lm_bit_identity_test lm_bit_identity_test.cpp)
+target_compile_definitions(lm_bit_identity_test
+    PRIVATE CARTAN_LM_GOLDEN_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 option(CARTAN_RUN_BITWISE_GOLDEN
-    "Run the projected_lm bitwise golden comparison — an opt-in single-build refactor guard" OFF)
+    "Run the lm and projected_lm bitwise golden comparisons — an opt-in single-build refactor guard, since floating-point results are not bit-portable across toolchains" OFF)
 if (CARTAN_RUN_BITWISE_GOLDEN)
     target_compile_definitions(projected_lm_bit_identity_test PRIVATE CARTAN_RUN_BITWISE_GOLDEN)
+    target_compile_definitions(lm_bit_identity_test PRIVATE CARTAN_RUN_BITWISE_GOLDEN)
 endif ()
 cartan_add_test(projected_lm_alloc_free_test projected_lm_alloc_free_test.cpp)
 # The global operator new/delete counter and Eigen's process-global no-malloc

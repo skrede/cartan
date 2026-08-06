@@ -15,6 +15,20 @@
             }
         },
         {
+            "name": "golden",
+            "displayName": "Bitwise golden gate (development tree with the bit comparison compiled in)",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/golden",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "CARTAN_BUILD_TESTS": "ON",
+                "CARTAN_BUILD_ARGMIN": "ON",
+                "CARTAN_CMAKE_FETCH_DEPS": "ON",
+                "CARTAN_RUN_BITWISE_GOLDEN": "ON"
+            }
+        },
+        {
             "name": "python-dev",
             "displayName": "Python development (bindings + URDF + compile_commands)",
             "generator": "Ninja",
@@ -146,6 +160,10 @@
             "configurePreset": "dev"
         },
         {
+            "name": "golden",
+            "configurePreset": "golden"
+        },
+        {
             "name": "python-dev",
             "configurePreset": "python-dev"
         },
@@ -186,6 +204,13 @@
         {
             "name": "dev",
             "configurePreset": "dev",
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
+            "name": "golden",
+            "configurePreset": "golden",
             "output": {
                 "outputOnFailure": true
             }
