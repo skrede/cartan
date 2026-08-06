@@ -79,6 +79,33 @@ cartan_add_boundary_test(nonfinite_matrix_test nonfinite_matrix_test.cpp)
 # data, so nothing here depends on NDEBUG either.
 cartan_add_boundary_test(axis_classification_test axis_classification_test.cpp)
 
+# A violated caller contract that stops the process needs a binary of its own,
+# with no test framework to take down with it, and the stop has nothing to do
+# with a sanitizer, so the target is declared in every configuration. Following
+# the convention of the probes below, it gets no test entry of its own: the
+# driver script that runs it and reads its result is the test.
+add_executable(lm_chain_identity_probe lm_chain_identity_probe.cpp)
+target_link_libraries(lm_chain_identity_probe PRIVATE cartan::cartan)
+target_compile_options(lm_chain_identity_probe PRIVATE ${CARTAN_WARNING_FLAGS})
+
+# Stepping the chain setup() latched must run to completion, and the assertion
+# above must reject that same run. The first is what makes a stop attributable
+# to the swapped chain rather than to anything else the probe does; the second is
+# what keeps the stop assertion from being satisfiable by anything at all.
+add_test(NAME lm_chain_swap_stops
+    COMMAND "${CMAKE_COMMAND}"
+        "-DPROBE=$<TARGET_FILE:lm_chain_identity_probe>"
+        "-DPROBE_ARGS=mismatched"
+        -DEXPECT=stop
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/expect_stop.cmake")
+
+add_test(NAME lm_matching_chain_is_clean
+    COMMAND "${CMAKE_COMMAND}"
+        "-DPROBE=$<TARGET_FILE:lm_chain_identity_probe>"
+        "-DPROBE_ARGS=matching"
+        -DEXPECT=clean
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/expect_stop.cmake")
+
 # Capability probes rather than a search of CMAKE_CXX_FLAGS: a flag can arrive
 # through CMAKE_CXX_FLAGS_<CONFIG>, a toolchain file, add_compile_options() or a
 # different spelling of the sanitizer list, and a substring test that misses it
