@@ -32,7 +32,7 @@ namespace cartan::bench
 {
 
 constexpr std::array<double, 3> k_accuracy_targets{1e-5, 1e-6, 1e-7};
-constexpr int k_bisection_steps = 8;
+constexpr int k_bisection_steps = 16;
 
 /// What a record row says about the accuracy target it ran under, preformatted:
 /// both fields empty under the budget mode, and on an accuracy-mode row the
