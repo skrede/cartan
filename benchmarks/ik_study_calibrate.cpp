@@ -33,7 +33,7 @@
 namespace
 {
 
-constexpr std::uint64_t pool_seed = 42;
+constexpr std::uint64_t pool_seed = cartan::bench::k_target_pool_seed;
 
 /// The group built only to enumerate resolved participants solves nothing, so
 /// what it is asked for cannot reach a measurement.

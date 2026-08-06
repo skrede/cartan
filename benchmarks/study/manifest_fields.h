@@ -36,6 +36,9 @@ struct capture_parameters
     std::vector<double> accuracy_targets;
     int repetitions;
     int targets_requested;
+    /// Every target in the study is drawn from this, so a record that omits it
+    /// describes rows nobody can redraw.
+    std::uint64_t pool_seed;
     std::string run_command;
 };
 
@@ -143,7 +146,8 @@ inline std::string parameters_object(const capture_parameters& parameters)
          json_string("repetitions") + ": " + std::to_string(parameters.repetitions),
          json_string("budget_ladder") + ": " + numbers(parameters.budget_ladder),
          json_string("accuracy_targets") + ": " + numbers(parameters.accuracy_targets),
-         json_string("targets_requested") + ": " + std::to_string(parameters.targets_requested)},
+         json_string("targets_requested") + ": " + std::to_string(parameters.targets_requested),
+         json_string("target_pool_seed") + ": " + std::to_string(parameters.pool_seed)},
         "  ");
 }
 

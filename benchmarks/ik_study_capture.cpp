@@ -31,7 +31,7 @@
 namespace
 {
 
-constexpr std::uint64_t pool_seed = 42;
+constexpr std::uint64_t pool_seed = cartan::bench::k_target_pool_seed;
 constexpr double budget_tolerance = 1e-5;
 
 std::vector<cartan::bench::budget> rungs_for(const cartan::bench::capture_options& options)

@@ -21,6 +21,11 @@
 namespace cartan::bench
 {
 
+/// Every target the study solves is drawn from this, so it travels into the
+/// manifest: the pools are reproducible from the pinned descriptions and this
+/// number, and a record omitting it describes rows nobody can redraw.
+constexpr std::uint64_t k_target_pool_seed = 42;
+
 template <int N>
 class target_pool
 {

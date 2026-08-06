@@ -28,7 +28,7 @@ namespace
 constexpr int study_joints = 6;
 using feasible_type = cartan::bench::feasible_set<study_joints>;
 
-constexpr std::uint64_t pool_seed = 42;
+constexpr std::uint64_t pool_seed = cartan::bench::k_target_pool_seed;
 constexpr int pool_targets = 200;
 constexpr double budget_tolerance = 1e-5;
 
