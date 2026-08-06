@@ -35,7 +35,11 @@ namespace cartan::bench
 
 constexpr int k_targets_reachable = 2000;
 constexpr int k_targets_secondary = 500;
-constexpr int k_repetitions = 3;
+/// One invocation solves every target in its pool exactly once, so this is what
+/// the manifest states. Repeating a measurement to separate machine noise from
+/// problem-to-problem spread is done by running the sweep again and comparing the
+/// passes, which is a property of the capture rather than of this program.
+constexpr int k_passes_per_invocation = 1;
 constexpr int k_budget_points = 6;
 constexpr int k_comparator_cap_default_ms = 50;
 constexpr int k_comparator_cap_failure_strata_ms = 10;

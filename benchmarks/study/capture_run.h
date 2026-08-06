@@ -110,8 +110,8 @@ inline capture_parameters study_parameters(const capture_options& options)
     {
         rungs.push_back(rung.kernel_evaluations);
     }
-    return capture_parameters{targets, caps, rungs, options.accuracy_targets(), k_repetitions,
-        options.targets, options.command};
+    return capture_parameters{targets, caps, rungs, options.accuracy_targets(),
+        k_passes_per_invocation, options.targets, options.command};
 }
 
 template <int N>
