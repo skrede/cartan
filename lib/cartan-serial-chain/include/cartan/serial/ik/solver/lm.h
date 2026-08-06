@@ -22,7 +22,9 @@
 #include "cartan/serial/ik/detail/limit_enforcement.h"
 
 #include "cartan/lie/se3.h"
+#include "cartan/detail/compat.h"
 #include "cartan/serial/fk/jacobian.h"
+#include "cartan/serial/fk/fk_result.h"
 #include "cartan/serial/chain/joint_state.h"
 #include "cartan/serial/chain/chain_concept.h"
 #include "cartan/serial/fk/forward_kinematics.h"
@@ -31,7 +33,10 @@
 
 #include <cmath>
 #include <vector>
+#include <concepts>
+#include <optional>
 #include <algorithm>
+#include <functional>
 
 namespace cartan
 {
@@ -93,6 +98,7 @@ public:
         }
 
         m_setup_joints = chain.num_joints();
+        m_chain = std::cref(chain);
 
         m_target = target;
         m_q = q0;
@@ -102,12 +108,12 @@ public:
         m_nu = scalar_type(2);
         m_error_history.clear();
 
-        auto fk = forward_kinematics_unchecked(chain, m_q);
-        m_V_b = (fk.end_effector.inverse() * m_target).log();
+        m_fk = forward_kinematics_unchecked(chain, m_q);
+        m_V_b = (m_fk.end_effector.inverse() * m_target).log();
         m_error_norm = m_V_b.norm();
         m_initial_error = m_error_norm;
 
-        auto J_b = body_jacobian_unchecked(chain, fk);
+        auto J_b = body_jacobian_unchecked(chain, m_fk);
         int n = static_cast<int>(J_b.cols());
         auto JtJ = (J_b.transpose() * J_b).eval();
         scalar_type max_diag{0};
@@ -122,16 +128,35 @@ public:
         }
     }
 
+    /// Deleted rvalue overload: setup() latches the address of the chain it
+    /// validated so that step() can re-check it, and the pose held from that
+    /// chain outlives the call, so a temporary bound here would dangle the
+    /// moment setup() returns. A plain `const Chain&` parameter would silently
+    /// bind an rvalue, so the temporary is rejected at the call boundary
+    /// instead.
+    void setup(
+        Chain&&,
+        const se3<scalar_type>&,
+        const position_type&,
+        const convergence_criteria<scalar_type>&) = delete;
+
     step_result<scalar_type> step(const Chain& chain, int N)
     {
         m_status = cartan::detail::chain_bound_status(m_status, m_setup_joints, chain);
 
+        // A chain swapped between setup() and step() is unrecoverable rather
+        // than a bad argument: the damping was scaled from the setup chain's
+        // Jacobian, and the error history and the held pose describe that chain.
+        // No status a caller could act on exists, so the violated contract stops
+        // the process instead of being reported.
+        if (m_status == ik_status::running && (!m_chain || &m_chain->get() != &chain))
+        {
+            cartan::detail::fail_stop();
+        }
+
         int units = 0;
         while (units < N && m_status == ik_status::running)
         {
-            auto fk = forward_kinematics_unchecked(chain, m_q);
-            m_V_b = (fk.end_effector.inverse() * m_target).log();
-
             if (cartan::detail::is_converged_unweighted(m_V_b, m_criteria))
             {
                 m_error_norm = m_V_b.norm();
@@ -157,7 +182,7 @@ public:
                 break;
             }
 
-            auto J_b = body_jacobian_unchecked(chain, fk);
+            auto J_b = body_jacobian_unchecked(chain, m_fk);
             int n = static_cast<int>(J_b.cols());
 
             auto H = (J_b.transpose() * J_b).eval();
@@ -196,6 +221,10 @@ public:
             auto fk_trial = forward_kinematics_unchecked(chain, q_trial);
             auto V_b_trial = (fk_trial.end_effector.inverse() * m_target).log();
             const bool accepted = evaluate_gain_and_update_damping(dq, g, q_trial, V_b_trial);
+            if (accepted)
+            {
+                m_fk = fk_trial;
+            }
 
             m_error_norm = m_V_b.norm();
 
@@ -221,6 +250,15 @@ public:
             }
 
             cartan::detail::enforce_limits<LimitsPolicy>(m_q, chain);
+
+            // A policy other than the default moves the iterate after the step
+            // was evaluated, and both held quantities derive from the iterate.
+            // The refresh folds away with the enforcement itself under no_limits.
+            if constexpr (!std::same_as<LimitsPolicy, no_limits>)
+            {
+                m_fk = forward_kinematics_unchecked(chain, m_q);
+                m_V_b = (m_fk.end_effector.inverse() * m_target).log();
+            }
         }
         return {m_status, {units, m_error_norm}};
     }
@@ -263,9 +301,11 @@ private:
         return false;
     }
 
+    std::optional<std::reference_wrapper<const Chain>> m_chain{};
     se3<scalar_type> m_target{se3<scalar_type>::identity()};
     position_type m_q;
     vector6<scalar_type> m_V_b{vector6<scalar_type>::Zero()};
+    fk_result<scalar_type, joints> m_fk{};
     convergence_criteria<scalar_type> m_criteria{};
     options m_options{};
     cartan::detail::error_ring<scalar_type> m_error_history;

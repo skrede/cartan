@@ -94,10 +94,10 @@ TEST_CASE("the LM loop's kernel charges per budget", "[ik][lm][accounting]")
     const cartan::se3<double> target = cartan::testing::fk_at(chain, q_truth).end_effector;
 
     const std::array<accounting_row, 4> table{{
-        {3, 6, 3, false},
-        {9, 12, 6, true},
-        {27, 12, 6, true},
-        {81, 12, 6, true},
+        {3, 3, 3, false},
+        {9, 6, 6, true},
+        {27, 6, 6, true},
+        {81, 6, 6, true},
     }};
 
     for (const accounting_row& row : table)
@@ -112,7 +112,7 @@ TEST_CASE("the LM loop's kernel charges per budget", "[ik][lm][accounting]")
 
         REQUIRE(counts.fk == row.fk);
         REQUIRE(counts.jac == row.jac);
-        REQUIRE(counts.fk == 2 * counts.jac);
+        REQUIRE(counts.fk == counts.jac);
 
         REQUIRE(through.converged == row.converged);
         REQUIRE(through.iterations == (row.converged ? row.jac - 1 : row.jac));
