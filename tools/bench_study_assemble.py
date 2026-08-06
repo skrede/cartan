@@ -84,6 +84,10 @@ def main():
                         help="a table to assemble; defaults to a, b and c")
     parser.add_argument("--tier", action="append", default=[],
                         help=f"a tier to assemble; defaults to {' and '.join(TIERS)}")
+    parser.add_argument("--passes", type=int, default=0,
+                        help="how many independent sweep passes the capture comprised; defaults "
+                             "to the number of --capture roots, which understates it whenever "
+                             "only one pass's rows are the ones that ship")
     parser.add_argument("--manifest-from", default="",
                         help="the root the environment records are merged from; defaults to the "
                              "first capture, and is given explicitly when assembling the "
@@ -103,7 +107,8 @@ def main():
             print(f"table {table} {tier}: {rows} rows")
 
     records = Path(arguments.manifest_from).resolve() if arguments.manifest_from else captures[0]
-    merged = merge(sorted(records.rglob("environment.json")), len(captures))
+    merged = merge(sorted(records.rglob("environment.json")),
+                   arguments.passes or len(captures))
     (out / "environment.json").write_text(json.dumps(merged, indent=4) + "\n", encoding="utf-8")
     print(f"merged {merged['assembled_from']['invocations']} environment records into one")
     report_sizes(out)
