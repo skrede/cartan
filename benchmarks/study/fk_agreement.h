@@ -50,7 +50,10 @@ inline const std::vector<description_truth>& description_truths()
         {"kuka_kr6_r900", make_kr6_sixx_chain_extended<double>(), 300ULL},
         {"kuka_lbr_med14", make_iiwa14_chain_extended<double>(), 104ULL},
         {"franka_panda", make_panda_chain_extended<double>(), 200ULL},
-        {"universal_robots_ur3e", make_ur3e_chain_extended<double>(), 100ULL}};
+        {"universal_robots_ur3e", make_ur3e_chain_extended<double>(), 100ULL},
+        {"universal_robots_ur5e", make_ur5e_chain_extended<double>(), 105ULL},
+        {"universal_robots_ur10", make_ur10_chain_extended<double>(), 106ULL},
+        {"universal_robots_ur16e", make_ur16_chain_extended<double>(), 107ULL}};
     return truths;
 }
 

@@ -43,9 +43,9 @@ struct description_spec
 /// Both UR arguments are load-bearing: without them the description falls back
 /// to its own ur5x default, a placeholder variant shipping no joint-limits
 /// file, and the load fails on a path that is not there.
-inline const std::array<description_spec, 5>& description_specs()
+inline const std::array<description_spec, 8>& description_specs()
 {
-    static const std::array<description_spec, 5> specs{
+    static const std::array<description_spec, 8> specs{
         description_spec{
             "abb", "abb/abb_irb120_support/urdf/irb120_3_58.xacro", {}, 6, "abb_irb120"},
         description_spec{
@@ -60,7 +60,16 @@ inline const std::array<description_spec, 5>& description_specs()
             {}, 7, "franka_panda"},
         description_spec{
             "ur_description", "ur_description/urdf/ur.urdf.xacro",
-            {{"ur_type", "ur3e"}, {"name", "ur3e"}}, 6, "universal_robots_ur3e"}};
+            {{"ur_type", "ur3e"}, {"name", "ur3e"}}, 6, "universal_robots_ur3e"},
+        description_spec{
+            "ur_description", "ur_description/urdf/ur.urdf.xacro",
+            {{"ur_type", "ur5e"}, {"name", "ur5e"}}, 6, "universal_robots_ur5e"},
+        description_spec{
+            "ur_description", "ur_description/urdf/ur.urdf.xacro",
+            {{"ur_type", "ur10"}, {"name", "ur10"}}, 6, "universal_robots_ur10"},
+        description_spec{
+            "ur_description", "ur_description/urdf/ur.urdf.xacro",
+            {{"ur_type", "ur16e"}, {"name", "ur16e"}}, 6, "universal_robots_ur16e"}};
     return specs;
 }
 

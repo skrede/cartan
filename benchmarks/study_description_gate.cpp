@@ -78,8 +78,12 @@ bool refuses_a_wrong_joint_count()
 
 int main()
 {
-    const auto& specs = cartan::bench::description_specs();
-    const bool agreed = agrees<6>(specs[0]) & agrees<6>(specs[1]) & agrees<7>(specs[2])
-        & agrees<7>(specs[3]) & agrees<6>(specs[4]);
+    bool agreed = true;
+    for (const auto& spec : cartan::bench::description_specs())
+    {
+        const int robot_agreed = cartan::bench::dispatch_on_joints(spec,
+            [&spec](auto joints) { return static_cast<int>(agrees<decltype(joints)::value>(spec)); });
+        agreed = (robot_agreed != 0) && agreed;
+    }
     return agreed & refuses_a_wrong_joint_count() ? 0 : 1;
 }
