@@ -43,9 +43,10 @@ namespace cartan
 
 /// Levenberg-Marquardt IK solve policy with Nielsen lambda update strategy.
 ///
-/// Each step() call: compute FK, body-frame error, Jacobian, Hessian
-/// approximation H = J^T J, gradient g = J^T V_b, solve (H + lambda*I) dq = g,
-/// evaluate gain ratio, accept/reject step, update lambda.
+/// The pose and the body-frame error it induces are held from the last
+/// accepted iterate rather than recomputed per step, so an iteration evaluates
+/// one forward kinematics and one Jacobian. Anything that moves the iterate
+/// owes that pair a refresh.
 ///
 /// Reference: Lynch & Park, Modern Robotics, Ch. 6.2.
 ///            Nielsen, Damping Parameter in Marquardt's Method, 1999.
@@ -104,7 +105,6 @@ public:
         m_q = q0;
         m_criteria = criteria;
         m_iterations = 0;
-        m_status = ik_status::running;
         m_nu = scalar_type(2);
         m_error_history.clear();
 
@@ -126,6 +126,11 @@ public:
         {
             m_lambda = scalar_type(1e-4);
         }
+
+        // Published last: the running status is what admits step() to the pose
+        // and the error held above, so a throw before they exist has to leave
+        // the solver un-runnable rather than runnable over unassigned state.
+        m_status = ik_status::running;
     }
 
     /// Deleted rvalue overload: setup() latches the address of the chain it
