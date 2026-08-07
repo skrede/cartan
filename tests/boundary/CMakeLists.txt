@@ -106,6 +106,14 @@ add_test(NAME lm_matching_chain_is_clean
         -DEXPECT=clean
         -P "${CMAKE_CURRENT_SOURCE_DIR}/expect_stop.cmake")
 
+# The stop is a trap where the compiler has one and abort() otherwise, and an
+# abort can be a modal dialog rather than an exit code -- which would leave the
+# script waiting on the probe for CMake's 1500-second default. Both runs finish
+# in well under a second, so a bound this far above them only ever fires on a
+# termination that never came.
+set_tests_properties(lm_chain_swap_stops lm_matching_chain_is_clean
+    PROPERTIES TIMEOUT 30)
+
 # Capability probes rather than a search of CMAKE_CXX_FLAGS: a flag can arrive
 # through CMAKE_CXX_FLAGS_<CONFIG>, a toolchain file, add_compile_options() or a
 # different spelling of the sanitizer list, and a substring test that misses it
