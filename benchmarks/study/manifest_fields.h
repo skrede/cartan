@@ -10,7 +10,6 @@
 #include "build_manifest.h"
 #include "description_chain.h"
 
-#include <format>
 #include <string>
 #include <vector>
 #include <cstddef>
@@ -104,26 +103,6 @@ inline std::string descriptions_array()
         }
     }
     return json_array(objects, "  ");
-}
-
-inline std::string numbers(const std::vector<int>& values)
-{
-    std::string body{"["};
-    for (std::size_t i = 0; i < values.size(); ++i)
-    {
-        body += (i == 0 ? "" : ", ") + std::to_string(values[i]);
-    }
-    return body + "]";
-}
-
-inline std::string numbers(const std::vector<double>& values)
-{
-    std::string body{"["};
-    for (std::size_t i = 0; i < values.size(); ++i)
-    {
-        body += (i == 0 ? "" : ", ") + std::format("{:.17g}", values[i]);
-    }
-    return body + "]";
 }
 
 inline std::string counts_object(const std::vector<named_count>& counts, const char* indent)

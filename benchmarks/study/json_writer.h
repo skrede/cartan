@@ -79,6 +79,28 @@ inline std::string json_array(const std::vector<std::string>& elements, std::str
     return body;
 }
 
+inline std::string numbers(const std::vector<int>& values)
+{
+    std::string body{"["};
+    for (std::size_t i = 0; i < values.size(); ++i)
+    {
+        body += (i == 0 ? "" : ", ") + std::to_string(values[i]);
+    }
+    return body + "]";
+}
+
+/// Seventeen significant digits round-trip an IEEE 754 double, so a value read
+/// back out of the manifest is the value the run used.
+inline std::string numbers(const std::vector<double>& values)
+{
+    std::string body{"["};
+    for (std::size_t i = 0; i < values.size(); ++i)
+    {
+        body += (i == 0 ? "" : ", ") + std::format("{:.17g}", values[i]);
+    }
+    return body + "]";
+}
+
 }
 
 #endif
