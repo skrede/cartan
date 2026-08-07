@@ -85,6 +85,35 @@ cartan::jacobian_matrix<typename Inner::scalar_type, Inner::joints> body_jacobia
     return cartan::body_jacobian_unchecked(chain.inner(), fk);
 }
 
+/// The exclusion registered below takes the generic checked overload away with
+/// the unchecked one, and the runner's selection metrics reach the checked
+/// spelling. Charging here is what the generic pair did anyway: it delegated to
+/// the counting overload above by the same argument-dependent lookup.
+template <typename Inner>
+cartan::expected<
+    cartan::jacobian_matrix<typename Inner::scalar_type, Inner::joints>, cartan::chain_failure>
+body_jacobian(
+    const counting_chain<Inner>& chain,
+    const cartan::fk_result<typename Inner::scalar_type, Inner::joints>& fk)
+{
+    ++chain.counts().jac;
+    return cartan::body_jacobian(chain.inner(), fk);
+}
+
+}
+
+namespace cartan::detail
+{
+
+/// The counting overload above puts the adaptor in the position jacobian.h
+/// excludes its own two chain types from: a concrete-type body_jacobian
+/// competing with the concept-constrained generic, which MSVC reports as
+/// ambiguous (C2668) rather than ranking by partial ordering. The exclusion is
+/// the library's answer to that, and it applies to any type that reaches the
+/// same position.
+template <typename Inner>
+inline constexpr bool is_jacobian_specialized_v<cartan::testing::counting_chain<Inner>> = true;
+
 }
 
 #endif
