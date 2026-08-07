@@ -250,10 +250,25 @@ void enforce_limits(
         constexpr unsigned int svd_options = (N == dynamic)
             ? (Eigen::ComputeThinU | Eigen::ComputeFullV)
             : (Eigen::ComputeFullU | Eigen::ComputeFullV);
+        // Eigen counts the non-zero singular values inside the decomposition
+        // and rank() reads that count back. Once the constructor and the
+        // policy's rank() call are inlined into one function, GCC loses the
+        // write and reports the count as possibly unwritten; the constructor
+        // that takes a matrix always decomposes, so it is always written. The
+        // pop has to follow the call rather than the declaration because the
+        // read happens inside the callee. Only -O3 raises this, on every GCC
+        // tried rather than one version, and clang is clean on the same source.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
         Eigen::JacobiSVD<jacobian_matrix<Scalar, N>> svd(J_b, svd_options);
 
         LimitsPolicy::template enforce_extended<Chain>(
             q, chain.limits(), J_b, svd);
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
     }
     else
     {
