@@ -1,3 +1,7 @@
+#include "registrations.h"
+
+#include "detail/ik_python_helpers.h"
+
 #include "cartan/lie/se3.h"
 #include "cartan/serial/chain/kinematic_chain.h"
 #include "cartan/serial/ik/solver/exhaustive_ik_runner.h"
@@ -5,9 +9,6 @@
 #include "cartan/serial/ik/solver/lbfgsb.h"
 #include "cartan/serial/ik/policy/limits_policy.h"
 #include "cartan/serial/ik/ik_status.h"
-
-#include "registrations.h"
-#include "detail/ik_python_helpers.h"
 
 #include <nanobind/eigen/dense.h>
 #include <nanobind/stl/vector.h>

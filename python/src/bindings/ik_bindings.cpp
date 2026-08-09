@@ -1,3 +1,8 @@
+#include "registrations.h"
+
+#include "detail/format_double.h"
+#include "detail/ik_python_helpers.h"
+
 #include "cartan/lie/se3.h"
 #include "cartan/serial/ik/solvers.h"
 #include "cartan/serial/ik/ik_result.h"
@@ -12,10 +17,6 @@
 #include "cartan/serial/ik/solver/argmin_lm.h"
 #include "cartan/serial/ik/solver/argmin_lbfgsb.h"
 #endif
-
-#include "registrations.h"
-#include "detail/ik_python_helpers.h"
-#include "detail/format_double.h"
 
 #include <nanobind/eigen/dense.h>
 #include <nanobind/stl/optional.h>

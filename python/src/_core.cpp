@@ -1,8 +1,8 @@
-#include "cartan/version.h"
-
 #include "bindings/registrations.h"
 
 #include "cartan_source_digest.h"
+
+#include "cartan/version.h"
 
 #include <nanobind/nanobind.h>
 #include <nanobind/stl/string.h>

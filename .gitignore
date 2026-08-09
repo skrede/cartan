@@ -22,8 +22,9 @@ moc_*
 *~
 *.exe
 
-*.gdca
+*.gcda
 *.gcno
+*.gcov.json.gz
 qrc_*
 
 *object_script*

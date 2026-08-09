@@ -1,12 +1,13 @@
+#include "registrations.h"
+
+#include "detail/singularity_caster.h"
+
 #include "cartan/lie/se3.h"
 #include "cartan/serial/chain/kinematic_chain.h"
 #include "cartan/serial/fk/jacobian.h"
 #include "cartan/serial/fk/forward_kinematics.h"
 #include "cartan/serial/fk/singularity_analysis.h"
 #include "cartan/serial/fk/singularity_failure.h"
-
-#include "detail/singularity_caster.h"
-#include "registrations.h"
 
 #include <nanobind/eigen/dense.h>
 #include <nanobind/nanobind.h>

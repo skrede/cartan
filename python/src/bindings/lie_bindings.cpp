@@ -1,8 +1,8 @@
+#include "registrations.h"
+
 #include "cartan/lie/so3.h"
 #include "cartan/lie/se3.h"
 #include "cartan/lie/lie_failure.h"
-
-#include "registrations.h"
 
 #include <nanobind/eigen/dense.h>
 #include <nanobind/nanobind.h>

@@ -1,9 +1,9 @@
+#include "registrations.h"
+
 #include "cartan/serial/chain/screw_axis.h"
 #include "cartan/serial/chain/joint_limits.h"
 #include "cartan/serial/chain/kinematic_chain.h"
 #include "cartan/lie/se3.h"
-
-#include "registrations.h"
 
 #include <nanobind/eigen/dense.h>
 #include <nanobind/stl/vector.h>

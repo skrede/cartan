@@ -1,3 +1,8 @@
+#include "registrations.h"
+
+#include "detail/format_double.h"
+#include "detail/analytical_python_helpers.h"
+
 #include "cartan/analytical/solver_2r.h"
 #include "cartan/analytical/solver_3r.h"
 #include "cartan/analytical/solver_6r.h"
@@ -18,11 +23,6 @@
 #include "cartan/serial/ik/ik_validation.h"
 
 #include "cartan/serial/ik/detail/limit_enforcement.h"
-
-#include "registrations.h"
-
-#include "detail/format_double.h"
-#include "detail/analytical_python_helpers.h"
 
 #include <nanobind/eigen/dense.h>
 #include <nanobind/stl/pair.h>

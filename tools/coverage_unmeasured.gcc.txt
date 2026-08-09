@@ -58,28 +58,10 @@ lib/cartan-serial-chain/include/cartan/serial/chain/storage_trait.h             
 lib/cartan-serial-chain/include/cartan/serial/fk.h                                      declaration-only
 lib/cartan-serial-chain/include/cartan/serial/fk/kinematics.h                           declaration-only
 lib/cartan-serial-chain/include/cartan/serial/ik.h                                      declaration-only
-lib/cartan-serial-chain/include/cartan/serial/ik/detail/argmin_bounded_ik_problem.h     backend-not-built CARTAN_BUILD_ARGMIN
-lib/cartan-serial-chain/include/cartan/serial/ik/detail/argmin_constrained_problem.h    backend-not-built CARTAN_BUILD_ARGMIN
-lib/cartan-serial-chain/include/cartan/serial/ik/detail/argmin_convergence.h            backend-not-built CARTAN_BUILD_ARGMIN
-lib/cartan-serial-chain/include/cartan/serial/ik/detail/argmin_least_squares_problem.h  backend-not-built CARTAN_BUILD_ARGMIN
-lib/cartan-serial-chain/include/cartan/serial/ik/detail/argmin_problem.h                backend-not-built CARTAN_BUILD_ARGMIN
-lib/cartan-serial-chain/include/cartan/serial/ik/detail/argmin_unconstrained_problem.h  backend-not-built CARTAN_BUILD_ARGMIN
+lib/cartan-serial-chain/include/cartan/serial/ik/detail/argmin_convergence.h            declaration-only
 lib/cartan-serial-chain/include/cartan/serial/ik/ik.h                                   declaration-only
 lib/cartan-serial-chain/include/cartan/serial/ik/ik_result.h                            declaration-only
 lib/cartan-serial-chain/include/cartan/serial/ik/ik_status.h                            no-instantiating-test
-lib/cartan-serial-chain/include/cartan/serial/ik/solver/argmin_bobyqa.h                 backend-not-built CARTAN_BUILD_ARGMIN
-lib/cartan-serial-chain/include/cartan/serial/ik/solver/argmin_lbfgsb.h                 backend-not-built CARTAN_BUILD_ARGMIN
-lib/cartan-serial-chain/include/cartan/serial/ik/solver/argmin_lm.h                     backend-not-built CARTAN_BUILD_ARGMIN
-lib/cartan-serial-chain/include/cartan/serial/ik/solver/argmin_projected_gn.h           backend-not-built CARTAN_BUILD_ARGMIN
-lib/cartan-serial-chain/include/cartan/serial/ik/solver/argmin_projected_gradient_gn.h  backend-not-built CARTAN_BUILD_ARGMIN
-lib/cartan-serial-chain/include/cartan/serial/ik/solver/argmin_slsqp.h                  backend-not-built CARTAN_BUILD_ARGMIN
-lib/cartan-serial-chain/include/cartan/serial/ik/solver/augmented_lagrangian.h          backend-not-built CARTAN_BUILD_ARGMIN
-lib/cartan-serial-chain/include/cartan/serial/ik/solver/cmaes.h                         backend-not-built CARTAN_BUILD_ARGMIN
-lib/cartan-serial-chain/include/cartan/serial/ik/solver/filter_nw_sqp.h                 backend-not-built CARTAN_BUILD_ARGMIN
-lib/cartan-serial-chain/include/cartan/serial/ik/solver/filter_slsqp.h                  backend-not-built CARTAN_BUILD_ARGMIN
-lib/cartan-serial-chain/include/cartan/serial/ik/solver/gcmma.h                         backend-not-built CARTAN_BUILD_ARGMIN
-lib/cartan-serial-chain/include/cartan/serial/ik/solver/mma.h                           backend-not-built CARTAN_BUILD_ARGMIN
-lib/cartan-serial-chain/include/cartan/serial/ik/solver/nw_sqp.h                        backend-not-built CARTAN_BUILD_ARGMIN
 lib/cartan-serial-chain/include/cartan/serial_chain.h                                   declaration-only
 lib/cartan-urdf/include/cartan/urdf/error.h                                             declaration-only
 lib/cartan-urdf/include/cartan/urdf/schema.h                                            declaration-only

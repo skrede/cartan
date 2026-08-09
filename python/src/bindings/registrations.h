@@ -1,6 +1,9 @@
 #ifndef HPP_GUARD_CARTAN_PYTHON_BINDINGS_REGISTRATIONS_H
 #define HPP_GUARD_CARTAN_PYTHON_BINDINGS_REGISTRATIONS_H
 
+// This header carries Python.h into every binding translation unit, and Python.h
+// sets feature-test macros the standard headers must be configured with, so it
+// has to precede them: https://docs.python.org/3/extending/extending.html
 #include <nanobind/nanobind.h>
 
 namespace cartan::python

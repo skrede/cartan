@@ -54,10 +54,13 @@ jobs:
       - uses: actions/checkout@v4
 
       # Two of the four numbers this job publishes differ only by one gcovr flag's
-      # semantics, so an unpinned gcovr is an unpinned verdict.
-      - name: Install gcovr
+      # semantics, so an unpinned gcovr is an unpinned verdict. The other three
+      # are the Python suite's own requirements and carry the same bounds the
+      # package declares; nothing installs them here, because the suite runs
+      # against the in-source extension this job builds rather than a wheel.
+      - name: Install the coverage and Python test tools
         if: matrix.coverage
-        run: pip install gcovr==8.6
+        run: pip install gcovr==8.6 pytest hypothesis "numpy<2.5"
 
       - name: Configure
         env:
@@ -65,17 +68,35 @@ jobs:
           CXX: ${{ matrix.cxx }}
         run: |
           if [ "${{ matrix.coverage }}" = "true" ]; then
-            # The examples are deliberately left at their default here and built
-            # in the Release entry instead: compiling them would put their
-            # instantiations into this build's gcov records, and the record of
-            # which headers are unmeasured -- which this job checks and which is
-            # written against the tested surface -- would go stale for a reason
-            # that has nothing to do with coverage moving.
+            # Every deterministic compilable surface the library offers is built
+            # here, examples and tutorials included. Leaving them out kept this
+            # job's gcov records aligned with a narrower tested surface, at the
+            # price of a rate measured over a subset of what ships; the record of
+            # which headers are unmeasured is regenerated under the wider
+            # configuration instead, which is a deliberate one-off cost.
+            #
+            # Two surfaces stay out. The fuzz targets are excluded because their
+            # corpus is cumulative and grows with every run, so a figure that
+            # counted them would drift upward without anyone changing a test.
+            # The packaging matrix drives configure and install trees of its own
+            # and compiles nothing in this one.
+            #
+            # Atomic counter updates are a prerequisite, not a tuning knob: the
+            # Python suite exercises the bindings from several threads, and
+            # libgcov's non-atomic increments then leave gcov reporting negative
+            # hit counts (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=68080),
+            # which aborts the whole report rather than degrading one file.
             cmake . -B build -DCMAKE_BUILD_TYPE=Debug \
-              -DCMAKE_CXX_FLAGS="-Werror --coverage" \
-              -DCMAKE_C_FLAGS="--coverage" \
+              -DCMAKE_CXX_FLAGS="-Werror --coverage -fprofile-update=atomic" \
+              -DCMAKE_C_FLAGS="--coverage -fprofile-update=atomic" \
               -DCARTAN_BUILD_TESTS=ON \
               -DCARTAN_BUILD_URDF=ON \
+              -DCARTAN_BUILD_ARGMIN=ON \
+              -DCARTAN_BUILD_EXAMPLES=ON \
+              -DCARTAN_BUILD_PROPERTY_TESTS=ON \
+              -DCARTAN_BUILD_URDF_EXTENDED_TESTS=ON \
+              -DCARTAN_BUILD_DOC_TESTS=ON \
+              -DCARTAN_BUILD_PYTHON=ON \
               -DCARTAN_CMAKE_FETCH_DEPS=ON
           else
             # The exclusion list is empty and that is a statement, not an
@@ -100,6 +121,18 @@ jobs:
       - name: Test
         run: cd build && ctest --output-on-failure --no-tests=error
 
+      # The bindings' translation units are compiled by this job and counted in
+      # its denominator, so leaving their suite unrun would measure them at
+      # whatever the three tutorials happen to touch. The extension is built into
+      # the source tree, which is why the path below reaches it there rather than
+      # through an install.
+      - name: Test the Python bindings
+        if: matrix.coverage
+        env:
+          PYTHONPATH: ${{ github.workspace }}/python/cartan:${{ github.workspace }}/python
+          PYTHONNOUSERSITE: 1
+        run: python3 -m pytest python/tests
+
       # gcov keeps one record per template instantiation. The first invocation sums
       # them, so a header line instantiated five times weighs five; the second
       # collapses them, so a line counts once and is covered if any instantiation
@@ -109,6 +142,12 @@ jobs:
       # their notes files under build/_deps, where the source paths they record
       # resolve against neither working directory gcov tries. Reading them is an
       # error that aborts the run, and nothing they measure is reportable here.
+      #
+      # The fifth filter is a source tree rather than an include tree because the
+      # bindings are the one shipped surface that can grow without any C++ test
+      # noticing, and their instantiations already weigh on the module headers'
+      # denominator. The absent-header accounting below still governs the module
+      # include trees alone.
       - name: Generate coverage
         id: coverage
         if: matrix.coverage
@@ -122,6 +161,7 @@ jobs:
             --filter lib/cartan-serial-chain/include/ \
             --filter lib/cartan-analytical/include/ \
             --filter lib/cartan-urdf/include/ \
+            --filter python/src/ \
             --xml coverage-unmerged.xml \
             --txt coverage-unmerged.txt
           gcovr build \
@@ -133,6 +173,7 @@ jobs:
             --filter lib/cartan-serial-chain/include/ \
             --filter lib/cartan-analytical/include/ \
             --filter lib/cartan-urdf/include/ \
+            --filter python/src/ \
             --xml coverage-merged.xml \
             --txt coverage-merged.txt
           python3 tools/check_coverage_report.py \
