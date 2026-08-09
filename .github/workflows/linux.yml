@@ -187,13 +187,19 @@ jobs:
             --unmeasured ${{ matrix.unmeasured }} \
             --source-root . | tee -a "$GITHUB_STEP_SUMMARY"
 
-      # Cobertura keys on (file, line) and defines no reduction for repeats, and the
-      # unmerged document repeats a line once per instantiation: 25548 entries over
-      # 4382 keys, 942 of which disagree about whether the line ran. Reducing it
-      # last-wins gives 79.96% and max-wins 91.67% where its own header says 73.46%,
-      # so a consumer's badge would contradict the log by up to eighteen points. The
-      # merged document has exactly one entry per key and no such freedom, so that is
-      # what is published; the unmerged figure goes out as text, which nothing reduces.
+      # Cobertura keys on (file, line) and defines no reduction for repeats, and both
+      # of these documents repeat keys: --merge-lines merges the records of a
+      # multi-line statement, not those of a template's instantiations. What separates
+      # them is what the repeats reduce to. Collapsing the merged document last-wins
+      # or max-wins reproduces the rate its own header states, so a badge built from
+      # it agrees with the log; the same two reductions over the unmerged document
+      # land apart from each other and from its header, so a badge built from that one
+      # would contradict the log outright. A min-wins consumer reproduces neither
+      # header and so is not what decides this. That is why the merged document is
+      # uploaded and the unmerged figure goes out as text, which nothing reduces. No
+      # rate is repeated here deliberately — a percentage written into a comment goes
+      # stale in silence, and the claim above is re-derivable by counting entries and
+      # distinct keys in the two files this step writes.
       - name: Upload to Codecov
         if: matrix.coverage && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
