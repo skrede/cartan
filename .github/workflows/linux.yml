@@ -75,11 +75,16 @@ jobs:
             # which headers are unmeasured is regenerated under the wider
             # configuration instead, which is a deliberate one-off cost.
             #
-            # Two surfaces stay out. The fuzz targets are excluded because their
-            # corpus is cumulative and grows with every run, so a figure that
-            # counted them would drift upward without anyone changing a test.
-            # The packaging matrix drives configure and install trees of its own
-            # and compiles nothing in this one.
+            # Three surfaces stay out, and each for a reason rather than by
+            # oversight. The fuzz targets are excluded because their corpus is
+            # cumulative and grows with every run, so a figure that counted them
+            # would drift upward without anyone changing a test. The packaging
+            # matrix drives configure and install trees of its own and compiles
+            # nothing in this one. The profiling targets are measurement
+            # harnesses rather than shipped surface, and measuring them was
+            # priced before they were left out: they add 1.9% to the line
+            # denominator and around a third to a cold build, while reaching no
+            # header this job does not already reach without them.
             #
             # Atomic counter updates are a prerequisite, not a tuning knob: the
             # Python suite exercises the bindings from several threads, and
