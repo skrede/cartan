@@ -9,18 +9,20 @@
 # a row for a header the report names, whatever the row claims. This record cannot
 # accumulate.
 #
-# There is one record per coverage instrument, and this one is Clang's. It is six
-# rows shorter than GCC's because Clang emits records for implicitly-defined
+# There is one record per coverage instrument, and this one is Clang's. It is
+# three rows shorter than GCC's because Clang emits records for implicitly-defined
 # special members and attributes them to the declaring line, so urdf/error.h,
-# urdf/metadata.h, urdf/schema.h, analytical/unwrapped_result.h, ik/ik_status.h and
-# ik/ik_result.h are named by this instrument and not by GCC's. Sharing one record would force the
-# check to stop refuting a whole class of row, which is how a wrong row survives.
+# urdf/schema.h and ik/ik_result.h are named by this instrument and not by GCC's.
+# The difference runs one way only: every header GCC's report names, this one names
+# too. Sharing one record would force the check to stop refuting a whole class of
+# row, which is how a wrong row survives.
 #
-# Two headers therefore carry no-instantiating-test in GCC's record and no row at
-# all here, and that is a limit of comparing whole headers: this instrument names
-# ik_status.h for its struct declarations while its two message() switches stay
-# uncovered. Whether a named header's lines run is what the percentage answers;
-# this record only answers whether the header reaches the denominator.
+# Comparing whole headers has a limit worth stating, because this record's own
+# history shows it: this instrument named ik_status.h all along, for the struct
+# declarations in it, while the two message() switches beside them went unexercised
+# until a test drove every enumerator through them at run time. Whether a named
+# header's lines run is what the percentage answers; this record only answers
+# whether the header reaches the denominator.
 #
 # One row per header: the path, then the reason. A reason is legitimate only when
 # a reader holding nothing but this repository can check it. Three reasons say
@@ -28,25 +30,38 @@
 #
 #   declaration-only        The header declares types, concepts, constants or
 #                           aliases and defines no executable line, so gcov has
-#                           nothing to emit for it. Open the file to check.
+#                           nothing to emit for it. Open the file to check. Every
+#                           row below carries this reason, and one of them is not
+#                           obvious from a glance: argmin_convergence.h is
+#                           instantiated by the solve policies, but its only
+#                           definitions are a constexpr function consumed as an
+#                           array extent and an alias template, and neither can
+#                           emit a line for an instantiation to reach.
 #   backend-not-built <OPT> Nothing the build compiles includes this header unless
 #                           the named option is on, so gcov emits no record for it.
 #                           Check the option's effect in CMake together with the
-#                           includes of the header or of whatever includes it: for
-#                           five of the six adapters under detail/, the option gates
-#                           the includers rather than the header itself, and
-#                           argmin_unconstrained_problem.h is reached from no
-#                           library header at all, only from two gated test files.
+#                           includes of the header or of whatever includes it,
+#                           since an option usually gates the includers rather than
+#                           the header itself. No row carries this reason, because
+#                           the measured configuration below builds the optional
+#                           solver backend. The spelling stays accepted so that a
+#                           header behind an option this configuration does not set
+#                           remains recordable.
 #   no-instantiating-test   The build compiles the header, but nothing in it calls
 #                           or instantiates what the header defines, so gcov emits
 #                           no record. This is a real coverage gap, not an
-#                           exemption.
+#                           exemption. No row carries it: a row appearing here
+#                           again names work to do, not a surface to excuse.
 #
 # This is not a place to excuse a header that ought to be measured. If a header
 # belongs in the denominator, the repair is the build configuration, not a row.
 #
-# Recorded against the measured configuration: tests and the URDF module built,
-# no optional solver backend.
+# Recorded against the measured configuration: the tests, the URDF module, the
+# optional solver backend, the examples and tutorials, the property tests, the
+# extended URDF parity tests, the doc snippets and the Python bindings are all
+# built, and the bindings' own suite runs under instrumentation. The fuzz targets,
+# the packaging matrix and the profiling targets stay out, each for a reason the
+# lane's configure step states rather than leaves to be inferred.
 
 lib/cartan-analytical/include/cartan/analytical.h                                       declaration-only
 lib/cartan-analytical/include/cartan/analytical/analytical_solver.h                     declaration-only
@@ -63,24 +78,6 @@ lib/cartan-serial-chain/include/cartan/serial/chain/storage_trait.h             
 lib/cartan-serial-chain/include/cartan/serial/fk.h                                      declaration-only
 lib/cartan-serial-chain/include/cartan/serial/fk/kinematics.h                           declaration-only
 lib/cartan-serial-chain/include/cartan/serial/ik.h                                      declaration-only
-lib/cartan-serial-chain/include/cartan/serial/ik/detail/argmin_bounded_ik_problem.h     backend-not-built CARTAN_BUILD_ARGMIN
-lib/cartan-serial-chain/include/cartan/serial/ik/detail/argmin_constrained_problem.h    backend-not-built CARTAN_BUILD_ARGMIN
-lib/cartan-serial-chain/include/cartan/serial/ik/detail/argmin_convergence.h            backend-not-built CARTAN_BUILD_ARGMIN
-lib/cartan-serial-chain/include/cartan/serial/ik/detail/argmin_least_squares_problem.h  backend-not-built CARTAN_BUILD_ARGMIN
-lib/cartan-serial-chain/include/cartan/serial/ik/detail/argmin_problem.h                backend-not-built CARTAN_BUILD_ARGMIN
-lib/cartan-serial-chain/include/cartan/serial/ik/detail/argmin_unconstrained_problem.h  backend-not-built CARTAN_BUILD_ARGMIN
+lib/cartan-serial-chain/include/cartan/serial/ik/detail/argmin_convergence.h            declaration-only
 lib/cartan-serial-chain/include/cartan/serial/ik/ik.h                                   declaration-only
-lib/cartan-serial-chain/include/cartan/serial/ik/solver/argmin_bobyqa.h                 backend-not-built CARTAN_BUILD_ARGMIN
-lib/cartan-serial-chain/include/cartan/serial/ik/solver/argmin_lbfgsb.h                 backend-not-built CARTAN_BUILD_ARGMIN
-lib/cartan-serial-chain/include/cartan/serial/ik/solver/argmin_lm.h                     backend-not-built CARTAN_BUILD_ARGMIN
-lib/cartan-serial-chain/include/cartan/serial/ik/solver/argmin_projected_gn.h           backend-not-built CARTAN_BUILD_ARGMIN
-lib/cartan-serial-chain/include/cartan/serial/ik/solver/argmin_projected_gradient_gn.h  backend-not-built CARTAN_BUILD_ARGMIN
-lib/cartan-serial-chain/include/cartan/serial/ik/solver/argmin_slsqp.h                  backend-not-built CARTAN_BUILD_ARGMIN
-lib/cartan-serial-chain/include/cartan/serial/ik/solver/augmented_lagrangian.h          backend-not-built CARTAN_BUILD_ARGMIN
-lib/cartan-serial-chain/include/cartan/serial/ik/solver/cmaes.h                         backend-not-built CARTAN_BUILD_ARGMIN
-lib/cartan-serial-chain/include/cartan/serial/ik/solver/filter_nw_sqp.h                 backend-not-built CARTAN_BUILD_ARGMIN
-lib/cartan-serial-chain/include/cartan/serial/ik/solver/filter_slsqp.h                  backend-not-built CARTAN_BUILD_ARGMIN
-lib/cartan-serial-chain/include/cartan/serial/ik/solver/gcmma.h                         backend-not-built CARTAN_BUILD_ARGMIN
-lib/cartan-serial-chain/include/cartan/serial/ik/solver/mma.h                           backend-not-built CARTAN_BUILD_ARGMIN
-lib/cartan-serial-chain/include/cartan/serial/ik/solver/nw_sqp.h                        backend-not-built CARTAN_BUILD_ARGMIN
 lib/cartan-serial-chain/include/cartan/serial_chain.h                                   declaration-only
