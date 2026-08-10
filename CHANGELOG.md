@@ -30,13 +30,6 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   is legitimate and unchanged; the result now says which one produced the answer
   instead of leaving the split silent. A fully bounded chain reports `declared`
   for every policy.
-- `ik_status::unreachable`, latched at `setup()` for a chain with no joints whose
-  target is away from the single pose it can hold. `ik_failure::unreachable` was
-  declared and carried a message but was emitted nowhere on the iterative path,
-  which was correct: an iterative solver cannot certify infeasibility from a
-  failed search. A chain with no joints is the one case where it can, because its
-  workspace is one point. Such a target previously reported `diverged`, which
-  claims a search went wrong rather than that no solution exists.
 - `cartan::lie_failure::non_finite_input`, reported by `so2`/`so3`/`se2`/`se3`
   `from_matrix`, `so3::from_quaternion`, the frame-tagged `rotation`/`transform`
   wrappers and `screw_axis::from_vector` when an input component is NaN or
@@ -52,8 +45,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   half is the defect: a joint vector whose length disagreed with the chain was
   read past the end of, which is an assertion failure in a checked build and a
   plausible spectrum computed from adjacent memory in one built with `NDEBUG`.
-  Every way of having no answer now carries a name -- `empty_spectrum` for a
-  chain with no joints, `zero_spectrum` for the entirely zero Jacobian whose
+  Every way of having no answer now carries a name -- `empty_spectrum` for an
+  empty spectrum, `zero_spectrum` for the entirely zero Jacobian whose
   isotropy ratio has nothing to divide by, and `invalid_configuration` for a
   configuration that produced no Jacobian. The first two were previously the
   same empty optional and a caller could not tell them apart. `condition_number`
@@ -63,7 +56,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   the exception `forward_kinematics` and both Jacobians already raise for the
   same underlying failure, while `empty_spectrum` and `zero_spectrum` return
   `None` -- nothing was wrong with the call, and forcing a `try`/`except` around
-  a jointless chain or a zero Jacobian would say otherwise. The annotations are
+  an empty or entirely zero Jacobian would say otherwise. The annotations are
   `float | None` and `bool | None`, and the idiom is
   `if (k := condition_number(sigma)) is not None:`. In C++ the truth-test trap
   survives the change -- an errored `expected` is falsy exactly as an empty
@@ -181,14 +174,6 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   measurement fixture the three objectives previously returned the same
   candidate; they now return the candidate each objective actually ranks
   highest.
-- **Breaking.** Both Jacobian measures are undefined, rather than one or zero,
-  where the decomposition has no singular values. A chain with no joints
-  previously drove a product over an empty set, which evaluates to one and would
-  have reported such a chain as maximally manipulable; in practice it faulted
-  inside the decomposition's own construction before reaching that value.
-  `setup()` now refuses the combination. `ik_status` and `ik_failure` each gain
-  `unsupported_configuration`, so a switch over either that was previously
-  exhaustive needs one more arm.
 - `solver_options` gains `characteristic_length`, in the chain's linear unit,
   which divides the body Jacobian's linear rows before the decomposition so the
   singular values are commensurable with the angular rows. It applies to the

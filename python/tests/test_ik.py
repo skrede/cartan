@@ -407,9 +407,9 @@ def test_singularity_analysis_reads_one_spectrum(
 def test_singularity_analysis_is_undefined_rather_than_wrong_without_a_spectrum() -> None:
     empty = np.zeros(0, dtype=np.float64)
 
-    # A chain with no joints is a valid chain and an entirely zero Jacobian is a
-    # valid Jacobian; the caller did nothing wrong, so the measure is absent
-    # rather than an error to be caught.
+    # An empty spectrum and an entirely zero Jacobian are both well-formed;
+    # the caller did nothing wrong, so the measure is absent rather than an
+    # error to be caught.
     for measure in (
         cartan.condition_number,
         cartan.manipulability,
@@ -419,10 +419,6 @@ def test_singularity_analysis_is_undefined_rather_than_wrong_without_a_spectrum(
         assert measure(empty) is None
 
     assert cartan.isotropy(np.zeros(3, dtype=np.float64)) is None
-
-    jointless = cartan.KinematicChain(cartan.SE3.identity(), [], [])
-    assert cartan.singular_values(jointless, empty) is None
-    assert cartan.is_near_singular(jointless, empty) is None
 
 
 def test_singularity_analysis_refuses_a_configuration_the_chain_cannot_accept(

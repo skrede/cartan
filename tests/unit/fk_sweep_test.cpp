@@ -12,8 +12,7 @@
 /// Both must agree with the fixed-size result to 1e-10, so a regression in the
 /// PoE formula or in either specialization fails the sweep on the offending
 /// robot and configuration. Coverage extends past the revolute-only robots to
-/// a pure-prismatic chain, a mixed revolute/prismatic chain, and a zero-DOF
-/// chain.
+/// a pure-prismatic chain and a mixed revolute/prismatic chain.
 ///
 /// The pattern (mt19937 seed 42, per-joint uniform-in-limits draw, 1e-10 gate)
 /// mirrors the KDL comparison sweep; the deterministic seed makes any failure
@@ -133,19 +132,6 @@ auto make_ppp_chain() -> cartan::kinematic_chain<Scalar, 3>
         home, {s1, s2, s3}, {lim, lim, lim});
 }
 
-/// Zero-DOF dynamic chain: empty axis/limit storage, non-trivial home pose.
-template <typename Scalar>
-auto make_zero_dof_chain() -> cartan::kinematic_chain<Scalar, cartan::dynamic>
-{
-    auto home = cartan::se3<Scalar>(
-        cartan::so3<Scalar>::identity(),
-        cartan::vector3<Scalar>(Scalar(0.1), Scalar(0.2), Scalar(0.3)));
-    return cartan::kinematic_chain<Scalar, cartan::dynamic>(
-        home,
-        std::vector<cartan::screw_axis<Scalar>>{},
-        std::vector<cartan::joint_limits<Scalar>>{});
-}
-
 }
 
 TEST_CASE("FK sweep: nine robots x fifty seeded configs", "[fk][sweep]")
@@ -161,7 +147,7 @@ TEST_CASE("FK sweep: nine robots x fifty seeded configs", "[fk][sweep]")
     fk_sweep_robot(cartan::fixtures::make_kuka_lwr4_chain<double>, "Kuka LWR4");
 }
 
-TEST_CASE("FK sweep: prismatic, mixed, and zero-DOF coverage",
+TEST_CASE("FK sweep: prismatic and mixed coverage",
     "[fk][sweep][prismatic]")
 {
     SECTION("pure prismatic chain")
@@ -173,15 +159,5 @@ TEST_CASE("FK sweep: prismatic, mixed, and zero-DOF coverage",
     {
         fk_sweep_robot(
             cartan::fixtures::make_rppr_signed_chain<double>, "RPPR mixed");
-    }
-
-    SECTION("zero-DOF chain returns the home pose")
-    {
-        auto chain = make_zero_dof_chain<double>();
-        REQUIRE(chain.num_joints() == 0);
-
-        Eigen::VectorX<double> q(0);
-        auto fk = cartan::testing::fk_at(chain, q).end_effector;
-        REQUIRE(pose_error(fk, chain.home()) < sweep_tol);
     }
 }

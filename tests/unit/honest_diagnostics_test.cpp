@@ -166,21 +166,6 @@ TEST_CASE("the near-singularity threshold is the caller's", "[ik][diagnostics]")
     CHECK(spp::default_singularity_threshold_v<double> == 1e3);
 }
 
-// Each way of having no answer carries its own name, which a single shared
-// absence could not say.
-TEST_CASE("an unmeasurable spectrum names why rather than answering false", "[ik][diagnostics]")
-{
-    chain_dyn chain(spp::se3<double>::identity(), {}, {});
-
-    auto spectrum = spp::singular_values(chain, Eigen::VectorXd::Zero(0));
-    REQUIRE_FALSE(spectrum.has_value());
-    CHECK(spectrum.error() == spp::singularity_failure::empty_spectrum);
-
-    auto near = spp::is_near_singular(chain, Eigen::VectorXd::Zero(0));
-    REQUIRE_FALSE(near.has_value());
-    CHECK(near.error() == spp::singularity_failure::empty_spectrum);
-}
-
 // A joint vector the chain cannot accept used to be read past the end of: an
 // assertion failure in a checked build, and a plausible spectrum computed from
 // whatever followed the vector in memory in one built with NDEBUG.

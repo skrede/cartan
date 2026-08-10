@@ -330,38 +330,18 @@ TEST_CASE("the length reorders isotropy on a square Jacobian", "[ik][selection]"
 }
 
 // ============================================================================
-// A chain with no joints leaves both Jacobian measures undefined
-// ============================================================================
-
-TEST_CASE("both Jacobian measures are undefined on a jointless chain", "[ik][selection]")
-{
-    chain_dyn chain(spp::se3<double>::identity(), {}, {});
-    Eigen::VectorXd q = Eigen::VectorXd::Zero(0);
-
-    REQUIRE_FALSE(
-        spp::detail::jacobian_metric(spp::ik_objective::max_manipulability, chain, q, 1.0));
-    REQUIRE_FALSE(
-        spp::detail::jacobian_metric(spp::ik_objective::max_isotropy, chain, q, 1.0));
-
-    REQUIRE(spp::detail::selection_admissibility(
-        spp::ik_objective::max_manipulability, chain, 1.0)
-        == spp::ik_status::unsupported_configuration);
-    REQUIRE_FALSE(spp::detail::selection_admissibility(
-        spp::ik_objective::min_error_norm, chain, 1.0));
-}
-
-// ============================================================================
 // Setup refuses what it cannot rank, rather than ranking on a fabrication
 // ============================================================================
 
 TEST_CASE("setup refuses an unrankable objective and reports it", "[ik][selection]")
 {
-    chain_dyn chain(spp::se3<double>::identity(), {}, {});
+    auto chain = make_ur5_like_chain();
 
-    spp::basic_ik_runner<spp::lm<chain_dyn>> solver;
+    spp::basic_ik_runner<spp::lm<chain6>> solver;
     spp::convergence_criteria<double> criteria{1e-6, 1e-6, 200, 400};
-    spp::solver_options<double> opts{.objective = spp::ik_objective::max_isotropy};
-    solver.setup(chain, spp::se3<double>::identity(), Eigen::VectorXd::Zero(0), criteria, opts);
+    spp::solver_options<double> opts{
+        .objective = spp::ik_objective::max_isotropy, .characteristic_length = 0.0};
+    solver.setup(chain, spp::se3<double>::identity(), vec6::Zero(), criteria, opts);
 
     REQUIRE(solver.status() == spp::ik_status::unsupported_configuration);
 

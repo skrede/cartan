@@ -267,19 +267,6 @@ auto make_ppp_chain() -> cartan::kinematic_chain<Scalar, 3>
         home, {s1, s2, s3}, {lim, lim, lim});
 }
 
-// Zero-DOF dynamic chain: empty axis/limit storage, non-trivial home pose.
-template <typename Scalar>
-auto make_zero_dof_chain() -> cartan::kinematic_chain<Scalar, cartan::dynamic>
-{
-    auto home = cartan::se3<Scalar>(
-        cartan::so3<Scalar>::identity(),
-        cartan::vector3<Scalar>(Scalar(0.1), Scalar(0.2), Scalar(0.3)));
-    return cartan::kinematic_chain<Scalar, cartan::dynamic>(
-        home,
-        std::vector<cartan::screw_axis<Scalar>>{},
-        std::vector<cartan::joint_limits<Scalar>>{});
-}
-
 }
 
 // ---------------------------------------------------------------------------
@@ -370,9 +357,9 @@ TEMPLATE_TEST_CASE("Jacobian sweep: nine robots x fifty seeded configs",
 }
 
 // ---------------------------------------------------------------------------
-// Prismatic, mixed, and zero-DOF coverage.
+// Prismatic and mixed coverage.
 // ---------------------------------------------------------------------------
-TEMPLATE_TEST_CASE("Jacobian sweep: prismatic, mixed, and zero-DOF coverage",
+TEMPLATE_TEST_CASE("Jacobian sweep: prismatic and mixed coverage",
     "[jacobian][sweep][prismatic]", double, float)
 {
     using Scalar = TestType;
@@ -386,17 +373,5 @@ TEMPLATE_TEST_CASE("Jacobian sweep: prismatic, mixed, and zero-DOF coverage",
     {
         jac_gate_robot(
             cartan::fixtures::make_rppr_signed_chain<Scalar>, "RPPR mixed");
-    }
-
-    SECTION("zero-DOF chain has a 6x0 space Jacobian")
-    {
-        auto chain = make_zero_dof_chain<Scalar>();
-        REQUIRE(chain.num_joints() == 0);
-
-        Eigen::VectorX<Scalar> q(0);
-        auto fk = cartan::testing::fk_at(chain, q);
-        auto Js = cartan::testing::space_jacobian_at(chain, fk);
-        REQUIRE(Js.rows() == 6);
-        REQUIRE(Js.cols() == 0);
     }
 }

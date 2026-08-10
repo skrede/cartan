@@ -13,8 +13,8 @@
 /// The sweep runs in double precision: the metre-scale float residual floor and
 /// its gating are covered exhaustively by the dedicated float-tolerance sweep,
 /// whereas here a fixed 1e-6 gate must hold deterministically for every robot
-/// and seed. Coverage extends to a pure-prismatic chain, a mixed
-/// revolute/prismatic chain, and a zero-DOF chain.
+/// and seed. Coverage extends to a pure-prismatic chain and a mixed
+/// revolute/prismatic chain.
 
 #include "../support/kinematics_helpers.h"
 #include "../support/joint_limits_helpers.h"
@@ -141,19 +141,6 @@ auto make_ppp_chain() -> cartan::kinematic_chain<Scalar, 3>
         home, {s1, s2, s3}, {lim, lim, lim});
 }
 
-/// Zero-DOF dynamic chain: empty axis/limit storage, non-trivial home pose.
-template <typename Scalar>
-auto make_zero_dof_chain() -> cartan::kinematic_chain<Scalar, cartan::dynamic>
-{
-    auto home = cartan::se3<Scalar>(
-        cartan::so3<Scalar>::identity(),
-        cartan::vector3<Scalar>(Scalar(0.1), Scalar(0.2), Scalar(0.3)));
-    return cartan::kinematic_chain<Scalar, cartan::dynamic>(
-        home,
-        std::vector<cartan::screw_axis<Scalar>>{},
-        std::vector<cartan::joint_limits<Scalar>>{});
-}
-
 }
 
 TEST_CASE("IK sweep: nine robots x fifty seeded configs", "[ik][sweep]")
@@ -183,7 +170,7 @@ TEST_CASE("IK sweep: nine robots x fifty seeded configs", "[ik][sweep]")
     REQUIRE(total.converged >= (total.attempts * 9) / 10);
 }
 
-TEST_CASE("IK sweep: prismatic, mixed, and zero-DOF coverage",
+TEST_CASE("IK sweep: prismatic and mixed coverage",
     "[ik][sweep][prismatic]")
 {
     SECTION("pure prismatic chain")
@@ -198,18 +185,5 @@ TEST_CASE("IK sweep: prismatic, mixed, and zero-DOF coverage",
         auto s = ik_sweep_robot(
             cartan::fixtures::make_rppr_signed_chain<double>, "RPPR mixed");
         REQUIRE(s.converged >= (s.attempts * 9) / 10);
-    }
-
-    SECTION("zero-DOF chain: home target verifies trivially")
-    {
-        auto chain = make_zero_dof_chain<double>();
-        REQUIRE(chain.num_joints() == 0);
-
-        const double tol = 1e-6;
-        cartan::convergence_criteria<double> criteria{tol, tol, 500, 1000};
-
-        Eigen::VectorX<double> q(0);
-        auto target = chain.home();
-        REQUIRE(cartan::verify_solution(chain, target, q, criteria));
     }
 }

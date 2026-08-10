@@ -370,10 +370,7 @@ status.
 
 `setup()` returns `void`, so it reports a rejected seed or target by latching
 `dimension_mismatch` or `non_finite_input`, and `basic_ik_runner` reports a
-selection it cannot rank by latching `unsupported_configuration`. It latches
-`unreachable` for a chain with no joints whose target is away from the single
-pose that chain can hold -- the one place on the iterative path where
-infeasibility is certified rather than guessed at from a failed search. Every solve policy validates its
+selection it cannot rank by latching `unsupported_configuration`. Every solve policy validates its
 arguments this way, as do `basic_ik_runner`, `restart_wrapper` and
 `exhaustive_ik_runner`; the policies that require the optional numeric backend
 are no exception, so a solve driven straight through one of them, rather than
@@ -440,11 +437,9 @@ displacement from the seed configuration, max manipulability
 Each objective has one definition, read by both the single-policy and the
 racing selection paths. The two Jacobian measures divide the body Jacobian's
 linear rows by `solver_options::characteristic_length` before the
-decomposition, so the singular values are commensurable; both are undefined on
-a chain with no joints, and `setup()` refuses that combination rather than
-ranking on a fabricated value. `min_joint_distance` measures a Euclidean
-displacement, so it is refused on a chain mixing revolute and prismatic joints,
-where the components carry different units.
+decomposition, so the singular values are commensurable. `min_joint_distance`
+measures a Euclidean displacement, so it is refused on a chain mixing revolute
+and prismatic joints, where the components carry different units.
 
 The winning candidate's metric is reported on `ik_result::selection_metric`
 together with the objective it was computed under. Under `speed` nothing is
@@ -620,7 +615,6 @@ objectives read the same definitions.
 ```cpp
 enum class singularity_failure
 {
-    empty_spectrum,
     zero_spectrum,
     invalid_configuration,
     invalid_length
@@ -677,11 +671,8 @@ surface refuses anything else with `invalid_length`, and `solver_options`'
 `characteristic_length` is admitted at `setup()` through the same test, so no
 length one accepts is a length the other rejects.
 
-Every way of having no answer carries a name. `empty_spectrum` is the chain with
-no joints: the empty product is one, which would report such a chain as
-maximally manipulable, so no measure answers on it. `zero_spectrum` is the
-entirely zero Jacobian, where the isotropy ratio has nothing to divide by --
-distinct from having no spectrum at all, which is why it is a separate name.
+Every way of having no answer carries a name. `zero_spectrum` is the entirely
+zero Jacobian, where the isotropy ratio has nothing to divide by.
 `invalid_configuration` is a `q` whose length disagrees with the chain or which
 carries a non-finite component; the `(chain, q)` overloads run through the
 checked forward kinematics and Jacobian, so such a `q` is reported rather than
@@ -721,9 +712,9 @@ the classification `is_invalid_argument` carries. `invalid_configuration` and
 `invalid_length` raise `ValueError`, the same exception `forward_kinematics` and
 both Jacobians raise for the same underlying `chain_failure`: a mis-sized or
 non-finite `q`, and a length that cannot divide, are bad arguments.
-`empty_spectrum` and `zero_spectrum` return `None`, because nothing was wrong
-with the call -- a chain with no joints is a valid chain and an entirely zero
-Jacobian is a valid Jacobian, and the measure is simply undefined on them. The annotations are
+`zero_spectrum` returns `None`, because nothing was wrong with the call -- an
+entirely zero Jacobian is a valid Jacobian, and the measure is simply
+undefined on it. The annotations are
 `float | None` and `bool | None`, and the idiom is:
 
 ```python

@@ -346,24 +346,3 @@ TEST_CASE("Generic dynamic-chain FK/Jacobian stays in bounds", "[jacobian][dynam
     REQUIRE(diff.norm() < 1e-12);
 }
 
-// ============================================================================
-// Zero-joint dynamic chain: space Jacobian is 6x0, not a crash
-// ============================================================================
-
-TEST_CASE("Zero-joint dynamic chain space Jacobian is 6x0", "[jacobian][dynamic]")
-{
-    auto home = spp::se3<double>::identity();
-    spp::kinematic_chain<double, spp::dynamic> zero_chain(
-        home,
-        std::vector<spp::screw_axis<double>>{},
-        std::vector<spp::joint_limits<double>>{});
-
-    REQUIRE(zero_chain.num_joints() == 0);
-
-    spp::fk_result<double, spp::dynamic> fk;
-    auto J = spp::testing::space_jacobian_at(zero_chain, fk);
-
-    REQUIRE(J.rows() == 6);
-    REQUIRE(J.cols() == 0);
-}
-

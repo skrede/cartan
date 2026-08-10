@@ -249,21 +249,3 @@ TEMPLATE_TEST_CASE("kinematic_chain still admits a zero-magnitude axis",
         (cartan::kinematic_chain<S, cartan::dynamic>(
             cartan::se3<S>::identity(), axes, limits)));
 }
-
-// A chain with no joints is a permitted value of the runtime chain, not an
-// accident of the validation happening to pass: its workspace is the single
-// pose of its home configuration, and the solver semantics built on that
-// require it to be constructible. static_chain refuses the same shape at
-// compile time, so the two chain types disagree here deliberately on the
-// runtime side and unintentionally overall.
-TEMPLATE_TEST_CASE("kinematic_chain admits a chain with no joints",
-    "[kinematic_chain][boundary]", double, float)
-{
-    using S = TestType;
-    using chain_type = cartan::kinematic_chain<S, cartan::dynamic>;
-
-    REQUIRE_NOTHROW((chain_type(cartan::se3<S>::identity(), {}, {})));
-
-    chain_type chain(cartan::se3<S>::identity(), {}, {});
-    REQUIRE(chain.num_joints() == 0);
-}

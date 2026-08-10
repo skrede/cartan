@@ -80,9 +80,9 @@ void register_fk(nb::module_& m)
           },
           "Singular values of the body Jacobian at q, largest first, with the "
           "linear rows divided by length so they are commensurable with the "
-          "angular ones. None for a chain with no joints. Raises ValueError for "
-          "a q whose length disagrees with the chain or carries a non-finite "
-          "component, and for a length that is not positive and finite.",
+          "angular ones. Raises ValueError for a q whose length disagrees with "
+          "the chain or carries a non-finite component, and for a length that "
+          "is not positive and finite.",
           nb::arg("chain"), nb::arg("q").noconvert(), nb::arg("length") = 1.0);
 
     m.def("condition_number",
