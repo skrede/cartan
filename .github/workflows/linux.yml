@@ -86,6 +86,13 @@ jobs:
             # denominator and around a third to a cold build, while reaching no
             # header this job does not already reach without them.
             #
+            # The instantiation targets are in, and this is the only job that
+            # builds them: they force every advertised combination of a solver
+            # family into the build, so a combination nothing names shows up here
+            # as uncovered rather than as absent. They carry their own option
+            # because that forcing is what makes them the most expensive targets
+            # in the tree, and no other lane needs to pay for it.
+            #
             # Atomic counter updates are a prerequisite, not a tuning knob: the
             # Python suite exercises the bindings from several threads, and
             # libgcov's non-atomic increments then leave gcov reporting negative
@@ -99,6 +106,7 @@ jobs:
               -DCARTAN_BUILD_ARGMIN=ON \
               -DCARTAN_BUILD_EXAMPLES=ON \
               -DCARTAN_BUILD_PROPERTY_TESTS=ON \
+              -DCARTAN_BUILD_INSTANTIATION_TESTS=ON \
               -DCARTAN_BUILD_URDF_EXTENDED_TESTS=ON \
               -DCARTAN_BUILD_DOC_TESTS=ON \
               -DCARTAN_BUILD_PYTHON=ON \

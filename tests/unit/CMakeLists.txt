@@ -128,6 +128,10 @@ if(CARTAN_BUILD_ARGMIN)
     endforeach ()
 endif()
 
+if(CARTAN_BUILD_INSTANTIATION_TESTS)
+    cartan_add_test(static_chain_instantiation_test static_chain_instantiation_test.cpp)
+endif()
+
 cartan_add_test(fk_sweep_test fk_sweep_test.cpp)
 cartan_add_test(jacobian_sweep_test jacobian_sweep_test.cpp)
 cartan_add_test(ik_sweep_test ik_sweep_test.cpp)

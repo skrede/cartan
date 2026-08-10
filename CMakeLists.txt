@@ -57,6 +57,11 @@ option(CARTAN_BUILD_DOC_TESTS "Compile documentation C++ snippets against the he
 # and compiles nothing in this one, so it needs no unit-test framework. Keeping it
 # off CARTAN_BUILD_TESTS lets a packaging lane run it without acquiring one.
 option(CARTAN_BUILD_PACKAGING_TESTS "Register the install-relocate-consume matrix" OFF)
+# Each of these translation units instantiates every advertised form of one
+# solver family across both scalar types and every joint count, which makes them
+# the most expensive targets in the tree; their own option lets a lane that wants
+# that coverage pay for it while every other build does not.
+option(CARTAN_BUILD_INSTANTIATION_TESTS "Register the advertised-combination instantiation targets" OFF)
 option(CARTAN_CMAKE_FETCH_DEPS "Use CMake FetchContent to download and install dependencies" OFF)
 
 set(CARTAN_ARGMIN_SOURCE_DIR "" CACHE PATH "Path to local argmin source checkout")
