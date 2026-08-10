@@ -175,20 +175,6 @@ public:
 
             auto J_b = body_jacobian_unchecked(chain, fk);
 
-            // A chain with no joints holds one pose, and the convergence test
-            // above has just refused the target, so it is certifiably out of
-            // reach rather than merely not found -- the same reading the runner
-            // takes before it constructs a policy at all. Decomposing the empty
-            // Jacobian instead would be the fault: Eigen resizes a fixed-size
-            // vector to zero, tripping an assertion in a checked build and
-            // faulting in one without.
-            if (J_b.cols() == 0)
-            {
-                m_error_norm = V_b.norm();
-                m_status = ik_status::unreachable;
-                break;
-            }
-
             constexpr unsigned int svd_options = (joints == dynamic)
                 ? (Eigen::ComputeThinU | Eigen::ComputeThinV)
                 : (Eigen::ComputeFullU | Eigen::ComputeFullV);

@@ -36,6 +36,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   infinite. Each factory now tests finiteness on its raw input before any other
   check, so a nonfinite value is refused rather than admitted by a tolerance
   comparison that is false for a NaN.
+- `ik_status::unsupported_configuration` and `ik_failure::unsupported_configuration`.
+  **Breaking** for a switch that was previously exhaustive over either enum: it
+  now needs one more arm. `basic_ik_runner` latches it at `setup()` for an
+  invalid characteristic length, and again for a `min_joint_distance` selection
+  over a chain that mixes revolute and prismatic joints.
 
 ### Changed
 - **Breaking.** The singularity-analysis surface returns

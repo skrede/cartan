@@ -23,13 +23,12 @@ TEST_CASE("IK types compile", "[ik][compile]")
     auto o5 = spp::ik_objective::max_isotropy;
     (void)o1; (void)o2; (void)o3; (void)o4; (void)o5;
 
-    auto f1 = spp::ik_failure::unreachable;
-    auto f2 = spp::ik_failure::diverged;
-    auto f3 = spp::ik_failure::stalled;
-    auto f4 = spp::ik_failure::iteration_limit;
-    auto f5 = spp::ik_failure::joint_limit_violation;
-    auto f6 = spp::ik_failure::aborted;
-    (void)f1; (void)f2; (void)f3; (void)f4; (void)f5; (void)f6;
+    auto f1 = spp::ik_failure::diverged;
+    auto f2 = spp::ik_failure::stalled;
+    auto f3 = spp::ik_failure::iteration_limit;
+    auto f4 = spp::ik_failure::joint_limit_violation;
+    auto f5 = spp::ik_failure::aborted;
+    (void)f1; (void)f2; (void)f3; (void)f4; (void)f5;
 
     // Convergence criteria fields
     spp::convergence_criteria<double> cc;

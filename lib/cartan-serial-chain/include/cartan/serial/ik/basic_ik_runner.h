@@ -273,27 +273,7 @@ private:
         {
             return held.error();
         }
-        if (chain.num_joints() == 0 && !reaches_target_without_joints(chain, target, q0))
-        {
-            return ik_status::unreachable;
-        }
         return cartan::detail::selection_admissibility(m_objective, chain, m_length);
-    }
-
-    /// A chain with no joints has a one-point workspace, so a target away from
-    /// that point is certifiably infeasible rather than merely not found. It is
-    /// the only place on the iterative path where infeasibility is provable: an
-    /// iterative solver that has joints to move cannot conclude it from a failed
-    /// search. The test is the solver's own convergence test, so exactly the
-    /// targets a solve would have accepted are the ones not refused here.
-    bool reaches_target_without_joints(
-        const chain_type& chain,
-        const se3<scalar_type>& target,
-        const position_type& q0) const
-    {
-        auto fk = forward_kinematics_unchecked(chain, q0);
-        auto twist = (fk.end_effector.inverse() * target).log();
-        return cartan::detail::is_converged_unweighted(twist, m_criteria);
     }
 
     /// The single owner of the work-unit accumulator and of the total-budget

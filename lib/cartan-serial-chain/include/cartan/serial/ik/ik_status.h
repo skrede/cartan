@@ -31,8 +31,7 @@ enum class ik_status
     not_initialized,
     dimension_mismatch,
     non_finite_input,
-    unsupported_configuration,
-    unreachable
+    unsupported_configuration
 };
 
 /// Human-readable diagnostic for an ik_status, for logging and binding
@@ -63,8 +62,6 @@ constexpr const char* message(ik_status status)
         return "Seed joint vector or target pose contains a NaN or infinite component";
     case ik_status::unsupported_configuration:
         return "Selection objective is not defined for this chain or characteristic length";
-    case ik_status::unreachable:
-        return "Target lies outside the reachable workspace";
     }
     return "Unknown ik_status";
 }
@@ -105,7 +102,6 @@ enum class ik_objective
 /// where it builds the error.
 enum class ik_failure
 {
-    unreachable,
     diverged,
     stalled,
     iteration_limit,
@@ -123,8 +119,6 @@ constexpr const char* message(ik_failure failure)
 {
     switch (failure)
     {
-    case ik_failure::unreachable:
-        return "Target lies outside the reachable workspace";
     case ik_failure::diverged:
         return "Solver diverged";
     case ik_failure::stalled:

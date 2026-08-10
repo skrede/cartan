@@ -201,7 +201,6 @@ TEST_CASE("an entirely zero Jacobian is its own no-answer", "[ik][diagnostics]")
     auto ratio = spp::isotropy(*spectrum);
     REQUIRE_FALSE(ratio.has_value());
     CHECK(ratio.error() == spp::singularity_failure::zero_spectrum);
-    CHECK_FALSE(ratio.error() == spp::singularity_failure::empty_spectrum);
 
     REQUIRE(spp::condition_number(*spectrum));
     CHECK(std::isinf(*spp::condition_number(*spectrum)));
@@ -331,7 +330,6 @@ TEST_CASE("every status maps to a reason that does not misstate it", "[ik][diagn
     CHECK(failure_reason_for(ik_status::iteration_limit) == ik_failure::iteration_limit);
     CHECK(failure_reason_for(ik_status::joint_limit_hit) == ik_failure::joint_limit_violation);
     CHECK(failure_reason_for(ik_status::aborted) == ik_failure::aborted);
-    CHECK(failure_reason_for(ik_status::unreachable) == ik_failure::unreachable);
     CHECK(failure_reason_for(ik_status::dimension_mismatch) == ik_failure::dimension_mismatch);
     CHECK(failure_reason_for(ik_status::non_finite_input) == ik_failure::non_finite_input);
     CHECK(failure_reason_for(ik_status::unsupported_configuration)

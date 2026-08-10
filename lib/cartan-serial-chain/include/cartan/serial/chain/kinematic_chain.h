@@ -40,6 +40,7 @@ template <typename Scalar = double, int N = dynamic>
 class kinematic_chain
 {
     static_assert(std::is_floating_point_v<Scalar>, "kinematic_chain requires a floating-point Scalar type");
+    static_assert(N != 0, "kinematic_chain requires at least one joint");
 public:
     using scalar_type = Scalar;
     static constexpr int joints = N;
@@ -157,6 +158,15 @@ private:
 #if defined(__cpp_exceptions) || defined(_CPPUNWIND)
             throw std::invalid_argument(
                 "kinematic_chain: screw axes and home pose must be finite");
+#else
+            ::cartan::detail::fail_stop();
+#endif
+        }
+        if (m_axes.empty())
+        {
+#if defined(__cpp_exceptions) || defined(_CPPUNWIND)
+            throw std::invalid_argument(
+                "kinematic_chain: at least one joint is required");
 #else
             ::cartan::detail::fail_stop();
 #endif

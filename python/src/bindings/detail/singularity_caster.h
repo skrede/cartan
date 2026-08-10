@@ -18,11 +18,10 @@ namespace nanobind::detail
 /// A configuration the chain cannot accept, or a characteristic length that
 /// cannot divide the Jacobian's linear rows, is a bad argument, so it raises
 /// ValueError -- the exception forward_kinematics and both Jacobians already
-/// raise for the same underlying chain_failure. An empty or entirely zero
-/// spectrum is a well-formed question whose measure is simply undefined there,
-/// so it answers None; raising would make a caller who did nothing wrong wrap a
-/// try/except around a jointless chain or a zero Jacobian, both of which are
-/// valid. The Python idiom is
+/// raise for the same underlying chain_failure. An entirely zero Jacobian is a
+/// well-formed question whose measure is simply undefined there, so it answers
+/// None; raising would make a caller who did nothing wrong wrap a try/except
+/// around a zero Jacobian, which is valid. The Python idiom is
 /// `if (k := condition_number(chain, q)) is not None:`.
 template <typename T>
 struct type_caster<cartan::expected<T, cartan::singularity_failure>>

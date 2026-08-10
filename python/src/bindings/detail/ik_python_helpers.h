@@ -51,7 +51,6 @@ inline std::string ik_failure_to_string(cartan::ik_failure r)
 {
     switch (r)
     {
-        case cartan::ik_failure::unreachable:           return "unreachable";
         case cartan::ik_failure::diverged:              return "diverged";
         case cartan::ik_failure::stalled:               return "stalled";
         case cartan::ik_failure::iteration_limit:       return "iteration_limit";

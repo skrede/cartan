@@ -56,11 +56,6 @@ bool is_valid_characteristic_length(Scalar length)
 /// them. Without that division the product of them has no coherent unit and
 /// their ratio compares incommensurables. The default of one reproduces the
 /// unnormalized arithmetic exactly.
-///
-/// The guard precedes the decomposition because constructing one over an empty
-/// matrix is itself the fault: Eigen's preconditioner resizes a fixed-size
-/// vector to zero, which trips an assertion in a checked build and faults in
-/// one without.
 template <typename Derived>
 cartan::expected<singular_values_t<Derived>, singularity_failure> singular_values(
     const Eigen::MatrixBase<Derived>& jacobian,
@@ -69,10 +64,6 @@ cartan::expected<singular_values_t<Derived>, singularity_failure> singular_value
     if (!is_valid_characteristic_length(length))
     {
         return cartan::unexpected(singularity_failure::invalid_length);
-    }
-    if (jacobian.cols() == 0)
-    {
-        return cartan::unexpected(singularity_failure::empty_spectrum);
     }
 
     svd_matrix_t<Derived> scaled = jacobian;

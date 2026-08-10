@@ -179,7 +179,7 @@ ik_result_speed: cartan.IkResult = cartan.solve_ik_speed(ik_chain, ik_target, ik
 ik_result_robust: cartan.IkResult = cartan.solve_ik_robust(ik_chain, ik_target, ik_q_seed)
 
 # Spot-check the IkFailure enum so the strict-mode gate sees the binding.
-ik_failure_enum: cartan.IkFailure = cartan.IkFailure.unreachable
+ik_failure_enum: cartan.IkFailure = cartan.IkFailure.diverged
 
 
 # ---------------------------------------------------------------------------

@@ -125,7 +125,6 @@ def test_ik_objective_enum_values() -> None:
 
 def test_ik_failure_enum_values() -> None:
     for name in (
-        "unreachable",
         "diverged",
         "stalled",
         "iteration_limit",
@@ -404,21 +403,27 @@ def test_singularity_analysis_reads_one_spectrum(
     assert cartan.is_near_singular(chain, q, kappa * 0.5) is True
 
 
-def test_singularity_analysis_is_undefined_rather_than_wrong_without_a_spectrum() -> None:
+def test_singularity_analysis_is_undefined_rather_than_wrong_on_a_zero_jacobian() -> None:
+    # An entirely zero (but non-empty) spectrum is well-formed; the caller did
+    # nothing wrong, so the measure is absent rather than an error to be
+    # caught.
+    assert cartan.isotropy(np.zeros(3, dtype=np.float64)) is None
+
+
+def test_singularity_analysis_refuses_an_empty_spectrum() -> None:
+    # No chain can produce an empty spectrum, so a caller-supplied empty
+    # vector is a wrong-length vector -- the same mistake a wrong-length
+    # joint vector already is, and raised the same way.
     empty = np.zeros(0, dtype=np.float64)
 
-    # An empty spectrum and an entirely zero Jacobian are both well-formed;
-    # the caller did nothing wrong, so the measure is absent rather than an
-    # error to be caught.
     for measure in (
         cartan.condition_number,
         cartan.manipulability,
         cartan.isotropy,
         cartan.is_near_singular,
     ):
-        assert measure(empty) is None
-
-    assert cartan.isotropy(np.zeros(3, dtype=np.float64)) is None
+        with pytest.raises(ValueError, match="does not produce a Jacobian"):
+            measure(empty)
 
 
 def test_singularity_analysis_refuses_a_configuration_the_chain_cannot_accept(

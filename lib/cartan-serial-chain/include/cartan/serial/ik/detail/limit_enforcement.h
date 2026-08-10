@@ -240,15 +240,6 @@ void enforce_limits(
         auto fk = forward_kinematics_unchecked(chain, q);
         auto J_b = body_jacobian_unchecked(chain, fk);
 
-        // A chain with no joints has nothing to project and nothing to clamp,
-        // and decomposing its empty Jacobian would be the fault: Eigen resizes a
-        // fixed-size vector to zero, tripping an assertion in a checked build
-        // and faulting in one without.
-        if (J_b.cols() == 0)
-        {
-            return;
-        }
-
         // V must be full: matrixV() is then n x n and V.rightCols(n - rank)
         // spans the true Jacobian kernel. A thin V is only n x min(m, n), so
         // for a wide (redundant) Jacobian it omits the kernel columns and hands

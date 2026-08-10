@@ -183,7 +183,6 @@ void register_ik(nb::module_& m)
         "Coarse-grained failure category reported by an IK solve when it does "
         "not converge. Mirrors C++ ik_failure for typed dispatch on the "
         "Python side.")
-        .value("unreachable",           cartan::ik_failure::unreachable)
         .value("diverged",              cartan::ik_failure::diverged)
         .value("stalled",               cartan::ik_failure::stalled)
         .value("iteration_limit",       cartan::ik_failure::iteration_limit)

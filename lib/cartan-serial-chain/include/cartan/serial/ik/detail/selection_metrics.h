@@ -22,12 +22,6 @@ constexpr bool maximizes(ik_objective objective)
         || objective == ik_objective::max_isotropy;
 }
 
-constexpr bool reads_jacobian(ik_objective objective)
-{
-    return objective == ik_objective::max_manipulability
-        || objective == ik_objective::max_isotropy;
-}
-
 template <typename Chain>
 bool mixes_revolute_and_prismatic(const Chain& chain)
 {
@@ -43,11 +37,10 @@ bool mixes_revolute_and_prismatic(const Chain& chain)
 /// The combinations a selection cannot answer, reported so setup can refuse
 /// them rather than rank on a fabricated number.
 ///
-/// A chain with no joints has no singular values, so neither Jacobian measure
-/// is defined on it. A joint-space displacement over a chain mixing revolute
-/// and prismatic joints would add radians to metres; the scale that would make
-/// them commensurable is a caller's to state and not this library's to assume,
-/// so the combination is refused instead. The characteristic length is tested by
+/// A joint-space displacement over a chain mixing revolute and prismatic
+/// joints would add radians to metres; the scale that would make them
+/// commensurable is a caller's to state and not this library's to assume, so
+/// the combination is refused instead. The characteristic length is tested by
 /// the same predicate the analysis surface divides through, so a length this
 /// admits cannot be one that surface then refuses.
 template <typename Chain, typename Scalar>
@@ -57,10 +50,6 @@ std::optional<ik_status> selection_admissibility(
     Scalar length)
 {
     if (!is_valid_characteristic_length(length))
-    {
-        return ik_status::unsupported_configuration;
-    }
-    if (reads_jacobian(objective) && chain.num_joints() == 0)
     {
         return ik_status::unsupported_configuration;
     }

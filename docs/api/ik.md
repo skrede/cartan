@@ -352,8 +352,7 @@ enum class ik_status
     not_initialized,
     dimension_mismatch,
     non_finite_input,
-    unsupported_configuration,
-    unreachable
+    unsupported_configuration
 };
 
 constexpr const char* message(ik_status status);
@@ -451,7 +450,6 @@ ranked and the metric is absent.
 ```cpp
 enum class ik_failure
 {
-    unreachable,
     diverged,
     stalled,
     iteration_limit,

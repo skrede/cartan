@@ -35,11 +35,9 @@ constexpr std::array k_statuses{
     spp::ik_status::not_initialized,
     spp::ik_status::dimension_mismatch,
     spp::ik_status::non_finite_input,
-    spp::ik_status::unsupported_configuration,
-    spp::ik_status::unreachable};
+    spp::ik_status::unsupported_configuration};
 
 constexpr std::array k_failures{
-    spp::ik_failure::unreachable,
     spp::ik_failure::diverged,
     spp::ik_failure::stalled,
     spp::ik_failure::iteration_limit,

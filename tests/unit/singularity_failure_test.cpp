@@ -14,7 +14,6 @@ namespace
 // leaves the new case unexercised, which is the same silence the header's
 // default-less switches exist to refuse at compile time.
 constexpr std::array k_failures{
-    spp::singularity_failure::empty_spectrum,
     spp::singularity_failure::zero_spectrum,
     spp::singularity_failure::invalid_configuration,
     spp::singularity_failure::invalid_length};
@@ -52,7 +51,6 @@ TEST_CASE("every singularity failure carries its own non-empty diagnostic",
 TEST_CASE("the failure classification separates a caller's mistake from an undefined measure",
     "[ik][diagnostics][singularity_failure]")
 {
-    CHECK_FALSE(spp::is_invalid_argument(spp::singularity_failure::empty_spectrum));
     CHECK_FALSE(spp::is_invalid_argument(spp::singularity_failure::zero_spectrum));
 
     CHECK(spp::is_invalid_argument(spp::singularity_failure::invalid_configuration));
@@ -66,7 +64,7 @@ TEST_CASE("the diagnostic and its classification are usable in a constant expres
     "[ik][diagnostics][singularity_failure]")
 {
     static_assert(spp::is_invalid_argument(spp::singularity_failure::invalid_length));
-    static_assert(!spp::is_invalid_argument(spp::singularity_failure::empty_spectrum));
+    static_assert(!spp::is_invalid_argument(spp::singularity_failure::zero_spectrum));
     static_assert(spp::message(spp::singularity_failure::invalid_length)[0] != '\0');
 
     SUCCEED("the assertions above are compile-time");

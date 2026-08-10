@@ -61,8 +61,7 @@ constexpr bool is_precondition_failure(ik_status status)
 {
     return status == ik_status::dimension_mismatch
         || status == ik_status::non_finite_input
-        || status == ik_status::unsupported_configuration
-        || status == ik_status::unreachable;
+        || status == ik_status::unsupported_configuration;
 }
 
 /// The statuses from which no iteration may run: a failed precondition, or a
@@ -90,7 +89,6 @@ constexpr ik_failure failure_reason_for(ik_status status)
     case ik_status::dimension_mismatch:        return ik_failure::dimension_mismatch;
     case ik_status::non_finite_input:          return ik_failure::non_finite_input;
     case ik_status::unsupported_configuration: return ik_failure::unsupported_configuration;
-    case ik_status::unreachable:               return ik_failure::unreachable;
     case ik_status::running:
     case ik_status::converged:
     case ik_status::not_initialized:

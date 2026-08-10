@@ -4,8 +4,7 @@
 /// The four measures of distance to a singularity, read off one spectrum.
 ///
 /// Every no-answer case carries a name from singularity_failure rather than
-/// collapsing into a single absence, so a caller can tell a chain with no
-/// joints from a configuration that produced no Jacobian.
+/// collapsing into a single absence.
 
 #include "cartan/expected.h"
 
@@ -43,6 +42,10 @@ Scalar spectrum_resolution_floor(Scalar largest, Eigen::Index count)
 /// and the ratio built from it is rounding too, so it is reported as the
 /// infinity it is approximating rather than as whichever large number the
 /// instruction set happened to produce.
+///
+/// No chain can produce an empty spectrum, so an empty `sigma` here is a
+/// caller-supplied vector of the wrong length -- the same mistake a wrong-
+/// length joint vector already is, and reported the same way.
 template <typename Vector>
 cartan::expected<typename Vector::Scalar, singularity_failure>
 condition_number(const Vector& sigma)
@@ -51,7 +54,7 @@ condition_number(const Vector& sigma)
 
     if (sigma.size() == 0)
     {
-        return cartan::unexpected(singularity_failure::empty_spectrum);
+        return cartan::unexpected(singularity_failure::invalid_configuration);
     }
     const scalar largest = sigma(0);
     const scalar smallest = sigma(sigma.size() - 1);
@@ -69,15 +72,16 @@ condition_number(const Vector& sigma)
 /// Robotics Research 4(2), 1985.
 ///
 /// Undefined, rather than one, on an empty spectrum: the product over an empty
-/// set is one, which would report a chain with no joints as maximally
-/// manipulable.
+/// set is one, which would report a caller-supplied empty vector as maximally
+/// manipulable. No chain can produce an empty spectrum, so an empty `sigma`
+/// here is a caller-supplied vector of the wrong length.
 template <typename Vector>
 cartan::expected<typename Vector::Scalar, singularity_failure>
 manipulability(const Vector& sigma)
 {
     if (sigma.size() == 0)
     {
-        return cartan::unexpected(singularity_failure::empty_spectrum);
+        return cartan::unexpected(singularity_failure::invalid_configuration);
     }
     return sigma.prod();
 }
@@ -99,7 +103,7 @@ isotropy(const Vector& sigma)
 
     if (sigma.size() == 0)
     {
-        return cartan::unexpected(singularity_failure::empty_spectrum);
+        return cartan::unexpected(singularity_failure::invalid_configuration);
     }
     const scalar largest = sigma(0);
     if (!(largest > scalar(0)))
