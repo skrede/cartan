@@ -56,6 +56,12 @@ function(cartan_add_boundary_test TEST_NAME TEST_SOURCE)
     if (CARTAN_HAS_WNO_C2Y_EXTENSIONS)
         target_compile_options(${TEST_NAME} PRIVATE -Wno-c2y-extensions)
     endif ()
+    # A case templated over both scalars and several policies emits more COMDAT
+    # sections than the object file format admits by default, which MSVC reports
+    # as C1128 rather than as anything a reader would trace back to a test.
+    if (MSVC)
+        target_compile_options(${TEST_NAME} PRIVATE /bigobj)
+    endif ()
     add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
 endfunction()
 
