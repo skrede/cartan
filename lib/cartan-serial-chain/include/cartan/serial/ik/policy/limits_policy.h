@@ -13,6 +13,7 @@
 #include "cartan/serial/fk/jacobian.h"
 #include "cartan/serial/chain/joint_limits.h"
 #include "cartan/serial/chain/chain_concept.h"
+#include "cartan/serial/fk/singular_spectrum.h"
 
 #include <Eigen/SVD>
 
@@ -23,6 +24,14 @@
 namespace cartan
 {
 
+/// The decomposition an extended enforcement is handed. It runs over a fully
+/// dynamic copy for a chain whose joint count is a runtime value, because a
+/// thin left factor sized from the Jacobian's fixed six rows cannot be resized
+/// to a smaller column count.
+template <typename Scalar, int N>
+using enforcement_svd =
+    Eigen::JacobiSVD<svd_matrix_t<jacobian_matrix<Scalar, N>>>;
+
 /// Concept detecting whether a limits policy has an extended enforce signature
 /// that accepts the body Jacobian and its SVD (for null-space projection).
 template <typename P, typename Chain>
@@ -30,7 +39,7 @@ concept has_extended_enforce = chain<Chain> && requires(
     typename joint_state<typename Chain::scalar_type, Chain::joints>::position_type& q,
     const decltype(std::declval<const Chain&>().limits())& limits,
     const jacobian_matrix<typename Chain::scalar_type, Chain::joints>& J_b,
-    const Eigen::JacobiSVD<jacobian_matrix<typename Chain::scalar_type, Chain::joints>>& svd)
+    const enforcement_svd<typename Chain::scalar_type, Chain::joints>& svd)
 {
     { P::template enforce_extended<Chain>(q, limits, J_b, svd) };
 };
@@ -98,7 +107,7 @@ struct null_space_limits
         typename joint_state<typename Chain::scalar_type, Chain::joints>::position_type& q,
         const auto& limits,
         const jacobian_matrix<typename Chain::scalar_type, Chain::joints>&,
-        const Eigen::JacobiSVD<jacobian_matrix<typename Chain::scalar_type, Chain::joints>>& svd,
+        const enforcement_svd<typename Chain::scalar_type, Chain::joints>& svd,
         typename Chain::scalar_type gain = typename Chain::scalar_type(0.5))
     {
         using Scalar = typename Chain::scalar_type;

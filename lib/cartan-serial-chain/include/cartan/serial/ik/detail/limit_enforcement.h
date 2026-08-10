@@ -244,9 +244,9 @@ void enforce_limits(
         // spans the true Jacobian kernel. A thin V is only n x min(m, n), so
         // for a wide (redundant) Jacobian it omits the kernel columns and hands
         // back row-space directions instead, corrupting the null-space step.
-        // U may stay thin for a dynamic matrix (thin U is illegal for a
-        // fixed-size one, hence the branch), and its 6 rows make thin and full
-        // U identical in size regardless.
+        // U may stay thin for a dynamic matrix, whose decomposition runs over a
+        // fully dynamic copy; thin U is illegal for a fixed-size one, hence the
+        // branch.
         constexpr unsigned int svd_options = (N == dynamic)
             ? (Eigen::ComputeThinU | Eigen::ComputeFullV)
             : (Eigen::ComputeFullU | Eigen::ComputeFullV);
@@ -262,7 +262,7 @@ void enforce_limits(
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 #endif
-        Eigen::JacobiSVD<jacobian_matrix<Scalar, N>> svd(J_b, svd_options);
+        enforcement_svd<Scalar, N> svd(J_b, svd_options);
 
         LimitsPolicy::template enforce_extended<Chain>(
             q, chain.limits(), J_b, svd);

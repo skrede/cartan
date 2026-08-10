@@ -25,6 +25,7 @@
 #include "cartan/serial/fk/jacobian.h"
 #include "cartan/serial/chain/joint_state.h"
 #include "cartan/serial/chain/chain_concept.h"
+#include "cartan/serial/fk/singular_spectrum.h"
 #include "cartan/serial/fk/forward_kinematics.h"
 
 #include <Eigen/SVD>
@@ -188,7 +189,8 @@ public:
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 #endif
-            Eigen::JacobiSVD<jacobian_matrix<scalar_type, joints>> svd(J_b, svd_options);
+            Eigen::JacobiSVD<svd_matrix_t<jacobian_matrix<scalar_type, joints>>> svd(
+                J_b, svd_options);
 
             const auto& sigma = svd.singularValues();
             int rank = static_cast<int>(sigma.size());

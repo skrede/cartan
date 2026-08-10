@@ -66,6 +66,7 @@ cartan_add_boundary_test(velocity_shape_boundary_test velocity_shape_boundary_te
 cartan_add_boundary_test(fk_boundary_test fk_boundary_test.cpp)
 cartan_add_boundary_test(jacobian_boundary_test jacobian_boundary_test.cpp)
 cartan_add_boundary_test(solver_setup_boundary_test solver_setup_boundary_test.cpp)
+cartan_add_boundary_test(dynamic_svd_boundary_test dynamic_svd_boundary_test.cpp)
 cartan_add_boundary_test(fixture_smoke_test fixture_smoke_test.cpp)
 
 # One sweep of every checked factory against a NaN and both infinities. The

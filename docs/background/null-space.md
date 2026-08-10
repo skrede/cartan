@@ -178,7 +178,7 @@ static void enforce_extended(
     typename joint_state<typename Chain::scalar_type, Chain::joints>::position_type& q,
     const auto& limits,
     const jacobian_matrix<typename Chain::scalar_type, Chain::joints>& J_b,
-    const Eigen::JacobiSVD<jacobian_matrix<typename Chain::scalar_type, Chain::joints>>& svd,
+    const enforcement_svd<typename Chain::scalar_type, Chain::joints>& svd,
     typename Chain::scalar_type gain = typename Chain::scalar_type(0.5));
 ```
 
