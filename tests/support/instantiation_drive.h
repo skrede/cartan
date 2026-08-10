@@ -17,6 +17,7 @@
 #include <cartan/serial/ik/basic_ik_runner.h>
 
 #include <cartan/serial/ik/detail/convergence.h>
+#include <cartan/serial/ik/detail/setup_validation.h>
 
 #include <cartan/serial/ik/solver/exhaustive_ik_runner.h>
 
@@ -87,6 +88,12 @@ inline bool terminated(ik_status status)
 /// Only what solve_policy guarantees is read. A concrete solver also carries a
 /// status() accessor, but the wrappers composed from one do not, so a drive that
 /// reads it covers the policies and refuses the forms built on them.
+///
+/// A policy whose setup() refused latches the refusal and returns from step()
+/// without entering its body; the three reads below all pass in that state, the
+/// error norm starting at the scalar's maximum and the iteration count at zero.
+/// Naming the statuses no fresh seed could repair is what makes a regression in
+/// input validation red here rather than green at every caller of this drive.
 template <typename Policy, typename Chain>
 void drive_stepped(const Chain& chain, const se3<typename Chain::scalar_type>& target)
 {
@@ -97,6 +104,7 @@ void drive_stepped(const Chain& chain, const se3<typename Chain::scalar_type>& t
     step_result<scalar_type> stepped = policy.step(chain, 1);
 
     CHECK(stepped.status != ik_status::not_initialized);
+    CHECK_FALSE(cartan::detail::is_precondition_failure(stepped.status));
     CHECK(policy.error_norm() >= scalar_type(0));
     CHECK(policy.iterations() >= 0);
 }

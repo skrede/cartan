@@ -171,18 +171,11 @@ inline constexpr length_tolerance<Scalar> default_length_tolerance_v{Scalar(1e-6
 template <typename Scalar>
 inline constexpr direction_tolerance<Scalar> default_direction_tolerance_v{Scalar(1e-6)};
 
-/// Both fields are read by the forward-kinematics back-check and by the
-/// Paden-Kahan subproblem gates, so the value has to clear the reconstruction
-/// error of the scalar it is applied at.
-///
-/// 1e-6 is about eight float epsilons, below what a float forward map can
-/// reconstruct, so a target the mechanism reaches is reported as a whole-solve
-/// failure: over 1024 reachable poses the ortho-parallel solver loses 51 whole
-/// solves at float and the Pieper solver 23, where the same sweep at double
-/// loses none. The unverified ortho-parallel variant answers all 1024 at float,
-/// which places the loss at the gate rather than in the arithmetic. 1e-4 is the
-/// smallest decade at which the float sweep refuses exactly the poses the double
-/// sweep refuses at the same value; wider only widens the subproblem gates.
+/// The value has to clear the reconstruction error of the scalar it is applied
+/// at: at float the primary template's threshold is below what a float forward
+/// map reconstructs on a metre-scale arm, so reachable targets are reported as
+/// whole-solve failures. The specialization is the narrowest widening that stops
+/// that, and it widens every gate reading these fields, not the back-check alone.
 template <typename Scalar>
 inline constexpr verification_tolerance<Scalar> default_verification_tolerance_v{
     Scalar(1e-6), Scalar(1e-6)};
