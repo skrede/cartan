@@ -131,6 +131,7 @@ endif()
 if(CARTAN_BUILD_INSTANTIATION_TESTS)
     cartan_add_test(static_chain_instantiation_test static_chain_instantiation_test.cpp)
     cartan_add_test(native_policy_instantiation_test native_policy_instantiation_test.cpp)
+    cartan_add_test(runner_instantiation_test runner_instantiation_test.cpp)
     # Nested rather than listed in the backend block's foreach above: that list
     # names targets which exist unconditionally once the backend is on, and this
     # one exists only when both options are.
