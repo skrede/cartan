@@ -130,6 +130,14 @@ endif()
 
 if(CARTAN_BUILD_INSTANTIATION_TESTS)
     cartan_add_test(static_chain_instantiation_test static_chain_instantiation_test.cpp)
+    cartan_add_test(native_policy_instantiation_test native_policy_instantiation_test.cpp)
+    # Nested rather than listed in the backend block's foreach above: that list
+    # names targets which exist unconditionally once the backend is on, and this
+    # one exists only when both options are.
+    if(CARTAN_BUILD_ARGMIN)
+        cartan_add_test(backend_policy_instantiation_test backend_policy_instantiation_test.cpp)
+        target_link_libraries(backend_policy_instantiation_test PRIVATE cartan::argmin)
+    endif()
 endif()
 
 cartan_add_test(fk_sweep_test fk_sweep_test.cpp)
