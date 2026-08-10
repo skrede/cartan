@@ -54,13 +54,16 @@ jobs:
       - uses: actions/checkout@v4
 
       # Two of the four numbers this job publishes differ only by one gcovr flag's
-      # semantics, so an unpinned gcovr is an unpinned verdict. The other three
+      # semantics, so an unpinned gcovr is an unpinned verdict. The next three
       # are the Python suite's own requirements and carry the same bounds the
       # package declares; nothing installs them here, because the suite runs
       # against the in-source extension this job builds rather than a wheel.
+      # nanobind is that extension's build dependency rather than the suite's:
+      # the configure locates it by running it as a module in this interpreter,
+      # so its absence fails the configure rather than a test.
       - name: Install the coverage and Python test tools
         if: matrix.coverage
-        run: pip install gcovr==8.6 pytest hypothesis "numpy<2.5"
+        run: pip install gcovr==8.6 pytest hypothesis "numpy<2.5" "nanobind>=2.0"
 
       - name: Configure
         env:
