@@ -61,9 +61,18 @@ jobs:
       # nanobind is that extension's build dependency rather than the suite's:
       # the configure locates it by running it as a module in this interpreter,
       # so its absence fails the configure rather than a test.
+      #
+      # They go in a virtual environment rather than the interpreter's own site
+      # because the tutorial tests and the bindings suite both run under
+      # PYTHONNOUSERSITE, which is there to stop an installed extension shadowing
+      # the one this job builds and which also hides whatever pip puts in the user
+      # site. A venv's site is neither of those, so the tools stay visible and the
+      # shadowing guard keeps its meaning -- the venv holds no extension to shadow.
       - name: Install the coverage and Python test tools
         if: matrix.coverage
-        run: pip install gcovr==8.6 pytest hypothesis "numpy<2.5" "nanobind>=2.0"
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install gcovr==8.6 pytest hypothesis "numpy<2.5" "nanobind>=2.0"
 
       - name: Configure
         env:
@@ -113,6 +122,7 @@ jobs:
               -DCARTAN_BUILD_URDF_EXTENDED_TESTS=ON \
               -DCARTAN_BUILD_DOC_TESTS=ON \
               -DCARTAN_BUILD_PYTHON=ON \
+              -DPython_EXECUTABLE="${{ github.workspace }}/.venv/bin/python" \
               -DCARTAN_CMAKE_FETCH_DEPS=ON
           else
             # The exclusion list is empty and that is a statement, not an
@@ -147,7 +157,7 @@ jobs:
         env:
           PYTHONPATH: ${{ github.workspace }}/python/cartan:${{ github.workspace }}/python
           PYTHONNOUSERSITE: 1
-        run: python3 -m pytest python/tests
+        run: .venv/bin/python -m pytest python/tests
 
       # gcov keeps one record per template instantiation. The first invocation sums
       # them, so a header line instantiated five times weighs five; the second
@@ -169,7 +179,7 @@ jobs:
         if: matrix.coverage
         run: |
           set -o pipefail
-          gcovr build \
+          .venv/bin/gcovr build \
             --root . \
             --gcov-executable "${{ matrix.gcov_executable }}" \
             --exclude-directory '.*/_deps/.*' \
@@ -180,7 +190,7 @@ jobs:
             --filter python/src/ \
             --xml coverage-unmerged.xml \
             --txt coverage-unmerged.txt
-          gcovr build \
+          .venv/bin/gcovr build \
             --root . \
             --gcov-executable "${{ matrix.gcov_executable }}" \
             --exclude-directory '.*/_deps/.*' \
@@ -192,7 +202,7 @@ jobs:
             --filter python/src/ \
             --xml coverage-merged.xml \
             --txt coverage-merged.txt
-          python3 tools/check_coverage_report.py \
+          .venv/bin/python tools/check_coverage_report.py \
             --unmerged coverage-unmerged.xml \
             --merged coverage-merged.xml \
             --unmeasured ${{ matrix.unmeasured }} \
