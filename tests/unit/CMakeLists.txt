@@ -132,6 +132,8 @@ if(CARTAN_BUILD_INSTANTIATION_TESTS)
     cartan_add_test(static_chain_instantiation_test static_chain_instantiation_test.cpp)
     cartan_add_test(native_policy_instantiation_test native_policy_instantiation_test.cpp)
     cartan_add_test(runner_instantiation_test runner_instantiation_test.cpp)
+    cartan_add_test(analytical_instantiation_test analytical_instantiation_test.cpp)
+    cartan_add_test(lie_instantiation_test lie_instantiation_test.cpp)
     # Nested rather than listed in the backend block's foreach above: that list
     # names targets which exist unconditionally once the backend is on, and this
     # one exists only when both options are.
@@ -145,6 +147,7 @@ cartan_add_test(fk_sweep_test fk_sweep_test.cpp)
 cartan_add_test(jacobian_sweep_test jacobian_sweep_test.cpp)
 cartan_add_test(ik_sweep_test ik_sweep_test.cpp)
 cartan_add_test(ik_float_tolerance_sweep_test ik_float_tolerance_sweep_test.cpp)
+cartan_add_test(analytical_float_tolerance_sweep_test analytical_float_tolerance_sweep_test.cpp)
 
 # These two cover the NLopt solve policy, which ships as an example rather than
 # as library surface; each compiles to an empty translation unit without it.

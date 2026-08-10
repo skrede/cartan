@@ -168,7 +168,18 @@ inline constexpr direction_tolerance<Scalar> default_direction_tolerance_v{Scala
 template <typename Scalar>
 inline constexpr verification_tolerance<Scalar> default_verification_tolerance_v{
     Scalar(1e-6), Scalar(1e-6)};
+
+template <>
+inline constexpr verification_tolerance<float> default_verification_tolerance_v<float>{
+    1e-4f, 1e-4f};
 ```
+
+`default_verification_tolerance_v` is per scalar. `1e-6` is about eight `float`
+epsilons, below what a `float` forward map reconstructs, so at that value a
+`float` solver reports whole-solve failures on poses it in fact reaches; the
+`float` default is `1e-4` and is backed by a recorded sweep in
+`tests/unit/analytical_float_tolerance_sweep_test.cpp`. Every other scalar keeps
+`1e-6`. The Python bindings are `double`-only, so no Python default changes.
 
 A tolerance is named for the quantity it measures. `verification_tolerance`
 carries the FK back-check's position (linear unit) and orientation (radians, as
