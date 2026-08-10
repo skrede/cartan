@@ -166,8 +166,8 @@ public:
             units += inner_units;
 
             // argmin step_n returns the best-seen iterate in result.x (not
-            // state().x, which is the last trial). For oscillation-prone
-            // policies like MMA/GCMMA this distinction matters — read from
+            // state().x, which is the last trial). MMA's asymptote updates make
+            // it oscillation-prone, so the distinction matters — read from
             // result.x so downstream FK / convergence checks see the iterate
             // argmin actually endorses.
             sync_solution_from_result(result.x);

@@ -17,10 +17,8 @@
 #include "../fixtures/chain_factories.h"
 
 // Named one by one rather than through the ik.h umbrella, which does not carry
-// all thirteen.
+// all eleven.
 #include <cartan/serial/ik/solver/mma.h>
-#include <cartan/serial/ik/solver/cmaes.h>
-#include <cartan/serial/ik/solver/gcmma.h>
 #include <cartan/serial/ik/solver/nw_sqp.h>
 #include <cartan/serial/ik/solver/argmin_lm.h>
 #include <cartan/serial/ik/solver/argmin_slsqp.h>
@@ -84,10 +82,8 @@ void drive_every_policy(const Chain& chain, const spp::se3<double>& target)
     drive<spp::argmin_projected_gradient_gn<Chain>>(chain, target);
     drive<spp::argmin_slsqp<Chain>>(chain, target);
     drive<spp::augmented_lagrangian<Chain>>(chain, target);
-    drive<spp::cmaes<Chain>>(chain, target);
     drive<spp::filter_nw_sqp<Chain>>(chain, target);
     drive<spp::filter_slsqp<Chain>>(chain, target);
-    drive<spp::gcmma<Chain>>(chain, target);
     drive<spp::mma<Chain>>(chain, target);
     drive<spp::nw_sqp<Chain>>(chain, target);
 }

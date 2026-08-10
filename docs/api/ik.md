@@ -38,7 +38,7 @@ See [IK Methods](../background/ik-methods.md) | [IK Composition Guide](../guides
 | argmin-backed: `cartan::argmin_lm`, `argmin_lbfgsb`, `argmin_slsqp`, `argmin_bobyqa`, `argmin_projected_gn`, `argmin_projected_gradient_gn` | `#include <cartan/serial/ik/solver/argmin_*.h>` (requires `CARTAN_HAS_ARGMIN`) |
 | NLopt-backed: `cartan_examples::nlopt_slsqp`, `cartan_examples::nlopt_bobyqa` | carried as a solve-policy example, not library surface: see `examples/nlopt_policy/` |
 | SQP family: `cartan::nw_sqp`, `filter_nw_sqp`, `filter_slsqp` | `#include <cartan/serial/ik/solver/{nw_sqp,filter_nw_sqp,filter_slsqp}.h>` |
-| MMA / GCMMA / CMA-ES / aug. Lagrangian: `cartan::mma`, `gcmma`, `cmaes`, `augmented_lagrangian` | `#include <cartan/serial/ik/solver/{mma,gcmma,cmaes,augmented_lagrangian}.h>` |
+| MMA / aug. Lagrangian: `cartan::mma`, `augmented_lagrangian` | `#include <cartan/serial/ik/solver/{mma,augmented_lagrangian}.h>` |
 | `cartan::restart_wrapper` | `#include <cartan/serial/ik/wrapper/restart_wrapper.h>` |
 | `cartan::exhaustive_ik_runner`, `cartan::exhaustive_options`, `cartan::exhaustive_result`, `cartan::ranking_strategy` | `#include <cartan/serial/ik/solver/exhaustive_ik_runner.h>` |
 | `cartan::verify_solution`, `cartan::filter_valid_solutions` | `#include <cartan/serial/ik/ik_validation.h>` |
@@ -1001,31 +1001,6 @@ class mma;
 ```
 
 argmin-backed Method of Moving Asymptotes.
-
-### cartan::gcmma
-
-<!-- cartan:unbuilt kind=declaration -->
-```cpp
-template <chain Chain, typename LimitsPolicy = clamp_limits>
-class gcmma;
-```
-
-argmin-backed Globally Convergent MMA. Extends MMA with per-component
-conservativity coefficients that grow on non-conservative inner-loop
-trials and decay between outer iterations, yielding the global
-convergence guarantee.
-
-### cartan::cmaes
-
-<!-- cartan:unbuilt kind=declaration -->
-```cpp
-template <chain Chain, typename LimitsPolicy = clamp_limits>
-class cmaes;
-```
-
-argmin-backed Covariance Matrix Adaptation Evolution Strategy.
-Derivative-free, population-based; useful when the analytical gradient
-is unavailable or unreliable.
 
 ### cartan::augmented_lagrangian
 

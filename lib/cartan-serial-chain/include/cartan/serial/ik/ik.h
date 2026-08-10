@@ -26,7 +26,6 @@
 #include "cartan/serial/ik/policy/error_weight.h"
 
 #ifdef CARTAN_HAS_ARGMIN
-#include "cartan/serial/ik/solver/cmaes.h"
 #include "cartan/serial/ik/solver/argmin_lm.h"
 #include "cartan/serial/ik/solver/argmin_lbfgsb.h"
 #include "cartan/serial/ik/solver/argmin_slsqp.h"

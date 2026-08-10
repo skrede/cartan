@@ -103,9 +103,9 @@ was inconvenient, so each retirement is written down here.
   recomputed verdict. Both defects are structural, and the study replaces the harness with one
   feasible set no cell can opt out of and a verdict the harness computes for every participant.
 - **`cartan_restart_lm_clamped`, `argmin_mma` and `argmin_gcmma`.** Retired with that file: they
-  were benchmarked nowhere else, and the study does not declare them as participants. `mma` and
-  `gcmma` keep their compile coverage in `tests/unit/argmin_solver_instantiation_test.cpp` but
-  now have no measured cell at all.
+  were benchmarked nowhere else, and the study does not declare them as participants. `mma` keeps
+  its compile coverage in `tests/unit/argmin_solver_instantiation_test.cpp` and now has no
+  measured cell at all; `gcmma` has since been removed from the library altogether.
 - **Every `_no_limits` method variant (136 cells).** Retired: 136 of 136 limited-versus-unbounded
   pairs produced identical success rates, because the default cells clamp while the variant cells
   run unbounded and every target is drawn from inside the box, so no bound ever binds. The
