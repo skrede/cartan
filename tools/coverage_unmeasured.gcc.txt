@@ -51,10 +51,16 @@
 #
 # Recorded against the measured configuration: the tests, the URDF module, the
 # optional solver backend, the examples and tutorials, the property tests, the
-# extended URDF parity tests, the doc snippets and the Python bindings are all
-# built, and the bindings' own suite runs under instrumentation. The fuzz targets,
-# the packaging matrix and the profiling targets stay out, each for a reason the
-# lane's configure step states rather than leaves to be inferred.
+# extended URDF parity tests, the doc snippets, the Python bindings and the
+# instantiation targets are all built, and the bindings' own suite runs under
+# instrumentation. The fuzz targets, the packaging matrix and the profiling
+# targets stay out, each for a reason the lane's configure step states rather than
+# leaves to be inferred.
+#
+# The instantiation targets force every advertised combination of a solver family
+# into the build, and they move no row below: regenerating this record with their
+# option off produces the same rows. What they add is per-instantiation records on
+# headers the report already names, not a header the report was missing.
 
 lib/cartan-analytical/include/cartan/analytical.h                                       declaration-only
 lib/cartan-analytical/include/cartan/analytical/analytical_solver.h                     declaration-only
