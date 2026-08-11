@@ -56,6 +56,32 @@ load_urdf(const std::filesystem::path& path, const load_options& opts = {})
     return result;
 }
 
+/// Load a URDF or xacro document from disk and return the rigid transform from
+/// its base link to its tool link.
+///
+/// This is the entry point for a description that poses no inverse-kinematics
+/// problem, which load_urdf refuses with urdf_failure::no_movable_joint: an
+/// assembly of links bolted together, a sensor bracket, a tool adapter. It is
+/// defined for the shape the chain extractor walks -- one root, one leaf after
+/// the fixed-joint merge -- and a description that branches is refused rather
+/// than answered. It reads a description with mobile joints too, where the
+/// transform is the chain's home pose.
+///
+/// It does not answer the pose of a named intermediate frame: no intermediate
+/// frame survives loading, for any description, so there is nothing to name.
+template <typename Scalar = double>
+inline cartan::expected<se3<Scalar>, urdf_error>
+load_urdf_transform(const std::filesystem::path& path, const load_options& opts = {})
+{
+    detail::diagnostic_sink log;
+    auto loaded = meios::load(path, opts.description, log);
+    if (!loaded)
+    {
+        return cartan::unexpected(detail::failure_from(loaded.error()));
+    }
+    return transform_from_model<Scalar>(loaded->robot, opts);
+}
+
 /// SDF loading is deferred; this entry point exists so the supported input
 /// formats live behind a uniform pair of names. Returns
 /// urdf_failure::sdf_not_supported unconditionally.

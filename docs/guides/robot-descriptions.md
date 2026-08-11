@@ -76,6 +76,40 @@ Every structural failure stays hard too -- an include that does not resolve, a
 joint naming a link that was not declared, a topology that is not a tree. So
 this is not a strictness dial, and it is not a tradeoff.
 
+## A description with no movable joint
+
+A description whose joints are all fixed -- a sensor bracket, a tool adapter, an
+assembly bolted together -- poses no inverse-kinematics problem, and `load_urdf`
+refuses it with `urdf_failure::no_movable_joint` rather than handing back a chain
+with no joints. What such a description does answer is the rigid transform from
+its base link to its tool link, which is what `load_urdf_transform` returns:
+
+<!-- cartan:snippet name=load-fixed-assembly-transform needs=urdf -->
+```cpp
+auto bracket = cartan::load_urdf_transform<double>("sensor_bracket.urdf");
+if (!bracket)
+{
+    std::cerr << bracket.error().detail << "\n";
+    return 1;
+}
+
+std::cout << bracket->translation().transpose() << "\n";
+```
+
+Its scope is the shape the extractor walks: one root, and one leaf after the
+fixed-joint merge. A description that branches is refused on this route too, with
+`branched_kinematic_tree`, because the transform is not defined when the merge
+leaves several leaves to choose between. A description with mobile joints reads
+here as well, where the transform is the chain's home pose.
+
+It answers no named intermediate frame. No intermediate frame survives loading,
+for any description -- the metadata carries the two endpoint names, the joint
+names and the per-link inertials, and no pose -- so `load_urdf_transform` takes a
+path and the load options and nothing else.
+
+The Python extension carries it as `cartan.load_urdf_transform`, which returns a
+`cartan.SE3` and raises `cartan.UrdfError` on the same refusals.
+
 ## Evaluation backends
 
 A xacro description carries expressions, and which evaluator expands them is

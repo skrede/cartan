@@ -86,10 +86,10 @@ def test_ur3e_loads_and_fk_is_reproducible(ur3e_chain: cartan.KinematicChain) ->
 
 
 def test_urdf_failure_names_every_kind_the_loader_can_produce() -> None:
-    # 18 is the number of enumerators in cartan/urdf/error.h. A kind added there
+    # 19 is the number of enumerators in cartan/urdf/error.h. A kind added there
     # and left unregistered reaches a caller as a value this enum cannot name,
     # which the translator surfaces as a bare ValueError rather than UrdfError.
-    assert len(cartan.UrdfFailure.__members__) == 18
+    assert len(cartan.UrdfFailure.__members__) == 19
 
 
 @pytest.mark.parametrize(
@@ -107,6 +107,41 @@ def test_load_urdf_reports_the_expected_failure_kind(fixture: str, expected: str
     with pytest.raises(cartan.UrdfError) as excinfo:
         cartan.load_urdf(str(FIXTURES / fixture))
     assert excinfo.value.kind == getattr(cartan.UrdfFailure, expected)
+
+
+@pytest.mark.parametrize("fixture", ["all_fixed_linear.urdf", "single_link.urdf"])
+def test_a_description_with_no_movable_joint_is_refused(fixture: str) -> None:
+    with pytest.raises(cartan.UrdfError) as excinfo:
+        cartan.load_urdf(str(FIXTURES / fixture))
+    assert excinfo.value.kind == cartan.UrdfFailure.no_movable_joint
+    assert "load_urdf_transform" in excinfo.value.detail
+
+
+def test_a_branched_all_fixed_description_is_refused_as_branched() -> None:
+    with pytest.raises(cartan.UrdfError) as excinfo:
+        cartan.load_urdf(str(FIXTURES / "all_fixed_branched.urdf"))
+    assert excinfo.value.kind == cartan.UrdfFailure.branched_kinematic_tree
+    assert "left_mount" in excinfo.value.detail
+    assert "right_mount" in excinfo.value.detail
+
+
+def test_load_urdf_transform_composes_the_fixtures_own_origins() -> None:
+    transform = cartan.load_urdf_transform(str(FIXTURES / "all_fixed_linear.urdf"))
+    assert isinstance(transform, cartan.SE3)
+    # The fixture's first joint sits at (0.1, 0.2, 0.3) turned a quarter turn
+    # about z, so the second joint's (0.05, 0, 0.4) arrives rotated.
+    np.testing.assert_allclose(transform.translation, [0.1, 0.25, 0.7], atol=1e-12)
+
+
+def test_load_urdf_transform_answers_the_identity_for_a_single_link() -> None:
+    transform = cartan.load_urdf_transform(str(FIXTURES / "single_link.urdf"))
+    np.testing.assert_allclose(transform.matrix(), np.eye(4), atol=1e-12)
+
+
+def test_load_urdf_transform_refuses_a_branched_description() -> None:
+    with pytest.raises(cartan.UrdfError) as excinfo:
+        cartan.load_urdf_transform(str(FIXTURES / "all_fixed_branched.urdf"))
+    assert excinfo.value.kind == cartan.UrdfFailure.branched_kinematic_tree
 
 
 def test_urdf_error_carries_the_readers_code_for_a_parse_failure() -> None:

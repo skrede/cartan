@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<robot name="single_link">
+
+  <link name="base_link"/>
+
+</robot>

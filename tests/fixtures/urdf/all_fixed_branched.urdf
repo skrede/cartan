@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<robot name="all_fixed_branched">
+
+  <link name="base_link"/>
+  <link name="left_mount"/>
+  <link name="right_mount"/>
+
+  <joint name="base_to_left" type="fixed">
+    <parent link="base_link"/>
+    <child link="left_mount"/>
+    <origin xyz="0 0.2 0.1" rpy="0 0 0"/>
+  </joint>
+
+  <joint name="base_to_right" type="fixed">
+    <parent link="base_link"/>
+    <child link="right_mount"/>
+    <origin xyz="0 -0.2 0.1" rpy="0 0 0"/>
+  </joint>
+
+</robot>

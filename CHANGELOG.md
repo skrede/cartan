@@ -41,6 +41,15 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   now needs one more arm. `basic_ik_runner` latches it at `setup()` for an
   invalid characteristic length, and again for a `min_joint_distance` selection
   over a chain that mixes revolute and prismatic joints.
+- `cartan::load_urdf_transform` and `cartan::urdf_failure::no_movable_joint`
+  (Python: `cartan.load_urdf_transform`, `cartan.UrdfFailure.no_movable_joint`).
+  **Breaking** for a switch that was previously exhaustive over `urdf_failure`.
+  A description whose joints are all fixed is refused by `load_urdf` under the
+  new value instead of being extracted as a chain with no joints, and the refusal
+  names the new entry point, which folds the same root-to-leaf walk down to the
+  rigid transform from the base link to the tool link. It is defined for one root
+  and one leaf after the fixed-joint merge; it takes a path and the load options
+  and answers no named intermediate frame.
 
 ### Changed
 - **Breaking.** The singularity-analysis surface returns
@@ -370,6 +379,14 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   shoulder angle, and reported `verification_failed`. Both reach gates now
   compare lengths against the same acceptance length the back-check applies,
   rather than comparing squared distances against squared reaches.
+- **Behavior change.** A link with several outgoing fixed leaves that are not
+  self-collision wrappers (a child named `{parent}_sc`) is refused with
+  `urdf_failure::branched_kinematic_tree`, and the refusal names the leaves. The
+  extractor previously stopped there without folding any of them and reported
+  success, so a description whose joints are all fixed and whose links branch
+  loaded as a chain with an identity home pose and a tool link equal to its base
+  link. A link whose extra leaves are all wrappers is unaffected: that is the end
+  of the chain, not a branch.
 
 ## [0.4.1] - 2026-07-06
 

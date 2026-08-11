@@ -62,6 +62,23 @@ chain_from_model(const meios::model<>& robot, const load_options& opts = {})
     return sink.result();
 }
 
+/// Fold an already-evaluated robot description down to its base-to-tool rigid
+/// transform. It stages the description exactly as chain_from_model does and
+/// then reads the walk rather than the chain, so a description either entry
+/// point refuses is refused here by the same value.
+template <typename Scalar = double>
+inline cartan::expected<se3<Scalar>, urdf_error>
+transform_from_model(const meios::model<>& robot, const load_options& opts = {})
+{
+    detail::model_sink<Scalar> sink(opts);
+    detail::push_model(robot, sink);
+    if (sink.failure())
+    {
+        return cartan::unexpected(*sink.failure());
+    }
+    return build_transform<Scalar>(sink.staged(), opts);
+}
+
 }
 
 #endif

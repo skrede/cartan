@@ -84,6 +84,7 @@ try:
         UrdfMetadata,
         UrdfSourceLocation,
         load_urdf,
+        load_urdf_transform,
     )
 
     __all__ += [
@@ -94,6 +95,7 @@ try:
         "UrdfMetadata",
         "UrdfSourceLocation",
         "load_urdf",
+        "load_urdf_transform",
     ]
 except ImportError:
     pass

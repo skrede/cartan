@@ -23,9 +23,9 @@ namespace cartan
 /// so a condition this taxonomy has no name for still reaches the caller as
 /// what the reader actually reported. A failure raised afterwards by the chain
 /// extractor (branched_kinematic_tree, link_not_found, sdf_not_supported,
-/// missing_joint_limit, zero_axis, invalid_joint_limit, tool_link_unreachable)
-/// carries neither: there is no element left to point at and no reader code to
-/// quote.
+/// missing_joint_limit, zero_axis, invalid_joint_limit, tool_link_unreachable,
+/// no_movable_joint) carries neither: there is no element left to point at and
+/// no reader code to quote.
 ///
 /// The loader is the library's only untrusted-input surface, so every spec
 /// violation is a strict rejection whose detail names the offending joint or
@@ -50,6 +50,7 @@ enum class urdf_failure
     duplicate_name,            ///< A link or joint name is declared more than once.
     multi_parent_link,         ///< A link is the child of more than one joint (non-tree topology).
     tool_link_unreachable,     ///< The requested tool link is not reached by the serial walk.
+    no_movable_joint,          ///< No joint moves, so there is no inverse-kinematics problem; load_urdf_transform answers the base-to-tool transform instead.
     unknown_error              ///< Reader code has no cartan kind; meios_code carries it verbatim.
 };
 

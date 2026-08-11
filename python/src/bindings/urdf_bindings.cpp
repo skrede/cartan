@@ -50,6 +50,13 @@ std::string code_name(meios::diagnostic_code code)
     return std::string(meios::to_string(code));
 }
 
+cartan::detail::urdf_python_error python_error(cartan::urdf_error error)
+{
+    std::string code = error.meios_code ? code_name(*error.meios_code) : std::string();
+    return cartan::detail::urdf_python_error{
+        error.kind, std::move(error.detail), std::move(code)};
+}
+
 }
 
 namespace cartan::python
@@ -76,6 +83,7 @@ void register_urdf(nb::module_& m)
         .value("duplicate_name", cartan::urdf_failure::duplicate_name)
         .value("multi_parent_link", cartan::urdf_failure::multi_parent_link)
         .value("tool_link_unreachable", cartan::urdf_failure::tool_link_unreachable)
+        .value("no_movable_joint", cartan::urdf_failure::no_movable_joint)
         .value("unknown_error", cartan::urdf_failure::unknown_error);
 
     // Create the Python exception class as a true subclass of RuntimeError via
@@ -192,17 +200,30 @@ void register_urdf(nb::module_& m)
               auto result = cartan::load_urdf<double>(path);
               if (!result)
               {
-                  auto err = std::move(result).error();
-                  std::string code =
-                      err.meios_code ? code_name(*err.meios_code) : std::string();
-                  throw cartan::detail::urdf_python_error{
-                      err.kind, std::move(err.detail), std::move(code)};
+                  throw python_error(std::move(result).error());
               }
               return std::move(*result);
           },
           "Load a URDF or xacro document and return the extracted kinematic "
           "chain, metadata and diagnostics. Raises cartan.UrdfError on parse "
           "or extraction failure.",
+          nb::arg("path"));
+
+    m.def("load_urdf_transform",
+          [](const std::filesystem::path& path) -> cartan::se3<double> {
+              auto result = cartan::load_urdf_transform<double>(path);
+              if (!result)
+              {
+                  throw python_error(std::move(result).error());
+              }
+              return std::move(*result);
+          },
+          "Load a URDF or xacro document and return the rigid transform from "
+          "its base link to its tool link. This is the route for a description "
+          "load_urdf refuses with no_movable_joint, and it is defined for one "
+          "root and one leaf after the fixed-joint merge; a branched "
+          "description is refused. Raises cartan.UrdfError on parse or "
+          "extraction failure.",
           nb::arg("path"));
 }
 

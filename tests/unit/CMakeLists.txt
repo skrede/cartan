@@ -174,6 +174,11 @@ if (CARTAN_BUILD_URDF)
     target_compile_definitions(urdf_adversarial_test PRIVATE
         CARTAN_TESTS_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures")
 
+    cartan_add_test(urdf_all_fixed_test urdf_all_fixed_test.cpp)
+    target_link_libraries(urdf_all_fixed_test PRIVATE cartan::urdf)
+    target_compile_definitions(urdf_all_fixed_test PRIVATE
+        CARTAN_TESTS_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures")
+
     cartan_add_test(urdf_evaluator_test urdf_evaluator_test.cpp)
     target_link_libraries(urdf_evaluator_test PRIVATE cartan::urdf)
     target_compile_definitions(urdf_evaluator_test PRIVATE
