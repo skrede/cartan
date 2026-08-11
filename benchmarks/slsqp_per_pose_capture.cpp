@@ -70,15 +70,15 @@ constexpr std::string_view to_string(cartan::ik_failure r) noexcept
     using F = cartan::ik_failure;
     switch (r)
     {
-        case F::unreachable:           return "unreachable";
-        case F::diverged:              return "diverged";
-        case F::stalled:               return "stalled";
-        case F::iteration_limit:       return "iteration_limit";
-        case F::joint_limit_violation: return "joint_limit_violation";
-        case F::aborted:               return "aborted";
-        case F::not_initialized:       return "not_initialized";
-        case F::dimension_mismatch:    return "dimension_mismatch";
-        case F::non_finite_input:      return "non_finite_input";
+        case F::diverged:                  return "diverged";
+        case F::stalled:                   return "stalled";
+        case F::iteration_limit:           return "iteration_limit";
+        case F::joint_limit_violation:     return "joint_limit_violation";
+        case F::aborted:                   return "aborted";
+        case F::not_initialized:           return "not_initialized";
+        case F::dimension_mismatch:        return "dimension_mismatch";
+        case F::non_finite_input:          return "non_finite_input";
+        case F::unsupported_configuration: return "unsupported_configuration";
     }
     return "unknown_failure";
 }
