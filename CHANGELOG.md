@@ -50,18 +50,19 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   half is the defect: a joint vector whose length disagreed with the chain was
   read past the end of, which is an assertion failure in a checked build and a
   plausible spectrum computed from adjacent memory in one built with `NDEBUG`.
-  Every way of having no answer now carries a name -- `empty_spectrum` for an
-  empty spectrum, `zero_spectrum` for the entirely zero Jacobian whose
-  isotropy ratio has nothing to divide by, and `invalid_configuration` for a
-  configuration that produced no Jacobian. The first two were previously the
-  same empty optional and a caller could not tell them apart. `condition_number`
+  Every way of having no answer now carries a name -- `zero_spectrum` for the
+  entirely zero Jacobian whose isotropy ratio has nothing to divide by,
+  `invalid_configuration` for a configuration that produced no Jacobian, and
+  `invalid_length` for a characteristic length that cannot divide the Jacobian's
+  linear rows. All three were previously the same empty optional and a caller
+  could not tell them apart. `condition_number`
   is unchanged in answering infinity at a singular configuration: that is a
   measurement, not a failure. Python splits the three names by kind rather than
-  mapping them all to one outcome: `invalid_configuration` raises `ValueError`,
-  the exception `forward_kinematics` and both Jacobians already raise for the
-  same underlying failure, while `empty_spectrum` and `zero_spectrum` return
+  mapping them all to one outcome: `invalid_configuration` and `invalid_length`
+  raise `ValueError`, the exception `forward_kinematics` and both Jacobians
+  already raise for the same underlying failure, while `zero_spectrum` returns
   `None` -- nothing was wrong with the call, and forcing a `try`/`except` around
-  an empty or entirely zero Jacobian would say otherwise. The annotations are
+  an entirely zero Jacobian would say otherwise. The annotations are
   `float | None` and `bool | None`, and the idiom is
   `if (k := condition_number(sigma)) is not None:`. In C++ the truth-test trap
   survives the change -- an errored `expected` is falsy exactly as an empty
