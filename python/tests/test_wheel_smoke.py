@@ -59,7 +59,7 @@ def _ur5e_like_chain() -> cartan.KinematicChain:
 
 
 def test_installed_wheel_exports_core_surface() -> None:
-    assert cartan.__version__.startswith("0.4.2")
+    assert cartan.__version__.startswith("0.4.3")
     for name in (
         "SE3",
         "KinematicChain",

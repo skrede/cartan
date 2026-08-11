@@ -78,7 +78,7 @@ set(CARTAN_CMAKE_FETCH_DEPS ON)
 FetchContent_Declare(
     cartan
     GIT_REPOSITORY https://github.com/skrede/cartan.git
-    GIT_TAG        v0.4.2
+    GIT_TAG        v0.4.3
 )
 FetchContent_MakeAvailable(cartan)
 
