@@ -57,7 +57,7 @@ cartan::bench::tolerance_policy tolerances_for(const cartan::bench::capture_opti
     }
     return cartan::bench::tolerance_policy(
         cartan::bench::calibration_table::load(options.calibration), options.table, options.robot,
-        options.accuracy_target, options.include_unconverged);
+        options.provenance, options.accuracy_target, options.include_unconverged);
 }
 
 /// Measured for the robot this capture ran on, not asserted: the deviation

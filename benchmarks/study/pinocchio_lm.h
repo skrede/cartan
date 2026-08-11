@@ -55,26 +55,30 @@ struct pin_lm_state
     double nu;
 };
 
-struct pin_lm_answer
-{
-    Eigen::VectorXd q;
-    bool converged;
-    int iterations;
-};
-
-inline Eigen::Matrix<double, 6, 1> pin_error(
+/// The counter is a template parameter rather than a second copy of the loop:
+/// the timed pass has to measure the solve alone, and a solve written twice
+/// would drift from the one the capture pass counts.
+template <bool Counting>
+Eigen::Matrix<double, 6, 1> pin_error(
     pinocchio_model& peer, const Eigen::VectorXd& q, const pinocchio::SE3& goal,
     kernel_counts& counts)
 {
-    ++counts.fk;
+    if constexpr (Counting)
+    {
+        ++counts.fk;
+    }
     pinocchio::framesForwardKinematics(peer.model, peer.data, q);
     return pinocchio::log6(peer.data.oMf[peer.ee_frame].actInv(goal)).toVector();
 }
 
-inline void pin_jacobian(
+template <bool Counting>
+void pin_jacobian(
     pinocchio_model& peer, const Eigen::VectorXd& q, Eigen::MatrixXd& jac, kernel_counts& counts)
 {
-    ++counts.jac;
+    if constexpr (Counting)
+    {
+        ++counts.jac;
+    }
     pinocchio::computeFrameJacobian(peer.model, peer.data, q, peer.ee_frame, pinocchio::LOCAL, jac);
 }
 
@@ -91,10 +95,11 @@ inline double pin_initial_damping(const Eigen::MatrixXd& normal)
     return lambda < std::numeric_limits<double>::epsilon() ? 1e-4 : lambda;
 }
 
-inline void pin_propose_step(
+template <bool Counting>
+void pin_propose_step(
     pinocchio_model& peer, pin_lm_scratch& work, const pin_lm_state& state, kernel_counts& counts)
 {
-    pin_jacobian(peer, state.q, work.jac, counts);
+    pin_jacobian<Counting>(peer, state.q, work.jac, counts);
     work.normal.noalias() = work.jac.transpose() * work.jac;
     work.gradient.noalias() = work.jac.transpose() * state.error;
     work.normal.diagonal().array() += state.lambda;
@@ -113,53 +118,30 @@ inline double pin_gain_ratio(
     return (state.squared - trial_squared) / predicted;
 }
 
-inline void pin_lm_step(
+template <bool Counting>
+bool pin_lm_step(
     pinocchio_model& peer,
     pin_lm_scratch& work,
     const pinocchio::SE3& goal,
     pin_lm_state& state,
     kernel_counts& counts)
 {
-    pin_propose_step(peer, work, state, counts);
-    const auto trial_error = pin_error(peer, work.trial, goal, counts);
+    pin_propose_step<Counting>(peer, work, state, counts);
+    const auto trial_error = pin_error<Counting>(peer, work.trial, goal, counts);
     const double trial_squared = trial_error.squaredNorm();
     const double gain = pin_gain_ratio(work, state, trial_squared);
     if (gain <= 0.0)
     {
         state.lambda *= state.nu;
         state.nu *= 2.0;
-        return;
+        return false;
     }
     state.q = work.trial;
     state.error = trial_error;
     state.squared = trial_squared;
     state.lambda *= std::max(1.0 / 3.0, 1.0 - std::pow(2.0 * gain - 1.0, 3.0));
     state.nu = 2.0;
-}
-
-inline pin_lm_answer run_pinocchio_lm(
-    pinocchio_model& peer,
-    pin_lm_scratch& work,
-    const pinocchio::SE3& goal,
-    Eigen::VectorXd seed,
-    const solve_budget& budget,
-    kernel_counts& counts)
-{
-    const auto error = pin_error(peer, seed, goal, counts);
-    pin_jacobian(peer, seed, work.jac, counts);
-    work.normal.noalias() = work.jac.transpose() * work.jac;
-    pin_lm_state state{std::move(seed), error, error.squaredNorm(),
-        pin_initial_damping(work.normal), 2.0};
-
-    for (int iteration = 0; iteration < budget.units; ++iteration)
-    {
-        if (pin_converged(state.error, budget.tolerance))
-        {
-            return pin_lm_answer{state.q, true, iteration};
-        }
-        pin_lm_step(peer, work, goal, state, counts);
-    }
-    return pin_lm_answer{state.q, pin_converged(state.error, budget.tolerance), budget.units};
+    return true;
 }
 
 }

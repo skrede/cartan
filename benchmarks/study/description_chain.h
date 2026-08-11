@@ -43,9 +43,9 @@ struct description_spec
 /// Both UR arguments are load-bearing: without them the description falls back
 /// to its own ur5x default, a placeholder variant shipping no joint-limits
 /// file, and the load fails on a path that is not there.
-inline const std::array<description_spec, 8>& description_specs()
+inline const std::array<description_spec, 9>& description_specs()
 {
-    static const std::array<description_spec, 8> specs{
+    static const std::array<description_spec, 9> specs{
         description_spec{
             "abb", "abb/abb_irb120_support/urdf/irb120_3_58.xacro", {}, 6, "abb_irb120"},
         description_spec{
@@ -54,7 +54,11 @@ inline const std::array<description_spec, 8>& description_specs()
         description_spec{
             "kuka_experimental",
             "kuka_experimental/kuka_lbr_iiwa_support/urdf/lbr_iiwa_14_r820.urdf",
-            {}, 7, "kuka_lbr_med14"},
+            {}, 7, "kuka_lbr_iiwa14_r820"},
+        description_spec{
+            "lbr_med14_r820_description",
+            "lbr_med14_r820_description/urdf/lbr_med14_r820.urdf.xacro",
+            {}, 7, "kuka_lbr_med14_r820"},
         description_spec{
             "franka_ros", "franka_ros/franka_description/robots/panda/panda.urdf.xacro",
             {}, 7, "franka_panda"},

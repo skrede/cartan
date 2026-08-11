@@ -49,6 +49,20 @@ FetchContent_Declare(
     SYSTEM
 )
 
+# The LBR Med is a distinct product from the LBR iiwa that kuka_experimental
+# carries, and no revision of that repository describes it. Like ur_description
+# below, this repository is itself the package its document addresses through
+# $(find), so the checkout is named for the package.
+FetchContent_Declare(
+    lbr_med_descriptions
+    GIT_REPOSITORY https://github.com/lbr-stack/lbr_med14_r820_description.git
+    GIT_TAG 990d95ea87691f88b779acbbe9a3d3be4906003a
+    SOURCE_DIR "${CARTAN_BENCH_DESCRIPTION_ROOT}/lbr_med14_r820_description"
+    SOURCE_SUBDIR does-not-exist
+    EXCLUDE_FROM_ALL
+    SYSTEM
+)
+
 # This repository is itself the ur_description package -- its manifest sits at
 # the repository root -- so the checkout is named for the package, which is what
 # package://ur_description/... resolves against under the root.
@@ -102,7 +116,8 @@ endfunction()
 cartan_bench_record_description_pins(CARTAN_BENCH_DESCRIPTION_PINS)
 
 FetchContent_MakeAvailable(
-    abb_descriptions kuka_descriptions franka_descriptions universal_robots_descriptions)
+    abb_descriptions kuka_descriptions franka_descriptions lbr_med_descriptions
+    universal_robots_descriptions)
 
 message(STATUS
     "cartan benchmarks: robot descriptions resolve under ${CARTAN_BENCH_DESCRIPTION_ROOT}")

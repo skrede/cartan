@@ -4,7 +4,7 @@
 /// @file pinocchio_participant.h
 /// @brief The peer solver under the one call signature every participant has.
 
-#include "pinocchio_lm.h"
+#include "pinocchio_lm_run.h"
 #include "feasible_set.h"
 #include "solve_outcome.h"
 #include "counting_chain.h"
@@ -44,7 +44,7 @@ public:
         const solve_budget& budget)
     {
         kernel_counts counts{0, 0};
-        const auto answer = detail::run_pinocchio_lm(
+        const auto answer = detail::run_pinocchio_lm<true>(
             m_peer, m_work, to_pinocchio(target), Eigen::VectorXd(seed), budget, counts);
         // The gate every unconstrained trust-region solve in this repository
         // consults at convergence, and what makes this loop comparable with the

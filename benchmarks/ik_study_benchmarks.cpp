@@ -76,6 +76,46 @@ void bm_study_pinocchio_lm(benchmark::State& state)
     const auto& feasible = study_feasible_set();
     const auto& pool = study_target_pool();
     const auto budget = rung_budget(static_cast<int>(state.range(0)));
+    auto peer = cartan::bench::build_pinocchio_model<study_joints>(feasible.chain(), "timed");
+    cartan::bench::detail::pin_lm_scratch work(study_joints);
+    int index = 0;
+
+    for (auto _ : state)
+    {
+        auto outcome = cartan::bench::timed_pinocchio_lm<study_joints>(
+            peer, work, pool.target(index), pool.seed(index), budget);
+        benchmark::DoNotOptimize(outcome);
+        index = (index + 1 == pool_targets) ? 0 : index + 1;
+    }
+}
+#endif
+
+/// What the two adapters cost when their counters are left in the measured
+/// block. Published beside the figures above because "the instrumentation is
+/// negligible" is a claim, and a study that makes it without measuring it is
+/// the kind this one exists to replace.
+void bm_study_cartan_lm_counted(benchmark::State& state)
+{
+    const auto& feasible = study_feasible_set();
+    const auto& pool = study_target_pool();
+    const auto budget = rung_budget(static_cast<int>(state.range(0)));
+    cartan::bench::cartan_lm_solver solver;
+    int index = 0;
+
+    for (auto _ : state)
+    {
+        auto outcome = solver(feasible, pool.target(index), pool.seed(index), budget);
+        benchmark::DoNotOptimize(outcome);
+        index = (index + 1 == pool_targets) ? 0 : index + 1;
+    }
+}
+
+#ifdef CARTAN_BENCH_STUDY_HAS_PINOCCHIO
+void bm_study_pinocchio_lm_counted(benchmark::State& state)
+{
+    const auto& feasible = study_feasible_set();
+    const auto& pool = study_target_pool();
+    const auto budget = rung_budget(static_cast<int>(state.range(0)));
     cartan::bench::pinocchio_lm_solver<study_joints> peer(feasible);
     int index = 0;
 
@@ -91,6 +131,8 @@ void bm_study_pinocchio_lm(benchmark::State& state)
 }
 
 BENCHMARK(bm_study_cartan_lm)->DenseRange(0, cartan::bench::k_budget_points - 1);
+BENCHMARK(bm_study_cartan_lm_counted)->DenseRange(0, cartan::bench::k_budget_points - 1);
 #ifdef CARTAN_BENCH_STUDY_HAS_PINOCCHIO
 BENCHMARK(bm_study_pinocchio_lm)->DenseRange(0, cartan::bench::k_budget_points - 1);
+BENCHMARK(bm_study_pinocchio_lm_counted)->DenseRange(0, cartan::bench::k_budget_points - 1);
 #endif

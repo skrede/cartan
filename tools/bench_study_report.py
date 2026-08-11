@@ -48,7 +48,11 @@ EXIT_HELP = """exit codes:
 
 HEADING_LINES = frozenset({table_row(HEADINGS), table_row(PAIRED_HEADINGS)})
 
-SOURCE_LINES = ("Records:", "Paired differences:")
+# The excluded-row count is a cell count in one tier and a target count in the
+# other, so comparing it verbatim would refuse every cross-check on a
+# difference of unit rather than of figure.
+SOURCE_LINES = ("Records:", "Paired differences:", "Participants declared by:",
+                "Excluded from every figure here:")
 
 
 @dataclass

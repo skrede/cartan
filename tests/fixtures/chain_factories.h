@@ -1193,6 +1193,59 @@ auto make_iiwa14_chain_extended() -> cartan::kinematic_chain<Scalar, cartan::dyn
     return chain_static.to_dynamic();
 }
 
+/// Hand-coded ground-truth chain matching lbr-stack/lbr_med14_r820_description
+/// at 990d95ea87691f88b779acbbe9a3d3be4906003a, urdf/lbr_med14_r820_macro.xacro.
+/// Every joint origin in that document carries a zero rpy, so the cumulative
+/// frame stays axis-aligned and each screw point is the running sum of the
+/// origins; the trailing fixed joint_ee offset folds into the home pose. The
+/// bounds are config/joint_limits.yaml, which states them in degrees.
+template <typename Scalar = double>
+auto make_lbr_med14_r820_chain_extended() -> cartan::kinematic_chain<Scalar, cartan::dynamic>
+{
+    using vec3 = cartan::vector3<Scalar>;
+    using mat3 = cartan::matrix3<Scalar>;
+
+    auto s1 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(0), Scalar(1.0)),
+        vec3(Scalar(0), Scalar(0), Scalar(0.147)));
+    auto s2 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(1.0), Scalar(0)),
+        vec3(Scalar(0), Scalar(-0.01), Scalar(0.3595)));
+    auto s3 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(0), Scalar(1.0)),
+        vec3(Scalar(0), Scalar(0), Scalar(0.5875)));
+    auto s4 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(-1.0), Scalar(0)),
+        vec3(Scalar(0), Scalar(0.0105), Scalar(0.7795)));
+    auto s5 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(0), Scalar(1.0)),
+        vec3(Scalar(0), Scalar(0), Scalar(0.987)));
+    auto s6 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(1.0), Scalar(0)),
+        vec3(Scalar(0), Scalar(-0.0707), Scalar(1.1795)));
+    auto s7 = cartan::screw_axis<Scalar>::revolute(
+        vec3(Scalar(0), Scalar(0), Scalar(1.0)),
+        vec3(Scalar(0), Scalar(0), Scalar(1.2705)));
+
+    mat3 R_home;
+    R_home << Scalar(1.0), Scalar(0), Scalar(0),
+              Scalar(0), Scalar(1.0), Scalar(0),
+              Scalar(0), Scalar(0), Scalar(1.0);
+    vec3 p_home(Scalar(0), Scalar(0), Scalar(1.3055));
+    auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::from_matrix(R_home).value(), p_home);
+
+    const Scalar degree = std::numbers::pi_v<Scalar> / Scalar(180);
+    auto wide = cartan::testing::limits(-Scalar(170) * degree, +Scalar(170) * degree);
+    auto narrow = cartan::testing::limits(-Scalar(120) * degree, +Scalar(120) * degree);
+    auto flange = cartan::testing::limits(-Scalar(175) * degree, +Scalar(175) * degree);
+
+    auto chain_static = cartan::kinematic_chain<Scalar, 7>(
+        home,
+        {s1, s2, s3, s4, s5, s6, s7},
+        {wide, narrow, wide, narrow, wide, narrow, flange});
+    return chain_static.to_dynamic();
+}
+
 /// Hand-coded ground-truth chain matching the vendored
 /// tests/fixtures/urdf/extended/panda.urdf. The screw axes were derived by
 /// walking the vendored URDF's joint tree from panda_link0 to the

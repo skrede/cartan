@@ -49,17 +49,19 @@ public:
         , m_table()
         , m_key()
         , m_robot()
+        , m_provenance()
     {
     }
 
-    tolerance_policy(calibration_table table, std::string key, std::string robot, double target,
-        bool include_unconverged)
+    tolerance_policy(calibration_table table, std::string key, std::string robot,
+        std::string provenance, double target, bool include_unconverged)
         : m_shared(std::numeric_limits<double>::quiet_NaN())
         , m_target(target)
         , m_include_unconverged(include_unconverged)
         , m_table(std::move(table))
         , m_key(std::move(key))
         , m_robot(std::move(robot))
+        , m_provenance(std::move(provenance))
     {
     }
 
@@ -95,10 +97,11 @@ private:
     std::optional<calibration_table> m_table;
     std::string m_key;
     std::string m_robot;
+    std::string m_provenance;
 
     const calibration_row& calibration_for(std::string_view solver) const
     {
-        const auto& row = m_table->row_for(m_key, m_robot, solver, m_target);
+        const auto& row = m_table->row_for(m_key, m_robot, m_provenance, solver, m_target);
         if (!row.converged && !m_include_unconverged)
         {
             throw std::runtime_error(std::string{solver}

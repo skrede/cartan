@@ -48,7 +48,8 @@ inline const std::vector<description_truth>& description_truths()
     static const std::vector<description_truth> truths{
         {"abb_irb120", make_abb_irb120_chain_extended<double>(), 301ULL},
         {"kuka_kr6_r900", make_kr6_sixx_chain_extended<double>(), 300ULL},
-        {"kuka_lbr_med14", make_iiwa14_chain_extended<double>(), 104ULL},
+        {"kuka_lbr_iiwa14_r820", make_iiwa14_chain_extended<double>(), 104ULL},
+        {"kuka_lbr_med14_r820", make_lbr_med14_r820_chain_extended<double>(), 108ULL},
         {"franka_panda", make_panda_chain_extended<double>(), 200ULL},
         {"universal_robots_ur3e", make_ur3e_chain_extended<double>(), 100ULL},
         {"universal_robots_ur5e", make_ur5e_chain_extended<double>(), 105ULL},

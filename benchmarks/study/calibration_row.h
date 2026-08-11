@@ -13,6 +13,11 @@
 /// `converged` is what keeps the two apart when the search fails: a row whose
 /// flag is false carries the closest accuracy the solver reached rather than
 /// the target it was asked for, and no reader of the table may treat it as met.
+///
+/// The provenance is on the row because the bounds a calibration ran under
+/// change what tolerance delivers an accuracy: a figure searched against
+/// invented bounds does not transfer to a run under the manufacturer's, and a
+/// table without the column cannot even say which one it holds.
 
 #include <cmath>
 #include <string>
@@ -28,6 +33,7 @@ struct calibration_row
 {
     std::string table;
     std::string robot;
+    std::string limits_provenance;
     std::string solver;
     double accuracy_target;
     double calibrated_tolerance;
@@ -50,8 +56,8 @@ inline bool target_reached(double achieved_median, int n, double target, int sub
 
 inline std::string_view calibration_header()
 {
-    return "table,robot,solver,accuracy_target,calibrated_tolerance,achieved_median,"
-           "achieved_p95,n,converged";
+    return "table,robot,limits_provenance,solver,accuracy_target,calibrated_tolerance,"
+           "achieved_median,achieved_p95,n,converged";
 }
 
 /// An accuracy measured over nothing is written empty rather than as a number.
@@ -64,9 +70,10 @@ inline std::string achieved_field(double value, int n)
 
 inline std::string calibration_csv_row(const calibration_row& row)
 {
-    return std::format("{},{},{},{:.17g},{:.17g},{},{},{},{:d}", row.table, row.robot, row.solver,
-        row.accuracy_target, row.calibrated_tolerance, achieved_field(row.achieved_median, row.n),
-        achieved_field(row.achieved_p95, row.n), row.n, row.converged);
+    return std::format("{},{},{},{},{:.17g},{:.17g},{},{},{},{:d}", row.table, row.robot,
+        row.limits_provenance, row.solver, row.accuracy_target, row.calibrated_tolerance,
+        achieved_field(row.achieved_median, row.n), achieved_field(row.achieved_p95, row.n), row.n,
+        row.converged);
 }
 
 }

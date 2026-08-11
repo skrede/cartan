@@ -28,6 +28,7 @@ struct calibration_options
 {
     std::string table;
     std::string robot;
+    std::string provenance;
     std::string command;
     int targets;
     double accuracy;
@@ -36,6 +37,7 @@ struct calibration_options
     calibration_options()
         : table("c")
         , robot("irb120")
+        , provenance("description")
         , command()
         , targets(k_calibration_targets)
         , accuracy(std::numeric_limits<double>::quiet_NaN())
@@ -61,6 +63,7 @@ inline bool apply_calibration_option(
 {
     if (flag == "--table") { options.table = one_table(value); return true; }
     if (flag == "--robot") { options.robot = value; return true; }
+    if (flag == "--limits") { options.provenance = one_provenance(value); return true; }
     if (flag == "--targets") { options.targets = to_count(value, 1); return true; }
     if (flag == "--accuracy") { options.accuracy = a_distance(value); return true; }
     if (flag == "--out") { options.out = value; return true; }

@@ -57,11 +57,13 @@ struct declared_participant
     bool kernel_countable;
 };
 
-inline const std::array<declared_participant, 3>& declared_participants()
+inline const std::array<declared_participant, 5>& declared_participants()
 {
-    static const std::array<declared_participant, 3> declared{
+    static const std::array<declared_participant, 5> declared{
         declared_participant{"cartan_lm", "", true},
+        declared_participant{"cartan_restart_lm", "", true},
         declared_participant{"pinocchio_lm", "pinocchio", true},
+        declared_participant{"pinocchio_restart_lm", "pinocchio", true},
         declared_participant{"trac_ik", "trac_ik", false}};
     return declared;
 }

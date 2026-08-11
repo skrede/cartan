@@ -5,7 +5,7 @@
 /// @brief Reading one row of a calibration table back off disk.
 ///
 /// The file this reads determines the tolerance every participant of an
-/// accuracy-mode run is asked for, so a line short of its nine fields is
+/// accuracy-mode run is asked for, so a line short of its ten fields is
 /// refused by number rather than filled in: a row read as something other than
 /// what was written would drive a solver at a tolerance nobody measured.
 
@@ -57,14 +57,14 @@ inline double to_achieved(const std::string& text)
 inline calibration_row parse_calibration_row(const std::string& line, int number)
 {
     const auto fields = split_fields(line);
-    if (fields.size() != 9)
+    if (fields.size() != 10)
     {
         throw std::runtime_error("line " + std::to_string(number) + " carries "
-            + std::to_string(fields.size()) + " fields against the nine a calibration row has");
+            + std::to_string(fields.size()) + " fields against the ten a calibration row has");
     }
-    return calibration_row{fields[0], fields[1], fields[2], std::stod(fields[3]),
-        std::stod(fields[4]), to_achieved(fields[5]), to_achieved(fields[6]),
-        std::stoi(fields[7]), fields[8] == "1"};
+    return calibration_row{fields[0], fields[1], fields[2], fields[3], std::stod(fields[4]),
+        std::stod(fields[5]), to_achieved(fields[6]), to_achieved(fields[7]),
+        std::stoi(fields[8]), fields[9] == "1"};
 }
 
 }

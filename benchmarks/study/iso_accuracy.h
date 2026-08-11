@@ -15,6 +15,9 @@
 /// The lookup refuses rather than substitutes. A participant this table does not
 /// cover cannot be run at a default tolerance in a mode whose whole claim is
 /// matched accuracy: the resulting table would say the opposite of what happened.
+/// The bounds a row was searched under are part of its identity for the same
+/// reason, so a run under one provenance cannot silently read a row measured
+/// under the other.
 
 #include "calibration_row.h"
 #include "calibration_parse.h"
@@ -81,27 +84,28 @@ public:
     }
 
     const calibration_row& row_for(std::string_view table, std::string_view robot,
-        std::string_view solver, double target) const
+        std::string_view provenance, std::string_view solver, double target) const
     {
         for (const auto& row : m_rows)
         {
-            if (row.table == table && row.robot == robot && row.solver == solver
-                && detail::same_target(row.accuracy_target, target))
+            if (row.table == table && row.robot == robot && row.limits_provenance == provenance
+                && row.solver == solver && detail::same_target(row.accuracy_target, target))
             {
                 return row;
             }
         }
         throw std::runtime_error(std::string{solver} + ": the calibration table carries no row for "
-            + std::string{robot} + " on table " + std::string{table} + " at accuracy target "
+            + std::string{robot} + " on table " + std::string{table} + " under "
+            + std::string{provenance} + " bounds at accuracy target "
             + std::format("{:g}", target)
             + ", and running it at a default tolerance in a matched-accuracy mode would produce a "
               "table saying the opposite of what happened");
     }
 
-    double tolerance_for(std::string_view table, std::string_view robot, std::string_view solver,
-        double target) const
+    double tolerance_for(std::string_view table, std::string_view robot,
+        std::string_view provenance, std::string_view solver, double target) const
     {
-        return row_for(table, robot, solver, target).calibrated_tolerance;
+        return row_for(table, robot, provenance, solver, target).calibrated_tolerance;
     }
 
 private:
