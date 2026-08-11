@@ -101,6 +101,7 @@ public:
             return;
         }
 
+        m_q = detail::poison_joint_position<scalar_type, joints>(chain.num_joints());
         m_setup_joints = chain.num_joints();
 
         m_chain = &chain;
