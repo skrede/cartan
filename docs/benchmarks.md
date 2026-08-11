@@ -1,343 +1,538 @@
 # Benchmarks
 
-Cartan is benchmarked head-to-head against TRAC-IK/KDL and Pinocchio on a nine-robot
-suite, covering forward kinematics, the Jacobian, and inverse kinematics (wall time,
-success rate, iterations, and pose accuracy). The head-to-head tables come from a
-single measured sweep so they are internally comparable; the accuracy-gate section
-adds a second sweep that drives every solver at a matched, varying convergence gate.
+This page publishes two kinds of measurement, captured on one machine on 2026-08-11 and kept
+apart because they answer different questions.
 
-## Setup
+The **iterative study** is a peer comparison among iterative inverse-kinematics solvers. It is not
+a comparison against one incumbent: cartan's Levenberg-Marquardt and a Levenberg-Marquardt driven
+over another library's kinematics kernels differ by less than the spread between repetitions on
+the axis that matters to a solver's user, which is how often it returns a usable answer. What the
+study varies, one axis at a time, is the kinematics kernels underneath a fixed algorithm, and the
+search strategy above fixed kernels.
+
+The **microbenchmarks** measure single operations — forward kinematics, the Jacobian, and the Lie
+group primitives underneath both. There a ratio against a reference implementation is a meaningful
+quantity, and this page states it.
+
+Every number below carries a source marker naming the record file it was computed from. Those
+records ship in this repository under `docs/benchmarks/raw/`, and
+`tools/check_benchmark_claims.py` refuses a claim whose record is missing.
+
+## Conditions
+
+<!-- source: docs/benchmarks/raw/2026-08-11/ladder/environment.json -->
 
 | | |
 |---|---|
-| Measured | 2026-07-12, except the `cartan_racing` success row (2026-08-03; see the note under that table) |
-| CPU | AMD Ryzen 7 5800X3D, pinned to one core (`taskset -c 4`) |
-| Build | Release, `-O3 -DNDEBUG`, system GCC |
-| Eigen | matched to the Pinocchio ABI (Pinocchio pixi environment) |
-| Harness | Google Benchmark, `--benchmark_repetitions=3 --benchmark_min_time=0.5s`, `real_time` **median** |
-| Compared | cartan · TRAC-IK/KDL · Pinocchio |
-| Robots | UR3e, ABB IRB 120, KUKA KR 6 R900 SIXX, Franka Panda, Fetch, Kinova Jaco2, Rethink Baxter, KUKA LWR 4+, KUKA LBR Med 14 |
-| IK protocol | 2000 FK-walked (reachable) targets per robot; accuracy gate 1e-5 rad / 1e-5 m by default, swept 1e-4…1e-7 |
-| Accuracy gate | one shared value (`CARTAN_BENCH_TOL`) sets cartan's convergence, TRAC-IK's `eps`, and the verifier |
-| TRAC-IK | `Speed` mode, 50 ms per-solve cap, `eps = gate/√3` (see gate note below) |
+| CPU | AMD Ryzen 7 5800X3D, 8 physical cores |
+| Simultaneous multithreading | off, read back from the kernel after writing |
+| Frequency boost | off, read back from the kernel after writing |
+| Governor | `performance` (`amd-pstate-epp`) |
+| Kernel | 6.18.42-1-lts |
+| Compiler | GCC 16.1.1, Release |
+| Standard library | libstdc++ 16 (20260728) |
+| Eigen | 3.4.0 |
+| Study passes | 3 independent sweeps of the full matrix |
+| Microbenchmark repetitions | 5, median reported |
 
-Each cell measures one thing. The harness was hardened so that dead-code elimination cannot
-fold away an op (every cell cycles varied inputs) and so no cross-library cell does unequal
-work. Success accounting is **not** symmetric across libraries — see the two qualifications
-below before quoting any IK comparison.
+Dependencies are recorded in three classes, because they are three different kinds of evidence. A
+**fetched** dependency is pinned to an immutable commit by this project's build. A **discovered**
+one is whatever the machine resolved, and carries the version it reported. A **generated** one was
+produced by a code generator and carries the generator's own provenance.
 
-## Read before quoting numbers
+| dependency | class | identity |
+|---|---|---|
+| `benchmark` | fetched | 1.9.5 at `192ef100` |
+| `meios` | fetched | `b772a310` |
+| `argmin` | fetched | `864d558c` |
+| `pinocchio` | discovered | 4.0.0 |
+| `orocos_kdl` | discovered | 1.5.3 |
+| `trac_ik` | discovered | 2.0.0 at `9511f2f3` |
+| `nlopt` | discovered | 2.11.0 |
+| `lapack` | discovered | 3.11.0 |
+| `ik_geo` | discovered | 0.1.2 |
+| `ikfast_kr6r900` | generated | ikfast `0x1000004c`, kinematics hash `06b2c8e082c6110f0c322529e18b8ef5` |
 
-> **The cartan-vs-TRAC-IK IK comparison below is under revision and its headline ratio should
-> not be quoted.** Two defects in the experiment were identified in a 2026-07-25 audit and
-> reproduced against the harness source:
->
-> 1. **The compared problems are not the same feasible set.** The highlighted `cartan_restart_lm`
->    row runs with `no_limits`, while TRAC-IK is
->    constructed with explicit `q_min`/`q_max`. cartan is solving an unconstrained problem and
->    TRAC-IK a box-constrained one. The paired `cartan_restart_lm_clamped` row (47.8–70.4%
->    success, 5–8× slower) shows that limit treatment is material, so the two cannot be read as
->    like-for-like. Post-step clamping is not cartan's best bounded method, but no bound-aware
->    cartan variant has been measured against TRAC-IK yet.
-> 2. **Success is verified asymmetrically.** TRAC-IK success is gated on an independently
->    recomputed pose error. cartan success is taken from `result.has_value()`;
->    the recomputed errors are accumulated into the accuracy columns but never gate
->    the success count. cartan's convergence criteria are set to the same gate, so the two
->    definitions may agree closely — but that agreement is unmeasured, and it is not the
->    independent verification claimed here previously.
->
-> Consequently the 11–42× per-core figure and the "matches TRAC-IK's success" statement are
-> **not established by this experiment**. The wall-time and accuracy columns are unaffected by
-> (2) and remain as measured; what is unsupported is the constraint-feasible parity that makes
-> them comparable. The study is being rebuilt with identical feasible sets, independent pose and
-> limit verification for every solver, pinned comparator revisions, published raw per-target
-> data, and success-versus-budget curves in place of a single timeout.
+The robot descriptions are fetched from their upstream repositories rather than transcribed, so a
+joint limit in this study is the one the manufacturer's description declares.
 
-- **No CPU exclusivity, and the budget mechanisms differ.** The benchmark process is
-  pinned to one core, but pinning constrains which core it uses; it does not stop other
-  work on the machine contending for that core, its SMT sibling, memory bandwidth or
-  shared cache. None of the figures here was captured on an otherwise idle machine.
-  The effect is **not** uniform noise: TRAC-IK is budgeted by a 50 ms wall-clock cap
-  while cartan's cells are budgeted in work units, so under contention TRAC-IK completes
-  fewer iterations inside its fixed cap and its success rate falls, while cartan spends
-  its full work-unit budget however long that takes. A contended run therefore
-  systematically flatters cartan against TRAC-IK. Treat every wall-time figure and every
-  TRAC-IK success figure as carrying that exposure; the cartan-versus-cartan success
-  comparisons are work-budgeted on both sides and are insensitive to it.
-- **Reachable targets only.** Targets are generated by walking FK from random joint
-  configurations, so every target is reachable. This is the regime where cartan and
-  closed-form solvers are strongest; on bounding-box-uniform (often unreachable) targets,
-  the success gaps widen and shift.
-- **Synthetic ±π joint limits.** Every chain uses symmetric ±π limits, not the manufacturer
-  limits. This affects which seeds canonicalize in-range and slightly flatters limit-aware
-  variants relative to a real robot's asymmetric limits.
-- **Success rates are survivor-biased means.** Iteration and pose-error columns are averaged
-  over *successful* solves only, so a solver that fails the hard targets is scored only on
-  the easy ones it did solve.
-- **Single-core pinning, and TRAC-IK is multi-threaded.** The whole process is pinned to one
-  core. cartan's solvers are single-threaded, so their figures are both latency and CPU cost.
-  TRAC-IK's default `Speed` mode races two threads (a KDL Newton solver and an SQP solver)
-  and returns on the first success; pinned to one core those threads serialize, so the
-  TRAC-IK wall time here is its per-core total work, not its idle-machine latency. On a spare
-  core its wall-clock latency would be lower (the threads run in parallel), but its per-solve
-  CPU work is unchanged. Read the comparison as per-core efficiency, not idle-machine latency.
-- **Matched convergence gate (∞-norm vs 2-norm).** TRAC-IK terminates on `KDL::Equal`, a
-  component-wise ∞-norm at its `eps`; the harness verifies on a 2-norm body-twist error. A
-  component-wise bound of `eps` admits a 2-norm up to `√3·eps`, so at a gate `g` TRAC-IK is
-  constructed with `eps = g/√3` and every solver — cartan's convergence criteria included — is
-  verified at 2-norm `g`. Both cartan's stopping tolerance and TRAC-IK's `eps` derive from the
-  same `g`, so lowering `g` tightens both at once; the accuracy-gate section sweeps `g` over
-  1e-4…1e-7. Under this matched gate, TRAC-IK's own success count and the independent FK
-  re-verification agree to within rounding (except where the 50 ms cap bites at the tightest
-  gate). Only its iteration count is blank (its API does not export it).
+## The participants
 
-## Summary
+`cartan_lm` and `cartan_restart_lm` are this repository's Levenberg-Marquardt, single-start and
+restarting.
 
-- **Speed (IK).** cartan solves in 17–27 µs (default LM) versus TRAC-IK's 214–1110 µs of
-  per-core work on the same single core. The ratio is **not quotable as a like-for-like
-  advantage**: cartan is running unconstrained here and TRAC-IK box-constrained (see the
-  qualification above). Both wall-time columns are as measured, and the ratio is stable across
-  accuracy gates, but the comparison establishes cost on two different problems.
-- **Success.** `cartan_restart_lm` reaches 98–100% by its own return status (≥99.4% on seven
-  of nine robots; 98.4% UR3e, 98.2% Panda) and `cartan_racing` 90.15–99.95%. TRAC-IK, gated on
-  independently recomputed pose error at the matched tolerance, is 99.7–100%. These two
-  percentages are **not the same measurement** — cartan's is unverified and unconstrained,
-  TRAC-IK's is verified and bounded — so no parity or advantage claim follows from them.
-- **Accuracy is a dial, not a fixed property.** Both solvers deliver position error
-  proportional to the gate — one decade of gate buys one decade of accuracy for each. cartan's
-  LM family settles at ~0.2× the gate (2.0–2.8 µm at 1e-5), TRAC-IK a few× tighter still
-  (0.3–1.1 µm at 1e-5) because its ∞-norm stop over-converges. Neither is "more accurate":
-  cartan dialed one decade tighter (gate 1e-6, ~0.2 µm, ~20 µs) is tighter than TRAC-IK at 1e-5
-  (~0.3–1.1 µm) and reaches it in a fraction of the time (~230 µs). See the accuracy-gate sweep.
-- **Gate sensitivity differs.** cartan is essentially gate-independent in cost and reported
-  success: `cartan_restart_lm` holds 98–100% and moves only ~2–4 µs across four decades of gate
-  (1e-4→1e-7). TRAC-IK's per-core time grows 1.4–2.3×, and its verified success falls from 100%
-  to 66–84% at 1e-7. That success collapse is a **censoring artifact of the fixed 50 ms cap**,
-  not a measured robustness limit — the two solvers are budgeted by different mechanisms
-  (wall-clock cap vs work units), so this does not establish a widening advantage. Establishing
-  one requires success-versus-budget curves for both. See the accuracy-gate sweep.
-- **Jacobian.** The whole-solve comparison (random q → Jacobian, matching KDL's
-  `JntToJac`) makes cartan's analytic Product-of-Exponentials Jacobian **~2.3–2.6× faster than
-  KDL** (367–448 ns vs 865–1085 ns). With the pose already computed, the *marginal* Jacobian
-  is 44–61 ns (~15–20× the KDL whole-solve figure) — a real number, but only for callers that
-  already hold FK.
-- **FK.** cartan is **~0.8× KDL/Pinocchio** — slightly *slower*; this is the screw/PoE
-  forward-kinematics tradeoff, reported as measured.
+`pinocchio_lm` and `pinocchio_restart_lm` are **this repository's Levenberg-Marquardt driven over
+Pinocchio's kinematics kernels**. Pinocchio ships no inverse-kinematics solver, so there is no
+Pinocchio solver here to compare against. Both call `framesForwardKinematics`,
+`computeFrameJacobian` and `log6`; everything above those calls is this repository's code,
+including the damping update, the stall and divergence rules, and the joint-limit gate. That is
+what makes the pair a comparison of kinematics kernels with the algorithm held fixed, and it also
+means these rows say nothing about Pinocchio as a solver. Sharing this repository's termination
+rules moves the peer's success rate on the near-singular stratum by 2.8 points relative to a peer
+terminating on its own rules.
 
-## Inverse kinematics
+`trac_ik` is the external comparator. It is budgeted by wall clock where every other participant is
+budgeted by kernel evaluations. The two denominations are not commensurable, and no figure on this
+page converts between them.
 
-`cartan_*` rows are cartan's LM family and scheduler variants, sourced from the cartan-vs-TRAC-IK
-benchmark; the broader solver matrix (DLS, projected-LM, L-BFGS-B, Newton-Raphson, NLopt,
-racing) is measured in `basic_ik_full_benchmarks`.
+## Method
 
-### Wall time per solve (µs)
+<!-- source: docs/benchmarks/raw/2026-08-11/ladder/table_c_cells.csv -->
 
-| method | UR3e | IRB 120 | KR 6 | Panda | Fetch | Jaco2 | Baxter | LWR 4+ | LBR Med 14 |
-|---|---|---|---|---|---|---|---|---|---|
-| cartan_restart_lm | 42 | 19 | 19 | 29 | 19 | 28 | 25 | 17 | 17 |
-| cartan_racing | 382 | 187 | 197 | 200 | 125 | 276 | 149 | 111 | 107 |
-| cartan (LM) | 27 | 19 | 19 | 22 | 18 | 24 | 21 | 17 | 17 |
-| cartan_speed | 118 | 77 | 76 | 84 | 53 | 99 | 66 | 53 | 52 |
-| cartan_restart_lm_clamped | 162 | 127 | 130 | 167 | 137 | 151 | 158 | 125 | 126 |
-| TRAC-IK (per-core) | 1110 | 220 | 214 | 283 | 238 | 543 | 289 | 222 | 231 |
+**One feasible set per run.** The harness constructs a single feasible set and hands it to every
+participant. No participant can be given a different problem from the one beside it, because
+there is no per-solver limits argument to give it.
 
-The `cartan_racing` times above predate the work-budget correction described under the
-success-rate table. Two later captures, one on each side of that correction, put the row
-within measurement variation of these figures on eight robots and about 13% below on UR3e,
-so the correction does not falsify them — the halved budget bites on the poses that fail
-anyway, not on the ones that converge early. They are left as measured rather than
-restated, because no capture on this machine had CPU exclusivity and a wall-time figure is
-the quantity that exposure moves. A re-capture on a quiet machine is owed for the whole
-table.
+**Success is the harness's verdict, not the solver's claim.** Every returned joint vector is run
+back through forward kinematics and scored against the target. The solver's own return code is
+recorded separately, as the self-reported column, so the two can disagree in the record and be
+counted when they do.
 
-### Success rate (%)
+**Six strata.** Targets are drawn as `reachable`, `boundary`, `near_singular`, `limit_adjacent`,
+`warm_start_trajectory` and `unreachable`. The unreachable stratum carries no success rate: its
+targets are not known to be reachable, so a solver reporting failure there is right rather than
+unsuccessful, and what it is scored on is the three-outcome breakdown below.
 
-TRAC-IK rows are gated on an independently recomputed pose error at the matched `eps/√3`
-gate; its own return-code rate is identical to that verified rate on every robot (shown once).
-`cartan_*` rows report the solver's own success status and are **not** independently verified —
-the harness recomputes their pose error for the accuracy columns but does not gate on it.
+**A budget ladder, not a timeout.** Each participant is run at six budget rungs — 9, 27, 81, 243,
+729 and 2187 kernel evaluations — so what is published is success against compute rather than
+success at one arbitrary cut-off. The wall-clock-budgeted comparator is run at the rungs its own
+denomination admits, 1.5 ms through 50 ms.
 
-| method | UR3e | IRB 120 | KR 6 | Panda | Fetch | Jaco2 | Baxter | LWR 4+ | LBR Med 14 |
-|---|---|---|---|---|---|---|---|---|---|
-| cartan_restart_lm | 98.4 | 100 | 100 | 98.2 | 100 | 99.4 | 99.9 | 100 | 100 |
-| cartan_racing | 90.15 | 99.30 | 99.55 | 97.70 | 99.95 | 96.95 | 99.25 | 99.75 | 99.65 |
-| cartan (LM) | 75.2 | 99.8 | 99.7 | 92.3 | 99.9 | 94.9 | 93.1 | 100 | 100 |
-| cartan_speed | 84.8 | 97.4 | 97.6 | 94.9 | 99.6 | 93.4 | 98.7 | 99.1 | 99.1 |
-| cartan_restart_lm_clamped | 47.8 | 66.8 | 65.3 | 48.3 | 69.3 | 57.0 | 58.9 | 70.4 | 68.8 |
-| TRAC-IK (verified = rc) | 99.7 | 100 | 100 | 100 | 100 | 100 | 100 | 100 | 100 |
+**Two limits provenances.** Every cell is run once against the manufacturer's declared joint
+limits and once against the symmetric ±π box that the previous version of this study used, so the
+effect of that choice is a measured axis rather than an assumption.
 
-The `cartan_racing` row is re-measured and carries its values unrounded; every other row is
-as first published. An earlier version of this row read `96.8 | 99.9 | 100 | 99.9 | 100 |
-99.5 | 100 | 100 | 100`, and those figures were wrong in cartan's favor. The racing cell
-declares a budget of 500 work units, but the racing entry point counted round-robin ticks
-against a separate cap and never read that field; with two policies each billing a unit per
-tick, the cell was spending roughly twice the budget it declared. Racing now bills work
-units against the budget like every other path, and the row above is the first measurement
-of those cells at the budget they ask for. The solver did not get worse — it stopped
-receiving compute it was never configured for. Nothing was retuned to obtain these numbers:
-no cell budget was resized, since restoring the old spend would have preserved a two-fold
-compute advantage over the external comparators inside this table.
+**Three periodic rules, three tables.** A joint's range may span more than a full turn, which makes
+"the same configuration" ambiguous. Rather than pick one convention, the study runs three:
 
-`cartan_restart_lm` is the closest structural analog to TRAC-IK — like TRAC-IK's `Speed` mode it
-is a multi-start strategy — but it is not a like-for-like comparator as measured here: it runs
-unconstrained against TRAC-IK's bounded problem, and its success column is unverified. Read the
-two success figures as describing different experiments. `cartan_racing` is cartan's own
-multi-strategy analog of TRAC-IK's dual-solver approach. The single LM stepper (`cartan (LM)`)
-is the bare inner loop — a component, not the recommended solver — and trails on the hardest
-chains (UR3e in particular); it is shown to expose what the multi-start wrapper buys.
-`cartan_restart_lm_clamped` trades success for strict joint-limit clamping and is included to
-show that cost.
+| table | rule |
+|---|---|
+| A | a joint whose declared range spans at least a full turn is treated as unbounded |
+| B | unbounded while solving, canonicalized for verification and comparison |
+| C | canonicalized to (-π, π] throughout |
 
-### Average iterations to converge
+Each table is its own experiment with its own records and its own conclusions. Nothing on this page
+combines two of them, and the analysis script emits no statistic that spans them.
 
-TRAC-IK does not expose iteration counts.
+## What the declared limits actually are
 
-| method | UR3e | IRB 120 | KR 6 | Panda | Fetch | Jaco2 | Baxter | LWR 4+ | LBR Med 14 |
-|---|---|---|---|---|---|---|---|---|---|
-| cartan_restart_lm | 31 | 14 | 14 | 16 | 11 | 20 | 16 | 11 | 11 |
-| cartan (LM) | 14 | 14 | 14 | 11 | 11 | 16 | 11 | 11 | 11 |
-| cartan_speed | 69 | 53 | 53 | 49 | 33 | 64 | 40 | 34 | 34 |
+<!-- source: docs/benchmarks/raw/2026-08-11/ladder/environment.json -->
 
-### Mean position error (µm)
+The periodic rule only has a subject where a joint's range spans a full turn, and the limits
+change only bites where the declared range differs from ±π. Both vary strongly by robot:
 
-Averaged over successful solves, with the pose error recomputed from FK against the target
-rather than read from the solver's own residual.
-
-| method | UR3e | IRB 120 | KR 6 | Panda | Fetch | Jaco2 | Baxter | LWR 4+ | LBR Med 14 |
-|---|---|---|---|---|---|---|---|---|---|
-| cartan_restart_lm | 2.46 | 2.31 | 2.19 | 2.01 | 2.06 | 2.78 | 2.04 | 1.99 | 2.02 |
-| cartan (LM) | 2.46 | 2.30 | 2.19 | 1.98 | 2.05 | 2.76 | 2.01 | 1.99 | 2.02 |
-| TRAC-IK | 1.12 | 0.31 | 0.34 | 0.45 | 0.41 | 0.33 | 0.44 | 0.49 | 0.47 |
-
-TRAC-IK's tighter mean is a direct consequence of its `eps/√3` stopping gate; cartan stops at
-its 1e-5 tolerance and does not iterate further. Both track the gate down together — the
-accuracy-gate sweep below shows how far.
-
-## Accuracy gate (QoS) sweep
-
-The gate was a single knob: one value (`CARTAN_BENCH_TOL`) set cartan's convergence tolerance,
-TRAC-IK's `eps = gate/√3`, and the FK verification threshold, so both solvers were driven and
-scored at the same accuracy. Sweeping it from 1e-4 to 1e-7 answers *how much* time, iterations,
-and success move with precision. Ranges are min–max across the nine robots; `cartan_restart_lm`
-and TRAC-IK are the two solvers held to the matched gate.
-
-| gate | cartan_restart_lm time | TRAC-IK time | cartan pos err | TRAC-IK pos err | cartan success | TRAC-IK success |
+| robot | joints | wider than ±π | narrower | spans ≥ a full turn | unbounded | range excluding zero |
 |---|---|---|---|---|---|---|
-| 1e-4 | 17–42 µs | 213–1013 µs | 21.3–33.3 µm | 3.3–14.6 µm | 98.2–100% | 99.9–100% |
-| 1e-5 | 18–43 µs | 218–1125 µs | 2.0–2.8 µm | 0.30–1.12 µm | 98.2–100% | 99.8–100% |
-| 1e-6 | 19–44 µs | 232–1705 µs | 0.18–0.24 µm | 0.03–0.11 µm | 98.2–100% | 98.9–100% |
-| 1e-7 | 20–46 µs | 231–2310 µs | 0.017–0.021 µm | 0.003–0.007 µm | 98.2–100% | 65.8–83.9% |
+| `universal_robots_ur3e` | 6 | 6 | 0 | 6 | 1 | 0 |
+| `universal_robots_ur5e` | 6 | 6 | 0 | 6 | 0 | 0 |
+| `universal_robots_ur10` | 6 | 6 | 0 | 6 | 0 | 0 |
+| `universal_robots_ur16e` | 6 | 6 | 0 | 6 | 0 | 0 |
+| `kuka_kr6_r900` | 6 | 3 | 3 | 2 | 0 | 0 |
+| `abb_irb120` | 6 | 1 | 5 | 1 | 0 | 0 |
+| `franka_panda` | 7 | 1 | 6 | 0 | 0 | 1 |
+| `kuka_lbr_iiwa14_r820` | 7 | 0 | 7 | 0 | 0 | 0 |
+| `kuka_lbr_med14_r820` | 7 | 0 | 7 | 0 | 0 | 0 |
 
-- **Time.** cartan's cost is essentially gate-independent: `restart_lm` moves only ~2–4 µs
-  (≈10%) across the full four-decade range, because LM converges quadratically near the root, so
-  a tighter gate costs at most a step or two. TRAC-IK's per-core time rises with the gate —
-  modestly on the easy chains (IRB 120 226→311 µs, 1.4×) and steeply on the hardest (UR3e
-  1013→2310 µs, 2.3×).
-- **Iterations.** `cartan_restart_lm` adds only ~0.6 iterations per decade of gate (IRB 120
-  12.9→14.7 over three decades; UR3e 29.6→31.5) — tightening the gate is nearly free in
-  iteration count.
-- **Accuracy scales linearly with the gate.** Both solvers' mean position error drops ~10× per
-  decade, in lockstep (IRB 120: cartan 2.31→0.019 µm, TRAC-IK 0.30→0.003 µm from 1e-5 to 1e-7).
-  cartan
-  settles at ~0.2× the gate, TRAC-IK a fixed few× tighter because its component-wise Newton stop
-  overshoots the 2-norm gate. That offset is a stopping-rule artifact, not a quality gap —
-  cartan at any gate is one dial-turn from matching it, at a fraction of the cost.
-- **Success: cartan flat, TRAC-IK falls off at high precision.** `cartan_restart_lm`'s verified
-  success barely moves (Δ < 0.5 pp across the sweep) because its failures are wrong-basin, not
-  precision. TRAC-IK holds 100% down to 1e-6, then falls to 66–84% at 1e-7: it times out against
-  the 50 ms cap before reaching `eps = 1e-7/√3` on 15–35% of targets. A longer cap trades that
-  back for more solve time.
+Two consequences follow directly, and both are findings rather than caveats.
 
-Absolute times here come from the gate sweep and agree with the fixed-gate tables above to
-within run-to-run noise; the cross-gate trends are the point. **This sweep is no longer
-reproducible from this tree**: the harness it drove, and the script that drove it, were retired
-with the two defects recorded above. The figures are left as measured, and driving every
-participant at one accuracy is now the study's own calibrated iso-accuracy mode.
+**The three periodic tables have no subject on three of the nine robots.** The Franka arm and the
+two seven-axis KUKA arms declare no joint spanning a full turn, so tables A, B and C measure the
+identical problem there. On the four UR arms nearly every joint qualifies, and one UR3e joint is
+declared genuinely unbounded.
+
+**The symmetric ±π box was not uniformly the easier problem.** It is *tighter* than the declared
+range on every UR joint and on the sixth joint of the ABB and KUKA six-axis arms, and *looser* on
+the Franka arm and both seven-axis KUKA arms. One Franka joint's declared range is
+[-3.07, -0.07] rad and does not contain zero at all, so the symmetric box admitted configurations
+the real robot cannot reach.
+
+## The iterative study
+
+The three tables agree closely enough that publishing all three in full would be repetition; the
+per-stratum ladders below are table C, and the records for A and B ship beside them and rebuild
+with the same command. Where A or B differs materially it is stated.
+
+### Success against compute budget
+
+<!-- source: docs/benchmarks/raw/2026-08-11/ladder/table_c_cells.csv -->
+
+Median over the nine robots, manufacturer limits, table C. Each cell is the harness-verified
+acceptance rate at that budget rung. Columns are the five participants in the order
+`cartan_lm` / `cartan_restart_lm` / `pinocchio_lm` / `pinocchio_restart_lm` / `trac_ik`.
+
+| stratum | 9 | 27 | 81 | 243 | 729 | 2187 |
+|---|---|---|---|---|---|---|
+| reachable | 0.0/0.0/0.1/0.1/98.6 | 20.3/20.3/27.7/27.7/99.4 | 71.8/83.5/71.8/83.9/99.9 | 72.0/96.1/72.0/96.2/100.0 | 72.0/99.6/72.0/99.6/100.0 | 72.0/100.0/72.0/100.0/100.0 |
+| boundary | 0.0/0.0/0.0/0.0/97.0 | 10.2/10.2/13.4/13.4/99.6 | 53.2/54.0/53.4/54.2/99.6 | 54.8/80.0/54.8/80.2/99.8 | 54.8/97.2/54.8/97.4/100.0 | 54.8/100.0/54.8/100.0/100.0 |
+| near_singular | 0.0/0.0/0.0/0.0/96.0 | 5.8/5.8/7.8/7.8/98.0 | 57.2/59.2/59.2/61.0/98.6 | 76.4/93.0/76.4/93.2/99.2 | 76.8/99.4/76.8/99.4/99.8 | 76.8/100.0/76.8/100.0/99.8 |
+| limit_adjacent | 0.0/0.0/0.0/0.0/98.0 | 18.2/18.2/24.4/24.4/99.6 | 61.4/80.6/61.6/81.6/100.0 | 63.2/95.6/63.2/96.0/100.0 | 63.2/99.8/63.2/99.8/100.0 | 63.2/100.0/63.2/100.0/100.0 |
+| warm_start_trajectory | 0.2/0.2/10.2/10.2/99.8 | 91.4/91.4/91.4/90.0/100.0 | 96.2/97.6/96.2/97.6/100.0 | 95.4/100.0/95.4/100.0/100.0 | 95.4/100.0/95.4/100.0/100.0 | 95.4/100.0/95.4/100.0/100.0 |
+
+The comparator's column is not on the same budget denomination as the four beside it and its
+progression across these six columns is a progression across its own wall-clock rungs. Read down
+a column, not across the participant groups within one.
+
+Three things are visible in this table, and each is the answer to one of the study's questions.
+
+**The restart strategy is what closes the gap.** A single-start Levenberg-Marquardt saturates well
+below full success on every stratum — 72.0% reachable, 54.8% boundary, 63.2% limit-adjacent — and
+adding budget past 243 evaluations does not move it, because its failures are wrong-basin rather
+than under-converged. The same solver restarted reaches 100.0% on every stratum by the top rung.
+
+**The kinematics kernels contribute nothing to success.** `cartan_lm` and `pinocchio_lm` are
+identical to the digit at every rung from 243 upward, as are `cartan_restart_lm` and
+`pinocchio_restart_lm`. That is the expected result of holding the algorithm fixed and swapping
+only the kernels underneath it, and it is what licenses reading the two restarting rows as one
+finding rather than two.
+
+**The restarting solver matches the external comparator.** At the top rung both reach 100.0% on
+four of five strata; on `near_singular` the restarting solvers reach 100.0% against the
+comparator's 99.8%. No claim about relative *speed* follows from this table, for the reason given
+under the wall-time section below.
+
+### Kernel evaluations
+
+<!-- source: docs/benchmarks/raw/2026-08-11/ladder/table_c_cells.csv -->
+
+**Excluded from this axis: `trac_ik`.** The harness does not drive that solver's own iteration, so
+no kernel evaluation can be attributed to it. Its cells read *not counted* in the records; the
+count is absent rather than zero, and it is never derived from the wall-clock figure beside it.
+
+At the top rung on the reachable stratum, `cartan_lm` and `pinocchio_lm` spend the same number of
+forward-kinematics evaluations per solve — 12 to 13 across the nine robots — and the two restarting
+participants the same 15 to 26 as each other. Equal counts on this axis are what makes the wall
+time beside them a measurement of the kernels rather than of the search.
+
+### Do the return codes tell the truth?
+
+<!-- source: docs/benchmarks/raw/2026-08-11/ladder/table_c_cells.csv -->
+
+Over 243 000 scored targets per participant, manufacturer limits, all strata and all rungs:
+
+| participant | targets | claimed success that was not | claimed failure that was not |
+|---|---|---|---|
+| `cartan_lm` | 243 000 | 0 | 10 |
+| `cartan_restart_lm` | 243 000 | 0 | 5 |
+| `pinocchio_lm` | 243 000 | 0 | 11 |
+| `pinocchio_restart_lm` | 243 000 | 0 | 1 |
+| `trac_ik` | 243 000 | 0 | 0 |
+
+No participant reported a success the harness could not confirm. This is the question the previous
+version of this page could not answer about its own solvers, because it took their success from
+the return value and never gated on a recomputed pose; here every participant's claim and the
+harness's verdict are separate recorded columns, and they disagree on 27 targets out of 1 215 000,
+always in the conservative direction.
+
+### Reachability claims
+
+<!-- source: docs/benchmarks/raw/2026-08-11/ladder/table_c_reachability.csv -->
+
+Success rate and reachability-claim correctness are different questions. On the unreachable
+stratum, manufacturer limits, table C, summed across robots:
+
+| outcome | count |
+|---|---|
+| targets in the stratum | 4 500 |
+| correctly reported unreachable | 2 673 |
+| falsely claimed reached | 0 |
+| reclassified as in fact reachable | 1 827 |
+
+The reclassification count is the interesting one: 40.6% of the targets this stratum constructed
+as unreachable turned out to be solvable, which is a statement about the difficulty of generating
+a genuinely unreachable pose rather than about any solver. Every participant produced the same
+three counts. No participant claimed to have reached a target it had not.
+
+### What changed when the joint limits became the manufacturer's
+
+<!-- source: docs/benchmarks/raw/2026-08-11/ladder/table_c_cells.csv -->
+
+Median change in acceptance rate, manufacturer limits minus the symmetric ±π box, at the top rung:
+
+| stratum | `cartan_lm` | `cartan_restart_lm` | `pinocchio_lm` | `trac_ik` |
+|---|---|---|---|---|
+| reachable | −24.0 | +0.0 | −24.0 | +0.0 |
+| boundary | −10.8 | +0.0 | −10.8 | +0.0 |
+| near_singular | −9.4 | +0.0 | −9.4 | −0.2 |
+| limit_adjacent | −33.0 | +0.0 | −33.0 | +0.0 |
+| warm_start_trajectory | −4.4 | +0.0 | −4.4 | +0.0 |
+
+**The direction is not uniform, and it is not uniform by robot.** On the limit-adjacent stratum the
+single-start solver loses 62.2 points on the Franka arm, 45.2 on the ABB arm and 33.0 to 39.4 on
+the three KUKA arms — but 0.2 to 2.0 points on the four UR arms, whose declared ranges are wider
+than the box they replaced. Across the whole record set there are 260 cells in which the
+manufacturer's limits produced the *higher* acceptance rate, the largest being the KR 6 on the
+warm-start stratum at the lowest rung: 94.0% under declared limits against 16.0% under the
+symmetric box.
+
+So "the old numbers were measured on an easier problem" is true for the Franka arm and the ABB
+arm, and false for the UR arms. A success rate that rises after the limits change is a correct
+result on a differently-shaped feasible set, not a defect.
+
+**A multi-start solver is insensitive to the change.** Both restarting participants and the
+external comparator move by 0.0 to 0.2 points on every stratum. What the limits change moves is
+the single-start solver, whose failures were already wrong-basin.
+
+### Matched accuracy
+
+<!-- source: docs/benchmarks/raw/2026-08-11/accuracy/1e-06/table_c_cells.csv -->
+<!-- source: docs/benchmarks/raw/2026-08-11/iso_accuracy_calibration.csv -->
+
+The budget ladder holds compute fixed and lets accuracy fall where it may. This mode does the
+reverse: each participant's own requested tolerance is calibrated until the error the harness
+recomputes lands on a target, and the calibrated tolerance and the achieved error are published
+together. Table C, manufacturer limits, reachable stratum, median over the nine robots.
+
+| accuracy target | participant | success % | achieved position error (m) | robots on target |
+|---|---|---|---|---|
+| 1e-05 | `cartan_lm` | 72.0 | 8.34e-06 | 8/9 |
+| 1e-05 | `cartan_restart_lm` | 100.0 | 8.56e-06 | 9/9 |
+| 1e-05 | `pinocchio_lm` | 72.0 | 8.28e-06 | 8/9 |
+| 1e-05 | `trac_ik` | 100.0 | 6.39e-06 | 2/9 |
+| 1e-06 | `cartan_lm` | 72.0 | 8.86e-07 | 5/9 |
+| 1e-06 | `cartan_restart_lm` | 100.0 | 8.73e-07 | 5/9 |
+| 1e-06 | `pinocchio_lm` | 72.0 | 8.86e-07 | 5/9 |
+| 1e-06 | `trac_ik` | 100.0 | 3.64e-07 | 1/9 |
+| 1e-07 | `cartan_lm` | 72.0 | 7.30e-08 | 3/9 |
+| 1e-07 | `cartan_restart_lm` | 99.9 | 7.90e-08 | 5/9 |
+| 1e-07 | `pinocchio_lm` | 72.0 | 7.30e-08 | 3/9 |
+| 1e-07 | `trac_ik` | 99.9 | 2.44e-08 | 0/9 |
+
+The "robots on target" column is the honest limit of this mode: calibration does not always find a
+requested tolerance that lands on the wanted accuracy, and the comparator is the hardest to
+calibrate because it stops on a component-wise bound and overshoots a two-norm target. Its
+achieved error is consistently tighter than asked for, which is the same fact as its longer solve
+times rather than a separate one.
+
+`pinocchio_restart_lm` is omitted from this table. Its rows in the matched-accuracy records were
+run against a calibration entry measured while that participant was not restarting, so its
+requested tolerance there is a single-start figure and those rows are not matched-accuracy
+results. The defect is confined to that participant in this mode; the budget ladder never reads
+the calibration table.
+
+### Wall time, and why it is not a comparison here
+
+<!-- source: docs/benchmarks/raw/2026-08-11/ladder/table_c_cells.csv -->
+
+The records carry a wall-time column for every cell and it is a diagnostic, not a ranking. Four
+participants are budgeted by kernel evaluations and stop when the work runs out; the external
+comparator is budgeted by wall clock and stops when the time runs out. Two solvers that stopped
+for different reasons have not been raced. The comparator's longer times and its tighter achieved
+error are the same fact about how it was budgeted, and neither is evidence about speed.
+
+Establishing a speed comparison against it needs a capture in which the accuracy binds and the
+budget does not, on both sides. That experiment has not been run, so this page makes no speed
+claim against the external comparator.
+
+A comparison the records *do* support is the one against Pinocchio's kernels, since both sides are
+driven by the same algorithm at the same kernel budget — but the participants that produced these
+ladder records carry counting instrumentation, and the peer's inline counters cost it 1.2% to 3.1%.
+A ratio computed from these records would therefore be biased in this repository's favour, so none
+is published. The uninstrumented kernel comparison is the microbenchmark section below.
+
+## Closed-form solvers
+
+This section is separate from everything above it, and a figure must not be carried across.
+
+A closed-form solve has no budget, no iteration count and no convergence tolerance. Success against
+a compute budget is therefore not a question that can be asked of it, and forcing it onto that axis
+compares quantities that do not correspond. What can be asked is whether it is exact, how many
+branches of the inverse it returns, and how much of the pose space it admits. Those are the axes
+here, and there are no others.
+
+**This section publishes no timing.** That is deliberate, and it is why these figures did not need
+the recorded machine conditions the study above required: exactness, branch count and coverage are
+not sensitive to machine contention. A timing comparison among closed-form solvers is a different
+experiment that has not been run, and nothing here may be read as one.
+
+### Exactness and coverage
+
+<!-- source: docs/benchmarks/raw/2026-08-11/closed_form_reference.csv -->
+
+| robot | solver | exact | branches | pose-space coverage | max position error (m) | max orientation error (rad) | poses |
+|---|---|---|---|---|---|---|---|
+| ABB IRB 120 | `cartan_opw_6r` | yes | – | 41.9% | 5.13e-13 | 1.70e-13 | 10 000 |
+| KUKA KR 6 R900 | `cartan_opw_6r` | yes | – | 46.1% | 3.10e-13 | 5.49e-13 | 10 000 |
+| KUKA KR 6 R900 | `opw_kinematics` | yes | 15 168 | – | – | – | – |
+| KUKA KR 6 R900 | `ikfast_kr6r900` | yes | 15 168 | – | – | – | – |
+| KUKA KR 6 R900 | `ik_geo` | yes | 15 168 | – | – | – | – |
+
+Coverage is the fraction of a bounding-box-uniform pose set the solver admits; that probe
+deliberately over-samples outside the reachable workspace, so the figure is a property of the
+chain's workspace against its bounding box and is not a success rate. A dash marks a quantity not
+measured for that row rather than a zero: the three witness rows record branch agreement against
+this library's solver on one arm, not an independent pose measurement of their own.
+
+**Comparators absent from this capture appear as a named absence with a reason, never as a missing
+row.** None was absent here; when one is, the record tool reports it in the form
+
+```
+ABSENT opw_kinematics on kr6_sixx: its comparison benchmark was not built, so the
+comparator was not found when this build was configured
+```
+
+### What each comparator is, and how independent it is
+
+| comparator | class | identity |
+|---|---|---|
+| `cartan_opw_6r` | this library | the analytic 6R solver this repository ships |
+| `opw_kinematics` | discovered source checkout | tag 0.5.5, commit `8a32bda8197c50bd0d60dfe1d12ecb4c13111b72` |
+| `ikfast_kr6r900` | generated, vendored | ikfast `0x1000004c`, kinematics hash `06b2c8e082c6110f0c322529e18b8ef5` |
+| `ik_geo` | discovered crate | the published Rust crate `ik-geo` 0.1.2, its `spherical_two_parallel` solver, driven through a C interface shim |
+
+The build records `opw_kinematics` under its commit rather than its tag, because that project
+interpolates its own version from a package manifest and declares no literal version to read; both
+are given above.
+
+Every branch of every solver is classified by this library's own branch classifier before being
+compared, so a match never depends on either side's ordering. On 2 000 poses of the KR 6 R900 each
+comparator returned 15 168 branches and every one of them matched:
+
+| comparator | formulation | max joint disagreement (rad) |
+|---|---|---|
+| `opw_kinematics` | shares this library's ortho-parallel derivation | 0 |
+| `ik_geo` | independent — subproblem decomposition | 3.89e-13 |
+| `ikfast_kr6r900` | independent — algebraic elimination, code-generated | 1.27e-10 |
+
+**The difference between those three numbers is information, not noise.** A solver sharing the
+derivation agrees bit for bit, and a zero there means the two implementations compute the same
+expressions. The two that derive the inverse independently agree to machine precision instead,
+which is the stronger result: it is evidence that the closed form itself is right rather than that
+two copies of one formula behave alike. `ik_geo` is named here by its published crate and release
+and is not interchangeable with any other implementation of the same algorithm; no figure produced
+against a different implementation of it appears in this section.
 
 ## Forward kinematics
 
-Wall time in nanoseconds (median). `specialized` is the compile-time fixed-DOF path; `dynamic`
-uses `Eigen::Dynamic`. Their near-identical times confirm dynamic dispatch is negligible at
-these chain sizes. cartan is slightly slower than KDL and Pinocchio here — the screw/PoE
-tradeoff, and cartan additionally cycles varied inputs per iteration (defeating dead-code
-elimination) while the reference cells reuse a loop-invariant configuration, so this
-comparison is conservative toward cartan.
+<!-- source: docs/benchmarks/raw/2026-08-11/microbench/fk_pinocchio.json -->
 
-| robot | cartan (specialized) | cartan (dynamic) | KDL | Pinocchio |
-|---|---|---|---|---|
-| UR3e | 318 | 329 | 269 | 261 |
-| IRB 120 | 334 | 343 | 265 | 263 |
-| KR 6 | 336 | 344 | 266 | 261 |
-| Panda | 362 | 375 | 309 | 295 |
-| Fetch | 392 | 405 | 305 | 294 |
-| Jaco2 | 335 | 342 | 265 | 260 |
-| Baxter | 395 | 405 | 305 | 295 |
-| LBR Med 14 | 364 | 372 | 309 | 297 |
+Median of 5 repetitions, nanoseconds, captured under the conditions above with no instrumentation
+on either side. **The microbenchmarks run on a different robot set from the study**: they use this
+repository's own chain fixtures, which include three arms the study excludes for want of a fetched
+description, and exclude the four UR arms the study covers. Against Pinocchio's
+`framesForwardKinematics`, which computes and stores every intermediate placement:
+
+| robot | Pinocchio | `forward_kinematics` (quaternion) | `forward_kinematics_matrix` | matrix, static chain | matrix / Pinocchio |
+|---|---|---|---|---|---|
+| UR3e | 328.1 | 424.0 | 266.6 | 273.2 | 0.81× |
+| ABB IRB 120 | 325.1 | 441.1 | 267.0 | 241.7 | 0.82× |
+| KUKA KR 6 R900 | 325.2 | 442.0 | 266.6 | 241.7 | 0.82× |
+| Franka Panda | 377.3 | 487.1 | 311.4 | 274.7 | 0.83× |
+| Kinova Jaco2 | 324.9 | 440.3 | 266.5 | 241.8 | 0.82× |
+| Fetch | 377.5 | 527.8 | 307.6 | 298.0 | 0.81× |
+| Rethink Baxter | 377.5 | 527.8 | 307.2 | 298.2 | 0.81× |
+| KUKA LBR Med 14 | 376.9 | 486.3 | 310.7 | 274.9 | 0.82× |
+| 3R planar | 163.9 | 190.9 | 133.5 | 127.2 | 0.81× |
+
+**This page previously reported that cartan's forward kinematics is slightly slower than the
+reference implementations. That described the quaternion path, and the table it appeared in listed
+neither matrix cell.** Both statements below are what this capture measures:
+
+- The quaternion path, `forward_kinematics`, is **1.17× to 1.40× slower** than Pinocchio. It
+  returns a quaternion pose, which is what costs it here.
+- The matrix path, `forward_kinematics_matrix`, is **0.81× to 0.83× of Pinocchio on every robot in
+  the set** — faster, and unusually consistent across chain sizes. On a compile-time-sized chain it
+  is 0.73× to 0.83×.
+
+Maximum coefficient of variation across the cells in this table is 1.37%.
+
+<!-- source: docs/benchmarks/raw/2026-08-11/microbench/fk_comparison_benchmarks.json -->
+
+Against KDL's `JntToCart`, in a separate binary that carries no matrix cell:
+
+| robot | KDL | `forward_kinematics` (quaternion) | ratio |
+|---|---|---|---|
+| UR3e | 345.9 | 428.5 | 1.24× |
+| ABB IRB 120 | 341.7 | 447.2 | 1.31× |
+| KUKA KR 6 R900 | 342.0 | 440.0 | 1.29× |
+| Franka Panda | 397.4 | 484.6 | 1.22× |
+| Kinova Jaco2 | 342.2 | 440.0 | 1.29× |
+| Fetch | 392.7 | 529.8 | 1.35× |
+| Rethink Baxter | 392.4 | 530.0 | 1.35× |
+| KUKA LBR Med 14 | 397.2 | 487.2 | 1.23× |
+| 3R planar | 184.6 | 164.4 | 0.89× |
+
+No matrix-versus-KDL cell exists, so this page states none. The quaternion cell is common to both
+binaries and agrees between them to 1.1% — 424.0 against 428.5 on UR3e — which is what makes the
+two tables above comparable at all.
 
 ## Jacobian
 
-Wall time in nanoseconds (median). The like-for-like comparison is **random q → Jacobian**: cartan's
-`space_jacobian` runs `forward_kinematics` inside the timed loop, matching KDL's `JntToJac`,
-which recomputes FK internally. On that basis cartan is ~2.3–2.6× faster than KDL. The
-*marginal* Jacobian (FK already computed, second column) is 44–61 ns — an ~15–20× headline
-against KDL's whole-solve number, but it only applies to callers that already hold the pose,
-so it is reported separately rather than as the comparison figure.
+<!-- source: docs/benchmarks/raw/2026-08-11/microbench/jacobian_comparison_benchmarks.json -->
 
-| robot | cartan q→J (specialized) | cartan J given FK | KDL (q→J) | q→J speedup |
-|---|---|---|---|---|
-| UR3e | 367 | 46 | 865 | 2.4× |
-| IRB 120 | 378 | 44 | 881 | 2.3× |
-| KR 6 | 378 | 44 | 879 | 2.3× |
-| Panda | 420 | 61 | 1085 | 2.6× |
-| Fetch | 446 | 53 | 1066 | 2.4× |
-| Jaco2 | 378 | 44 | 867 | 2.3× |
-| Baxter | 448 | 53 | 1071 | 2.4× |
-| LBR Med 14 | 420 | 61 | 1075 | 2.6× |
+The like-for-like comparison is **random q → Jacobian**: cartan's `space_jacobian` runs
+`forward_kinematics` inside the timed loop, matching KDL's `JntToJac`, which recomputes forward
+kinematics internally. The marginal Jacobian, with the pose already computed, is a different
+quantity and is reported in its own column rather than as the comparison figure — it applies only
+to callers that already hold the pose.
 
-## Cartan vs Pinocchio (IK)
+| robot | KDL q→J | cartan q→J | cartan q→J, static | cartan J given FK | KDL / cartan |
+|---|---|---|---|---|---|
+| UR3e | 1112.9 | 495.9 | 479.0 | 64.3 | 2.24× |
+| ABB IRB 120 | 1127.6 | 509.8 | 491.0 | 61.2 | 2.21× |
+| KUKA KR 6 R900 | 1123.5 | 509.5 | 490.9 | 61.1 | 2.20× |
+| Franka Panda | 1381.0 | 567.2 | 553.9 | 132.0 | 2.43× |
+| Kinova Jaco2 | 1123.7 | 509.0 | 491.1 | 61.1 | 2.21× |
+| Fetch | 1382.3 | 597.8 | 574.0 | 119.6 | 2.31× |
+| Rethink Baxter | 1358.4 | 597.1 | 574.2 | 119.6 | 2.27× |
+| KUKA LBR Med 14 | 1382.1 | 563.2 | 554.0 | 132.0 | 2.45× |
+| 3R planar | 473.0 | 223.7 | 220.5 | 33.4 | 2.11× |
 
-cartan's LM and an LM built directly on Pinocchio primitives (body Jacobian, log-error,
-LDLT damped update — the same math) are benchmarked on the identical target set. Both are a
-dead heat. This pairing is genuinely like-for-like — same math, same targets, same feasible
-set — unlike the TRAC-IK comparison above. Wall time (µs, median):
-
-| method | UR3e | IRB 120 | KR 6 | Panda | Fetch | Jaco2 | Baxter | LWR 4+ | LBR Med 14 |
-|---|---|---|---|---|---|---|---|---|---|
-| cartan LM | 27 | 19 | 19 | 22 | 18 | 25 | 21 | 17 | 18 |
-| Pinocchio LM | 41 | 19 | 18 | 29 | 20 | 26 | 27 | 19 | 19 |
-| TRAC-IK (per-core) | 1098 | 217 | 209 | 273 | 231 | 528 | 280 | 212 | 225 |
-
-The Pinocchio LM cell now also exports success and accuracy counters (an earlier version of
-this page compared on speed alone because it did not). FK-verified against the same 1e-5 gate,
-the two LM implementations reach **identical** success on every robot — 75% on UR3e, ≥99.7%
-on IRB 120 / KR 6 / Fetch / LWR 4+ / LBR Med 14, and 92–95% on Panda / Jaco2 / Baxter — at
-~2.0–2.8 µm mean position error, because they are the same algorithm. The Pinocchio LM's own
-success count and the FK re-verification agree exactly, confirming the return code is accurate
-here. The difference between the two is implementation overhead only, within run-to-run noise.
+cartan's analytic product-of-exponentials Jacobian is **2.11× to 2.45× faster than KDL** on the
+whole-solve basis, and 2.14× to 2.49× on a compile-time-sized chain. Maximum coefficient of
+variation across these cells is 1.14%. This claim survived the audit that rebuilt the rest of this
+page: it carries none of that audit's defects, and the figures here are a fresh reproduction of it
+rather than the earlier capture's.
 
 ## Lie group operations
 
-Per-operation microbenchmarks (nanoseconds, median). These are cartan-internal (no
-cross-library counterpart), reported here now that the harness cycles varied inputs so the
-optimizer cannot fold the op down to a store.
+<!-- source: docs/benchmarks/raw/2026-08-11/microbench/lie_group_benchmarks.json -->
+
+Per-operation microbenchmarks in nanoseconds, median of 5 repetitions. These are internal to this
+library — no cross-library counterpart is measured — and the harness cycles varied inputs so the
+optimizer cannot fold an operation down to a store.
 
 | group | exp | log | compose | inverse | adjoint | coadjoint |
 |---|---|---|---|---|---|---|
-| SO(2) | 37 | 24 | 15 | 12 | – | – |
-| SE(2) | 55 | 73 | 50 | 17 | 4 | – |
-| SO(3) | 50 | 33 | 11 | 9 | 5 | 5 |
-| SE(3) | 107 | 116 | 24 | 22 | 39 | 74 |
+| SO(2) | 24.1 | 15.5 | 9.5 | 8.1 | – | – |
+| SE(2) | 35.6 | 34.2 | 33.0 | 11.2 | 2.7 | – |
+| SO(3) | 32.5 | 20.9 | 7.4 | 5.7 | 3.2 | 3.2 |
+| SE(3) | 70.1 | 75.1 | 15.9 | 14.1 | 25.7 | 48.3 |
+
+Maximum coefficient of variation across these cells is 0.21%.
 
 ## Reproducing
 
-See [benchmarks/README.md](../benchmarks/README.md) for build and run instructions. The IK
-comparison requires the TRAC-IK and Pinocchio dependencies; each comparison is omitted with a
-warning when its dependency is unavailable. Success rates are FK-verified in the benchmark
-cells themselves, not read from a solver's own return code, and each cross-library cell is
-constructed so both sides do equal end-effector work.
+What this repository offers is **rebuilding every published table from the shipped records**, with
+`python3` and nothing else:
 
-The harness that carried the two defects recorded above has been retired, along with the script
-that swept its accuracy gate; the tables it produced are left in place as measured, and marked.
-Driving every participant at one *achieved* accuracy is now `ik_study_calibrate` plus the study
-capture's `--iso-accuracy` mode, which calibrates each solver's own requested tolerance against
-the error the harness recomputes. `benchmarks/README.md` records what was retired and why.
+```
+python3 tools/bench_study_report.py --root docs/benchmarks/raw/2026-08-11/ladder \
+    --table c --from aggregates --out table_c.md
+```
+
+That is a claim about rebuilding the published tables, not about rerunning the study. **Rerunning
+it additionally requires the comparator libraries, and obtaining those is the reader's own.** This
+project does not fetch, vendor or patch a library it does not own: `pinocchio`, `orocos_kdl`,
+`trac_ik`, `nlopt` and `lapack` are discovered on the machine if they are there, and each
+comparison is omitted with a warning when its dependency is absent.
+
+The capture was configured and run with:
+
+```
+cmake -S . -B build/bench -G Ninja -DCMAKE_BUILD_TYPE=Release \
+    -DCARTAN_BUILD_BENCHMARKS=ON -DCARTAN_BUILD_URDF=ON -DCARTAN_BUILD_ARGMIN=ON \
+    -DCARTAN_FETCH_BENCHMARK_DEPS=ON -DCARTAN_TRAC_IK_SOURCE_DIR=<checkout> \
+    -DCMAKE_PREFIX_PATH=<pinocchio environment>
+build/bench/benchmarks/ik_study_capture --table c --robot <robot> --limits description \
+    --stratum <stratum> --targets 500 --all-budgets --out-dir <records> --sidecar-dir <sidecar>
+```
+
+The full configure line, every per-invocation run command, and the machine state read back from
+the kernel are in `docs/benchmarks/raw/2026-08-11/ladder/environment.json`. The microbenchmarks
+were run with `--benchmark_repetitions=5 --benchmark_report_aggregates_only=true`.
+
+The shipped records are per-cell aggregates. The per-target rows — 6.9 million of them, one per
+solve — are a release asset rather than a file in this repository; at capture time both tiers were
+rebuilt independently and cross-checked, and 64 800 published figures per table agreed between
+them. `docs/benchmarks/README.md` records what ships, at what resolution, and what is known to be
+wrong with it.

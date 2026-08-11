@@ -53,6 +53,17 @@ jobs:
       - name: Study report fixtures
         run: python3 tools/bench_study_report_test.py
 
+      # A published figure whose experiment was retired is the defect this pair
+      # exists to catch, and it is invisible to a reader: the number reads the
+      # same either way. So the traceability from claim to shipped record is
+      # checked rather than asserted, and the fixtures come first for the same
+      # reason as every other gate here.
+      - name: Benchmark-claim fixtures
+        run: python3 tools/check_benchmark_claims_test.py
+
+      - name: Benchmark claims against the shipped records
+        run: python3 tools/check_benchmark_claims.py --doc docs/benchmarks.md --evidence-root docs/benchmarks
+
   # The linter needs a compile database and therefore a compiler, so it is its own
   # job: the checks above stay build-free and finish while this one is still
   # configuring.

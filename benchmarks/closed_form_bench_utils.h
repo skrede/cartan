@@ -176,6 +176,8 @@ void bm_closed_form_solver(
     int successes = 0;
     Scalar total_pos = Scalar(0);
     Scalar total_ori = Scalar(0);
+    Scalar worst_pos = Scalar(0);
+    Scalar worst_ori = Scalar(0);
     for (std::size_t i = 0; i < target_count; ++i)
     {
         auto result = solver.solve(ts.targets[i]);
@@ -191,6 +193,8 @@ void bm_closed_form_solver(
             ++successes;
             total_pos += pos_err;
             total_ori += ori_err;
+            worst_pos = std::max(worst_pos, pos_err);
+            worst_ori = std::max(worst_ori, ori_err);
         }
     }
 
@@ -210,6 +214,9 @@ void bm_closed_form_solver(
         static_cast<double>(total_pos) / std::max(successes, 1));
     state.counters["ori_err"] = benchmark::Counter(
         static_cast<double>(total_ori) / std::max(successes, 1));
+    state.counters["pos_err_max"] = benchmark::Counter(static_cast<double>(worst_pos));
+    state.counters["ori_err_max"] = benchmark::Counter(static_cast<double>(worst_ori));
+    state.counters["n_poses"] = benchmark::Counter(static_cast<double>(denom));
 }
 
 /// Closed-form solver driver — workspace coverage cell.
