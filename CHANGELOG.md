@@ -388,6 +388,16 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   link. A link whose extra leaves are all wrappers is unaffected: that is the end
   of the chain, not a branch.
 
+### Fixed
+- The argmin-backed solve policies size the joint vector they report at `setup()`.
+  Where a policy reported no progress on its first step -- a seed that already
+  meets its target -- the vector it handed back was empty on a runtime-sized
+  chain, and a caller indexing it by the chain's joint count wrote past its end.
+  `nw_sqp` and `argmin_lbfgsb` reached that state; the rest of the family is
+  sized for the same reason. The vector still carries the not-a-number sentinel
+  rather than the seed, so an unpopulated answer stays distinguishable from a
+  measured one.
+
 ## [0.4.1] - 2026-07-06
 
 ### Added
