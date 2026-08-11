@@ -59,6 +59,9 @@ if (NOT CARTAN_BUILD_URDF)
         "-DCARTAN_BUILD_URDF=ON.")
 endif ()
 
+include(${CMAKE_SOURCE_DIR}/cmake/CartanBenchRuntimePath.cmake)
+cartan_bench_prefer_toolchain_runtime()
+
 include(${CMAKE_SOURCE_DIR}/cmake/CartanBenchDescriptions.cmake)
 
 # The limit source's own correctness gate. It measures nothing and needs neither
