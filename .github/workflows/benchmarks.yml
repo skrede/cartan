@@ -92,11 +92,11 @@ jobs:
 
     env:
       # What this job expects the capture to declare, and what it expects to
-      # resolve on a runner that provides neither peer solver. A job that
+      # resolve on a runner that provides neither peer library. A job that
       # quietly ran one solver and went green is the same defect as a table
       # quietly missing a column, and it has occurred twice in this suite.
-      EXPECTED_DECLARED: cartan_lm pinocchio_lm trac_ik
-      EXPECTED_RESOLVED: cartan_lm
+      EXPECTED_DECLARED: cartan_lm cartan_restart_lm pinocchio_lm pinocchio_restart_lm trac_ik
+      EXPECTED_RESOLVED: cartan_lm cartan_restart_lm
       SMOKE_TARGETS: 25
       STRATA: reachable boundary near_singular limit_adjacent unreachable warm_start_trajectory
       TABLE: ${{ matrix.table }}
