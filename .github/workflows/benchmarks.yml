@@ -88,7 +88,7 @@ jobs:
           - table: c
             robot: ur3e
           - table: c
-            robot: lbr_med14
+            robot: lbr_med14_r820
 
     env:
       # What this job expects the capture to declare, and what it expects to
