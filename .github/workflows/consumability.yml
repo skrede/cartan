@@ -103,3 +103,61 @@ jobs:
           set -eu
           cmake -P tests/consumability/run_recipe.cmake -- \
             --repo-root "${PWD}" --out "${RUNNER_TEMP}/published" --mode published
+
+  # The same recipes, on the platform a known consumer actually has: a 2019
+  # Intel Mac. Nothing else in this repository builds cartan's headers as a
+  # consumer on x86_64 macOS -- the macOS lane is arm64 and the wheel cell
+  # reaches Intel only through the Python surface -- so an x86-only failure in a
+  # published recipe would reach a reader before it reached CI.
+  #
+  # Two deliberate differences from the Linux job above. The toolchain is
+  # whatever the image ships rather than the documented minimum, because the
+  # image is not ours to strip down; the minimum-version question is answered on
+  # Linux and is not platform-specific. And the absence check names Homebrew's
+  # two prefixes, since an Intel Mac installs into /usr/local where an Apple
+  # Silicon one uses /opt/homebrew.
+  fetchcontent-consumer-macos-intel:
+    runs-on: macos-15-intel
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Record the toolchain this image ships
+        run: |
+          set -eu
+          cc --version
+          cmake --version
+          sw_vers
+          uname -m
+
+      - name: Confirm the image carries no Eigen
+        run: |
+          set -eu
+          for path in /usr/local/include/eigen3 /usr/local/share/eigen3 \
+                      /usr/local/lib/cmake/eigen3 /opt/homebrew/include/eigen3 \
+                      /opt/homebrew/share/eigen3 /opt/homebrew/lib/cmake/eigen3; do
+            if [ -e "${path}" ]; then
+              echo "the image provides Eigen at ${path}; this lane tests nothing" >&2
+              exit 1
+            fi
+          done
+          echo "no Eigen in the image"
+
+      - name: Resolve the published fetch coordinates with git ls-remote
+        run: |
+          set -eu
+          cmake -P tests/consumability/run_recipe.cmake -- \
+            --repo-root "${PWD}" --out "${RUNNER_TEMP}/coordinates" --mode coordinates
+
+      - name: Consume the published recipes against this checkout
+        run: |
+          set -eu
+          cmake -P tests/consumability/run_recipe.cmake -- \
+            --repo-root "${PWD}" --out "${RUNNER_TEMP}/working-tree" --mode working-tree
+
+      - name: Consume the published recipes as a reader would
+        if: github.event_name == 'schedule' || github.ref == 'refs/heads/master'
+        run: |
+          set -eu
+          cmake -P tests/consumability/run_recipe.cmake -- \
+            --repo-root "${PWD}" --out "${RUNNER_TEMP}/published" --mode published
