@@ -114,10 +114,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             libeigen3-dev liborocos-kdl-dev ninja-build
-          # One of the descriptions reads its joint bounds out of a YAML sidecar
-          # through an expression the host language evaluates, so the reader needs
-          # a YAML module in the interpreter the build resolved.
-          python3 -m pip install --disable-pip-version-check pyyaml
 
       - name: Configure
         run: cmake --preset bench

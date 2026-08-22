@@ -13,7 +13,7 @@ from pathlib import Path
 
 GATE = Path(__file__).resolve().parent / "check_forbidden_calls.py"
 
-PIN = "cartan_acquire_meios()\nset(MEIOS_BUILD_EVAL_PYTHON OFF)\n"
+PIN = "cartan_acquire_meios()\nset(MEIOS_EVAL_PYTHON_SUPPORT OFF)\n"
 GOOD_CALL = "auto loaded = meios::load(path, opts.description, log);\n"
 
 
@@ -49,10 +49,10 @@ CASES = [
       "cmake/Supplier.cmake": PIN}, 1, "clears the completeness claim"),
     ("the evaluation backend switched on",
      {"lib/urdf.h": GOOD_CALL, "cmake/Supplier.cmake": PIN,
-      "CMakeLists.txt": "set(MEIOS_BUILD_EVAL_PYTHON ON)\n"}, 1, "CMakeLists.txt:1"),
+      "CMakeLists.txt": "set(MEIOS_EVAL_PYTHON_SUPPORT ON)\n"}, 1, "CMakeLists.txt:1"),
     ("the pin deleted",
      {"lib/urdf.h": GOOD_CALL, "cmake/Supplier.cmake": "cartan_acquire_meios()\n"},
-     3, "restore set(MEIOS_BUILD_EVAL_PYTHON OFF)"),
+     3, "restore set(MEIOS_EVAL_PYTHON_SUPPORT OFF)"),
     ("the three-argument call spread over several lines",
      {"lib/urdf.h": "auto loaded = meios::load(\n    path,\n    opts,\n    log);\n",
       "cmake/Supplier.cmake": PIN}, 0, "1 tracked C++ file"),
@@ -64,23 +64,23 @@ CASES = [
       "cmake/Supplier.cmake": PIN}, 0, "no forbidden call"),
     ("a CMake comment naming the option enabled",
      {"lib/urdf.h": GOOD_CALL,
-      "cmake/Supplier.cmake": "# never set(MEIOS_BUILD_EVAL_PYTHON ON)\n" + PIN},
+      "cmake/Supplier.cmake": "# never set(MEIOS_EVAL_PYTHON_SUPPORT ON)\n" + PIN},
      0, "no forbidden call"),
     ("the option enabled through option()",
      {"lib/urdf.h": GOOD_CALL, "cmake/Supplier.cmake": PIN,
-      "CMakeLists.txt": 'option(MEIOS_BUILD_EVAL_PYTHON "evaluate with a python backend" YES)\n'},
+      "CMakeLists.txt": 'option(MEIOS_EVAL_PYTHON_SUPPORT "evaluate with a python backend" YES)\n'},
      1, "CMakeLists.txt:1"),
     ("the option enabled through a cache entry",
      {"lib/urdf.h": GOOD_CALL, "cmake/Supplier.cmake": PIN,
-      "CMakeLists.txt": 'set(MEIOS_BUILD_EVAL_PYTHON 1 CACHE BOOL "evaluate expressions")\n'},
+      "CMakeLists.txt": 'set(MEIOS_EVAL_PYTHON_SUPPORT 1 CACHE BOOL "evaluate expressions")\n'},
      1, "CMakeLists.txt:1"),
     ("the option enabled through a preset cache variable",
      {"lib/urdf.h": GOOD_CALL, "cmake/Supplier.cmake": PIN,
-      "CMakePresets.json": '{"cacheVariables": {"MEIOS_BUILD_EVAL_PYTHON": "true"}}\n'},
+      "CMakePresets.json": '{"cacheVariables": {"MEIOS_EVAL_PYTHON_SUPPORT": "true"}}\n'},
      1, "CMakePresets.json:1"),
     ("a preset pinning the option off satisfies the pin on its own",
      {"lib/urdf.h": GOOD_CALL,
-      "CMakePresets.json": '{"cacheVariables": {"MEIOS_BUILD_EVAL_PYTHON": "OFF"}}\n'},
+      "CMakePresets.json": '{"cacheVariables": {"MEIOS_EVAL_PYTHON_SUPPORT": "OFF"}}\n'},
      0, "CMakePresets.json"),
     ("a C++ file outside the checked areas is not scanned",
      {"lib/urdf.h": GOOD_CALL, "cmake/Supplier.cmake": PIN,

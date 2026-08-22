@@ -1,21 +1,9 @@
 set(CARTAN_MEIOS_PACKAGE meios)
 set(CARTAN_MEIOS_TARGET meios::urdf)
 set(CARTAN_MEIOS_REPOSITORY https://github.com/skrede/meios.git)
-set(CARTAN_MEIOS_REVISION b772a31016eef46ff464fcf5ce5637f20b0afc8d)
+set(CARTAN_MEIOS_REVISION 469d7c5da37a9904694372f5b8b74acf61d476f8)
 
 set(CARTAN_MEIOS_SOURCE_DIR "" CACHE PATH "Path to local meios source checkout")
-
-option(CARTAN_MEIOS_ENABLE_PYTHON_EVAL
-    "Build the description supplier's optional Python evaluation component" OFF)
-
-# The benchmark suite reads its joint bounds off descriptions whose expressions
-# call into the host language, which no other cartan configuration needs and the
-# built-in evaluator cannot expand. Forced here rather than in benchmarks/,
-# because the supplier is acquired under lib/ and is already made available by
-# the time that directory is added.
-if (CARTAN_BUILD_BENCHMARKS AND NOT CARTAN_MEIOS_ENABLE_PYTHON_EVAL)
-    set(CARTAN_MEIOS_ENABLE_PYTHON_EVAL ON CACHE BOOL "" FORCE)
-endif ()
 
 macro(cartan_acquire_meios)
     if (CARTAN_MEIOS_SOURCE_DIR)
@@ -58,16 +46,7 @@ macro(cartan_acquire_meios)
             set(MEIOS_BUILD_TESTS OFF)
             set(MEIOS_BUILD_TOOLS OFF)
             set(MEIOS_BUILD_EXAMPLES OFF)
-            if (CARTAN_MEIOS_ENABLE_PYTHON_EVAL)
-                set(MEIOS_BUILD_EVAL_PYTHON ${CARTAN_MEIOS_ENABLE_PYTHON_EVAL})
-                # The supplier skips the component with a status line when the
-                # embeddable interpreter is absent, which would leave a caller
-                # that asked for it compiling against a header it links nothing
-                # for.
-                set(MEIOS_REQUIRE_EVAL_PYTHON ${CARTAN_MEIOS_ENABLE_PYTHON_EVAL})
-            else ()
-                set(MEIOS_BUILD_EVAL_PYTHON OFF)
-            endif ()
+            set(MEIOS_EVAL_PYTHON_SUPPORT OFF)
             FetchContent_MakeAvailable(meios)
         endblock()
     endif ()

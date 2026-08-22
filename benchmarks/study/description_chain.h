@@ -11,14 +11,9 @@
 #include <cartan/urdf.h>
 #include <cartan/serial/chain/kinematic_chain.h>
 
-#include <meios/eval/python_evaluator.h>
-
-#include <meios/xacro/evaluator_handle.h>
-
 #include <map>
 #include <array>
 #include <string>
-#include <memory>
 #include <utility>
 #include <stdexcept>
 #include <filesystem>
@@ -98,13 +93,6 @@ inline const description_spec& description_for(std::string_view robot)
     return *found;
 }
 
-/// The restricted evaluator is the widest authority anything under benchmarks/
-/// grants a description. The UR and Franka documents read their joint limits
-/// with a host-language call, so an evaluator is unavoidable; the backend that
-/// applies none of the refusal rules would evaluate every expression an include
-/// pulls in with the process's own authority, and it has been measured to
-/// produce the same result on these inputs, so widening buys nothing.
-///
 /// Two roots because the repositories carry their packages at two depths: the
 /// description root reaches a repository that is itself one package, and the
 /// repository directory reaches the packages a multi-package repository holds.
@@ -112,8 +100,6 @@ inline cartan::load_options description_load_options(const description_spec& spe
 {
     const std::filesystem::path root{CARTAN_BENCH_DESCRIPTION_ROOT};
     cartan::load_options opts;
-    opts.description.backend =
-        std::make_shared<meios::evaluator_handle>(meios::python_evaluator{});
     opts.description.package_roots.push_back(root);
     opts.description.package_roots.push_back(root / spec.repository_key);
     opts.description.args = spec.args;

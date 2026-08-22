@@ -23,7 +23,7 @@ CXX_AREAS = ("lib/", "python/", "examples/", "tests/")
 BUILD_NAMES = frozenset({"CMakeLists.txt", "CMakePresets.json"})
 BUILD_SUFFIX = ".cmake"
 
-EVAL_OPTION = "MEIOS_BUILD_EVAL_PYTHON"
+EVAL_OPTION = "MEIOS_EVAL_PYTHON_SUPPORT"
 TRUE_VALUES = frozenset({"ON", "TRUE", "YES", "Y", "1"})
 FALSE_VALUES = frozenset({"OFF", "FALSE", "NO", "N", "0"})
 
