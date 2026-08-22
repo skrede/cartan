@@ -339,9 +339,9 @@ jobs:
       #
       # The compiler is pinned for the same reason every other job here pins
       # one: an unpinned compiler is an unpinned verdict, and this job promotes
-      # every diagnostic to an error. GCC 13 loses std::optional's engaged flag
-      # when it inlines the payload move at -O3 and reports the empty payload's
-      # members as maybe-uninitialized; GCC 14, 15 and 16 do not.
+      # every diagnostic to an error. -Wmaybe-uninitialized on a std::optional
+      # payload inlined at -O3 is version-dependent: GCC 13 and 14 emit it where
+      # 15 and 16 stay silent.
       - name: Configure
         env:
           CC: gcc-14

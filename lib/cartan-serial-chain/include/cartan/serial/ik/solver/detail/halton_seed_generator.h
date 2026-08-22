@@ -103,7 +103,7 @@ public:
     /// Construct from a chain (borrows reference; chain must outlive generator)
     /// and the configuration a joint unbounded on both sides is seeded around.
     halton_seed_generator(const Chain& chain, position_type reference)
-        : m_chain(&chain)
+        : m_chain(chain)
         , m_reference(std::move(reference))
     {
     }
@@ -113,7 +113,7 @@ public:
     /// Maps Halton [0,1]^N to joint limits via linear scaling.
     position_type operator()(int index) const
     {
-        int n = m_chain->num_joints();
+        int n = m_chain.num_joints();
         position_type q;
         if constexpr (N == dynamic)
             q.resize(n);
@@ -126,7 +126,7 @@ public:
             // in-bounds; see the `bases` documentation for the reuse tradeoff.
             const std::size_t base_index = static_cast<std::size_t>(j) % bases.size();
             Scalar h = halton_element<Scalar>(halton_index, bases[base_index]);
-            auto lim = m_chain->limits()[static_cast<std::size_t>(j)];
+            auto lim = m_chain.limits()[static_cast<std::size_t>(j)];
             const auto bounds = cartan::detail::anchor_bounds(lim.position_min(),
                 lim.position_max(), cartan::detail::k_unbounded_angular_range_v<Scalar>,
                 m_reference[j]);
@@ -136,7 +136,7 @@ public:
     }
 
 private:
-    const Chain* m_chain;
+    const Chain& m_chain;
     position_type m_reference;
 };
 

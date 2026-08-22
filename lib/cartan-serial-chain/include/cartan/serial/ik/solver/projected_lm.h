@@ -46,7 +46,6 @@
 #include <array>
 #include <vector>
 #include <limits>
-#include <optional>
 #include <algorithm>
 #include <type_traits>
 
@@ -144,6 +143,7 @@ public:
         , m_best_q(detail::poison_joint_position<scalar_type, joints>())
         , m_q_min(detail::poison_joint_position<scalar_type, joints>())
         , m_q_max(detail::poison_joint_position<scalar_type, joints>())
+        , m_seed_reference(detail::poison_joint_position<scalar_type, joints>())
         , m_options(opts)
     {
     }
@@ -176,7 +176,7 @@ public:
 
         m_setup_joints = chain.num_joints();
 
-        m_seed_gen.emplace(chain, q0);
+        m_seed_reference = q0;
         m_restart_count = 0;
         m_total_iterations = 0;
         m_best_error = std::numeric_limits<scalar_type>::max();
@@ -231,7 +231,7 @@ public:
                 break;
             }
 
-            auto q_new = (*m_seed_gen)(m_restart_count);
+            auto q_new = halton_seed_generator<Chain>{chain, m_seed_reference}(m_restart_count);
             ++m_restart_count;
 
             // Free restart event: re-initialize the attempt without billing
@@ -671,11 +671,11 @@ private:
     position_type m_best_q;
     position_type m_q_min;
     position_type m_q_max;
+    position_type m_seed_reference;
     vector6<scalar_type> m_V_b{vector6<scalar_type>::Zero()};
     convergence_criteria<scalar_type> m_criteria{};
     error_weight<scalar_type> m_weight{};
     options m_options{};
-    std::optional<halton_seed_generator<Chain>> m_seed_gen{};
     cartan::detail::error_ring<scalar_type> m_error_history;
     scalar_type m_initial_error{};
     // The reported norm keeps its unweighted meaning for the public accessor and

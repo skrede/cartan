@@ -98,18 +98,21 @@ public:
 
     restart_wrapper()
         : m_best_q(detail::poison_joint_position<scalar_type, joints>())
+        , m_seed_reference(detail::poison_joint_position<scalar_type, joints>())
     {
     }
 
     explicit restart_wrapper(InnerPolicy inner)
         : m_inner(std::move(inner))
         , m_best_q(detail::poison_joint_position<scalar_type, joints>())
+        , m_seed_reference(detail::poison_joint_position<scalar_type, joints>())
     {
     }
 
     explicit restart_wrapper(const options& opts)
         : m_options(opts)
         , m_best_q(detail::poison_joint_position<scalar_type, joints>())
+        , m_seed_reference(detail::poison_joint_position<scalar_type, joints>())
     {
     }
 
@@ -117,6 +120,7 @@ public:
         : m_inner(std::move(inner))
         , m_options(opts)
         , m_best_q(detail::poison_joint_position<scalar_type, joints>())
+        , m_seed_reference(detail::poison_joint_position<scalar_type, joints>())
     {
     }
 
@@ -129,8 +133,8 @@ public:
         m_chain = std::cref(chain);
         m_target = target;
         m_criteria = criteria;
-        m_weight.reset();
-        m_seed_gen.emplace(chain, q0);
+        m_weight = error_weight<scalar_type>{};
+        m_seed_reference = q0;
         m_restart_count = 0;
         m_total_iterations = 0;
         m_best_lambda = scalar_type(0);
@@ -167,7 +171,7 @@ public:
         m_target = target;
         m_criteria = criteria;
         m_weight = weight;
-        m_seed_gen.emplace(chain, q0);
+        m_seed_reference = q0;
         m_restart_count = 0;
         m_total_iterations = 0;
         m_best_lambda = scalar_type(0);
@@ -256,7 +260,8 @@ public:
             return inner_result;
         }
 
-        reseed_inner(chain, (*m_seed_gen)(m_restart_count));
+        reseed_inner(chain,
+            halton_seed_generator<Chain>{m_chain->get(), m_seed_reference}(m_restart_count));
         apply_warm_start_lambda();
 
         ++m_restart_count;
@@ -357,20 +362,16 @@ private:
         }
     }
 
-    // A weight is held only when the constrained setup accepted one, which
-    // requires the inner policy to take it, so the unweighted branch is never
-    // a discarded weight.
     void reseed_inner(const Chain& chain, const position_type& q0)
     {
         if constexpr (detail::weighted_setup_policy<InnerPolicy, Chain>)
         {
-            if (m_weight.has_value())
-            {
-                m_inner.setup(chain, m_target, q0, m_criteria, *m_weight);
-                return;
-            }
+            m_inner.setup(chain, m_target, q0, m_criteria, m_weight);
         }
-        m_inner.setup(chain, m_target, q0, m_criteria);
+        else
+        {
+            m_inner.setup(chain, m_target, q0, m_criteria);
+        }
     }
 
     void apply_warm_start_lambda()
@@ -389,8 +390,7 @@ private:
     std::optional<std::reference_wrapper<const Chain>> m_chain{};
     se3<scalar_type> m_target{se3<scalar_type>::identity()};
     convergence_criteria<scalar_type> m_criteria{};
-    std::optional<error_weight<scalar_type>> m_weight{};
-    std::optional<halton_seed_generator<Chain>> m_seed_gen{};
+    error_weight<scalar_type> m_weight{};
     ik_status m_precondition{ik_status::not_initialized};
     int m_restart_count{};
     int m_setup_joints{-1};
@@ -398,6 +398,7 @@ private:
     scalar_type m_best_lambda{};
     scalar_type m_best_error{std::numeric_limits<scalar_type>::max()};
     position_type m_best_q;
+    position_type m_seed_reference;
     scalar_type m_best_q_error{std::numeric_limits<scalar_type>::max()};
     bool m_best_feasible{false};
     bool m_best_valid{false};

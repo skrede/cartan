@@ -134,7 +134,6 @@ public:
 
         m_best_q = q0;
         m_reference_q = q0;
-        m_seed_gen.emplace(chain, q0);
         std::get<0>(m_policies).setup(chain, target, q0, criteria);
 
         if constexpr (sizeof...(Policies) > 1)
@@ -480,7 +479,8 @@ private:
         unsigned int halton_seed_offset,
         std::size_t policy_index)
     {
-        auto seed = (*m_seed_gen)(static_cast<int>(policy_index + halton_seed_offset));
+        auto seed = halton_seed_generator<chain_type>{chain, m_reference_q}(
+            static_cast<int>(policy_index + halton_seed_offset));
         std::get<I>(m_policies).setup(chain, target, seed, criteria);
     }
 
@@ -513,7 +513,7 @@ private:
     /// solve, so a single start would be reported as a multistart.
     position_type restart_seed()
     {
-        return (*m_seed_gen)(m_restart_index++);
+        return halton_seed_generator<chain_type>{m_chain->get(), m_reference_q}(m_restart_index++);
     }
 
     cartan::expected<ik_result<scalar_type, joints>, ik_error<scalar_type, joints>> build_result()
@@ -716,7 +716,6 @@ private:
 
     std::array<bool, sizeof...(Policies)> m_parked{};
     std::array<std::optional<parked_result>, sizeof...(Policies)> m_results{};
-    std::optional<halton_seed_generator<chain_type>> m_seed_gen{};
     int m_best_solver_index{-1};
     bool m_early_stop{false};
 };
