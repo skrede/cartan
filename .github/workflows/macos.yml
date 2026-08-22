@@ -36,7 +36,7 @@ jobs:
         run: |
           set -eu
           cmake . -B build -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_CXX_FLAGS="-Werror" \
+            -DCARTAN_WERROR=ON \
             -DCARTAN_BUILD_TESTS=ON \
             -DCARTAN_BUILD_EXAMPLES=ON \
             -DCARTAN_BUILD_URDF=ON \
@@ -48,12 +48,12 @@ jobs:
       - name: Test
         run: cd build && ctest --output-on-failure --no-tests=error
 
-  # cartan's own suite and its -Werror build are exercised on arm64 only;
-  # consumability.yml reaches x86_64 macOS through the published FetchContent
-  # recipe alone, so a codegen or diagnostic difference inside the library would
-  # not surface there. This leg becomes vacuous the moment the macos-15-intel
-  # label is repointed at arm64 hardware -- it would keep passing while retesting
-  # arm64 -- which is what the architecture check guards against.
+  # cartan's own suite and its warnings-as-errors build are exercised on arm64
+  # only; consumability.yml reaches x86_64 macOS through the published
+  # FetchContent recipe alone, so a codegen or diagnostic difference inside the
+  # library would not surface there. This leg becomes vacuous the moment the
+  # macos-15-intel label is repointed at arm64 hardware -- it would keep passing
+  # while retesting arm64 -- which is what the architecture check guards against.
   #
   # No Xcode is selected: the release the arm64 matrix pins is absent from this
   # image, and the question this leg asks is the architecture, not the compiler
@@ -84,7 +84,7 @@ jobs:
         run: |
           set -eu
           cmake . -B build -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_CXX_FLAGS="-Werror" \
+            -DCARTAN_WERROR=ON \
             -DCARTAN_BUILD_TESTS=ON \
             -DCARTAN_BUILD_EXAMPLES=ON \
             -DCARTAN_BUILD_URDF=ON \

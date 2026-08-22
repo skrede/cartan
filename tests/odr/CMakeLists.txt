@@ -1,3 +1,5 @@
+cmake_language(DEFER CALL cartan_warn_directory_targets)
+
 # Two views of one public type, linked into one program. The only difference
 # between the native object library and a backend one is which component target
 # it links, so a compile definition applied by hand here would prove nothing
@@ -24,11 +26,9 @@ endforeach ()
 
 add_library(name_invariance_native OBJECT name_invariance.cpp)
 target_link_libraries(name_invariance_native PRIVATE cartan::serial_chain)
-target_compile_options(name_invariance_native PRIVATE ${CARTAN_WARNING_FLAGS})
 
 add_library(odr_native OBJECT tu_native.cpp)
 target_link_libraries(odr_native PRIVATE cartan::serial_chain)
-target_compile_options(odr_native PRIVATE ${CARTAN_WARNING_FLAGS})
 
 set(cartan_odr_covered "")
 foreach (cartan_odr_backend IN LISTS CARTAN_OPTIONAL_BACKENDS)
@@ -40,18 +40,13 @@ foreach (cartan_odr_backend IN LISTS CARTAN_OPTIONAL_BACKENDS)
     add_library(name_invariance_${cartan_odr_backend} OBJECT name_invariance.cpp)
     target_link_libraries(name_invariance_${cartan_odr_backend}
         PRIVATE cartan::${cartan_odr_backend})
-    target_compile_options(name_invariance_${cartan_odr_backend}
-        PRIVATE ${CARTAN_WARNING_FLAGS})
 
     add_library(odr_${cartan_odr_backend} OBJECT tu_backend.cpp)
     target_link_libraries(odr_${cartan_odr_backend} PRIVATE cartan::${cartan_odr_backend})
-    target_compile_options(odr_${cartan_odr_backend} PRIVATE ${CARTAN_WARNING_FLAGS})
 
     add_executable(mixed_configuration_${cartan_odr_backend}_test main.cpp)
     target_link_libraries(mixed_configuration_${cartan_odr_backend}_test
         PRIVATE cartan::serial_chain odr_native odr_${cartan_odr_backend})
-    target_compile_options(mixed_configuration_${cartan_odr_backend}_test
-        PRIVATE ${CARTAN_WARNING_FLAGS})
     add_test(NAME mixed_configuration_${cartan_odr_backend}_test
         COMMAND mixed_configuration_${cartan_odr_backend}_test)
 endforeach ()

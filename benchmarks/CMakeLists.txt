@@ -1,3 +1,5 @@
+cmake_language(DEFER CALL cartan_warn_directory_targets)
+
 # Measured-region purity gate.
 #
 # A checked kinematics entry point inside a `for (auto _ : state)` block times
@@ -72,7 +74,6 @@ target_link_libraries(study_description_gate PRIVATE cartan::cartan)
 target_compile_definitions(study_description_gate PRIVATE
     CARTAN_BENCH_DESCRIPTION_ROOT="${CARTAN_BENCH_DESCRIPTION_ROOT}"
     CARTAN_URDF_EXTENDED_TESTS)
-target_compile_options(study_description_gate PRIVATE ${CARTAN_WARNING_FLAGS})
 add_test(NAME study_description_gate COMMAND study_description_gate)
 
 # The measurement harness is the one third-party dependency this build may still
@@ -111,7 +112,6 @@ function(cartan_add_benchmark BENCH_NAME BENCH_SOURCE)
         benchmark::benchmark_main
         orocos-kdl
     )
-    target_compile_options(${BENCH_NAME} PRIVATE ${CARTAN_WARNING_FLAGS})
 endfunction()
 
 # Lie group benchmarks
@@ -153,14 +153,12 @@ if (CARTAN_HAVE_TRAC_IK)
             PRIVATE
             cartan::cartan
             cartan::argmin)
-        target_compile_options(slsqp_per_pose_capture PRIVATE ${CARTAN_WARNING_FLAGS})
 
         add_executable(slsqp_per_pose_trace slsqp_per_pose_trace.cpp)
         target_link_libraries(slsqp_per_pose_trace
             PRIVATE
             cartan::cartan
             cartan::argmin)
-        target_compile_options(slsqp_per_pose_trace PRIVATE ${CARTAN_WARNING_FLAGS})
     endif()
 
     if(TARGET cartan_examples::nlopt_policy)
@@ -169,7 +167,6 @@ if (CARTAN_HAVE_TRAC_IK)
             PRIVATE
             cartan::cartan
             cartan_examples::nlopt_policy)
-        target_compile_options(nlopt_slsqp_per_pose_capture PRIVATE ${CARTAN_WARNING_FLAGS})
     endif()
 
     cartan_add_benchmark(fk_comparison_benchmarks fk_comparison_benchmarks.cpp)
@@ -185,15 +182,12 @@ if (CARTAN_BENCH_PINOCCHIO_FOUND)
 
     add_executable(perf_fk_cartan_ur3e perf_fk_cartan_ur3e.cpp)
     target_link_libraries(perf_fk_cartan_ur3e PRIVATE cartan::cartan orocos-kdl)
-    target_compile_options(perf_fk_cartan_ur3e PRIVATE ${CARTAN_WARNING_FLAGS})
 
     add_executable(perf_fk_pinocchio_ur3e perf_fk_pinocchio_ur3e.cpp)
     target_link_libraries(perf_fk_pinocchio_ur3e PRIVATE cartan::cartan pinocchio::pinocchio orocos-kdl)
-    target_compile_options(perf_fk_pinocchio_ur3e PRIVATE ${CARTAN_WARNING_FLAGS})
 
     add_executable(perf_fk_cartan_matrix_ur3e perf_fk_cartan_matrix_ur3e.cpp)
     target_link_libraries(perf_fk_cartan_matrix_ur3e PRIVATE cartan::cartan orocos-kdl)
-    target_compile_options(perf_fk_cartan_matrix_ur3e PRIVATE ${CARTAN_WARNING_FLAGS})
 
     cartan_add_benchmark(ik_comparison_pinocchio_benchmarks ik_comparison_pinocchio_benchmarks.cpp)
     target_link_libraries(ik_comparison_pinocchio_benchmarks PRIVATE pinocchio::pinocchio)
@@ -253,7 +247,6 @@ foreach (_study_program ik_study_benchmarks ik_study_capture ik_study_calibrate)
         CARTAN_BENCH_DESCRIPTION_MANIFEST="${CARTAN_BENCH_DESCRIPTION_MANIFEST}"
         CARTAN_BENCH_CONFIGURE_COMMAND="${CARTAN_BENCH_CONFIGURE_COMMAND}"
         CARTAN_BENCH_COMPILER="${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
-    target_compile_options(${_study_program} PRIVATE ${CARTAN_WARNING_FLAGS})
     if (CARTAN_BENCH_PINOCCHIO_FOUND)
         target_link_libraries(${_study_program} PRIVATE pinocchio::pinocchio)
         target_compile_definitions(${_study_program} PRIVATE
@@ -286,7 +279,6 @@ if (CARTAN_BENCH_OPW_KINEMATICS_FOUND)
         benchmark::benchmark
         opw_kinematics_reference
     )
-    target_compile_options(opw_comparison_benchmarks PRIVATE ${CARTAN_WARNING_FLAGS})
 endif ()
 
 # --- IKFast comparison benchmark: an OpenRAVE-generated closed-form solver for
@@ -296,11 +288,13 @@ endif ()
 # is a VENDORED artifact (benchmarks/third_party/ikfast_kr6r900/), since codegen
 # is a one-shot offline OpenRAVE build; provenance is pinned in its README. It is
 # self-contained: only ikfast.h + LAPACK (it calls dgeev_ for polynomial roots).
-# Compiled into a static library WITHOUT cartan's warning flags (generated code)
-# and linked ONLY into this one benchmark. ---
+# Compiled into a static library linked ONLY into this one benchmark. ---
 if (CARTAN_BENCH_LAPACK_FOUND)
     add_library(ikfast_kr6r900_reference STATIC
         third_party/ikfast_kr6r900/ikfast_kr6r900_transform6d.cpp)
+    # Machine-emitted source nobody edits, so a diagnostic cartan's warning set
+    # raises in it has no author to act on.
+    cartan_exclude_from_warnings(ikfast_kr6r900_reference)
     # IKFAST_NO_MAIN drops the generated CLI main(). The entry points keep
     # default (C++) linkage, matching ikfast.h's declarations in the benchmark.
     target_compile_definitions(ikfast_kr6r900_reference PRIVATE IKFAST_NO_MAIN)
@@ -319,7 +313,6 @@ if (CARTAN_BENCH_LAPACK_FOUND)
         benchmark::benchmark
         ikfast_kr6r900_reference
     )
-    target_compile_options(ikfast_comparison_benchmarks PRIVATE ${CARTAN_WARNING_FLAGS})
 endif ()
 
 # --- ik-geo comparison benchmark: an independent geometric
@@ -356,5 +349,4 @@ if (CARTAN_BENCH_IK_GEO_FOUND)
         "${CARTAN_IKGEO_FFI_LIB}"
         pthread dl m
     )
-    target_compile_options(ikgeo_comparison_benchmarks PRIVATE ${CARTAN_WARNING_FLAGS})
 endif ()

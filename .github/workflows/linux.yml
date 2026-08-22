@@ -111,7 +111,8 @@ jobs:
             # hit counts (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=68080),
             # which aborts the whole report rather than degrading one file.
             cmake . -B build -DCMAKE_BUILD_TYPE=Debug \
-              -DCMAKE_CXX_FLAGS="-Werror --coverage -fprofile-update=atomic" \
+              -DCARTAN_WERROR=ON \
+              -DCMAKE_CXX_FLAGS="--coverage -fprofile-update=atomic" \
               -DCMAKE_C_FLAGS="--coverage -fprofile-update=atomic" \
               -DCARTAN_BUILD_TESTS=ON \
               -DCARTAN_BUILD_URDF=ON \
@@ -133,7 +134,7 @@ jobs:
             # unbuilt rather than excluded, and this is the only entry in that
             # list. Nothing is skipped for being known broken.
             cmake . -B build -DCMAKE_BUILD_TYPE=Release \
-              -DCMAKE_CXX_FLAGS="-Werror" \
+              -DCARTAN_WERROR=ON \
               -DCARTAN_BUILD_TESTS=ON \
               -DCARTAN_BUILD_EXAMPLES=ON \
               -DCARTAN_BUILD_URDF=ON \
@@ -247,16 +248,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Warnings are errors here too, and the promotion goes into the same
-          # variable as the sanitizer switches rather than replacing them: a
-          # sanitizer build is a build like any other, and a diagnostic only this
-          # configuration produces was invisible while this was the one Linux job
-          # without the promotion.
+          # The sanitizer switches stay in the compiler flags variable, which
+          # reaches every target in the tree rather than cartan's own alone: an
+          # instrumented build that skipped the dependencies compiled here would
+          # miss the undefined behavior cartan's code triggers through them.
           - name: asan-ubsan-debug
             build_type: Debug
             cc: clang-18
             cxx: clang++-18
-            flags: "-Werror -fsanitize=address,undefined -fno-omit-frame-pointer"
+            flags: "-fsanitize=address,undefined -fno-omit-frame-pointer"
             link_flags: "-fsanitize=address,undefined"
           # Optimized, assertions compiled out, and the undefined-behavior
           # sanitizer made non-recovering: without -fno-sanitize-recover a
@@ -266,7 +266,7 @@ jobs:
             build_type: Release
             cc: clang-18
             cxx: clang++-18
-            flags: "-Werror -fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=undefined -g"
+            flags: "-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=undefined -g"
             link_flags: "-fsanitize=address,undefined"
 
     runs-on: ubuntu-24.04
@@ -281,6 +281,7 @@ jobs:
           CXX: ${{ matrix.cxx }}
         run: |
           cmake . -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DCARTAN_WERROR=ON \
             -DCMAKE_CXX_FLAGS="${{ matrix.flags }}" \
             -DCMAKE_EXE_LINKER_FLAGS="${{ matrix.link_flags }}" \
             -DCARTAN_BUILD_TESTS=ON \
@@ -312,7 +313,7 @@ jobs:
           CXX: clang++-18
         run: |
           cmake . -B build -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_CXX_FLAGS="-Werror" \
+            -DCARTAN_WERROR=ON \
             -DCARTAN_BUILD_TESTS=ON \
             -DCARTAN_BUILD_ARGMIN=ON \
             -DCARTAN_BUILD_URDF=ON \
@@ -347,7 +348,7 @@ jobs:
           CXX: g++-14
         run: |
           cmake . -B build -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_CXX_FLAGS="-Werror" \
+            -DCARTAN_WERROR=ON \
             -DCARTAN_BUILD_TESTS=ON \
             -DCARTAN_BUILD_URDF=OFF \
             -DCARTAN_CMAKE_FETCH_DEPS=ON

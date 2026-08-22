@@ -51,6 +51,30 @@ nanobind_add_module(
     src/bindings/exhaustive_bindings.cpp
 )
 
+# nanobind publishes its own headers and CPython's with -I rather than -isystem
+# unless asked, and the keyword that asks it only exists from nanobind 2.5 while
+# the declared floor is 2.0. Republishing them as system roots is what keeps a
+# C-style cast in code cartan does not own from becoming an error under cartan's
+# warning set, as the Eigen acquisition does for Eigen. Cartan's own targets are
+# linked after this loop precisely so that their roots stay non-system.
+get_target_property(_cartan_core_links _core LINK_LIBRARIES)
+foreach (_cartan_core_link IN LISTS _cartan_core_links)
+    if (NOT TARGET ${_cartan_core_link})
+        continue ()
+    endif ()
+    get_target_property(_cartan_link_includes ${_cartan_core_link}
+        INTERFACE_INCLUDE_DIRECTORIES)
+    if (_cartan_link_includes)
+        set_target_properties(${_cartan_core_link} PROPERTIES
+            INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_cartan_link_includes}")
+    endif ()
+endforeach ()
+
+# Named rather than swept: nanobind_add_module defines its own static library
+# in this directory, and a sweep of the directory would put cartan's warning set
+# on nanobind's sources.
+cartan_target_warnings(_core)
+
 add_dependencies(_core _core_source_digest)
 
 target_include_directories(_core PRIVATE src/bindings "${CMAKE_CURRENT_BINARY_DIR}/generated")

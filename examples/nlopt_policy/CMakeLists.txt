@@ -21,6 +21,8 @@ if (NOT NLopt_FOUND AND NOT TARGET NLopt::nlopt)
     return ()
 endif ()
 
+cmake_language(DEFER CALL cartan_warn_directory_targets)
+
 add_library(cartan_example_nlopt_policy INTERFACE)
 add_library(cartan_examples::nlopt_policy ALIAS cartan_example_nlopt_policy)
 target_include_directories(cartan_example_nlopt_policy
@@ -36,4 +38,3 @@ target_compile_definitions(cartan_example_nlopt_policy INTERFACE CARTAN_EXAMPLE_
 
 add_executable(nlopt_policy_example nlopt_policy_example.cpp)
 target_link_libraries(nlopt_policy_example PRIVATE cartan_examples::nlopt_policy)
-target_compile_options(nlopt_policy_example PRIVATE ${CARTAN_WARNING_FLAGS})

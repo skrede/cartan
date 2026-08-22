@@ -1,3 +1,12 @@
+# Appended to this directory's copy of the flag list rather than applied to each
+# target: the sweep below puts the list on the command line last, and a
+# suppression that -Wpedantic follows suppresses nothing.
+if (CARTAN_HAS_WNO_C2Y_EXTENSIONS)
+    list(APPEND CARTAN_WARNING_FLAGS -Wno-c2y-extensions)
+endif ()
+
+cmake_language(DEFER CALL cartan_warn_directory_targets)
+
 # Each header's declared entry-point count is asserted, not printed: a family
 # that quietly shrinks is the same defect as one that quietly grows.
 set(cartan_kinematics_headers "")
@@ -52,10 +61,6 @@ function(cartan_add_boundary_test TEST_NAME TEST_SOURCE)
         cartan::cartan
         Catch2::Catch2WithMain
     )
-    target_compile_options(${TEST_NAME} PRIVATE ${CARTAN_WARNING_FLAGS})
-    if (CARTAN_HAS_WNO_C2Y_EXTENSIONS)
-        target_compile_options(${TEST_NAME} PRIVATE -Wno-c2y-extensions)
-    endif ()
     # A case templated over both scalars and several policies emits more COMDAT
     # sections than the object file format admits by default, which MSVC reports
     # as C1128 rather than as anything a reader would trace back to a test.
@@ -93,7 +98,6 @@ cartan_add_boundary_test(axis_classification_test axis_classification_test.cpp)
 # driver script that runs it and reads its result is the test.
 add_executable(lm_chain_identity_probe lm_chain_identity_probe.cpp)
 target_link_libraries(lm_chain_identity_probe PRIVATE cartan::cartan)
-target_compile_options(lm_chain_identity_probe PRIVATE ${CARTAN_WARNING_FLAGS})
 
 # Stepping the chain setup() latched must run to completion, and the assertion
 # above must reject that same run. The first is what makes a stop attributable
@@ -192,7 +196,6 @@ if (CARTAN_BOUNDARY_ADDRESS_SANITIZER)
     function(cartan_add_sanitizer_probe PROBE_NAME PROBE_SOURCE)
         add_executable(${PROBE_NAME} ${PROBE_SOURCE})
         target_link_libraries(${PROBE_NAME} PRIVATE cartan::cartan)
-        target_compile_options(${PROBE_NAME} PRIVATE ${CARTAN_WARNING_FLAGS})
         target_compile_definitions(${PROBE_NAME} PRIVATE NDEBUG _GLIBCXX_NO_ASSERTIONS)
     endfunction()
 
@@ -361,7 +364,6 @@ list(LENGTH cartan_boundary_differential_names cartan_boundary_differential_test
 # deleting the group. The guard is compiled in this configuration and reads
 # NDEBUG and the sanitizer for itself.
 add_executable(boundary_evidence_guard boundary_evidence_guard.cpp)
-target_compile_options(boundary_evidence_guard PRIVATE ${CARTAN_WARNING_FLAGS})
 target_compile_definitions(boundary_evidence_guard PRIVATE
     CARTAN_REGISTERED_EVIDENCE_TESTS=${cartan_boundary_evidence_tests}
     CARTAN_EXPECTED_EVIDENCE_TESTS=21

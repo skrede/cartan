@@ -1,3 +1,5 @@
+cmake_language(DEFER CALL cartan_warn_directory_targets)
+
 if (NOT TARGET benchmark::benchmark)
     include(FetchContent)
     FetchContent_Declare(
@@ -18,7 +20,6 @@ target_link_libraries(ik_profiling
     benchmark::benchmark
     benchmark::benchmark_main
 )
-target_compile_options(ik_profiling PRIVATE ${CARTAN_WARNING_FLAGS})
 
 # Argmin (argmin) solvers are optional
 if (CARTAN_BUILD_ARGMIN)

@@ -9,6 +9,8 @@
 # These targets are compile-only: they are never linked into an executable and
 # never run. Their sole purpose is to force the compiler across the documented API.
 
+cmake_language(DEFER CALL cartan_warn_directory_targets)
+
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
 set(_doc_snippet_extractor ${CMAKE_SOURCE_DIR}/tools/extract_doc_snippets.py)

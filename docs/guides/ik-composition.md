@@ -13,6 +13,8 @@ runtime dispatch.
 ```cpp
 #include <cartan/serial_chain.h>
 
+#include <type_traits>
+
 // Every snippet below solves over a fixed-size six-joint chain. Swap this for
 // cartan::kinematic_chain<double, cartan::dynamic> for a runtime-sized arm.
 using Chain = cartan::kinematic_chain<double, 6>;
@@ -242,16 +244,28 @@ like `.from_config(cfg).build()`.
 
 ### Preset Builders
 
+A preset factory wraps the aliased policy in a runner, except for the dual
+preset: `dual_ik_runner` is already a runner, so `.build()` hands it back as it
+stands.
+
 <!-- cartan:snippet name=preset-builders -->
 ```cpp
 auto speed  = cartan::make_speed_ik_runner<Chain>().build();
 auto robust = cartan::make_robust_ik_runner<Chain>().build();
 auto dual   = cartan::make_dual_ik_runner<Chain>().build();
+
+static_assert(std::is_same_v<decltype(speed),
+    cartan::basic_ik_runner<cartan::speed_ik_runner<Chain>>>);
+static_assert(std::is_same_v<decltype(robust),
+    cartan::basic_ik_runner<cartan::robust_ik_runner<Chain>>>);
+static_assert(std::is_same_v<decltype(dual), cartan::dual_ik_runner<Chain>>);
 ```
 
 ### Composable Builder
 
-Chain `.policy()` calls to accumulate policies, then finish with `.build()`:
+Chain `.policy()` calls to accumulate policies, then finish with `.build()`.
+The accumulated policies become the runner's template arguments, in the order
+they were added:
 
 <!-- cartan:snippet name=composable-builder -->
 ```cpp
@@ -260,6 +274,11 @@ auto solver = cartan::make_solver<Chain>()
         cartan::lm<Chain, cartan::no_limits>, cartan::no_limits>{})
     .policy(cartan::dls<Chain>{})
     .build();
+
+static_assert(std::is_same_v<decltype(solver), cartan::basic_ik_runner<
+    cartan::restart_wrapper<Chain, cartan::lm<Chain, cartan::no_limits>,
+        cartan::no_limits>,
+    cartan::dls<Chain>>>);
 ```
 
 ## argmin Solvers

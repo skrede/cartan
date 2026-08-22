@@ -8,6 +8,8 @@ if (NOT CARTAN_BUILD_URDF)
         "Reconfigure with -DCARTAN_BUILD_URDF=ON.")
 endif ()
 
+cmake_language(DEFER CALL cartan_warn_directory_targets)
+
 set(cartan_fuzz_binary_dir ${CMAKE_BINARY_DIR}/fuzz)
 set(cartan_fuzz_corpus_dir ${cartan_fuzz_binary_dir}/corpus)
 
@@ -31,7 +33,7 @@ set(cartan_fuzz_flags
 function(cartan_add_fuzz_target target)
     add_executable(${target} ${target}.cpp)
     target_link_libraries(${target} PRIVATE cartan::cartan)
-    target_compile_options(${target} PRIVATE ${cartan_fuzz_flags} ${CARTAN_WARNING_FLAGS})
+    target_compile_options(${target} PRIVATE ${cartan_fuzz_flags})
     target_link_options(${target} PRIVATE ${cartan_fuzz_flags})
     set_target_properties(${target} PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${cartan_fuzz_binary_dir})

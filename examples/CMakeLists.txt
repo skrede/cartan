@@ -1,3 +1,5 @@
+cmake_language(DEFER CALL cartan_warn_directory_targets)
+
 add_executable(lie_basics lie_basics.cpp)
 target_link_libraries(lie_basics PRIVATE cartan::cartan)
 

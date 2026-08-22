@@ -22,26 +22,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
 
-set(CARTAN_WARNING_FLAGS
-    $<$<CXX_COMPILER_ID:MSVC>:/W4 /permissive- /utf-8>
-    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:
-    -fPIC
-    -Wall
-    -Wextra
-    -Wpedantic
-    -Wshadow
-    -Wconversion
-    -Wsign-conversion
-    -Wold-style-cast
-    -Wcast-align
-    -Woverloaded-virtual
-    -Wnon-virtual-dtor
-    -Wdouble-promotion
-    -Wimplicit-fallthrough
-    -Wformat=2
-    >
-)
-
 option(CARTAN_BUILD_TESTS "Build unit and compile tests" OFF)
 option(CARTAN_BUILD_EXAMPLES "Build examples" OFF)
 option(CARTAN_BUILD_FUZZ_TESTS "Build fuzz test targets" OFF)
@@ -69,6 +49,7 @@ set(CARTAN_ARGMIN_SOURCE_DIR "" CACHE PATH "Path to local argmin source checkout
 include(FetchContent)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/CartanWarnings.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/CartanMeios.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/CartanOptionalBackends.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/CartanBackendContract.cmake)

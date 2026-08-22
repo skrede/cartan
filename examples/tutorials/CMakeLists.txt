@@ -8,6 +8,8 @@
 # module and so is gated on CARTAN_BUILD_URDF=ON. The `tutorials` aggregate
 # target depends on whichever tutorial executables are configured in.
 
+cmake_language(DEFER CALL cartan_warn_directory_targets)
+
 add_executable(02_fk_and_jacobians 02_fk_and_jacobians.cpp)
 target_link_libraries(02_fk_and_jacobians PRIVATE cartan::cartan)
 add_test(NAME tutorial_02_fk_and_jacobians COMMAND 02_fk_and_jacobians)

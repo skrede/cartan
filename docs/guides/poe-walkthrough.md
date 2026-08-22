@@ -11,6 +11,8 @@ axis definition to Jacobian output.
 ```cpp
 #include <cartan/serial_chain.h>
 
+#include <iostream>
+
 using vec3 = cartan::vector3<double>;
 ```
 
@@ -28,6 +30,8 @@ two common joint types:
 auto s1 = cartan::screw_axis<double>::revolute(
     vec3(0, 0, 1),    // omega: rotation axis direction
     vec3(0, 0, 0));   // point: any point on the axis
+
+std::cout << "Screw vector (omega, v): " << s1.to_vector().transpose() << "\n";
 ```
 
 The factory normalizes the axis direction and computes `v = -omega x point`
@@ -39,6 +43,9 @@ internally, giving the 6D screw vector `(omega, v)`.
 ```cpp
 // Joint slides along the x-axis.
 auto s_prismatic = cartan::screw_axis<double>::prismatic(vec3(1, 0, 0));
+
+std::cout << "omega: " << s_prismatic.omega().transpose()
+          << ", v: " << s_prismatic.v().transpose() << "\n";
 ```
 
 For prismatic joints, `omega = 0` and `v` is the unit translation direction.
@@ -58,6 +65,9 @@ end-effector when all joint angles are zero:
 // End-effector at (3, 0, 0) with identity rotation at zero config.
 vec3 home_translation(3.0, 0.0, 0.0);
 auto home = cartan::se3<double>(cartan::so3<double>{}, home_translation);
+
+std::cout << "Home translation: " << home.translation().transpose() << "\n";
+std::cout << "Home rotation:\n" << home.rotation().matrix() << "\n";
 ```
 
 A default-constructed `so3<double>` is the identity rotation. The home pose
