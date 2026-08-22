@@ -1,7 +1,7 @@
 set(CARTAN_MEIOS_PACKAGE meios)
 set(CARTAN_MEIOS_TARGET meios::urdf)
 set(CARTAN_MEIOS_REPOSITORY https://github.com/skrede/meios.git)
-set(CARTAN_MEIOS_REVISION 469d7c5da37a9904694372f5b8b74acf61d476f8)
+set(CARTAN_MEIOS_REVISION 30a2422ee6fa6b4923f00500d31dd067493bdc81)
 
 set(CARTAN_MEIOS_SOURCE_DIR "" CACHE PATH "Path to local meios source checkout")
 
@@ -18,9 +18,11 @@ macro(cartan_acquire_meios)
         # configure outright instead of quietly generating no install rules.
         set(CARTAN_MEIOS_PROVIDER fetched)
     else ()
-        # No version constraint anywhere: the revision below declares 0.2.0,
-        # so a constraint written from the branch it sits on refuses a correct
-        # installation at configure time. The revision is the only authority.
+        # No version constraint, even though the revision below now declares one
+        # that would satisfy it: a constraint is a second authority that can
+        # disagree with the pin, and it cannot express the pin, since the
+        # supplier republishes a release tag onto a later commit. The revision
+        # is the only authority.
         #
         # GLOBAL, because acquisition happens in the URDF module's directory and
         # the install-surface feasibility gate runs at the top level: without it
