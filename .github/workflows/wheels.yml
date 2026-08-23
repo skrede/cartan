@@ -25,11 +25,15 @@ on:
           - limited
           - smoke
           - auto
-      publish_pypi:
-        description: "Publish the built wheels to PyPI (production release). Bump the version in pyproject.toml first; runs the full matrix and only from master."
+      publish:
+        description: "Publish target. testpypi: any branch, uploads <version>.dev<run>. pypi: master only, uploads the real version -- bump pyproject.toml first. Either forces the full matrix."
         required: false
-        default: false
-        type: boolean
+        default: none
+        type: choice
+        options:
+          - none
+          - testpypi
+          - pypi
   schedule:
     # Weekly full-matrix drift check: catches runner-image / toolchain changes
     # that turn a green build red with no code change. Scheduled runs use the
@@ -94,9 +98,9 @@ jobs:
           ref='${{ github.ref }}'
           base='${{ github.base_ref }}'
           requested='${{ github.event.inputs.tier }}'
-          publish='${{ github.event.inputs.publish_pypi }}'
+          publish='${{ github.event.inputs.publish }}'
 
-          if [ "$event" = "workflow_dispatch" ] && [ "$publish" = "true" ]; then
+          if [ "$event" = "workflow_dispatch" ] && [ "$publish" != "none" ] && [ -n "$publish" ]; then
             tier="full"
           elif [ "$event" = "workflow_dispatch" ] && [ "$requested" != "auto" ]; then
             tier="$requested"
@@ -379,9 +383,11 @@ jobs:
       - uses: actions/checkout@v4
 
       # TestPyPI needs a unique PEP 440 dev version per run; inject it before
-      # cibuildwheel reads pyproject.toml so the wheels carry it. develop only.
+      # cibuildwheel reads pyproject.toml so the wheels carry it. Without this a
+      # rehearsal would consume the real version number on TestPyPI, which
+      # refuses re-upload of a version for good.
       - name: Inject dev version for TestPyPI
-        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+        if: github.event.inputs.publish == 'testpypi'
         run: sed -i -E 's/^version = "([^"]+)"/version = "\1.dev${{ github.run_number }}"/' pyproject.toml
 
       - name: Build wheels
@@ -512,7 +518,7 @@ jobs:
   sdist:
     if: >-
       (github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/master')) ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_pypi == 'true' && github.ref == 'refs/heads/master')
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.publish != 'none')
     name: build sdist
     needs: select
     runs-on: ubuntu-latest
@@ -524,7 +530,7 @@ jobs:
           python-version: "3.12"
 
       - name: Inject dev version for TestPyPI
-        if: github.ref == 'refs/heads/develop'
+        if: github.event.inputs.publish == 'testpypi'
         run: sed -i -E 's/^version = "([^"]+)"/version = "\1.dev${{ github.run_number }}"/' pyproject.toml
 
       - name: Build sdist
@@ -537,7 +543,7 @@ jobs:
           path: dist/*.tar.gz
 
   publish-testpypi:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'testpypi'
     name: publish to TestPyPI
     needs: [select, build-wheels, test-wheel-artifacts, sdist]
     runs-on: ubuntu-latest
@@ -558,13 +564,17 @@ jobs:
           name: sdist
           path: dist
 
+      # Rehearsals are manual: dispatch this workflow with publish=testpypi from
+      # any branch. The version carries a .dev<run> suffix, so no upload can
+      # collide with another or be mistaken for a release.
       - name: Publish to TestPyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
+          skip-existing: true
 
   publish-pypi:
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish_pypi == 'true' && github.ref == 'refs/heads/master'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'pypi' && github.ref == 'refs/heads/master'
     name: publish to PyPI
     needs: [select, build-wheels, test-wheel-artifacts, sdist]
     runs-on: ubuntu-latest
@@ -586,8 +596,8 @@ jobs:
           path: dist
 
       # Releases are manual: dispatch this workflow from master with
-      # publish_pypi=true after bumping the version in pyproject.toml. No push
-      # or PR publishes. skip-existing keeps a re-dispatched unchanged version a
+      # publish=pypi after bumping the version in pyproject.toml. No push or PR
+      # publishes. skip-existing keeps a re-dispatched unchanged version a
       # no-op rather than failing on PyPI's rule against re-uploading a version.
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
