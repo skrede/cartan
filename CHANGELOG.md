@@ -5,7 +5,7 @@ All notable user-facing changes to this project are documented in this file.
 The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.4.3] - 2026-08-23
 
 ### Added
 - `cartan/serial/fk/singularity_analysis.h`: `singular_values`, `condition_number`,
@@ -397,6 +397,61 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   sized for the same reason. The vector still carries the not-a-number sentinel
   rather than the seed, so an unpopulated answer stays distinguishable from a
   measured one.
+
+## [0.4.2] - 2026-07-11
+
+### Added
+- `cartan-bindings` on PyPI: `pip install cartan-bindings` now resolves binary
+  wheels for CPython 3.10 through 3.14 on Linux (x86_64 and aarch64, glibc 2.28
+  and newer), macOS (arm64 and x86_64) and Windows (x64), alongside a source
+  distribution. The import package remains `cartan`. Development builds are
+  published to TestPyPI.
+- Ortho-parallel spherical-wrist closed-form 6R solver covering the OPW geometry
+  class, with a compile-time verification policy, construction-time geometry
+  validation, a pinned wrist-fold threshold, and Python bindings beside the
+  existing analytical solvers.
+- `unwrapped_solver`, a composable post-filter over any analytical solver that
+  reports joint-range admissibility through `range_status` and
+  `unwrapped_result`, built on a reference-aware per-angle unwrap primitive.
+- `closest_to_seed`, a public branch selector over an analytical solution set
+  that carries the joint-range verdict through to the branch it picks.
+- Closed-form planar 2R solution for bent-home geometries.
+- Python tutorial documentation mirroring the C++ tutorials.
+- ESP32 examples running forward kinematics, a Paden-Kahan subproblem and a
+  float-precision IK solve on-device, plus an on-device IK timing bench over the
+  native solvers.
+- Closed-form IK cross-check benchmarks against `opw_kinematics`, IKFast and
+  ik-geo.
+- A README statement of cartan's forward- and inverse-kinematics scope and its
+  non-goals.
+
+### Changed
+- The analytical solvers expose their kinematic chain by const reference.
+- The ABB IRB 120 chain factory is reconciled to a spherical wrist.
+- Benchmark builds are gated behind `CARTAN_BUILD_BENCHMARKS` and degrade
+  gracefully when a comparison dependency is absent, rather than failing the
+  configure step.
+- Documentation C++ snippets are compiled against the real headers in continuous
+  integration, so a documented call that no longer exists fails the build.
+- `[[nodiscard]]` no longer appears anywhere in the public headers.
+
+### Fixed
+- IK error diagnostics defaulted to a plausible-looking value when no error had
+  been computed, so an unpopulated diagnostic was indistinguishable from a
+  measured one; they now default to a not-a-number poison.
+- URDF numeric triples were parsed, and bound numbers formatted, under the
+  active C locale, which could segfault NumPy; both paths are now
+  locale-independent, and the URDF parse no longer depends on an
+  availability-gated `from_chars` overload.
+- The damped-least-squares working iterate was left uninitialized in
+  size-optimized builds.
+- Per-attempt iteration caps did not match the solver options' integer width,
+  and the analytical result array was sized with a mismatched type.
+- The generic Jacobian overloads were ambiguous to MSVC.
+- Windows builds lost `/EHsc`, and exception availability was detected from a
+  compiler name rather than from `_CPPUNWIND`.
+- The ESP-IDF component manifest declared its dependencies through the wrong
+  field, and the embedded builds had no path to Eigen.
 
 ## [0.4.1] - 2026-07-06
 
