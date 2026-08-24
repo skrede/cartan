@@ -14,13 +14,13 @@ The **microbenchmarks** measure single operations — forward kinematics, the Ja
 group primitives underneath both. There a ratio against a reference implementation is a meaningful
 quantity, and this page states it.
 
-Every number below carries a source marker naming the record file it was computed from. Those
-records ship in this repository under `docs/benchmarks/raw/`, and
-`tools/check_benchmark_claims.py` refuses a claim whose record is missing.
+Every figure and table below was computed from one capture, taken on the machine described under
+**Conditions**. That capture's records are not carried in this repository: a measurement taken on
+one machine describes that machine, and what this repository offers instead is the harness that
+produced it, so a reader can run the same study on the hardware they will actually deploy on and
+decide from their own numbers. **Reproducing** says how.
 
 ## Conditions
-
-<!-- source: docs/benchmarks/raw/2026-08-11/ladder/environment.json -->
 
 | | |
 |---|---|
@@ -77,8 +77,6 @@ page converts between them.
 
 ## Method
 
-<!-- source: docs/benchmarks/raw/2026-08-11/ladder/table_c_cells.csv -->
-
 **One feasible set per run.** The harness constructs a single feasible set and hands it to every
 participant. No participant can be given a different problem from the one beside it, because
 there is no per-solver limits argument to give it.
@@ -116,8 +114,6 @@ combines two of them, and the analysis script emits no statistic that spans them
 
 ## What the declared limits actually are
 
-<!-- source: docs/benchmarks/raw/2026-08-11/ladder/environment.json -->
-
 The periodic rule only has a subject where a joint's range spans a full turn, and the limits
 change only bites where the declared range differs from ±π. Both vary strongly by robot:
 
@@ -154,7 +150,16 @@ with the same command. Where A or B differs materially it is stated.
 
 ### Success against compute budget
 
-<!-- source: docs/benchmarks/raw/2026-08-11/ladder/table_c_cells.csv -->
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="benchmarks/figures/success-against-budget-dark.svg">
+  <img alt="Acceptance rate against budget rung, five participants, five strata" src="benchmarks/figures/success-against-budget-light.svg" width="100%">
+</picture>
+
+Acceptance against the budget ladder, pooled over the nine robots as accepted solves over targets
+offered. The `cartan` and `pinocchio` arms coincide at every rung, which is why the thin orange
+line sits inside the thicker blue one; that coincidence is the study's first finding rather than a
+rendering artifact. The table below resolves the same cells as a median over the nine robots, so
+the two disagree slightly wherever one robot sits far from the rest.
 
 Median over the nine robots, manufacturer limits, table C. Each cell is the harness-verified
 acceptance rate at that budget rung. Columns are the five participants in the order
@@ -190,13 +195,44 @@ four of five strata; on `near_singular` the restarting solvers reach 100.0% agai
 comparator's 99.8%. No claim about relative *speed* follows from this table, for the reason given
 under the wall-time section below.
 
-### Kernel evaluations
+### Where the difficulty sits
 
-<!-- source: docs/benchmarks/raw/2026-08-11/ladder/table_c_cells.csv -->
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="benchmarks/figures/success-by-robot-dark.svg">
+  <img alt="Acceptance rate at the top budget rung, by robot and participant" src="benchmarks/figures/success-by-robot-light.svg" width="100%">
+</picture>
+
+The same measurement resolved by robot rather than by stratum, at the top rung over all
+strata. A single-start solve is not uniformly mediocre: it holds above 0.75 on the six-axis
+arms and falls to 0.41 on the seven-axis Panda, whose redundancy gives the search more ways
+to settle in the wrong basin. Restarting recovers every robot to 0.92 or better.
+
+### Accuracy at the top rung
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="benchmarks/figures/accuracy-reached-dark.svg">
+  <img alt="Position error, median to p95, by participant and stratum" src="benchmarks/figures/accuracy-reached-light.svg" width="100%">
+</picture>
+
+Position error at the top rung: the marker is the median across the nine robots, the line
+runs to the p95. The p95 is taken over every target offered, unconverged ones included,
+which is why the single-start arms reach a tenth of a metre while their medians sit at a
+micrometre. A solver's median accuracy says nothing about what its tail does.
+
+### Kernel evaluations
 
 **Excluded from this axis: `trac_ik`.** The harness does not drive that solver's own iteration, so
 no kernel evaluation can be attributed to it. Its cells read *not counted* in the records; the
 count is absent rather than zero, and it is never derived from the wall-clock figure beside it.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="benchmarks/figures/kernel-work-dark.svg">
+  <img alt="Kernel evaluations and wall time at that work, four work-budgeted participants" src="benchmarks/figures/kernel-work-light.svg" width="100%">
+</picture>
+
+The left panel is why the right one is a comparison of kernels: the four work-budgeted
+participants spend the same evaluations reaching their answers, because they run the same
+algorithm for the same iterations. What differs is what one evaluation costs.
 
 At the top rung on the reachable stratum, `cartan_lm` and `pinocchio_lm` spend the same number of
 forward-kinematics evaluations per solve — 12 to 13 across the nine robots — and the two restarting
@@ -204,8 +240,6 @@ participants the same 15 to 26 as each other. Equal counts on this axis are what
 time beside them a measurement of the kernels rather than of the search.
 
 ### Do the return codes tell the truth?
-
-<!-- source: docs/benchmarks/raw/2026-08-11/ladder/table_c_cells.csv -->
 
 Over 243 000 scored targets per participant, manufacturer limits, all strata and all rungs:
 
@@ -225,8 +259,6 @@ always in the conservative direction.
 
 ### Reachability claims
 
-<!-- source: docs/benchmarks/raw/2026-08-11/ladder/table_c_reachability.csv -->
-
 Success rate and reachability-claim correctness are different questions. On the unreachable
 stratum, manufacturer limits, table C, summed across robots:
 
@@ -243,8 +275,6 @@ a genuinely unreachable pose rather than about any solver. Every participant pro
 three counts. No participant claimed to have reached a target it had not.
 
 ### What changed when the joint limits became the manufacturer's
-
-<!-- source: docs/benchmarks/raw/2026-08-11/ladder/table_c_cells.csv -->
 
 Median change in acceptance rate, manufacturer limits minus the symmetric ±π box, at the top rung:
 
@@ -273,9 +303,6 @@ external comparator move by 0.0 to 0.2 points on every stratum. What the limits 
 the single-start solver, whose failures were already wrong-basin.
 
 ### Matched accuracy
-
-<!-- source: docs/benchmarks/raw/2026-08-11/accuracy/1e-06/table_c_cells.csv -->
-<!-- source: docs/benchmarks/raw/2026-08-11/iso_accuracy_calibration.csv -->
 
 The budget ladder holds compute fixed and lets accuracy fall where it may. This mode does the
 reverse: each participant's own requested tolerance is calibrated until the error the harness
@@ -311,8 +338,6 @@ the calibration table.
 
 ### Wall time, and why it is not a comparison here
 
-<!-- source: docs/benchmarks/raw/2026-08-11/ladder/table_c_cells.csv -->
-
 The records carry a wall-time column for every cell and it is a diagnostic, not a ranking. Four
 participants are budgeted by kernel evaluations and stop when the work runs out; the external
 comparator is budgeted by wall clock and stops when the time runs out. Two solvers that stopped
@@ -345,8 +370,6 @@ not sensitive to machine contention. A timing comparison among closed-form solve
 experiment that has not been run, and nothing here may be read as one.
 
 ### Exactness and coverage
-
-<!-- source: docs/benchmarks/raw/2026-08-11/closed_form_reference.csv -->
 
 | robot | solver | exact | branches | pose-space coverage | max position error (m) | max orientation error (rad) | poses |
 |---|---|---|---|---|---|---|---|
@@ -403,8 +426,6 @@ against a different implementation of it appears in this section.
 
 ## Forward kinematics
 
-<!-- source: docs/benchmarks/raw/2026-08-11/microbench/fk_pinocchio.json -->
-
 Median of 5 repetitions, nanoseconds, captured under the conditions above with no instrumentation
 on either side. **The microbenchmarks run on a different robot set from the study**: they use this
 repository's own chain fixtures, which include three arms the study excludes for want of a fetched
@@ -435,8 +456,6 @@ neither matrix cell.** Both statements below are what this capture measures:
 
 Maximum coefficient of variation across the cells in this table is 1.37%.
 
-<!-- source: docs/benchmarks/raw/2026-08-11/microbench/fk_comparison_benchmarks.json -->
-
 Against KDL's `JntToCart`, in a separate binary that carries no matrix cell:
 
 | robot | KDL | `forward_kinematics` (quaternion) | ratio |
@@ -456,8 +475,6 @@ binaries and agrees between them to 1.1% — 424.0 against 428.5 on UR3e — whi
 two tables above comparable at all.
 
 ## Jacobian
-
-<!-- source: docs/benchmarks/raw/2026-08-11/microbench/jacobian_comparison_benchmarks.json -->
 
 The like-for-like comparison is **random q → Jacobian**: cartan's `space_jacobian` runs
 `forward_kinematics` inside the timed loop, matching KDL's `JntToJac`, which recomputes forward
@@ -485,8 +502,6 @@ rather than the earlier capture's.
 
 ## Lie group operations
 
-<!-- source: docs/benchmarks/raw/2026-08-11/microbench/lie_group_benchmarks.json -->
-
 Per-operation microbenchmarks in nanoseconds, median of 5 repetitions. These are internal to this
 library — no cross-library counterpart is measured — and the harness cycles varied inputs so the
 optimizer cannot fold an operation down to a store.
@@ -502,16 +517,27 @@ Maximum coefficient of variation across these cells is 0.21%.
 
 ## Reproducing
 
-What this repository offers is **rebuilding every published table from the shipped records**, with
-`python3` and nothing else:
+What this repository offers is **the study itself, to run on your own machine**. Every number on
+this page describes one AMD Ryzen 7 5800X3D with simultaneous multithreading disabled; yours will
+differ, and on the question this page exists to answer — whether cartan is the right fit for your
+robots, on your hardware, under your budget — your machine is the only authority. The harness, the
+strata, the budget ladder, the verdict rules and the analysis scripts are all here for that.
+
+Capture, then render, then read:
 
 ```
-python3 tools/bench_study_report.py --root docs/benchmarks/raw/2026-08-11/ladder \
-    --table c --from aggregates --out table_c.md
+build/bench/benchmarks/ik_study_capture --table c --robot <robot> --limits description \
+    --stratum <stratum> --targets 500 --all-budgets --out-dir <records> --sidecar-dir <sidecar>
+python3 tools/bench_study_figures.py --root <records> --table c --out <figures>
+python3 tools/bench_study_report.py --root <records> --table c --from aggregates --out table_c.md
 ```
 
-That is a claim about rebuilding the published tables, not about rerunning the study. **Rerunning
-it additionally requires the comparator libraries, and obtaining those is the reader's own.** This
+The two analysis scripts read any capture in the record schema, this project's or your own. The
+report script needs `python3` and nothing else; the figure script additionally needs `matplotlib`
+and `numpy`, which is why the figures are committed as SVG rather than rendered on demand.
+
+**Rerunning the full comparison additionally requires the comparator libraries, and obtaining
+those is the reader's own.** This
 project does not fetch, vendor or patch a library it does not own: `pinocchio`, `orocos_kdl`,
 `trac_ik`, `nlopt` and `lapack` are discovered on the machine if they are there, and each
 comparison is omitted with a warning when its dependency is absent.
@@ -527,12 +553,12 @@ build/bench/benchmarks/ik_study_capture --table c --robot <robot> --limits descr
     --stratum <stratum> --targets 500 --all-budgets --out-dir <records> --sidecar-dir <sidecar>
 ```
 
-The full configure line, every per-invocation run command, and the machine state read back from
-the kernel are in `docs/benchmarks/raw/2026-08-11/ladder/environment.json`. The microbenchmarks
-were run with `--benchmark_repetitions=5 --benchmark_report_aggregates_only=true`.
+The capture writes an `environment.json` beside its records holding the full configure line, every
+per-invocation run command, and the machine state read back from the kernel; that is what makes
+two captures comparable, and it is worth keeping beside your own. The microbenchmarks were run
+with `--benchmark_repetitions=5 --benchmark_report_aggregates_only=true`.
 
-The shipped records are per-cell aggregates. The per-target rows — 6.9 million of them, one per
-solve — are a release asset rather than a file in this repository; at capture time both tiers were
-rebuilt independently and cross-checked, and 64 800 published figures per table agreed between
-them. `docs/benchmarks/README.md` records what ships, at what resolution, and what is known to be
-wrong with it.
+This capture's records are not in the repository. At capture time the per-cell aggregates and the
+6.9 million per-target rows were rebuilt independently and cross-checked, and 64 800 published
+figures per table agreed between the two tiers. `docs/benchmarks/README.md` records what the
+capture consisted of and what is known to be wrong with it.
