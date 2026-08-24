@@ -5,7 +5,7 @@ All notable user-facing changes to this project are documented in this file.
 The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.4.3] - 2026-08-23
+## [0.4.3] - 2026-08-24
 
 ### Added
 - `cartan/serial/fk/singularity_analysis.h`: `singular_values`, `condition_number`,

@@ -90,7 +90,8 @@ void register_fk(nb::module_& m)
               return cartan::condition_number(sigma);
           },
           "Ratio of largest to smallest singular value: one at an isotropic "
-          "Jacobian, infinite at a singular one. None on an empty spectrum.",
+          "Jacobian, infinite at a singular one. Raises ValueError on an empty "
+          "spectrum, which no chain produces.",
           nb::arg("singular_values").noconvert());
 
     m.def("manipulability",
@@ -99,8 +100,8 @@ void register_fk(nb::module_& m)
           },
           "Yoshikawa's manipulability, the product of the singular values -- "
           "the manipulability ellipsoid's volume up to a constant factor. "
-          "None on an empty spectrum, since the empty product of one would "
-          "read as maximally manipulable.",
+          "Raises ValueError on an empty spectrum rather than reporting the "
+          "empty product of one, which would read as maximally manipulable.",
           nb::arg("singular_values").noconvert());
 
     m.def("isotropy",
@@ -108,16 +109,17 @@ void register_fk(nb::module_& m)
               return cartan::isotropy(sigma);
           },
           "Salisbury's isotropy index, the inverse condition number: one where "
-          "the ellipsoid is a sphere, zero at a singularity. None on an empty "
-          "spectrum, and on an entirely zero Jacobian, which has no ratio.",
+          "the ellipsoid is a sphere, zero at a singularity. None on an "
+          "entirely zero Jacobian, which has no ratio, and raises ValueError "
+          "on an empty spectrum.",
           nb::arg("singular_values").noconvert());
 
     m.def("is_near_singular",
           [](const nb::DRef<const VectorXd>& sigma, double threshold) -> Measured<bool> {
               return cartan::is_near_singular(sigma, threshold);
           },
-          "Whether the condition number is at or above threshold. None on an "
-          "empty spectrum, which is neither near a singularity nor far from one.",
+          "Whether the condition number is at or above threshold. Raises "
+          "ValueError on an empty spectrum, which no chain produces.",
           nb::arg("singular_values").noconvert(),
           nb::arg("threshold") = cartan::default_singularity_threshold_v<double>);
 
