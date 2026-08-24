@@ -11,11 +11,15 @@ stated conditions. This directory is that run's evidence.
 | `raw/2026-08-11/accuracy/{1e-05,1e-06,1e-07}/` | the matched-accuracy sweep, one directory per accuracy target | one row per cell, at a single budget rung |
 | `raw/2026-08-11/iso_accuracy_calibration.csv` | what each solver had to be asked for to deliver each accuracy | 810 rows |
 | `raw/2026-08-11/*/environment.json` | the conditions the numbers were taken under, merged across every process of the capture | one record per record set |
-| `fixtures/2026-08-11/` | the target sets, so a reader can re-solve the same problems | canonical table, manufacturer limits, all nine robots and six strata |
 
 The shipped records are **aggregates**. The full per-target rows — 6.9 million of them, one per solve —
 are not in this repository; they are a release asset, `table_{a,b,c}_targets.csv.gz`, produced under
 an ignored build path at capture time.
+
+The target sets themselves are not shipped either. The capture writes them to its `--sidecar-dir`,
+which defaults to the ignored `study-targets/`, and they follow from the harness, the pinned
+descriptions and a fixed pool seed alone -- every target's draw is seeded by a hash of its own
+identity, so a rerun of the same command on the same toolchain reproduces them byte for byte.
 
 **What the shipped set is sufficient for.** Every published table rebuilds from these aggregates
 alone, with nothing but `python3` and `tools/bench_study_report.py`; that is the reproducibility this

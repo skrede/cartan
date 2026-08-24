@@ -58,8 +58,9 @@ cmake-build-*
 # Top-level compile_commands.json symlink (developer-local; points into build/)
 /compile_commands.json
 
-# Study sweep output: the capture binary's default --sidecar-dir, written into
-# the working directory. Machine-specific timings and seeded targets.
+# Study sweep output: the capture binary's default --out-dir and --sidecar-dir,
+# written into the working directory. Machine-specific timings and seeded targets.
+/study-cells/
 /study-targets/
 
 # Python build / cache
