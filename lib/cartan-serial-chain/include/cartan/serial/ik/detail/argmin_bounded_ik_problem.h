@@ -7,12 +7,11 @@
 /// Satisfies argmin::objective, argmin::differentiable, and
 /// argmin::bound_constrained. Joint limits are returned from
 /// lower_bounds() / upper_bounds() so policies with native box-constrained
-/// handling (mma_policy, gcmma_policy, lbfgsb_policy) use the natural
-/// formulation rather than encoding limits as 2n redundant inequality
-/// constraints. num_equality() / num_inequality() both return zero so
-/// the same adapter is usable by MMA / GCMMA (which assert the equality
-/// count is zero and skip constraint evaluation when the inequality
-/// count is zero).
+/// handling (mma_policy, lbfgsb_policy) use the natural formulation rather
+/// than encoding limits as 2n redundant inequality constraints.
+/// num_equality() / num_inequality() both return zero so the same adapter
+/// is usable by MMA, which asserts the equality count is zero and skips
+/// constraint evaluation when the inequality count is zero.
 
 #include "cartan/serial/ik/policy/error_weight.h"
 #include "cartan/serial/ik/solver/detail/analytical_gradient.h"
@@ -33,7 +32,7 @@ namespace cartan::detail
 /// Exposes the IK SE(3) log-error objective and analytical gradient,
 /// plus joint limits as box bounds. No inequality or equality
 /// constraints are reported, keeping the formulation clean for native
-/// bound-constrained policies (MMA / GCMMA / L-BFGS-B).
+/// bound-constrained policies (MMA / L-BFGS-B).
 template <chain Chain>
 class argmin_bounded_ik_problem
 {
@@ -83,10 +82,9 @@ public:
     int num_equality() const { return 0; }
     int num_inequality() const { return 0; }
 
-    // Stub methods required by argmin::constrained concept (MMA / GCMMA
-    // static_assert constrained<Problem>). Never invoked at runtime
-    // because both counts above are zero, but must be present for the
-    // concept to be satisfied.
+    // Stub methods required by the argmin::constrained concept, which MMA
+    // static_asserts. Never invoked at runtime because both counts above are
+    // zero, but must be present for the concept to be satisfied.
     template <typename DerivedIn, typename DerivedOut>
     void constraints(const Eigen::MatrixBase<DerivedIn>&, Eigen::MatrixBase<DerivedOut>&) const
     {}
@@ -106,7 +104,7 @@ public:
         for (int i = 0; i < n; ++i)
         {
             lo[i] = static_cast<double>(
-                m_chain->limits()[static_cast<std::size_t>(i)].position_min);
+                m_chain->limits()[static_cast<std::size_t>(i)].position_min());
         }
         return lo;
     }
@@ -122,7 +120,7 @@ public:
         for (int i = 0; i < n; ++i)
         {
             hi[i] = static_cast<double>(
-                m_chain->limits()[static_cast<std::size_t>(i)].position_max);
+                m_chain->limits()[static_cast<std::size_t>(i)].position_max());
         }
         return hi;
     }

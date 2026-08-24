@@ -65,7 +65,7 @@ lim: cartan.JointLimits = cartan.JointLimits(
 )
 lim_min: float = lim.position_min
 lim_max: float = lim.position_max
-in_range: bool = lim.contains(0.0)
+in_range: bool | None = lim.contains(0.0)
 
 chain: cartan.KinematicChain = cartan.KinematicChain(T2, [s], [lim])
 home_pose: cartan.SE3 = chain.home()
@@ -167,14 +167,19 @@ ik_iterations: int = ik_result.iterations
 ik_error: float = ik_result.error_norm
 ik_failure_reason: str = ik_result.failure_reason
 ik_termination: cartan.IkTerminationReason = ik_result.termination_reason
-ik_near_singular: bool = ik_result.near_singular
-ik_condition_number: float = ik_result.condition_number
+ik_feasible_set: cartan.FeasibleSet = ik_result.solved_feasible_set
+
+if (ik_sigma := cartan.singular_values(ik_chain, ik_result.q)) is not None:
+    ik_condition_number: float | None = cartan.condition_number(ik_sigma)
+    ik_manipulability: float | None = cartan.manipulability(ik_sigma)
+    ik_isotropy: float | None = cartan.isotropy(ik_sigma)
+    ik_near_singular: bool | None = cartan.is_near_singular(ik_sigma)
 
 ik_result_speed: cartan.IkResult = cartan.solve_ik_speed(ik_chain, ik_target, ik_q_seed)
 ik_result_robust: cartan.IkResult = cartan.solve_ik_robust(ik_chain, ik_target, ik_q_seed)
 
 # Spot-check the IkFailure enum so the strict-mode gate sees the binding.
-ik_failure_enum: cartan.IkFailure = cartan.IkFailure.unreachable
+ik_failure_enum: cartan.IkFailure = cartan.IkFailure.diverged
 
 
 # ---------------------------------------------------------------------------
@@ -233,7 +238,7 @@ _solve_all: _SolveAllLike = cast(_SolveAllLike, getattr(_analytical, "solve_all"
 
 analytical_result: cartan.AnalyticalResult = _solve_pieper_6r(ik_chain, ik_target)
 analytical_status: cartan.AnalyticalStatus = analytical_result.status
-analytical_error_metric: float = analytical_result.error_metric
+analytical_error_metric: float | None = analytical_result.error_metric
 analytical_solutions = analytical_result.solutions
 
 _ClosestLike = Callable[..., object]
@@ -266,13 +271,14 @@ opw_a1: float = opw_params.a1
 opw_offsets: list[float] = opw_params.offsets
 opw_signs: list[int] = opw_params.sign_corrections
 analytical_opw: cartan.AnalyticalResult = _solve_opw_6r(
-    ik_chain, opw_params, ik_target)
+    ik_chain, opw_params, ik_target, orientation_tolerance=1e-6)
 
 range_status: cartan.RangeStatus = cartan.RangeStatus.in_range
 unwrapped_result: cartan.UnwrappedResult = _solve_unwrapped_opw_6r(
-    ik_chain, opw_params, ik_target, q_seed=ik_q_seed)
+    ik_chain, opw_params, ik_target, q_seed=ik_q_seed,
+    orientation_tolerance=1e-6)
 unwrapped_status: cartan.AnalyticalStatus = unwrapped_result.status
-unwrapped_error_metric: float = unwrapped_result.error_metric
+unwrapped_error_metric: float | None = unwrapped_result.error_metric
 unwrapped_solutions = unwrapped_result.solutions
 unwrapped_tags: list[cartan.RangeStatus] = unwrapped_result.tags
 unwrapped_pieper: cartan.UnwrappedResult = _solve_unwrapped_pieper_6r(

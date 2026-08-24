@@ -1,3 +1,8 @@
+#include "registrations.h"
+
+#include "detail/format_double.h"
+#include "detail/analytical_python_helpers.h"
+
 #include "cartan/analytical/solver_2r.h"
 #include "cartan/analytical/solver_3r.h"
 #include "cartan/analytical/solver_6r.h"
@@ -18,12 +23,6 @@
 #include "cartan/serial/ik/ik_validation.h"
 
 #include "cartan/serial/ik/detail/limit_enforcement.h"
-
-#include "registrations.h"
-
-#include "detail/expected_caster.h"
-#include "detail/format_double.h"
-#include "detail/analytical_python_helpers.h"
 
 #include <nanobind/eigen/dense.h>
 #include <nanobind/stl/pair.h>
@@ -57,6 +56,13 @@ using cartan::python::to_analytical_result;
 
 using cartan::python::format_double;
 
+/// __repr__ text for an optional magnitude: Python's own spelling of absence,
+/// so a reader cannot mistake it for a number.
+inline std::string format_error_metric(const std::optional<double> &metric)
+{
+    return metric.has_value() ? format_double(*metric) : std::string("None");
+}
+
 /// Guard each solver lambda against NaN / non-finite target components.
 /// Hard fails raise Python ValueError per the input contract;
 /// joint-count / geometry mismatches are soft fails that flow through the
@@ -70,6 +76,26 @@ inline void validate_target_finite(const char *fn_name, const SE3d &target)
     if(!target.rotation().matrix().array().isFinite().all())
     {
         throw nb::value_error((std::string(fn_name) + ": target contains NaN or non-finite rotation").c_str());
+    }
+}
+
+/// Both rejections below precede l2_distance, whose +inf fallback would
+/// otherwise rank every candidate equal and hand the caller an arbitrary
+/// branch in answer to "which branch is nearest my seed".
+inline void validate_seed_finite(const char *fn_name, const Eigen::Ref<const VectorXd> &q_seed)
+{
+    if(!q_seed.allFinite())
+    {
+        throw nb::value_error((std::string(fn_name) + ": q_seed contains a NaN or non-finite component").c_str());
+    }
+}
+
+inline void validate_seed_size(const char *fn_name, int expected, const Eigen::Ref<const VectorXd> &q_seed)
+{
+    if(q_seed.size() != expected)
+    {
+        throw nb::value_error(
+                (std::string(fn_name) + ": q_seed.size() (" + std::to_string(q_seed.size()) + ") does not match the joint count (" + std::to_string(expected) + ")").c_str());
     }
 }
 
@@ -164,10 +190,8 @@ inline VectorXd validated_reference(const char *fn_name, const KC &chain, const 
     {
         return reference;
     }
-    if(q_seed->size() != n)
-    {
-        throw nb::value_error((std::string(fn_name) + ": q_seed.size() (" + std::to_string(q_seed->size()) + ") does not match chain.num_joints() (" + std::to_string(n) + ")").c_str());
-    }
+    validate_seed_size(fn_name, n, *q_seed);
+    validate_seed_finite(fn_name, *q_seed);
     reference = q_seed.value();
     return reference;
 }
@@ -184,7 +208,7 @@ inline VectorXd unwrap_solution(const KC &chain, const VectorXd &q, const Vector
             continue;
         }
         const auto idx = static_cast<std::size_t>(i);
-        out(i)         = cartan::detail::unwrap_to_range_nearest(q(i), limits[idx].position_min, limits[idx].position_max, reference(i), tol);
+        out(i)         = cartan::detail::unwrap_to_range_nearest(q(i), limits[idx].position_min(), limits[idx].position_max(), reference(i), tol);
     }
     return out;
 }
@@ -216,9 +240,11 @@ inline UnwrappedResult unwrap_analytical_result(const char *fn_name, const KC &c
     return out;
 }
 
-inline AnalyticalResult solve_opw_result(const KC &chain, const OPWParametersd &params, const SE3d &target, double position_tolerance, double singularity_tolerance)
+inline AnalyticalResult solve_opw_result(const KC &chain, const OPWParametersd &params, const SE3d &target, double position_tolerance, double singularity_tolerance,
+                                         double orientation_tolerance)
 {
-    auto solver = cartan::opw_6r_solver<KC>::make(chain, params, position_tolerance, singularity_tolerance);
+    auto solver = cartan::opw_6r_solver<KC>::make(
+        chain, params, cartan::verification_tolerance<double>(position_tolerance, orientation_tolerance), singularity_tolerance);
     if(!solver)
     {
         return to_analytical_error_result(solver.error());
@@ -228,20 +254,32 @@ inline AnalyticalResult solve_opw_result(const KC &chain, const OPWParametersd &
 
 inline AnalyticalResult solve_pieper_result(const KC &chain, const SE3d &target)
 {
-    cartan::pieper_6r_solver solver(chain);
-    return to_analytical_result(solver.solve(target));
+    auto solver = cartan::pieper_6r_solver<KC>::make(chain);
+    if(!solver)
+    {
+        return to_analytical_error_result(solver.error());
+    }
+    return to_analytical_result(solver->solve(target));
 }
 
 inline AnalyticalResult solve_planar_result(const KC &chain, const SE3d &target)
 {
-    cartan::planar_2r_solver solver(chain);
-    return to_analytical_result(solver.solve(target));
+    auto solver = cartan::planar_2r_solver<KC>::make(chain);
+    if(!solver)
+    {
+        return to_analytical_error_result(solver.error());
+    }
+    return to_analytical_result(solver->solve(target));
 }
 
 inline AnalyticalResult solve_spatial_3r_result(const KC &chain, const SE3d &target)
 {
-    cartan::spatial_3r_solver solver(chain);
-    return to_analytical_result(solver.solve(target));
+    auto solver = cartan::spatial_3r_solver<KC>::make(chain);
+    if(!solver)
+    {
+        return to_analytical_error_result(solver.error());
+    }
+    return to_analytical_result(solver->solve(target));
 }
 
 }
@@ -253,40 +291,45 @@ void register_analytical(nb::module_ &m)
     nb::module_ analytical = m.def_submodule("analytical", "Closed-form analytical IK solvers and Paden-Kahan subproblems.");
 
     // ------------------------------------------------------------------
-    // AnalyticalStatus enum (5 variants mirroring C++ analytical_failure
+    // AnalyticalStatus enum (6 variants mirroring C++ analytical_failure
     // plus a Python success sentinel "ok"). The set is fixed to mirror
     // cartan::analytical_failure; the Python surface intentionally does
     // not expose any legacy "singular" / "near_singular" names.
     // ------------------------------------------------------------------
     nb::enum_<py_analytical_status>(analytical, "AnalyticalStatus",
-                                    "Outcome of an analytical IK solve. ok signals success; the four "
+                                    "Outcome of an analytical IK solve. ok signals success; the five "
                                     "failure variants mirror cartan::analytical_failure.")
             .value("ok", py_analytical_status::ok)
             .value("unreachable", py_analytical_status::unreachable)
             .value("degenerate_geometry", py_analytical_status::degenerate_geometry)
             .value("singular_configuration", py_analytical_status::singular_configuration)
-            .value("verification_failed", py_analytical_status::verification_failed);
+            .value("verification_failed", py_analytical_status::verification_failed)
+            .value("non_finite_input", py_analytical_status::non_finite_input);
 
     // ------------------------------------------------------------------
     // AnalyticalResult value class (def_ro on the three fields). The
     // solutions list is populated on the success path; status carries
-    // the coarse outcome; error_metric is the workspace_distance from
-    // the C++ analytical_error on the unreachable branch and 0.0 on
-    // the success path.
+    // the coarse outcome; error_metric is the optional workspace_distance
+    // from the C++ analytical_error, and is None wherever that diagnostic
+    // carries no magnitude -- including on the success path.
     // ------------------------------------------------------------------
     nb::class_<AnalyticalResult>(analytical, "AnalyticalResult",
-                                 "Closed-form solve outcome with always-populated fields. "
+                                 "Closed-form solve outcome with always-present fields. "
                                  "solutions is the list of joint vectors that survived FK back-check; "
                                  "status names the coarse outcome; error_metric is the workspace "
-                                 "distance magnitude when status == unreachable, otherwise 0.0.")
+                                 "distance magnitude where a geometric inequality failed, and None "
+                                 "wherever no such magnitude was computed.")
             .def_ro("solutions", &AnalyticalResult::solutions)
             .def_ro("status", &AnalyticalResult::status)
-            .def_ro("error_metric", &AnalyticalResult::error_metric)
+            .def_ro("error_metric", &AnalyticalResult::error_metric,
+                    "Workspace-distance magnitude where a geometric inequality failed, "
+                    "else None. Absence is not zero: a target exactly on the workspace "
+                    "boundary has a deficit of zero.")
             .def("__repr__",
                  [](const AnalyticalResult &r)
                  {
                      return "AnalyticalResult(num_solutions=" + std::to_string(r.solutions.size()) + ", status=" + std::to_string(static_cast<int>(r.status))
-                          + ", error_metric=" + format_double(r.error_metric) + ")";
+                          + ", error_metric=" + format_error_metric(r.error_metric) + ")";
                  });
 
     nb::class_<OPWParametersd>(analytical, "OPWParameters", "Geometric OPW parameters for an ortho-parallel spherical-wrist 6R arm.")
@@ -331,33 +374,30 @@ void register_analytical(nb::module_ &m)
             .def_ro("solutions", &UnwrappedResult::solutions)
             .def_ro("tags", &UnwrappedResult::tags)
             .def_ro("status", &UnwrappedResult::status)
-            .def_ro("error_metric", &UnwrappedResult::error_metric)
+            .def_ro("error_metric", &UnwrappedResult::error_metric,
+                    "Workspace-distance magnitude where a geometric inequality failed, "
+                    "else None. Absence is not zero: a target exactly on the workspace "
+                    "boundary has a deficit of zero.")
             .def("__repr__",
                  [](const UnwrappedResult &r)
                  {
                      return "UnwrappedResult(num_solutions=" + std::to_string(r.solutions.size()) + ", status=" + std::to_string(static_cast<int>(r.status))
-                          + ", error_metric=" + format_double(r.error_metric) + ")";
+                          + ", error_metric=" + format_error_metric(r.error_metric) + ")";
                  });
 
-    // ------------------------------------------------------------------
-    // Solver lambdas: solve_pieper_6r, solve_planar_2r, solve_3r.
-    // Each constructs a fresh solver from the dynamic chain via CTAD on
-    // the chain concept, calls solve(target), and unwraps the
-    // expected<...> via to_analytical_result. Hard-fail target validation
-    // happens before the GIL is released so the ValueError is raised on
-    // the calling thread.
-    // ------------------------------------------------------------------
+    // Hard-fail target validation happens before the GIL is released so the
+    // ValueError is raised on the calling thread.
     analytical.def(
             "solve_pieper_6r",
             [](const KC &chain, const SE3d &target) -> AnalyticalResult
             {
                 validate_target_finite("solve_pieper_6r", target);
-                cartan::pieper_6r_solver solver(chain);
-                return to_analytical_result(solver.solve(target));
+                return solve_pieper_result(chain, target);
             },
             "Closed-form 6R inverse kinematics for Pieper-type wrists. "
-            "Returns up to 8 FK-verified branches; on a non-Pieper chain "
-            "status is degenerate_geometry and solutions is empty.",
+            "Returns up to 8 FK-verified branches; a non-Pieper chain is "
+            "rejected when the solver is constructed, so status is "
+            "degenerate_geometry and solutions is empty.",
             nb::arg("chain"), nb::arg("target").noconvert(), nb::call_guard<nb::gil_scoped_release>());
 
     analytical.def(
@@ -365,11 +405,14 @@ void register_analytical(nb::module_ &m)
             [](const KC &chain, const SE3d &target) -> AnalyticalResult
             {
                 validate_target_finite("solve_planar_2r", target);
-                cartan::planar_2r_solver solver(chain);
-                return to_analytical_result(solver.solve(target));
+                return solve_planar_result(chain, target);
             },
             "Closed-form planar 2R inverse kinematics. Returns up to two "
-            "FK-verified branches (elbow-up and elbow-down).",
+            "FK-verified branches (elbow-up and elbow-down). A chain that is "
+            "not two revolute joints on parallel axes, whose home end-effector "
+            "leaves the mechanism plane, or that has a zero-length link is "
+            "rejected at construction: status is degenerate_geometry and "
+            "solutions is empty.",
             nb::arg("chain"), nb::arg("target").noconvert(), nb::call_guard<nb::gil_scoped_release>());
 
     analytical.def(
@@ -377,46 +420,62 @@ void register_analytical(nb::module_ &m)
             [](const KC &chain, const SE3d &target) -> AnalyticalResult
             {
                 validate_target_finite("solve_3r", target);
-                cartan::spatial_3r_solver solver(chain);
-                return to_analytical_result(solver.solve(target));
+                return solve_spatial_3r_result(chain, target);
             },
             "Closed-form spatial 3R position-only inverse kinematics. "
-            "Returns up to four FK-verified branches.",
+            "Returns up to four FK-verified branches. A chain that is not "
+            "three revolute joints whose first two axes meet at a point, or "
+            "whose home end-effector lies on the third axis, is rejected at "
+            "construction: status is degenerate_geometry and solutions is "
+            "empty.",
             nb::arg("chain"), nb::arg("target").noconvert(), nb::call_guard<nb::gil_scoped_release>());
 
     analytical.def(
             "solve_opw_6r",
-            [](const KC &chain, const OPWParametersd &params, const SE3d &target, double position_tolerance, double singularity_tolerance) -> AnalyticalResult
+            [](const KC &chain, const OPWParametersd &params, const SE3d &target, double position_tolerance, double singularity_tolerance,
+               double orientation_tolerance) -> AnalyticalResult
             {
                 validate_target_finite("solve_opw_6r", target);
                 nb::gil_scoped_release release;
-                return solve_opw_result(chain, params, target, position_tolerance, singularity_tolerance);
+                return solve_opw_result(chain, params, target, position_tolerance, singularity_tolerance, orientation_tolerance);
             },
             "Closed-form OPW inverse kinematics for offset-shoulder, "
             "ortho-parallel, spherical-wrist 6R arms. Returns up to 8 "
             "FK-verified branches through the same AnalyticalResult contract as "
-            "the other analytical solvers.",
+            "the other analytical solvers. position_tolerance bounds the FK "
+            "back-check's position residual, a distance in the chain's linear "
+            "unit; orientation_tolerance bounds its orientation residual, the "
+            "norm of the residual rotation vector in radians; "
+            "singularity_tolerance is the dimensionless |sin(theta5)| below "
+            "which the wrist fold path is taken.",
             nb::arg("chain"), nb::arg("params"), nb::arg("target").noconvert(),
             nb::arg("position_tolerance") = cartan::opw_6r_solver<KC>::default_position_tolerance,
-            nb::arg("singularity_tolerance") = cartan::opw_6r_solver<KC>::default_singularity_tolerance);
+            nb::arg("singularity_tolerance") = cartan::opw_6r_solver<KC>::default_singularity_tolerance,
+            nb::arg("orientation_tolerance") = cartan::opw_6r_solver<KC>::default_orientation_tolerance);
 
     analytical.def(
             "solve_unwrapped_opw_6r",
             [](const KC &chain, const OPWParametersd &params, const SE3d &target, std::optional<nb::DRef<const VectorXd>> q_seed, double position_tolerance,
-               double singularity_tolerance) -> UnwrappedResult
+               double singularity_tolerance, double orientation_tolerance) -> UnwrappedResult
             {
                 validate_target_finite("solve_unwrapped_opw_6r", target);
                 VectorXd reference = validated_reference("solve_unwrapped_opw_6r", chain, q_seed);
                 nb::gil_scoped_release release;
-                AnalyticalResult raw = solve_opw_result(chain, params, target, position_tolerance, singularity_tolerance);
+                AnalyticalResult raw = solve_opw_result(chain, params, target, position_tolerance, singularity_tolerance, orientation_tolerance);
                 return unwrap_analytical_result("solve_unwrapped_opw_6r", chain, raw, reference);
             },
             "Solve OPW IK and return every branch with a per-solution range tag. "
             "q_seed selects the nearest 2*pi representative when a joint range "
-            "spans multiple turns.",
+            "spans multiple turns. position_tolerance bounds the FK back-check's "
+            "position residual, a distance in the chain's linear unit; "
+            "orientation_tolerance bounds its orientation residual, the norm of "
+            "the residual rotation vector in radians; singularity_tolerance is "
+            "the dimensionless |sin(theta5)| below which the wrist fold path is "
+            "taken.",
             nb::arg("chain"), nb::arg("params"), nb::arg("target").noconvert(), nb::kw_only(), nb::arg("q_seed") = nb::none(),
             nb::arg("position_tolerance") = cartan::opw_6r_solver<KC>::default_position_tolerance,
-            nb::arg("singularity_tolerance") = cartan::opw_6r_solver<KC>::default_singularity_tolerance);
+            nb::arg("singularity_tolerance") = cartan::opw_6r_solver<KC>::default_singularity_tolerance,
+            nb::arg("orientation_tolerance") = cartan::opw_6r_solver<KC>::default_orientation_tolerance);
 
     analytical.def(
             "solve_unwrapped_pieper_6r",
@@ -481,9 +540,31 @@ void register_analytical(nb::module_ &m)
                 return *r;
             },
             "Paden-Kahan subproblem 1: find theta such that exp([omega]*theta) "
-            "applied at q maps p to p'. Returns None when the constraint has no "
-            "solution (the two points are not equidistant from the axis).",
+            "applied at q maps p to p'. Returns None whenever no angle is "
+            "returned, which covers all of: the two points differ in their "
+            "component along omega; they are not equidistant from the axis; the "
+            "computed angle does not reconstruct p'; both points coincide on the "
+            "axis, so every angle is a solution; an argument is NaN or infinite; "
+            "or omega is not a unit vector.",
             nb::arg("omega").noconvert(), nb::arg("q").noconvert(), nb::arg("p").noconvert(), nb::arg("p_prime").noconvert(), nb::call_guard<nb::gil_scoped_release>());
+
+    analytical.def(
+            "paden_kahan_1_direction",
+            [](const Vec3d &omega, const Vec3d &u, const Vec3d &u_prime) -> std::optional<double>
+            {
+                auto r = cartan::paden_kahan_1_direction<double>(omega, u, u_prime);
+                if(!r)
+                    return std::nullopt;
+                return *r;
+            },
+            "Paden-Kahan subproblem 1 for unit direction vectors about an axis "
+            "through the origin: find theta such that exp([omega]*theta) maps u "
+            "to u'. The residuals it judges are dimensionless, so it takes no "
+            "axis point and requires u and u' to be unit vectors; a position "
+            "pair returns None rather than being judged against a threshold that "
+            "does not apply to it. Returns None on the same conditions as "
+            "paden_kahan_1.",
+            nb::arg("omega").noconvert(), nb::arg("u").noconvert(), nb::arg("u_prime").noconvert(), nb::call_guard<nb::gil_scoped_release>());
 
     analytical.def(
             "paden_kahan_2",
@@ -502,7 +583,11 @@ void register_analytical(nb::module_ &m)
             },
             "Paden-Kahan subproblem 2: find up to two (theta1, theta2) pairs "
             "such that exp([omega1]*theta1) * exp([omega2]*theta2) applied at q "
-            "maps p to p'. Axes omega1 and omega2 must intersect at q.",
+            "maps p to p'. Axes omega1 and omega2 must intersect at q. Returns "
+            "an empty list whenever no pair is returned, which covers a target "
+            "no pair of rotations reaches, a pair whose angles do not "
+            "reconstruct it, parallel axes, a NaN or infinite argument, and a "
+            "non-unit axis.",
             nb::arg("omega1").noconvert(), nb::arg("omega2").noconvert(), nb::arg("q").noconvert(), nb::arg("p").noconvert(), nb::arg("p_prime").noconvert(),
             nb::call_guard<nb::gil_scoped_release>());
 
@@ -523,7 +608,11 @@ void register_analytical(nb::module_ &m)
             },
             "Paden-Kahan subproblem 3: find up to two theta values such that "
             "||exp([omega]*theta)*p - p'|| == delta, with the rotation taken "
-            "about the axis omega through q.",
+            "about the axis omega through q. Returns an empty list whenever no "
+            "angle is returned, which covers an unachievable distance, a point "
+            "on the axis for which the achieved distance is constant and equal "
+            "to delta so every angle is a solution, a NaN or infinite argument "
+            "including delta, and a non-unit axis.",
             nb::arg("omega").noconvert(), nb::arg("q").noconvert(), nb::arg("p").noconvert(), nb::arg("p_prime").noconvert(), nb::arg("delta"),
             nb::call_guard<nb::gil_scoped_release>());
 
@@ -543,8 +632,10 @@ void register_analytical(nb::module_ &m)
             "closest_to_seed",
             [](const AnalyticalResult &result, const nb::DRef<const VectorXd> &q_seed) -> std::optional<VectorXd>
             {
+                validate_seed_finite("closest_to_seed", q_seed);
                 if(result.solutions.empty())
                     return std::nullopt;
+                validate_seed_size("closest_to_seed", static_cast<int>(result.solutions.front().size()), q_seed);
                 const VectorXd seed = q_seed;
                 auto it             = std::min_element(result.solutions.begin(), result.solutions.end(),
                                                        [&seed](const VectorXd &a, const VectorXd &b) { return l2_distance(a, seed) < l2_distance(b, seed); });
@@ -564,6 +655,10 @@ void register_analytical(nb::module_ &m)
                     throw nb::value_error(("verify_solution: q.size() (" + std::to_string(q.size()) + ") does not match chain.num_joints() ("
                                            + std::to_string(chain.num_joints()) + ")")
                                                   .c_str());
+                }
+                if(!q.allFinite())
+                {
+                    throw nb::value_error("verify_solution: q contains a NaN or non-finite component");
                 }
                 cartan::convergence_criteria<double> criteria{tolerance, tolerance, 0, 0};
                 return cartan::verify_solution(chain, target, VectorXd(q), criteria);
@@ -605,31 +700,27 @@ void register_analytical(nb::module_ &m)
             [](const KC &chain, const SE3d &target, std::optional<nb::DRef<const VectorXd>> q_seed, int /*rank*/) -> AnalyticalResult
             {
                 validate_target_finite("solve_all", target);
-                AnalyticalResult result;
                 const int n = chain.num_joints();
+                if(q_seed.has_value())
+                {
+                    validate_seed_size("solve_all", n, *q_seed);
+                    validate_seed_finite("solve_all", *q_seed);
+                }
+                AnalyticalResult result;
                 switch(n)
                 {
                     case 6:
-                        {
-                            cartan::pieper_6r_solver solver(chain);
-                            result = to_analytical_result(solver.solve(target));
-                            break;
-                        }
+                        result = solve_pieper_result(chain, target);
+                        break;
                     case 2:
-                        {
-                            cartan::planar_2r_solver solver(chain);
-                            result = to_analytical_result(solver.solve(target));
-                            break;
-                        }
+                        result = solve_planar_result(chain, target);
+                        break;
                     case 3:
-                        {
-                            cartan::spatial_3r_solver solver(chain);
-                            result = to_analytical_result(solver.solve(target));
-                            break;
-                        }
+                        result = solve_spatial_3r_result(chain, target);
+                        break;
                     default:
                         result.status       = py_analytical_status::degenerate_geometry;
-                        result.error_metric = 0.0;
+                        result.error_metric = std::nullopt;
                         return result;
                 }
 

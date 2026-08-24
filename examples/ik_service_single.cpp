@@ -7,6 +7,7 @@
 
 #include "cartan/serial_chain.h"
 
+#include <atomic>
 #include <condition_variable>
 #include <iostream>
 #include <mutex>
@@ -17,7 +18,7 @@
 
 // --- UR3e 6-DOF chain geometry (hardcoded PoE parameters) ---
 
-cartan::kinematic_chain<double, 6> make_ur3e()
+cartan::expected<cartan::kinematic_chain<double, 6>, cartan::chain_failure> make_ur3e()
 {
     using vec3 = cartan::vector3<double>;
 
@@ -31,10 +32,15 @@ cartan::kinematic_chain<double, 6> make_ur3e()
     vec3 home_trans(-0.45675, 0.22315, 0.0665);
     auto home = cartan::se3<double>(cartan::so3<double>::identity(), home_trans);
 
-    cartan::joint_limits<double> lim{-std::numbers::pi, std::numbers::pi};
+    auto lim = cartan::joint_limits<double>::make(-std::numbers::pi, std::numbers::pi);
+    if (!lim.has_value())
+    {
+        return cartan::unexpected(lim.error());
+    }
+
     return cartan::kinematic_chain<double, 6>(
         home, {s1, s2, s3, s4, s5, s6},
-        {lim, lim, lim, lim, lim, lim});
+        {*lim, *lim, *lim, *lim, *lim, *lim});
 }
 
 // --- IK service types ---
@@ -57,14 +63,19 @@ class ik_service
 public:
     explicit ik_service(cartan::kinematic_chain<double, 6> chain)
         : m_chain(std::move(chain))
-        , m_worker([this](std::stop_token stoken) { worker_loop(stoken); })
+        , m_stop(false)
+        , m_worker([this] { worker_loop(); })
     {
     }
 
     ~ik_service()
     {
-        m_worker.request_stop();
+        {
+            std::lock_guard lock(m_mutex);
+            m_stop.store(true);
+        }
         m_cv.notify_one();
+        m_worker.join();
     }
 
     /// Submit an IK request and block until the result is ready.
@@ -86,18 +97,16 @@ public:
     }
 
 private:
-    void worker_loop(std::stop_token stoken)
+    void worker_loop()
     {
         cartan::convergence_criteria<double> criteria{1e-6, 1e-6, 200};
 
-        while (!stoken.stop_requested())
+        while (!m_stop.load())
         {
             std::unique_lock lock(m_mutex);
-            m_cv.wait(lock, [this, &stoken] {
-                return !m_requests.empty() || stoken.stop_requested();
-            });
+            m_cv.wait(lock, [this] { return !m_requests.empty() || m_stop.load(); });
 
-            if (stoken.stop_requested())
+            if (m_stop.load())
                 break;
 
             ik_request req = m_requests.front();
@@ -124,13 +133,24 @@ private:
     std::condition_variable m_response_cv;
     std::queue<ik_request> m_requests;
     std::optional<ik_response> m_response;
-    std::jthread m_worker;
+    // std::jthread would carry the stop flag and the join, but libc++ still
+    // ships <stop_token> behind an experimental opt-in, so an example meant to
+    // build on every supported toolchain owns both explicitly.
+    std::atomic<bool> m_stop;
+    std::thread m_worker;
 };
 
 int main()
 {
     auto chain = make_ur3e();
-    ik_service service(chain);
+    if (!chain.has_value())
+    {
+        std::cerr << "chain construction failed: "
+                  << cartan::message(chain.error()) << "\n";
+        return 1;
+    }
+
+    ik_service service(*chain);
 
     // Generate targets via FK at known configurations
     std::array<Eigen::Vector<double, 6>, 4> configs = {{
@@ -144,12 +164,19 @@ int main()
 
     for (std::size_t i = 0; i < configs.size(); ++i)
     {
-        auto target = cartan::forward_kinematics(chain, configs[i]).end_effector;
-        auto response = service.solve({target, q0});
+        auto fk = cartan::forward_kinematics(*chain, configs[i]);
+        if (!fk.has_value())
+        {
+            std::cerr << "forward kinematics rejected configuration " << i << ": "
+                      << cartan::message(fk.error()) << "\n";
+            return 1;
+        }
+
+        auto response = service.solve({fk->end_effector, q0});
 
         if (response.result.has_value())
         {
-            auto& r = response.result.value();
+            auto& r = *response.result;
             std::cout << "Request " << i << ": converged in "
                       << r.iterations << " iterations, error = "
                       << r.final_error_norm << "\n";
@@ -159,4 +186,6 @@ int main()
             std::cout << "Request " << i << ": failed\n";
         }
     }
+
+    return 0;
 }

@@ -13,6 +13,8 @@ runtime dispatch.
 ```cpp
 #include <cartan/serial_chain.h>
 
+#include <type_traits>
+
 // Every snippet below solves over a fixed-size six-joint chain. Swap this for
 // cartan::kinematic_chain<double, cartan::dynamic> for a runtime-sized arm.
 using Chain = cartan::kinematic_chain<double, 6>;
@@ -53,6 +55,13 @@ The `lm<Chain>`, `dls<Chain>`, `projected_lm<Chain, no_limits>`, and
 `builtin_lbfgsb<Chain, no_limits>` policies are the native (dependency-free)
 steppers. Each takes the chain type as its first template argument and a limit
 policy (`no_limits` or `clamp_limits`) as its second.
+
+These names are configuration-invariant. `lm` and `lbfgsb` alias `builtin_lm`
+and `builtin_lbfgsb` unconditionally, so they denote the native implementations
+in every build; a backend's steppers are reachable only under their own prefixed
+names (`argmin_lm`, `argmin_slsqp`, `argmin_bobyqa`, and the rest). A policy name
+therefore means the same type in every translation unit, whichever backends the
+build enabled.
 
 ## Restart Wrapping
 
@@ -97,10 +106,16 @@ cartan::basic_ik_runner solver{
 ```
 
 The first policy receives the user's `q0`; the remaining policies receive
-deterministic Halton seeds within the joint limits. For the `speed` objective
+deterministic Halton seeds within the joint limits. A joint with a non-finite
+bound is seeded from a finite window of two full turns anchored to whichever
+side is finite, or centered on `q0` when neither is, so its seeds satisfy the
+chain's declared limits too. For the `speed` objective
 (the default), the first policy to converge wins and the runner stops the rest.
-For the other objectives (`min_distance`, `max_manipulability`,
-`max_isotropy`), all policies run to completion and the best is selected.
+For the other objectives (`min_error_norm`, `min_joint_distance`,
+`max_manipulability`, `max_isotropy`), all policies run to completion and the
+best is selected, on one definition of the objective's metric shared with the
+single-policy path. The winning candidate's metric is reported on the result
+together with the objective it was computed under.
 
 This cooperative model is the key differentiator versus TRAC-IK: **all policies
 run in the calling thread**, ticked round-robin, with no thread spawning or
@@ -134,14 +149,27 @@ int main()
 
     auto home = cartan::se3<double>(
         cartan::so3<double>::identity(), vec3(0.935, 0, 0.400));
-    cartan::joint_limits<double> lim{-std::numbers::pi, std::numbers::pi};
+    auto lim = cartan::joint_limits<double>::make(-std::numbers::pi, std::numbers::pi);
+    if (!lim.has_value())
+    {
+        std::cerr << "joint limits rejected: " << cartan::message(lim.error()) << "\n";
+        return 1;
+    }
 
     Chain chain(home, {k1, k2, k3, k4, k5, k6},
-                {lim, lim, lim, lim, lim, lim});
+                {*lim, *lim, *lim, *lim, *lim, *lim});
 
     // Target: forward kinematics of a known configuration -- guaranteed reachable.
     Eigen::Vector<double, 6> q_truth{0.2, -0.4, 0.3, -0.5, 0.6, -0.2};
-    auto target = cartan::forward_kinematics(chain, q_truth).end_effector;
+    auto fk_truth = cartan::forward_kinematics(chain, q_truth);
+    if (!fk_truth.has_value())
+    {
+        std::cerr << "forward kinematics rejected q_truth: "
+                  << cartan::message(fk_truth.error()) << "\n";
+        return 1;
+    }
+
+    auto target = fk_truth->end_effector;
 
     // Race the speed and robust presets cooperatively in the calling thread.
     cartan::dual_ik_runner<Chain> solver;
@@ -154,7 +182,7 @@ int main()
 
     if (result.has_value())
     {
-        const auto& r = result.value();
+        const auto& r = *result;
         std::cout << "Policy " << r.solver_index << " won in "
                   << r.iterations << " iterations\n";
         std::cout << "Solution: " << r.solution.position.transpose() << "\n";
@@ -216,16 +244,28 @@ like `.from_config(cfg).build()`.
 
 ### Preset Builders
 
+A preset factory wraps the aliased policy in a runner, except for the dual
+preset: `dual_ik_runner` is already a runner, so `.build()` hands it back as it
+stands.
+
 <!-- cartan:snippet name=preset-builders -->
 ```cpp
 auto speed  = cartan::make_speed_ik_runner<Chain>().build();
 auto robust = cartan::make_robust_ik_runner<Chain>().build();
 auto dual   = cartan::make_dual_ik_runner<Chain>().build();
+
+static_assert(std::is_same_v<decltype(speed),
+    cartan::basic_ik_runner<cartan::speed_ik_runner<Chain>>>);
+static_assert(std::is_same_v<decltype(robust),
+    cartan::basic_ik_runner<cartan::robust_ik_runner<Chain>>>);
+static_assert(std::is_same_v<decltype(dual), cartan::dual_ik_runner<Chain>>);
 ```
 
 ### Composable Builder
 
-Chain `.policy()` calls to accumulate policies, then finish with `.build()`:
+Chain `.policy()` calls to accumulate policies, then finish with `.build()`.
+The accumulated policies become the runner's template arguments, in the order
+they were added:
 
 <!-- cartan:snippet name=composable-builder -->
 ```cpp
@@ -234,14 +274,31 @@ auto solver = cartan::make_solver<Chain>()
         cartan::lm<Chain, cartan::no_limits>, cartan::no_limits>{})
     .policy(cartan::dls<Chain>{})
     .build();
+
+static_assert(std::is_same_v<decltype(solver), cartan::basic_ik_runner<
+    cartan::restart_wrapper<Chain, cartan::lm<Chain, cartan::no_limits>,
+        cartan::no_limits>,
+    cartan::dls<Chain>>>);
 ```
 
 ## argmin Solvers
 
 The argmin-backed policies (`argmin_slsqp`, `argmin_bobyqa`, and the rest of the
 argmin family) provide constrained optimization with joint limits as box bounds.
-They are compiled only when Cartan is built with argmin support
-(`CARTAN_BUILD_ARGMIN`).
+`CARTAN_BUILD_ARGMIN` decides whether the `cartan::argmin` component is built at
+all; linking that component is what makes the policies visible, because it
+carries the backend headers and `CARTAN_HAS_ARGMIN` on its interface. Linking
+`cartan::cartan` alone never defines that macro, and no consumer ever defines it
+by hand:
+
+```cmake
+find_package(cartan CONFIG REQUIRED COMPONENTS argmin)
+target_link_libraries(app PRIVATE cartan::cartan cartan::argmin)
+```
+
+Requesting the component is what makes the package config resolve argmin itself.
+Omit it and the export file still names `argmin::argmin`, but nothing defines it,
+and configuring fails inside `cartanTargets.cmake`.
 
 <!-- cartan:snippet name=argmin-slsqp needs=argmin -->
 ```cpp
@@ -256,11 +313,26 @@ BOBYQA is derivative-free, useful when the gradient is expensive or unreliable:
 cartan::basic_ik_runner solver{cartan::argmin_bobyqa<Chain>{}};
 ```
 
+## NLopt Solvers
+
+NLopt-backed policies are not library surface. They are carried as a solve-policy
+example under `examples/nlopt_policy/`, which owns its own option and acquires
+NLopt itself, so a cartan build depends on Eigen alone. Enabling
+`CARTAN_EXAMPLE_NLOPT_POLICY` defines `cartan_examples::nlopt_policy`, an
+interface target carrying the headers and the dependency:
+
+```cmake
+target_link_libraries(app PRIVATE cartan::cartan cartan_examples::nlopt_policy)
+```
+
+The example exists because wrapping an optimizer that only runs to completion is
+the case a natively steppable policy cannot demonstrate. See that directory's
+README for what it does and does not claim.
+
 ## Mixing Families
 
-Any combination of native, argmin, and NLopt policies can race together in a
-single `basic_ik_runner`, as long as they all agree on `scalar_type` and
-`joints`:
+Any combination of native and argmin policies can race together in a single
+`basic_ik_runner`, as long as they all agree on `scalar_type` and `joints`:
 
 <!-- cartan:snippet name=mixing-families needs=argmin -->
 ```cpp

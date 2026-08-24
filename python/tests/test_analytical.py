@@ -224,12 +224,16 @@ def test_solve_opw_6r_kr6_round_trip() -> None:
         target,
         position_tolerance=STRICT_TOL,
         singularity_tolerance=STRICT_TOL,
+        orientation_tolerance=STRICT_TOL,
     )
 
     assert result.status == cartan.AnalyticalStatus.ok
     assert len(result.solutions) >= 1
     for q in result.solutions:
         assert q.shape == (6,)
+        # The assertion below is on the worse of the position and orientation
+        # errors, so both tolerances have to be passed for the gate to enforce
+        # what is asserted: position_tolerance no longer binds orientation.
         assert _fk_pose_error(chain, q, target) < STRICT_TOL
 
 
@@ -382,8 +386,8 @@ def test_solve_pieper_6r_ur5e_soft_fails_on_wrist_offset(
     target = cartan.forward_kinematics(chain, q_truth)
     result = cartan.analytical.solve_pieper_6r(chain, target)
     # UR5e vendored URDF has an offset wrist; the strict Pieper solver
-    # rejects it at ctor (degenerate_geometry) or during decomposition
-    # (unreachable / verification_failed).
+    # rejects it when the factory validates the chain (degenerate_geometry) or
+    # during decomposition (unreachable / verification_failed).
     assert result.status in (
         cartan.AnalyticalStatus.degenerate_geometry,
         cartan.AnalyticalStatus.unreachable,
@@ -661,7 +665,7 @@ def test_solve_all_dispatches_by_joint_count(
     assert len(result_2r.solutions) >= 1
 
     # cartanbot has prismatic / 6 joints with non-revolute -> Pieper rejects;
-    # solve_all dispatches to pieper_6r_solver for n=6, which fails at ctor.
+    # solve_all dispatches to pieper_6r_solver for n=6, whose factory rejects it.
     target_bot = cartan.forward_kinematics(
         cartanbot_chain, np.zeros(cartanbot_chain.num_joints()))
     result_bot = cartan.analytical.solve_all(cartanbot_chain, target_bot)
@@ -752,3 +756,31 @@ def test_analytical_result_fields_are_read_only(
     r = cartan.analytical.solve_pieper_6r(chain, target)
     with pytest.raises((AttributeError, TypeError)):
         r.status = cartan.AnalyticalStatus.unreachable  # type: ignore[misc]
+
+
+def test_opw_orientation_tolerance_gates_independently() -> None:
+    """The orientation keyword reaches the FK back-check's orientation field.
+
+    A threshold of zero needs no residual band: no norm is below zero, so every
+    branch must be refused. Before this keyword existed, position_tolerance bound
+    both halves of the check, and a caller had no way to tighten one alone.
+    """
+    chain = _make_kr6_opw_chain()
+    params = _kr6_opw_params()
+    q_known = np.array([0.3, -0.4, 0.5, 0.2, -0.3, 0.1], dtype=np.float64)
+    target = cartan.forward_kinematics(chain, q_known)
+
+    admitted = cartan.analytical.solve_opw_6r(
+        chain, params, target, position_tolerance=1e-6, orientation_tolerance=1e-6)
+    assert admitted.status == cartan.AnalyticalStatus.ok
+    assert len(admitted.solutions) >= 1
+
+    refused = cartan.analytical.solve_opw_6r(
+        chain, params, target, position_tolerance=1e-6, orientation_tolerance=0.0)
+    assert refused.status != cartan.AnalyticalStatus.ok
+    assert len(refused.solutions) == 0
+
+    unwrapped = cartan.analytical.solve_unwrapped_opw_6r(
+        chain, params, target, position_tolerance=1e-6, orientation_tolerance=0.0)
+    assert unwrapped.status != cartan.AnalyticalStatus.ok
+    assert len(unwrapped.solutions) == 0

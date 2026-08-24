@@ -1,3 +1,4 @@
+#include "checked_cache.h"
 #include "benchmark_utils.h"
 
 #include <cartan/serial/fk/forward_kinematics.h>
@@ -16,6 +17,8 @@ namespace
 // loop. Each cell draws from a table of fk results built from varied configs,
 // indexed by the iteration counter, and DoNotOptimize's the chosen fk before
 // the call. Power-of-two size wraps the index with a mask.
+// The tables are filled through the checked entry point and read by timed loops
+// that call the unchecked sibling, so no cell times the guard in front of it.
 constexpr std::size_t kInputs = 1024;
 
 }
@@ -28,15 +31,15 @@ static void bm_space_jacobian_3r_planar(benchmark::State& state)
 {
     auto chain = cartan::fixtures::make_3r_planar_chain<double>();
     std::mt19937 rng(42);
-    std::array<decltype(cartan::forward_kinematics(chain, cartan::fixtures::random_joint_config(chain, rng))), kInputs> fks;
-    for (auto& f : fks) f = cartan::forward_kinematics(chain, cartan::fixtures::random_joint_config(chain, rng));
+    std::array<decltype(cartan::forward_kinematics_unchecked(chain, cartan::fixtures::random_joint_config(chain, rng))), kInputs> fks;
+    if (!cartan::bench::fill_fk_cache(fks, chain, rng, state)) return;
 
     std::size_t i = 0;
     for (auto _ : state)
     {
         auto& fk = fks[i++ & (kInputs - 1)];
         benchmark::DoNotOptimize(fk);
-        auto J = cartan::space_jacobian(chain, fk);
+        auto J = cartan::space_jacobian_unchecked(chain, fk);
         benchmark::DoNotOptimize(J.data());
     }
 }
@@ -46,15 +49,15 @@ static void bm_space_jacobian_ur3e_fixed(benchmark::State& state)
 {
     auto chain = cartan::fixtures::make_ur3e_chain<double>();
     std::mt19937 rng(42);
-    std::array<decltype(cartan::forward_kinematics(chain, cartan::fixtures::random_joint_config(chain, rng))), kInputs> fks;
-    for (auto& f : fks) f = cartan::forward_kinematics(chain, cartan::fixtures::random_joint_config(chain, rng));
+    std::array<decltype(cartan::forward_kinematics_unchecked(chain, cartan::fixtures::random_joint_config(chain, rng))), kInputs> fks;
+    if (!cartan::bench::fill_fk_cache(fks, chain, rng, state)) return;
 
     std::size_t i = 0;
     for (auto _ : state)
     {
         auto& fk = fks[i++ & (kInputs - 1)];
         benchmark::DoNotOptimize(fk);
-        auto J = cartan::space_jacobian(chain, fk);
+        auto J = cartan::space_jacobian_unchecked(chain, fk);
         benchmark::DoNotOptimize(J.data());
     }
 }
@@ -64,15 +67,15 @@ static void bm_space_jacobian_ur3e_dynamic(benchmark::State& state)
 {
     auto chain = cartan::fixtures::make_ur3e_chain_dynamic<double>();
     std::mt19937 rng(42);
-    std::array<decltype(cartan::forward_kinematics(chain, cartan::fixtures::random_joint_config(chain, rng))), kInputs> fks;
-    for (auto& f : fks) f = cartan::forward_kinematics(chain, cartan::fixtures::random_joint_config(chain, rng));
+    std::array<decltype(cartan::forward_kinematics_unchecked(chain, cartan::fixtures::random_joint_config(chain, rng))), kInputs> fks;
+    if (!cartan::bench::fill_fk_cache(fks, chain, rng, state)) return;
 
     std::size_t i = 0;
     for (auto _ : state)
     {
         auto& fk = fks[i++ & (kInputs - 1)];
         benchmark::DoNotOptimize(fk);
-        auto J = cartan::space_jacobian(chain, fk);
+        auto J = cartan::space_jacobian_unchecked(chain, fk);
         benchmark::DoNotOptimize(J.data());
     }
 }
@@ -82,15 +85,15 @@ static void bm_space_jacobian_lbr_med14_fixed(benchmark::State& state)
 {
     auto chain = cartan::fixtures::make_lbr_med14_chain<double>();
     std::mt19937 rng(42);
-    std::array<decltype(cartan::forward_kinematics(chain, cartan::fixtures::random_joint_config(chain, rng))), kInputs> fks;
-    for (auto& f : fks) f = cartan::forward_kinematics(chain, cartan::fixtures::random_joint_config(chain, rng));
+    std::array<decltype(cartan::forward_kinematics_unchecked(chain, cartan::fixtures::random_joint_config(chain, rng))), kInputs> fks;
+    if (!cartan::bench::fill_fk_cache(fks, chain, rng, state)) return;
 
     std::size_t i = 0;
     for (auto _ : state)
     {
         auto& fk = fks[i++ & (kInputs - 1)];
         benchmark::DoNotOptimize(fk);
-        auto J = cartan::space_jacobian(chain, fk);
+        auto J = cartan::space_jacobian_unchecked(chain, fk);
         benchmark::DoNotOptimize(J.data());
     }
 }
@@ -100,15 +103,15 @@ static void bm_space_jacobian_lbr_med14_dynamic(benchmark::State& state)
 {
     auto chain = cartan::fixtures::make_lbr_med14_chain_dynamic<double>();
     std::mt19937 rng(42);
-    std::array<decltype(cartan::forward_kinematics(chain, cartan::fixtures::random_joint_config(chain, rng))), kInputs> fks;
-    for (auto& f : fks) f = cartan::forward_kinematics(chain, cartan::fixtures::random_joint_config(chain, rng));
+    std::array<decltype(cartan::forward_kinematics_unchecked(chain, cartan::fixtures::random_joint_config(chain, rng))), kInputs> fks;
+    if (!cartan::bench::fill_fk_cache(fks, chain, rng, state)) return;
 
     std::size_t i = 0;
     for (auto _ : state)
     {
         auto& fk = fks[i++ & (kInputs - 1)];
         benchmark::DoNotOptimize(fk);
-        auto J = cartan::space_jacobian(chain, fk);
+        auto J = cartan::space_jacobian_unchecked(chain, fk);
         benchmark::DoNotOptimize(J.data());
     }
 }
@@ -122,15 +125,15 @@ static void bm_body_jacobian_3r_planar(benchmark::State& state)
 {
     auto chain = cartan::fixtures::make_3r_planar_chain<double>();
     std::mt19937 rng(42);
-    std::array<decltype(cartan::forward_kinematics(chain, cartan::fixtures::random_joint_config(chain, rng))), kInputs> fks;
-    for (auto& f : fks) f = cartan::forward_kinematics(chain, cartan::fixtures::random_joint_config(chain, rng));
+    std::array<decltype(cartan::forward_kinematics_unchecked(chain, cartan::fixtures::random_joint_config(chain, rng))), kInputs> fks;
+    if (!cartan::bench::fill_fk_cache(fks, chain, rng, state)) return;
 
     std::size_t i = 0;
     for (auto _ : state)
     {
         auto& fk = fks[i++ & (kInputs - 1)];
         benchmark::DoNotOptimize(fk);
-        auto J = cartan::body_jacobian(chain, fk);
+        auto J = cartan::body_jacobian_unchecked(chain, fk);
         benchmark::DoNotOptimize(J.data());
     }
 }
@@ -140,15 +143,15 @@ static void bm_body_jacobian_ur3e_fixed(benchmark::State& state)
 {
     auto chain = cartan::fixtures::make_ur3e_chain<double>();
     std::mt19937 rng(42);
-    std::array<decltype(cartan::forward_kinematics(chain, cartan::fixtures::random_joint_config(chain, rng))), kInputs> fks;
-    for (auto& f : fks) f = cartan::forward_kinematics(chain, cartan::fixtures::random_joint_config(chain, rng));
+    std::array<decltype(cartan::forward_kinematics_unchecked(chain, cartan::fixtures::random_joint_config(chain, rng))), kInputs> fks;
+    if (!cartan::bench::fill_fk_cache(fks, chain, rng, state)) return;
 
     std::size_t i = 0;
     for (auto _ : state)
     {
         auto& fk = fks[i++ & (kInputs - 1)];
         benchmark::DoNotOptimize(fk);
-        auto J = cartan::body_jacobian(chain, fk);
+        auto J = cartan::body_jacobian_unchecked(chain, fk);
         benchmark::DoNotOptimize(J.data());
     }
 }
@@ -158,15 +161,15 @@ static void bm_body_jacobian_ur3e_dynamic(benchmark::State& state)
 {
     auto chain = cartan::fixtures::make_ur3e_chain_dynamic<double>();
     std::mt19937 rng(42);
-    std::array<decltype(cartan::forward_kinematics(chain, cartan::fixtures::random_joint_config(chain, rng))), kInputs> fks;
-    for (auto& f : fks) f = cartan::forward_kinematics(chain, cartan::fixtures::random_joint_config(chain, rng));
+    std::array<decltype(cartan::forward_kinematics_unchecked(chain, cartan::fixtures::random_joint_config(chain, rng))), kInputs> fks;
+    if (!cartan::bench::fill_fk_cache(fks, chain, rng, state)) return;
 
     std::size_t i = 0;
     for (auto _ : state)
     {
         auto& fk = fks[i++ & (kInputs - 1)];
         benchmark::DoNotOptimize(fk);
-        auto J = cartan::body_jacobian(chain, fk);
+        auto J = cartan::body_jacobian_unchecked(chain, fk);
         benchmark::DoNotOptimize(J.data());
     }
 }
@@ -176,15 +179,15 @@ static void bm_body_jacobian_lbr_med14_fixed(benchmark::State& state)
 {
     auto chain = cartan::fixtures::make_lbr_med14_chain<double>();
     std::mt19937 rng(42);
-    std::array<decltype(cartan::forward_kinematics(chain, cartan::fixtures::random_joint_config(chain, rng))), kInputs> fks;
-    for (auto& f : fks) f = cartan::forward_kinematics(chain, cartan::fixtures::random_joint_config(chain, rng));
+    std::array<decltype(cartan::forward_kinematics_unchecked(chain, cartan::fixtures::random_joint_config(chain, rng))), kInputs> fks;
+    if (!cartan::bench::fill_fk_cache(fks, chain, rng, state)) return;
 
     std::size_t i = 0;
     for (auto _ : state)
     {
         auto& fk = fks[i++ & (kInputs - 1)];
         benchmark::DoNotOptimize(fk);
-        auto J = cartan::body_jacobian(chain, fk);
+        auto J = cartan::body_jacobian_unchecked(chain, fk);
         benchmark::DoNotOptimize(J.data());
     }
 }
@@ -194,15 +197,15 @@ static void bm_body_jacobian_lbr_med14_dynamic(benchmark::State& state)
 {
     auto chain = cartan::fixtures::make_lbr_med14_chain_dynamic<double>();
     std::mt19937 rng(42);
-    std::array<decltype(cartan::forward_kinematics(chain, cartan::fixtures::random_joint_config(chain, rng))), kInputs> fks;
-    for (auto& f : fks) f = cartan::forward_kinematics(chain, cartan::fixtures::random_joint_config(chain, rng));
+    std::array<decltype(cartan::forward_kinematics_unchecked(chain, cartan::fixtures::random_joint_config(chain, rng))), kInputs> fks;
+    if (!cartan::bench::fill_fk_cache(fks, chain, rng, state)) return;
 
     std::size_t i = 0;
     for (auto _ : state)
     {
         auto& fk = fks[i++ & (kInputs - 1)];
         benchmark::DoNotOptimize(fk);
-        auto J = cartan::body_jacobian(chain, fk);
+        auto J = cartan::body_jacobian_unchecked(chain, fk);
         benchmark::DoNotOptimize(J.data());
     }
 }

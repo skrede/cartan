@@ -13,8 +13,9 @@
 #include "cartan/types.h"
 
 #include "cartan/serial/fk/jacobian.h"
-#include "cartan/serial/fk/forward_kinematics_matrix.h"
+#include "cartan/serial/fk/detail/shape_validation.h"
 #include "cartan/serial/fk/detail/axis_specializations.h"
+#include "cartan/serial/fk/forward_kinematics_matrix.h"
 
 #include "cartan/serial/chain/chain_concept.h"
 #include "cartan/serial/chain/static_chain.h"
@@ -141,9 +142,11 @@ inline void jacobian_column_matrix(
 
 }
 
-/// Space Jacobian from matrix-form FK result.
+/// Space Jacobian from a matrix-form FK result whose provenance the caller has
+/// already established, on the same terms as `space_jacobian_unchecked` over a
+/// quaternion-form result.
 template <typename Scalar, int N>
-jacobian_matrix<Scalar, N> space_jacobian(
+jacobian_matrix<Scalar, N> space_jacobian_unchecked(
     const kinematic_chain<Scalar, N>& chain,
     const fk_matrix_result<Scalar, N>& fk)
 {
@@ -175,12 +178,22 @@ jacobian_matrix<Scalar, N> space_jacobian(
     return J;
 }
 
-/// Space Jacobian from matrix-form FK result for a static_chain.
-/// Compile-time joint tags allow per-tag specialization to drop the
-/// runtime switch in the hot loop.
+/// Space Jacobian from matrix-form FK result.
+template <typename Scalar, int N>
+cartan::expected<jacobian_matrix<Scalar, N>, chain_failure> space_jacobian(
+    const kinematic_chain<Scalar, N>& chain,
+    const fk_matrix_result<Scalar, N>& fk)
+{
+    return detail::guarded(detail::check_fk_shape(chain, fk),
+        [&] { return space_jacobian_unchecked(chain, fk); });
+}
+
+/// Space Jacobian from matrix-form FK result for a static_chain, under the
+/// same unchecked precondition on fk. Compile-time joint tags allow per-tag
+/// specialization to drop the runtime switch in the hot loop.
 template <typename Scalar, joint_tag... Joints>
 jacobian_matrix<Scalar, static_cast<int>(sizeof...(Joints))>
-space_jacobian(
+space_jacobian_unchecked(
     const static_chain<Scalar, Joints...>& chain,
     const fk_matrix_result<Scalar, static_cast<int>(sizeof...(Joints))>& fk)
 {
@@ -212,6 +225,17 @@ space_jacobian(
     }(std::make_index_sequence<static_cast<std::size_t>(N)>{});
 
     return J;
+}
+
+/// Space Jacobian from matrix-form FK result for a static_chain.
+template <typename Scalar, joint_tag... Joints>
+cartan::expected<jacobian_matrix<Scalar, static_cast<int>(sizeof...(Joints))>, chain_failure>
+space_jacobian(
+    const static_chain<Scalar, Joints...>& chain,
+    const fk_matrix_result<Scalar, static_cast<int>(sizeof...(Joints))>& fk)
+{
+    return detail::guarded(detail::check_fk_shape(chain, fk),
+        [&] { return space_jacobian_unchecked(chain, fk); });
 }
 
 }

@@ -1,0 +1,274 @@
+#include "boundary_fixtures.h"
+
+#include <cartan/lie/se2.h>
+
+#include <cartan/serial/ik/detail/limit_enforcement.h>
+
+#include <cartan/analytical/detail/fk_verification.h>
+
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_template_test_macros.hpp>
+
+#include <array>
+#include <limits>
+#include <vector>
+#include <utility>
+#include <optional>
+
+namespace
+{
+
+/// Every boundary here is swept with all three classes rather than with a NaN
+/// alone. An infinity reaches a tolerance comparison as a NaN once the algebra
+/// has multiplied it by a zero, so a boundary can refuse one class and admit
+/// the other, and several of these did.
+template <typename Scalar>
+std::array<Scalar, 3> nonfinite_values()
+{
+    return {std::numeric_limits<Scalar>::quiet_NaN(),
+        std::numeric_limits<Scalar>::infinity(),
+        -std::numeric_limits<Scalar>::infinity()};
+}
+
+/// Poisons one entry at a time over the whole matrix, so a factory that reads
+/// only the block it validates cannot pass: the rotation block, the affine row
+/// and the translation block of a transform are distinct positions, and a
+/// guard that covers one of them says nothing about the other two.
+template <typename Matrix, typename Factory>
+void expect_every_entry_refused(const Matrix& seed, Factory factory)
+{
+    using Scalar = typename Matrix::Scalar;
+    for (Scalar poison : nonfinite_values<Scalar>())
+    {
+        for (int row = 0; row < int(seed.rows()); ++row)
+        {
+            for (int col = 0; col < int(seed.cols()); ++col)
+            {
+                Matrix poisoned = seed;
+                poisoned(row, col) = poison;
+                auto result = factory(poisoned);
+                REQUIRE_FALSE(result.has_value());
+                REQUIRE(result.error() == cartan::lie_failure::non_finite_input);
+            }
+        }
+    }
+}
+
+/// Not the aborting test helper: over-rejecting an infinite bound is one of the
+/// regressions this file exists to catch, and an abort would end the process on
+/// the first one, reporting a single failure where the truth is that the sweep
+/// never ran.
+template <typename Scalar>
+cartan::kinematic_chain<Scalar, cartan::dynamic> one_joint_chain(Scalar lo, Scalar hi)
+{
+    auto bounds = cartan::joint_limits<Scalar>::make(lo, hi);
+    REQUIRE(bounds.has_value());
+    std::vector<cartan::screw_axis<Scalar>> axes{
+        cartan::screw_axis<Scalar>::revolute({0, 0, 1}, {0, 0, 0})};
+    std::vector<cartan::joint_limits<Scalar>> limits{*bounds};
+    return cartan::kinematic_chain<Scalar, cartan::dynamic>(
+        cartan::se3<Scalar>::identity(), std::move(axes), std::move(limits));
+}
+
+template <typename Result>
+void expect_refused(const Result& result, cartan::chain_failure reason)
+{
+    REQUIRE_FALSE(result.has_value());
+    REQUIRE(result.error() == reason);
+}
+
+template <typename Scalar>
+bool feasible(Scalar q, Scalar lo, Scalar hi)
+{
+    auto chain = one_joint_chain(lo, hi);
+    Eigen::VectorX<Scalar> qv(1);
+    qv << q;
+    return cartan::detail::within_limits(
+        qv, chain, cartan::detail::default_feasibility_tol<Scalar>());
+}
+
+template <typename Chain, typename Scalar>
+void expect_candidates_refused(
+    const Chain& chain, const cartan::se3<Scalar>& target, bool check_orientation)
+{
+    const Eigen::Vector<Scalar, 6> home = Eigen::Vector<Scalar, 6>::Zero();
+    REQUIRE(cartan::detail::verify_analytical_solution(
+        chain, home, target, check_orientation,
+        cartan::default_verification_tolerance_v<Scalar>));
+    for (Scalar poison : nonfinite_values<Scalar>())
+    {
+        for (int i = 0; i < 6; ++i)
+        {
+            Eigen::Vector<Scalar, 6> candidate = home;
+            candidate(i) = poison;
+            REQUIRE_FALSE(cartan::detail::verify_analytical_solution(
+                chain, candidate, target, check_orientation,
+                cartan::default_verification_tolerance_v<Scalar>));
+        }
+    }
+}
+
+}
+
+TEMPLATE_TEST_CASE("every checked matrix factory refuses a nonfinite entry at every position",
+    "[nonfinite][boundary]", double, float)
+{
+    using S = TestType;
+    expect_every_entry_refused(cartan::matrix2<S>::Identity().eval(),
+        [](const cartan::matrix2<S>& m) { return cartan::so2<S>::from_matrix(m); });
+    expect_every_entry_refused(cartan::matrix3<S>::Identity().eval(),
+        [](const cartan::matrix3<S>& m) { return cartan::so3<S>::from_matrix(m); });
+    expect_every_entry_refused(cartan::matrix3<S>::Identity().eval(),
+        [](const cartan::matrix3<S>& m) { return cartan::se2<S>::from_matrix(m); });
+    expect_every_entry_refused(cartan::matrix4<S>::Identity().eval(),
+        [](const cartan::matrix4<S>& m) { return cartan::se3<S>::from_matrix(m); });
+}
+
+TEMPLATE_TEST_CASE("so3::from_quaternion refuses a nonfinite coefficient",
+    "[nonfinite][boundary]", double, float)
+{
+    using S = TestType;
+    for (S poison : nonfinite_values<S>())
+    {
+        for (int i = 0; i < 4; ++i)
+        {
+            cartan::quaternion<S> q = cartan::quaternion<S>::Identity();
+            q.coeffs()(i) = poison;
+            auto result = cartan::so3<S>::from_quaternion(q);
+            REQUIRE_FALSE(result.has_value());
+            REQUIRE(result.error() == cartan::lie_failure::non_finite_input);
+        }
+    }
+}
+
+/// Both branches, because the pre-guard factory validated only the component
+/// its branch selected on: a poisoned linear part was never examined on the
+/// revolute branch, and a poisoned angular part routed a revolute axis into the
+/// prismatic branch and was accepted there as a prismatic joint.
+TEMPLATE_TEST_CASE("screw_axis::from_vector refuses a nonfinite component on both branches",
+    "[nonfinite][boundary]", double, float)
+{
+    using S = TestType;
+    cartan::vector6<S> revolute;
+    revolute << S(0), S(0), S(1), S(0), S(0), S(0);
+    cartan::vector6<S> prismatic;
+    prismatic << S(0), S(0), S(0), S(1), S(0), S(0);
+    for (S poison : nonfinite_values<S>())
+    {
+        for (int branch = 0; branch < 2; ++branch)
+        {
+            for (int i = 0; i < 6; ++i)
+            {
+                cartan::vector6<S> poisoned = branch == 0 ? revolute : prismatic;
+                poisoned(i) = poison;
+                auto result = cartan::screw_axis<S>::from_vector(poisoned);
+                REQUIRE_FALSE(result.has_value());
+                REQUIRE(result.error() == cartan::lie_failure::non_finite_input);
+            }
+        }
+    }
+}
+
+/// The reason is asserted and not just the refusal: a NaN bound is refused as
+/// nonfinite input, a like-signed infinite pair by the interval predicate, and
+/// a has_value() check alone would let either cover for the other's removal.
+TEMPLATE_TEST_CASE("joint_limits::make refuses a NaN position bound as nonfinite input and a "
+                   "like-signed infinite pair as an empty interval",
+    "[nonfinite][boundary]", double, float)
+{
+    using S = TestType;
+    using cartan::chain_failure;
+    const S inf_b = std::numeric_limits<S>::infinity();
+    const S nan_b = std::numeric_limits<S>::quiet_NaN();
+
+    expect_refused(cartan::joint_limits<S>::make(nan_b, S(1)), chain_failure::non_finite_input);
+    expect_refused(cartan::joint_limits<S>::make(S(-1), nan_b), chain_failure::non_finite_input);
+    expect_refused(
+        cartan::joint_limits<S>::make(inf_b, inf_b), chain_failure::reversed_position_bounds);
+    expect_refused(
+        cartan::joint_limits<S>::make(-inf_b, -inf_b), chain_failure::reversed_position_bounds);
+
+    for (S poison : nonfinite_values<S>())
+    {
+        expect_refused(
+            cartan::joint_limits<S>::make(S(-1), S(1), poison), chain_failure::non_finite_input);
+        expect_refused(cartan::joint_limits<S>::make(S(-1), S(1), std::nullopt, poison),
+            chain_failure::non_finite_input);
+        expect_refused(cartan::joint_limits<S>::make(S(-1), S(1), std::nullopt, std::nullopt, poison),
+            chain_failure::non_finite_input);
+    }
+}
+
+TEMPLATE_TEST_CASE("limit feasibility refuses a nonfinite joint value against any bounds",
+    "[nonfinite][boundary]", double, float)
+{
+    using S = TestType;
+    const S inf_b = std::numeric_limits<S>::infinity();
+    for (S poison : nonfinite_values<S>())
+    {
+        REQUIRE_FALSE(feasible(poison, S(-3), S(3)));
+        REQUIRE_FALSE(feasible(poison, -inf_b, inf_b));
+        REQUIRE_FALSE(feasible(poison, -inf_b, S(3)));
+        REQUIRE_FALSE(feasible(poison, S(-3), inf_b));
+    }
+}
+
+TEMPLATE_TEST_CASE("the analytical verifier refuses a nonfinite candidate whether or not "
+                   "orientation is checked",
+    "[nonfinite][boundary]", double, float)
+{
+    using S = TestType;
+    auto chain = cartan::fixtures::make_six_joint_dynamic_chain<S>();
+    Eigen::VectorX<S> home = Eigen::VectorX<S>::Zero(6);
+    auto reference = cartan::forward_kinematics(chain, home);
+    REQUIRE(reference.has_value());
+
+    expect_candidates_refused<decltype(chain), S>(chain, reference->end_effector, false);
+    expect_candidates_refused<decltype(chain), S>(chain, reference->end_effector, true);
+}
+
+/// An unbounded continuous joint is *encoded* as the bounds (-inf, +inf), so a
+/// guard that refuses every nonfinite value it meets would make every such
+/// joint infeasible and every such chain unbuildable. This case and the next
+/// are what keeps the sweeps above from being satisfied that way.
+TEMPLATE_TEST_CASE("an infinite bound admits any finite joint value while finite bounds still "
+                   "refuse one outside them",
+    "[nonfinite][boundary]", double, float)
+{
+    using S = TestType;
+    const S inf_b = std::numeric_limits<S>::infinity();
+    REQUIRE(feasible(S(1000), -inf_b, inf_b));
+    REQUIRE(feasible(S(-1000), -inf_b, inf_b));
+    REQUIRE(feasible(S(-1000), -inf_b, S(3)));
+    REQUIRE(feasible(S(1000), S(-3), inf_b));
+    REQUIRE(feasible(S(0), S(-3), S(3)));
+    REQUIRE_FALSE(feasible(S(4), S(-3), S(3)));
+}
+
+TEMPLATE_TEST_CASE("the unbounded joint encoding still constructs",
+    "[nonfinite][boundary]", double, float)
+{
+    using S = TestType;
+    const S inf_b = std::numeric_limits<S>::infinity();
+    auto unbounded = cartan::joint_limits<S>::make(-inf_b, inf_b);
+    REQUIRE(unbounded.has_value());
+    REQUIRE(unbounded->position_min() == -inf_b);
+    REQUIRE(unbounded->position_max() == inf_b);
+    REQUIRE(one_joint_chain(-inf_b, inf_b).num_joints() == 1);
+}
+
+/// Without this the sweeps above are satisfiable by a factory that refuses
+/// everything, which is the failure mode a rejection corpus cannot see.
+TEMPLATE_TEST_CASE("the same boundaries still accept well-formed input",
+    "[nonfinite][boundary]", double, float)
+{
+    using S = TestType;
+    REQUIRE(cartan::so2<S>::from_matrix(cartan::matrix2<S>::Identity()).has_value());
+    REQUIRE(cartan::so3<S>::from_matrix(cartan::matrix3<S>::Identity()).has_value());
+    REQUIRE(cartan::se2<S>::from_matrix(cartan::matrix3<S>::Identity()).has_value());
+    REQUIRE(cartan::se3<S>::from_matrix(cartan::matrix4<S>::Identity()).has_value());
+    REQUIRE(cartan::so3<S>::from_quaternion(cartan::quaternion<S>::Identity()).has_value());
+    cartan::vector6<S> revolute;
+    revolute << S(0), S(0), S(1), S(0), S(0), S(0);
+    REQUIRE(cartan::screw_axis<S>::from_vector(revolute).has_value());
+}

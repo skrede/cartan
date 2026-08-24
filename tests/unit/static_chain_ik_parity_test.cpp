@@ -2,6 +2,9 @@
 /// @brief Verifies FK, Jacobian, and IK parity between kinematic_chain and
 ///        static_chain for all 9 benchmark robot geometries.
 
+#include "../support/kinematics_helpers.h"
+#include "../support/static_chain_factories.h"
+
 #include "../fixtures/chain_factories.h"
 
 #include <cartan/serial/ik/solvers.h>
@@ -19,101 +22,6 @@
 namespace spp = cartan;
 
 // ============================================================================
-// Static chain factory helpers
-//
-// Each mirrors the corresponding kinematic_chain factory from chain_factories.h
-// with identical runtime geometry but compile-time joint type tags.
-// ============================================================================
-
-template <typename Scalar>
-auto make_3r_planar_static()
-{
-    auto kc = spp::fixtures::make_3r_planar_chain<Scalar>();
-    return spp::static_chain<Scalar, spp::revolute_z, spp::revolute_z, spp::revolute_z>(
-        kc.home(), kc.axes(), kc.limits());
-}
-
-template <typename Scalar>
-auto make_ur3e_static()
-{
-    auto kc = spp::fixtures::make_ur3e_chain<Scalar>();
-    return spp::static_chain<Scalar,
-        spp::revolute_z, spp::revolute_y, spp::revolute_y,
-        spp::revolute_y, spp::revolute_z, spp::revolute_y>(
-        kc.home(), kc.axes(), kc.limits());
-}
-
-template <typename Scalar>
-auto make_lbr_med14_static()
-{
-    auto kc = spp::fixtures::make_lbr_med14_chain<Scalar>();
-    return spp::static_chain<Scalar,
-        spp::revolute_z, spp::revolute_y, spp::revolute_z, spp::revolute_y,
-        spp::revolute_z, spp::revolute_y, spp::revolute_z>(
-        kc.home(), kc.axes(), kc.limits());
-}
-
-template <typename Scalar>
-auto make_kr6_sixx_static()
-{
-    auto kc = spp::fixtures::make_kr6_sixx_chain<Scalar>();
-    return spp::static_chain<Scalar,
-        spp::revolute_z, spp::revolute_y, spp::revolute_y,
-        spp::revolute_x, spp::revolute_y, spp::revolute_x>(
-        kc.home(), kc.axes(), kc.limits());
-}
-
-template <typename Scalar>
-auto make_panda_static()
-{
-    auto kc = spp::fixtures::make_panda_chain<Scalar>();
-    return spp::static_chain<Scalar,
-        spp::revolute_z, spp::revolute_y, spp::revolute_z, spp::revolute_y,
-        spp::revolute_z, spp::revolute_y, spp::revolute_z>(
-        kc.home(), kc.axes(), kc.limits());
-}
-
-template <typename Scalar>
-auto make_abb_irb120_static()
-{
-    auto kc = spp::fixtures::make_abb_irb120_chain<Scalar>();
-    return spp::static_chain<Scalar,
-        spp::revolute_z, spp::revolute_y, spp::revolute_y,
-        spp::revolute_x, spp::revolute_y, spp::revolute_x>(
-        kc.home(), kc.axes(), kc.limits());
-}
-
-template <typename Scalar>
-auto make_jaco2_static()
-{
-    auto kc = spp::fixtures::make_jaco2_chain<Scalar>();
-    return spp::static_chain<Scalar,
-        spp::revolute_z, spp::revolute_y, spp::revolute_y,
-        spp::revolute_x, spp::revolute_y, spp::revolute_x>(
-        kc.home(), kc.axes(), kc.limits());
-}
-
-template <typename Scalar>
-auto make_fetch_static()
-{
-    auto kc = spp::fixtures::make_fetch_chain<Scalar>();
-    return spp::static_chain<Scalar,
-        spp::revolute_z, spp::revolute_y, spp::revolute_x, spp::revolute_y,
-        spp::revolute_x, spp::revolute_y, spp::revolute_x>(
-        kc.home(), kc.axes(), kc.limits());
-}
-
-template <typename Scalar>
-auto make_baxter_static()
-{
-    auto kc = spp::fixtures::make_baxter_chain<Scalar>();
-    return spp::static_chain<Scalar,
-        spp::revolute_z, spp::revolute_y, spp::revolute_x, spp::revolute_y,
-        spp::revolute_x, spp::revolute_y, spp::revolute_x>(
-        kc.home(), kc.axes(), kc.limits());
-}
-
-// ============================================================================
 // Parity verification helpers
 // ============================================================================
 
@@ -127,8 +35,8 @@ void verify_fk_parity(
 {
     for (const auto& q : configs)
     {
-        auto fk_kc = spp::forward_kinematics(kc, q);
-        auto fk_sc = spp::forward_kinematics(sc, q);
+        auto fk_kc = spp::testing::fk_at(kc, q);
+        auto fk_sc = spp::testing::fk_at(sc, q);
 
         auto diff = (fk_kc.end_effector.inverse() * fk_sc.end_effector).log();
         REQUIRE(diff.norm() < tol);
@@ -145,15 +53,15 @@ void verify_jacobian_parity(
 {
     for (const auto& q : configs)
     {
-        auto fk_kc = spp::forward_kinematics(kc, q);
-        auto fk_sc = spp::forward_kinematics(sc, q);
+        auto fk_kc = spp::testing::fk_at(kc, q);
+        auto fk_sc = spp::testing::fk_at(sc, q);
 
-        auto Js_kc = spp::space_jacobian(kc, fk_kc);
-        auto Js_sc = spp::space_jacobian(sc, fk_sc);
+        auto Js_kc = spp::testing::space_jacobian_at(kc, fk_kc);
+        auto Js_sc = spp::testing::space_jacobian_at(sc, fk_sc);
         REQUIRE((Js_kc - Js_sc).norm() < tol);
 
-        auto Jb_kc = spp::body_jacobian(kc, fk_kc);
-        auto Jb_sc = spp::body_jacobian(sc, fk_sc);
+        auto Jb_kc = spp::testing::body_jacobian_at(kc, fk_kc);
+        auto Jb_sc = spp::testing::body_jacobian_at(sc, fk_sc);
         REQUIRE((Jb_kc - Jb_sc).norm() < tol);
     }
 }
@@ -165,7 +73,7 @@ void verify_ik_parity(
     const SChain& sc,
     const Eigen::Vector<double, N>& q_known)
 {
-    auto target = spp::forward_kinematics(kc, q_known).end_effector;
+    auto target = spp::testing::fk_at(kc, q_known).end_effector;
     Eigen::Vector<double, N> q0 = Eigen::Vector<double, N>::Zero();
     spp::convergence_criteria<double> criteria{1e-6, 1e-6, 200};
 
@@ -180,8 +88,8 @@ void verify_ik_parity(
     REQUIRE(sc_result.has_value());
 
     // Verify both solutions reach the target
-    auto fk_kc = spp::forward_kinematics(kc, kc_result->solution.position);
-    auto fk_sc = spp::forward_kinematics(sc, sc_result->solution.position);
+    auto fk_kc = spp::testing::fk_at(kc, kc_result->solution.position);
+    auto fk_sc = spp::testing::fk_at(sc, sc_result->solution.position);
 
     auto err_kc = (fk_kc.end_effector.inverse() * target).log();
     auto err_sc = (fk_sc.end_effector.inverse() * target).log();
@@ -196,7 +104,7 @@ void verify_ik_parity(
 TEST_CASE("static_chain FK parity - 3R planar", "[static_chain][parity]")
 {
     auto kc = spp::fixtures::make_3r_planar_chain<double>();
-    auto sc = make_3r_planar_static<double>();
+    auto sc = spp::testing::make_3r_planar_static<double>();
 
     std::array<Eigen::Vector<double, 3>, 5> configs = {{
         {0.3, -0.5, 0.2}, {0.0, 0.0, 0.0}, {1.0, -1.0, 0.5},
@@ -211,7 +119,7 @@ TEST_CASE("static_chain FK parity - 3R planar", "[static_chain][parity]")
 TEST_CASE("static_chain IK parity - 3R planar", "[static_chain][parity]")
 {
     auto kc = spp::fixtures::make_3r_planar_chain<double>();
-    auto sc = make_3r_planar_static<double>();
+    auto sc = spp::testing::make_3r_planar_static<double>();
 
     Eigen::Vector<double, 3> q_known{0.3, -0.5, 0.2};
     verify_ik_parity<decltype(kc), decltype(sc), 3>(kc, sc, q_known);
@@ -224,7 +132,7 @@ TEST_CASE("static_chain IK parity - 3R planar", "[static_chain][parity]")
 TEST_CASE("static_chain FK parity - UR3e", "[static_chain][parity]")
 {
     auto kc = spp::fixtures::make_ur3e_chain<double>();
-    auto sc = make_ur3e_static<double>();
+    auto sc = spp::testing::make_ur3e_static<double>();
 
     std::array<Eigen::Vector<double, 6>, 5> configs = {{
         {0.3, -0.5, 0.8, -0.3, 0.6, -0.2}, {0.0, 0.0, 0.0, 0.0, 0.0, 0.0},
@@ -240,7 +148,7 @@ TEST_CASE("static_chain FK parity - UR3e", "[static_chain][parity]")
 TEST_CASE("static_chain IK parity - UR3e", "[static_chain][parity]")
 {
     auto kc = spp::fixtures::make_ur3e_chain<double>();
-    auto sc = make_ur3e_static<double>();
+    auto sc = spp::testing::make_ur3e_static<double>();
 
     Eigen::Vector<double, 6> q_known{0.3, -0.5, 0.8, -0.3, 0.6, -0.2};
     verify_ik_parity<decltype(kc), decltype(sc), 6>(kc, sc, q_known);
@@ -253,7 +161,7 @@ TEST_CASE("static_chain IK parity - UR3e", "[static_chain][parity]")
 TEST_CASE("static_chain FK parity - LBR Med14", "[static_chain][parity]")
 {
     auto kc = spp::fixtures::make_lbr_med14_chain<double>();
-    auto sc = make_lbr_med14_static<double>();
+    auto sc = spp::testing::make_lbr_med14_static<double>();
 
     std::array<Eigen::Vector<double, 7>, 5> configs = {{
         {0.2, -0.3, 0.1, -0.5, 0.4, -0.2, 0.3},
@@ -271,7 +179,7 @@ TEST_CASE("static_chain FK parity - LBR Med14", "[static_chain][parity]")
 TEST_CASE("static_chain IK parity - LBR Med14", "[static_chain][parity]")
 {
     auto kc = spp::fixtures::make_lbr_med14_chain<double>();
-    auto sc = make_lbr_med14_static<double>();
+    auto sc = spp::testing::make_lbr_med14_static<double>();
 
     Eigen::Vector<double, 7> q_known{0.2, -0.3, 0.1, -0.5, 0.4, -0.2, 0.3};
     verify_ik_parity<decltype(kc), decltype(sc), 7>(kc, sc, q_known);
@@ -284,7 +192,7 @@ TEST_CASE("static_chain IK parity - LBR Med14", "[static_chain][parity]")
 TEST_CASE("static_chain FK parity - KR6 SIXX", "[static_chain][parity]")
 {
     auto kc = spp::fixtures::make_kr6_sixx_chain<double>();
-    auto sc = make_kr6_sixx_static<double>();
+    auto sc = spp::testing::make_kr6_sixx_static<double>();
 
     std::array<Eigen::Vector<double, 6>, 5> configs = {{
         {0.1, -0.05, 0.1, 0.05, -0.05, 0.05},
@@ -302,7 +210,7 @@ TEST_CASE("static_chain FK parity - KR6 SIXX", "[static_chain][parity]")
 TEST_CASE("static_chain IK parity - KR6 SIXX", "[static_chain][parity]")
 {
     auto kc = spp::fixtures::make_kr6_sixx_chain<double>();
-    auto sc = make_kr6_sixx_static<double>();
+    auto sc = spp::testing::make_kr6_sixx_static<double>();
 
     Eigen::Vector<double, 6> q_known{0.1, -0.05, 0.1, 0.05, -0.05, 0.05};
     verify_ik_parity<decltype(kc), decltype(sc), 6>(kc, sc, q_known);
@@ -315,7 +223,7 @@ TEST_CASE("static_chain IK parity - KR6 SIXX", "[static_chain][parity]")
 TEST_CASE("static_chain FK parity - Franka Panda", "[static_chain][parity]")
 {
     auto kc = spp::fixtures::make_panda_chain<double>();
-    auto sc = make_panda_static<double>();
+    auto sc = spp::testing::make_panda_static<double>();
 
     std::array<Eigen::Vector<double, 7>, 5> configs = {{
         {0.2, -0.3, 0.1, -0.5, 0.4, -0.2, 0.3},
@@ -333,7 +241,7 @@ TEST_CASE("static_chain FK parity - Franka Panda", "[static_chain][parity]")
 TEST_CASE("static_chain IK parity - Franka Panda", "[static_chain][parity]")
 {
     auto kc = spp::fixtures::make_panda_chain<double>();
-    auto sc = make_panda_static<double>();
+    auto sc = spp::testing::make_panda_static<double>();
 
     Eigen::Vector<double, 7> q_known{0.2, -0.3, 0.1, -0.5, 0.4, -0.2, 0.3};
     verify_ik_parity<decltype(kc), decltype(sc), 7>(kc, sc, q_known);
@@ -346,7 +254,7 @@ TEST_CASE("static_chain IK parity - Franka Panda", "[static_chain][parity]")
 TEST_CASE("static_chain FK parity - ABB IRB120", "[static_chain][parity]")
 {
     auto kc = spp::fixtures::make_abb_irb120_chain<double>();
-    auto sc = make_abb_irb120_static<double>();
+    auto sc = spp::testing::make_abb_irb120_static<double>();
 
     std::array<Eigen::Vector<double, 6>, 5> configs = {{
         {0.3, -0.2, 0.4, 0.1, -0.3, 0.2},
@@ -364,7 +272,7 @@ TEST_CASE("static_chain FK parity - ABB IRB120", "[static_chain][parity]")
 TEST_CASE("static_chain IK parity - ABB IRB120", "[static_chain][parity]")
 {
     auto kc = spp::fixtures::make_abb_irb120_chain<double>();
-    auto sc = make_abb_irb120_static<double>();
+    auto sc = spp::testing::make_abb_irb120_static<double>();
 
     Eigen::Vector<double, 6> q_known{0.3, -0.2, 0.4, 0.1, -0.3, 0.2};
     verify_ik_parity<decltype(kc), decltype(sc), 6>(kc, sc, q_known);
@@ -377,7 +285,7 @@ TEST_CASE("static_chain IK parity - ABB IRB120", "[static_chain][parity]")
 TEST_CASE("static_chain FK parity - Jaco2", "[static_chain][parity]")
 {
     auto kc = spp::fixtures::make_jaco2_chain<double>();
-    auto sc = make_jaco2_static<double>();
+    auto sc = spp::testing::make_jaco2_static<double>();
 
     std::array<Eigen::Vector<double, 6>, 5> configs = {{
         {0.3, -0.2, 0.4, 0.1, -0.3, 0.2},
@@ -395,7 +303,7 @@ TEST_CASE("static_chain FK parity - Jaco2", "[static_chain][parity]")
 TEST_CASE("static_chain IK parity - Jaco2", "[static_chain][parity]")
 {
     auto kc = spp::fixtures::make_jaco2_chain<double>();
-    auto sc = make_jaco2_static<double>();
+    auto sc = spp::testing::make_jaco2_static<double>();
 
     Eigen::Vector<double, 6> q_known{0.3, -0.2, 0.4, 0.1, -0.3, 0.2};
     verify_ik_parity<decltype(kc), decltype(sc), 6>(kc, sc, q_known);
@@ -408,7 +316,7 @@ TEST_CASE("static_chain IK parity - Jaco2", "[static_chain][parity]")
 TEST_CASE("static_chain FK parity - Fetch", "[static_chain][parity]")
 {
     auto kc = spp::fixtures::make_fetch_chain<double>();
-    auto sc = make_fetch_static<double>();
+    auto sc = spp::testing::make_fetch_static<double>();
 
     std::array<Eigen::Vector<double, 7>, 5> configs = {{
         {0.2, -0.3, 0.1, -0.5, 0.4, -0.2, 0.3},
@@ -426,7 +334,7 @@ TEST_CASE("static_chain FK parity - Fetch", "[static_chain][parity]")
 TEST_CASE("static_chain IK parity - Fetch", "[static_chain][parity]")
 {
     auto kc = spp::fixtures::make_fetch_chain<double>();
-    auto sc = make_fetch_static<double>();
+    auto sc = spp::testing::make_fetch_static<double>();
 
     Eigen::Vector<double, 7> q_known{0.2, -0.3, 0.1, -0.5, 0.4, -0.2, 0.3};
     verify_ik_parity<decltype(kc), decltype(sc), 7>(kc, sc, q_known);
@@ -439,7 +347,7 @@ TEST_CASE("static_chain IK parity - Fetch", "[static_chain][parity]")
 TEST_CASE("static_chain FK parity - Baxter", "[static_chain][parity]")
 {
     auto kc = spp::fixtures::make_baxter_chain<double>();
-    auto sc = make_baxter_static<double>();
+    auto sc = spp::testing::make_baxter_static<double>();
 
     std::array<Eigen::Vector<double, 7>, 5> configs = {{
         {0.2, -0.3, 0.1, -0.5, 0.4, -0.2, 0.3},
@@ -457,7 +365,7 @@ TEST_CASE("static_chain FK parity - Baxter", "[static_chain][parity]")
 TEST_CASE("static_chain IK parity - Baxter", "[static_chain][parity]")
 {
     auto kc = spp::fixtures::make_baxter_chain<double>();
-    auto sc = make_baxter_static<double>();
+    auto sc = spp::testing::make_baxter_static<double>();
 
     Eigen::Vector<double, 7> q_known{0.2, -0.3, 0.1, -0.5, 0.4, -0.2, 0.3};
     verify_ik_parity<decltype(kc), decltype(sc), 7>(kc, sc, q_known);

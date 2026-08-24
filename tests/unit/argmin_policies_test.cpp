@@ -1,9 +1,9 @@
+#include "../support/joint_limits_helpers.h"
+
 #include <cartan/serial/ik/ik.h>
-#include <cartan/serial/ik/ik_validation.h>
 #include <cartan/serial/ik/basic_ik_runner.h>
 #include <cartan/serial/ik/concepts/solve_concept.h>
 #include <cartan/serial/ik/solver/nw_sqp.h>
-#include <cartan/serial/ik/solver/cmaes.h>
 #include <cartan/serial/ik/solver/argmin_lm.h>
 #include <cartan/serial/ik/solver/argmin_lbfgsb.h>
 #include <cartan/serial/ik/solver/augmented_lagrangian.h>
@@ -18,7 +18,6 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <cmath>
 #include <numbers>
 
 using chain_t = cartan::kinematic_chain<double, 6>;
@@ -26,7 +25,6 @@ using chain_t = cartan::kinematic_chain<double, 6>;
 static_assert(cartan::solve_policy<cartan::argmin_lbfgsb<chain_t>>);
 static_assert(cartan::solve_policy<cartan::nw_sqp<chain_t>>);
 static_assert(cartan::solve_policy<cartan::argmin_lm<chain_t>>);
-static_assert(cartan::solve_policy<cartan::cmaes<chain_t>>);
 static_assert(cartan::solve_policy<cartan::augmented_lagrangian<chain_t>>);
 
 static chain_t make_ur5_like_chain()
@@ -42,15 +40,17 @@ static chain_t make_ur5_like_chain()
     home_trans << 0.817, 0.191, -0.006;
     auto home = cartan::se3<double>(cartan::so3<double>::identity(), home_trans);
 
-    cartan::joint_limits<double> lim{-2 * std::numbers::pi, 2 * std::numbers::pi};
+    auto lim = cartan::testing::limits(-2 * std::numbers::pi, 2 * std::numbers::pi);
     return chain_t(home, {s1, s2, s3, s4, s5, s6}, {lim, lim, lim, lim, lim, lim});
 }
 
-static auto make_test_target(const chain_t& chain)
+static cartan::se3<double> make_test_target(const chain_t& chain)
 {
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.5, 0.8, -0.3, 0.6, -0.2;
-    return cartan::forward_kinematics(chain, q_known).end_effector;
+    auto held = cartan::forward_kinematics(chain, q_known);
+    REQUIRE(held.has_value());
+    return held->end_effector;
 }
 
 TEST_CASE("argmin_lbfgsb_solve_policy converges on UR5-like chain", "[ik][argmin][lbfgsb]")
@@ -99,43 +99,6 @@ TEST_CASE("argmin_lm_solve_policy converges on UR5-like chain", "[ik][argmin][lm
 
     REQUIRE(result.has_value());
     REQUIRE(result->final_error_norm < 1e-4);
-}
-
-TEST_CASE("cmaes_solve_policy converges on UR5-like chain", "[ik][argmin][cmaes]")
-{
-    auto chain = make_ur5_like_chain();
-    auto target = make_test_target(chain);
-
-    // CMA-ES needs a close starting point for 6-DOF IK
-    Eigen::Vector<double, 6> q_seed;
-    q_seed << 0.25, -0.45, 0.75, -0.25, 0.55, -0.15;
-    // The 4th literal carries the total work-unit envelope: CMA-ES needs the
-    // full headroom to clear the 1e-2 precision gate.
-    cartan::convergence_criteria<double> criteria{1e-2, 1e-2, 10000, 10000};
-
-    cartan::cmaes<chain_t>::options opts;
-    opts.initial_sigma = 0.05;
-    opts.stall_window = 200;
-    opts.stall_threshold = 1e-14;
-    // Fix the sampler seed so the search is reproducible run-to-run; this makes
-    // the test deterministic rather than depending on std::random_device. With
-    // these settings CMA-ES lands near the 1e-2 precision target; this seed was
-    // chosen from a sweep for a healthy margin (~0.0067 twist-error norm),
-    // giving the deterministic run comfortable headroom below the gate.
-    opts.seed = 987654321ULL;
-
-    cartan::basic_ik_runner<cartan::cmaes<chain_t>> solver{
-        cartan::cmaes<chain_t>{opts}};
-    solver.setup(chain, target, q_seed, criteria);
-    auto result = solver.solve();
-
-    // With the fixed seed the run is deterministic. The solver self-report is
-    // not trusted: FK-re-verify the recovered configuration against the same
-    // convergence criteria (the twist error the runner claims must actually
-    // hold under forward kinematics).
-    REQUIRE(result.has_value());
-    REQUIRE(result->final_error_norm < 1e-2);
-    REQUIRE(cartan::verify_solution(chain, target, result->solution.position, criteria));
 }
 
 TEST_CASE("augmented_lagrangian_solve_policy converges on UR5-like chain", "[ik][argmin][aug-lag]")

@@ -1,0 +1,163 @@
+name: Consumability
+
+# The three consumer jobs on the platform workflows all build against an
+# installed package, which is a different contract from the FetchContent recipe
+# the README and the getting-started guide publish. This workflow executes the
+# published recipe itself -- extracted from the markdown by the snippet
+# extractor, never transcribed here -- so the instruction a reader follows is a
+# checked fact rather than a claim.
+on:
+  push:
+    branches: [master, develop, 'milestone/**']
+    paths:
+      - 'README.md'
+      - 'docs/getting-started.md'
+      - 'CMakeLists.txt'
+      - 'lib/**/CMakeLists.txt'
+      - 'cmake/**'
+      - 'tools/extract_doc_snippets.py'
+      - 'tools/doc_snippets/**'
+      - 'tests/consumability/**'
+      - '.github/workflows/consumability.yml'
+  pull_request:
+    branches: [master]
+    paths:
+      - 'README.md'
+      - 'docs/getting-started.md'
+      - 'CMakeLists.txt'
+      - 'lib/**/CMakeLists.txt'
+      - 'cmake/**'
+      - 'tools/extract_doc_snippets.py'
+      - 'tools/doc_snippets/**'
+      - 'tests/consumability/**'
+      - '.github/workflows/consumability.yml'
+  # Monday 04:41 UTC, following the weekly-cron pattern already in this
+  # repository. The published mode fetches a released revision over the network,
+  # which is a slower and differently-scoped question than gating a change.
+  schedule:
+    - cron: "41 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # A plain distribution image, pinned by digest, because the local runs block
+  # the dependency's discovery at the call site that matters rather than lacking
+  # it: that reproduces the right failure but leaves the environment an
+  # assumption. Here the absence is real and the step below checks it.
+  fetchcontent-consumer:
+    runs-on: ubuntu-24.04
+    container: ubuntu@sha256:4fbb8e6a8395de5a7550b33509421a2bafbc0aab6c06ba2cef9ebffbc7092d90 # 24.04
+
+    steps:
+      # Deliberately short: a compiler, the build system at the version the
+      # documentation names as the minimum, the program that build system
+      # generates for, the version-control client the fetch uses, and the
+      # interpreter the extractor needs. Every package beyond that is a chance to
+      # satisfy the dependency the gate must find missing. Recommends are off, so
+      # make is named here rather than arriving with cmake.
+      - name: Install the consumer toolchain only, with Eigen deliberately not installed
+        run: |
+          set -eu
+          apt-get update
+          apt-get install -y --no-install-recommends g++ make cmake git python3 ca-certificates
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Confirm the image carries no Eigen
+        run: |
+          set -eu
+          for path in /usr/include/eigen3 /usr/local/include/eigen3 \
+                      /usr/share/eigen3 /usr/lib/cmake/eigen3; do
+            if [ -e "${path}" ]; then
+              echo "the image provides Eigen at ${path}; this lane tests nothing" >&2
+              exit 1
+            fi
+          done
+          echo "no Eigen in the image"
+
+      # The working-tree mode redirects the fetch source and so never reads the
+      # repository URL or the reference the recipe publishes. This resolves both
+      # with git ls-remote, which is one network call and fails on a typo in
+      # either line; it does not build from them, which is what published mode
+      # does.
+      - name: Resolve the published fetch coordinates with git ls-remote
+        run: |
+          set -eu
+          cmake -P tests/consumability/run_recipe.cmake -- \
+            --repo-root "${PWD}" --out "${RUNNER_TEMP}/coordinates" --mode coordinates
+
+      # The only mode that can fail on the change under review: the recipe text
+      # is untouched and the build system's own fetch-source override points it
+      # at this checkout.
+      - name: Consume the published recipes against this checkout
+        run: |
+          set -eu
+          cmake -P tests/consumability/run_recipe.cmake -- \
+            --repo-root "${PWD}" --out "${RUNNER_TEMP}/working-tree" --mode working-tree
+
+      - name: Consume the published recipes as a reader would
+        if: github.event_name == 'schedule' || github.ref == 'refs/heads/master'
+        run: |
+          set -eu
+          cmake -P tests/consumability/run_recipe.cmake -- \
+            --repo-root "${PWD}" --out "${RUNNER_TEMP}/published" --mode published
+
+  # The same recipes, on the platform a known consumer actually has: a 2019
+  # Intel Mac. Nothing else in this repository builds cartan's headers as a
+  # consumer on x86_64 macOS -- the macOS lane is arm64 and the wheel cell
+  # reaches Intel only through the Python surface -- so an x86-only failure in a
+  # published recipe would reach a reader before it reached CI.
+  #
+  # Two deliberate differences from the Linux job above. The toolchain is
+  # whatever the image ships rather than the documented minimum, because the
+  # image is not ours to strip down; the minimum-version question is answered on
+  # Linux and is not platform-specific. And the absence check names Homebrew's
+  # two prefixes, since an Intel Mac installs into /usr/local where an Apple
+  # Silicon one uses /opt/homebrew.
+  fetchcontent-consumer-macos-intel:
+    runs-on: macos-15-intel
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Record the toolchain this image ships
+        run: |
+          set -eu
+          cc --version
+          cmake --version
+          sw_vers
+          uname -m
+
+      - name: Confirm the image carries no Eigen
+        run: |
+          set -eu
+          for path in /usr/local/include/eigen3 /usr/local/share/eigen3 \
+                      /usr/local/lib/cmake/eigen3 /opt/homebrew/include/eigen3 \
+                      /opt/homebrew/share/eigen3 /opt/homebrew/lib/cmake/eigen3; do
+            if [ -e "${path}" ]; then
+              echo "the image provides Eigen at ${path}; this lane tests nothing" >&2
+              exit 1
+            fi
+          done
+          echo "no Eigen in the image"
+
+      - name: Resolve the published fetch coordinates with git ls-remote
+        run: |
+          set -eu
+          cmake -P tests/consumability/run_recipe.cmake -- \
+            --repo-root "${PWD}" --out "${RUNNER_TEMP}/coordinates" --mode coordinates
+
+      - name: Consume the published recipes against this checkout
+        run: |
+          set -eu
+          cmake -P tests/consumability/run_recipe.cmake -- \
+            --repo-root "${PWD}" --out "${RUNNER_TEMP}/working-tree" --mode working-tree
+
+      - name: Consume the published recipes as a reader would
+        if: github.event_name == 'schedule' || github.ref == 'refs/heads/master'
+        run: |
+          set -eu
+          cmake -P tests/consumability/run_recipe.cmake -- \
+            --repo-root "${PWD}" --out "${RUNNER_TEMP}/published" --mode published

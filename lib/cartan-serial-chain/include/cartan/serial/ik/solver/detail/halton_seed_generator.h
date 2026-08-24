@@ -18,6 +18,7 @@
 #include <array>
 #include <cmath>
 #include <numbers>
+#include <utility>
 
 namespace cartan
 {
@@ -99,9 +100,11 @@ public:
     /// Drop first 20 entries to reduce initial correlation between dimensions.
     static constexpr int skip_count = 20;
 
-    /// Construct from a chain (borrows reference; chain must outlive generator).
-    explicit halton_seed_generator(const Chain& chain)
-        : m_chain(&chain)
+    /// Construct from a chain (borrows reference; chain must outlive generator)
+    /// and the configuration a joint unbounded on both sides is seeded around.
+    halton_seed_generator(const Chain& chain, position_type reference)
+        : m_chain(chain)
+        , m_reference(std::move(reference))
     {
     }
 
@@ -110,7 +113,7 @@ public:
     /// Maps Halton [0,1]^N to joint limits via linear scaling.
     position_type operator()(int index) const
     {
-        int n = m_chain->num_joints();
+        int n = m_chain.num_joints();
         position_type q;
         if constexpr (N == dynamic)
             q.resize(n);
@@ -123,25 +126,18 @@ public:
             // in-bounds; see the `bases` documentation for the reuse tradeoff.
             const std::size_t base_index = static_cast<std::size_t>(j) % bases.size();
             Scalar h = halton_element<Scalar>(halton_index, bases[base_index]);
-            auto lim = m_chain->limits()[static_cast<std::size_t>(j)];
-            // Scale [0,1] -> [q_min, q_max] for finite-range joints; for an
-            // unbounded angular joint, fall back to one principal revolution
-            // centered at zero so the seed remains finite.
-            const Scalar range = lim.position_max - lim.position_min;
-            if (std::isfinite(range))
-            {
-                q[j] = lim.position_min + h * range;
-            }
-            else
-            {
-                q[j] = (h - Scalar(0.5)) * cartan::detail::k_unbounded_angular_range_v<Scalar>;
-            }
+            auto lim = m_chain.limits()[static_cast<std::size_t>(j)];
+            const auto bounds = cartan::detail::anchor_bounds(lim.position_min(),
+                lim.position_max(), cartan::detail::k_unbounded_angular_range_v<Scalar>,
+                m_reference[j]);
+            q[j] = bounds.lower + h * (bounds.upper - bounds.lower);
         }
         return q;
     }
 
 private:
-    const Chain* m_chain;
+    const Chain& m_chain;
+    position_type m_reference;
 };
 
 }

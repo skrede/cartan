@@ -82,6 +82,9 @@ constexpr std::string_view to_string(cartan::ik_status s) noexcept
         case S::diverged:              return "diverged";
         case S::iteration_limit:       return "iteration_limit";
         case S::joint_limit_hit:       return "joint_limit_hit";
+        case S::not_initialized:       return "not_initialized";
+        case S::dimension_mismatch:    return "dimension_mismatch";
+        case S::non_finite_input:      return "non_finite_input";
     }
     return "unknown";
 }
@@ -103,7 +106,7 @@ void trace_pose(
     cartan::argmin_slsqp<chain_t<N>> solver;
     solver.setup(chain, target, q_seed, criteria);
 
-    cartan::halton_seed_generator<chain_t<N>> seed_gen(chain);
+    cartan::halton_seed_generator<chain_t<N>> seed_gen(chain, q_seed);
 
     constexpr int wrapper_max_restarts = 20;  // restart_wrapper default
 

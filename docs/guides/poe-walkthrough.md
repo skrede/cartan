@@ -11,6 +11,8 @@ axis definition to Jacobian output.
 ```cpp
 #include <cartan/serial_chain.h>
 
+#include <iostream>
+
 using vec3 = cartan::vector3<double>;
 ```
 
@@ -28,6 +30,8 @@ two common joint types:
 auto s1 = cartan::screw_axis<double>::revolute(
     vec3(0, 0, 1),    // omega: rotation axis direction
     vec3(0, 0, 0));   // point: any point on the axis
+
+std::cout << "Screw vector (omega, v): " << s1.to_vector().transpose() << "\n";
 ```
 
 The factory normalizes the axis direction and computes `v = -omega x point`
@@ -39,6 +43,9 @@ internally, giving the 6D screw vector `(omega, v)`.
 ```cpp
 // Joint slides along the x-axis.
 auto s_prismatic = cartan::screw_axis<double>::prismatic(vec3(1, 0, 0));
+
+std::cout << "omega: " << s_prismatic.omega().transpose()
+          << ", v: " << s_prismatic.v().transpose() << "\n";
 ```
 
 For prismatic joints, `omega = 0` and `v` is the unit translation direction.
@@ -58,6 +65,9 @@ end-effector when all joint angles are zero:
 // End-effector at (3, 0, 0) with identity rotation at zero config.
 vec3 home_translation(3.0, 0.0, 0.0);
 auto home = cartan::se3<double>(cartan::so3<double>{}, home_translation);
+
+std::cout << "Home translation: " << home.translation().transpose() << "\n";
+std::cout << "Home rotation:\n" << home.rotation().matrix() << "\n";
 ```
 
 A default-constructed `so3<double>` is the identity rotation. The home pose
@@ -71,9 +81,10 @@ Combine the screw axes, home configuration, and joint limits into a
 `kinematic_chain`. The template parameters are `<Scalar, N>` -- the scalar type
 first, then the joint count:
 
+<!-- cartan:unbuilt kind=illustration reason="continues the running example, using the screw axes and the home pose the earlier blocks defined" -->
 ```cpp
 // Joint limits: [-pi, pi] for each joint.
-cartan::joint_limits<double> lim{-std::numbers::pi, std::numbers::pi};
+auto lim = cartan::joint_limits<double>::make(-std::numbers::pi, std::numbers::pi).value();
 
 // Fixed-size 3-DOF chain (N known at compile time).
 cartan::kinematic_chain<double, 3> chain(
@@ -85,6 +96,7 @@ cartan::kinematic_chain<double, 3> chain(
 For chains where the DOF is determined at runtime, use `cartan::dynamic` and
 `to_dynamic()` to erase the compile-time size of an existing fixed chain:
 
+<!-- cartan:unbuilt kind=illustration reason="continues the running example, using the chain the earlier blocks built" -->
 ```cpp
 // Dynamic-size chain (N determined at runtime).
 cartan::kinematic_chain<double, cartan::dynamic> dyn_chain = chain.to_dynamic();
@@ -100,9 +112,17 @@ configuration using the PoE formula:
 
     T(q) = exp([S1]q1) * exp([S2]q2) * ... * exp([Sn]qn) * M
 
+`forward_kinematics` validates that `q` holds one finite component per joint and
+returns `cartan::expected<fk_result, chain_failure>`. The fragments on this page
+unwrap with `.value()` only because a fragment has nowhere to return an error
+to. That accessor throws `bad_expected_access` carrying the
+failure, or fail-stops on the exceptions-off targets cartan supports; the
+complete example in section 6 shows the form to copy.
+
+<!-- cartan:unbuilt kind=illustration reason="continues the running example, using the chain the earlier blocks built" -->
 ```cpp
 Eigen::Vector3d q{0.5, -0.3, 0.8};   // joint angles in radians
-auto fk = cartan::forward_kinematics(chain, q);
+auto fk = cartan::forward_kinematics(chain, q).value();
 
 // End-effector SE(3) pose.
 cartan::se3<double> T_ee = fk.end_effector;
@@ -120,13 +140,14 @@ The **space Jacobian** maps joint velocities to the spatial twist of the
 end-effector. The **body Jacobian** maps to the body-frame twist. Both take the
 chain and the cached `fk_result`:
 
+<!-- cartan:unbuilt kind=illustration reason="continues the running example, using the chain and the cached result the earlier blocks produced" -->
 ```cpp
 // Space Jacobian: V_s = J_s(q) * dq
-auto Js = cartan::space_jacobian(chain, fk);
+auto Js = cartan::space_jacobian(chain, fk).value();
 std::cout << "Space Jacobian (6x3):\n" << Js << "\n";
 
 // Body Jacobian: V_b = J_b(q) * dq
-auto Jb = cartan::body_jacobian(chain, fk);
+auto Jb = cartan::body_jacobian(chain, fk).value();
 std::cout << "Body Jacobian (6x3):\n" << Jb << "\n";
 ```
 
@@ -160,22 +181,50 @@ int main()
     // Home: end-effector at (3, 0, 0) when all joints are zero.
     auto home = cartan::se3<double>(cartan::so3<double>::identity(), vec3(3, 0, 0));
 
-    cartan::joint_limits<double> lim{-std::numbers::pi, std::numbers::pi};
-    cartan::kinematic_chain<double, 3> chain(
-        home, {s1, s2, s3}, {lim, lim, lim});
+    auto lim = cartan::joint_limits<double>::make(-std::numbers::pi, std::numbers::pi);
+    if (!lim.has_value())
+    {
+        std::cerr << "joint limits rejected: " << cartan::message(lim.error()) << "\n";
+        return 1;
+    }
 
-    // Compute FK at q = (0.5, -0.3, 0.8).
+    cartan::kinematic_chain<double, 3> chain(
+        home, {s1, s2, s3}, {*lim, *lim, *lim});
+
+    // Compute FK at q = (0.5, -0.3, 0.8). Every checked entry point returns a
+    // cartan::expected: name the result, branch on it, report the failure
+    // through cartan::message, and only then read the value.
     Eigen::Vector3d q{0.5, -0.3, 0.8};
     auto fk = cartan::forward_kinematics(chain, q);
+    if (!fk.has_value())
+    {
+        std::cerr << "forward kinematics rejected q: "
+                  << cartan::message(fk.error()) << "\n";
+        return 1;
+    }
 
     std::cout << "End-effector position: "
-              << fk.end_effector.translation().transpose() << "\n";
+              << fk->end_effector.translation().transpose() << "\n";
 
     // Compute Jacobians from the cached FK result.
-    auto Js = cartan::space_jacobian(chain, fk);
-    auto Jb = cartan::body_jacobian(chain, fk);
-    std::cout << "Space Jacobian:\n" << Js << "\n";
-    std::cout << "Body Jacobian:\n" << Jb << "\n";
+    auto Js = cartan::space_jacobian(chain, *fk);
+    if (!Js.has_value())
+    {
+        std::cerr << "space Jacobian rejected the FK result: "
+                  << cartan::message(Js.error()) << "\n";
+        return 1;
+    }
+
+    auto Jb = cartan::body_jacobian(chain, *fk);
+    if (!Jb.has_value())
+    {
+        std::cerr << "body Jacobian rejected the FK result: "
+                  << cartan::message(Jb.error()) << "\n";
+        return 1;
+    }
+
+    std::cout << "Space Jacobian:\n" << *Js << "\n";
+    std::cout << "Body Jacobian:\n" << *Jb << "\n";
 
     return 0;
 }

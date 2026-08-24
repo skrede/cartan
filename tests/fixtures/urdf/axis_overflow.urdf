@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<!-- An <axis> magnitude that is representable but whose square overflows the
+     chain's scalar type. Eigen's normalized() divides by an infinite norm and
+     returns the zero vector, which is finite, so nothing downstream notices
+     that the joint has stopped being a joint. -->
+<robot name="axis_overflow">
+
+  <link name="base_link"/>
+  <link name="tip"/>
+
+  <joint name="overflow_axis_joint" type="revolute">
+    <parent link="base_link"/>
+    <child link="tip"/>
+    <origin xyz="0 0 0.1" rpy="0 0 0"/>
+    <axis xyz="1e30 0 0"/>
+    <limit lower="-1.0" upper="1.0" velocity="2.0" effort="50.0"/>
+  </joint>
+
+</robot>

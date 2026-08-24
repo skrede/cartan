@@ -14,7 +14,7 @@ if(ESP_PLATFORM)
 endif()
 
 cmake_minimum_required(VERSION 3.28)
-project(cartan VERSION 0.4.2 LANGUAGES CXX)
+project(cartan VERSION 0.4.3 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -22,39 +22,26 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
 
-set(CARTAN_WARNING_FLAGS
-    $<$<CXX_COMPILER_ID:MSVC>:/W4 /permissive- /utf-8>
-    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:
-    -fPIC
-    -Wall
-    -Wextra
-    -Wpedantic
-    -Wshadow
-    -Wconversion
-    -Wsign-conversion
-    -Wold-style-cast
-    -Wcast-align
-    -Woverloaded-virtual
-    -Wnon-virtual-dtor
-    -Wdouble-promotion
-    -Wimplicit-fallthrough
-    -Wformat=2
-    >
-)
-
 option(CARTAN_BUILD_TESTS "Build unit and compile tests" OFF)
 option(CARTAN_BUILD_EXAMPLES "Build examples" OFF)
 option(CARTAN_BUILD_FUZZ_TESTS "Build fuzz test targets" OFF)
 option(CARTAN_BUILD_PROPERTY_TESTS "Build property-based test targets (requires RapidCheck)" OFF)
 option(CARTAN_BUILD_ARGMIN "Build with Argmin NLP solver backend" OFF)
-option(CARTAN_BUILD_NLOPT "Build NLopt solver backend for IK" OFF)
 option(CARTAN_BUILD_URDF "Build URDF loading module" OFF)
 option(CARTAN_BUILD_URDF_EXTENDED_TESTS "Build extended URDF parity tests against vendored real-world URDFs" OFF)
 option(CARTAN_BUILD_BENCHMARKS "Build the benchmark suite; third-party comparison dependencies are auto-detected and any benchmark whose dependency is missing is omitted with a warning" OFF)
-option(CARTAN_FETCH_BENCHMARK_DEPS "Fetch missing benchmark dependencies via FetchContent instead of only using installed ones" OFF)
 option(CARTAN_BUILD_PROFILING "Build profiling benchmarks (no external robot library dependencies)" OFF)
 option(CARTAN_BUILD_PYTHON "Build Python bindings via nanobind" OFF)
 option(CARTAN_BUILD_DOC_TESTS "Compile documentation C++ snippets against the headers" OFF)
+# The matrix drives configure, build and install trees of its own from the checkout
+# and compiles nothing in this one, so it needs no unit-test framework. Keeping it
+# off CARTAN_BUILD_TESTS lets a packaging lane run it without acquiring one.
+option(CARTAN_BUILD_PACKAGING_TESTS "Register the install-relocate-consume matrix" OFF)
+# Each of these translation units instantiates every advertised form of one
+# solver family across both scalar types and every joint count, which makes them
+# the most expensive targets in the tree; their own option lets a lane that wants
+# that coverage pay for it while every other build does not.
+option(CARTAN_BUILD_INSTANTIATION_TESTS "Register the advertised-combination instantiation targets" OFF)
 option(CARTAN_CMAKE_FETCH_DEPS "Use CMake FetchContent to download and install dependencies" OFF)
 
 set(CARTAN_ARGMIN_SOURCE_DIR "" CACHE PATH "Path to local argmin source checkout")
@@ -62,20 +49,43 @@ set(CARTAN_ARGMIN_SOURCE_DIR "" CACHE PATH "Path to local argmin source checkout
 include(FetchContent)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/CartanWarnings.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/CartanMeios.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/CartanOptionalBackends.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/CartanBackendContract.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/CartanInstallSurface.cmake)
+
+cmake_language(DEFER CALL cartan_assert_no_unregistered_backend)
+
+# Acquisition must precede add_subdirectory(lib): in fetch mode the backend is
+# the one told to fetch Eigen, and it agrees only while Eigen3::Eigen does not
+# exist. Populating cartan's Eigen first sends the backend down its
+# find_package(Eigen3 CONFIG REQUIRED) branch, which then has nothing to find.
+cartan_acquire_optional_backends()
+
+set(_cartan_fetched_backends "")
+foreach (_cartan_backend IN LISTS CARTAN_OPTIONAL_BACKENDS)
+    string(TOUPPER "${_cartan_backend}" _cartan_upper)
+    if (CARTAN_BUILD_${_cartan_upper} AND CARTAN_${_cartan_upper}_PROVIDER STREQUAL "fetched")
+        list(APPEND _cartan_fetched_backends ${_cartan_backend})
+    endif ()
+endforeach ()
 
 # The install/export layer is only coherent when every exported target links
-# imported dependencies that the generated package config can re-resolve. Under
-# FetchContent the local eigen_headers/pugixml aliases are not installable, and
-# the Argmin/NLopt backends drag in FetchContent-only link edges; any of these
-# would poison install(EXPORT). Gate the whole install surface on a single
-# variable so the module files and the root config block stay in lockstep.
-if (NOT CARTAN_CMAKE_FETCH_DEPS AND NOT CARTAN_BUILD_ARGMIN AND NOT CARTAN_BUILD_NLOPT)
-    set(CARTAN_ENABLE_INSTALL ON)
+# imported dependencies that the generated package config can re-resolve. This
+# is only a prediction of that -- the dependency targets do not exist yet -- so
+# it decides the default and cartan_assert_install_surface() below decides the
+# refusal, once the targets can be inspected.
+if (PROJECT_IS_TOP_LEVEL AND NOT CARTAN_CMAKE_FETCH_DEPS AND NOT _cartan_fetched_backends)
+    set(_cartan_install_default ON)
 else ()
-    set(CARTAN_ENABLE_INSTALL OFF)
+    set(_cartan_install_default OFF)
 endif ()
+set(CARTAN_ENABLE_INSTALL ${_cartan_install_default} CACHE BOOL "Generate install and export rules")
 
 add_subdirectory(lib)
+
+cartan_assert_install_surface()
 
 # The doc-snippet compile gate reuses the cartan targets defined by lib/, so it
 # must be added after them. It is a compile-only target with no CTest entries,
@@ -118,9 +128,11 @@ endif ()
 # per-subdirectory CTestTestfile.cmake needed for ctest discovery. The gate is
 # widened to include CARTAN_BUILD_EXAMPLES so the tutorial smoke tests
 # registered under examples/tutorials/ are discoverable without also turning on
-# CARTAN_BUILD_TESTS. The tests/ subdirectory itself stays gated on the test
-# flags only.
-if (CARTAN_BUILD_TESTS OR CARTAN_BUILD_FUZZ_TESTS OR CARTAN_BUILD_PROPERTY_TESTS OR CARTAN_BUILD_EXAMPLES)
+# CARTAN_BUILD_TESTS, and CARTAN_BUILD_BENCHMARKS so the suite's own correctness
+# gates are. The tests/ subdirectory itself stays gated on the test flags only.
+if (CARTAN_BUILD_TESTS OR CARTAN_BUILD_FUZZ_TESTS OR CARTAN_BUILD_PROPERTY_TESTS
+        OR CARTAN_BUILD_PACKAGING_TESTS OR CARTAN_BUILD_EXAMPLES
+        OR CARTAN_BUILD_BENCHMARKS)
     enable_testing()
 endif ()
 
@@ -128,7 +140,17 @@ if (CARTAN_BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif ()
 
-if (CARTAN_BUILD_TESTS OR CARTAN_BUILD_FUZZ_TESTS OR CARTAN_BUILD_PROPERTY_TESTS)
+# The NLopt solve-policy example publishes an interface target that the
+# benchmarks, the profiling target and two policy tests also consume, so it is
+# reachable from any of them rather than from the examples alone. It builds
+# nothing unless its own option is on.
+if (CARTAN_BUILD_EXAMPLES OR CARTAN_BUILD_BENCHMARKS OR CARTAN_BUILD_PROFILING
+        OR CARTAN_BUILD_TESTS)
+    add_subdirectory(examples/nlopt_policy)
+endif ()
+
+if (CARTAN_BUILD_TESTS OR CARTAN_BUILD_FUZZ_TESTS OR CARTAN_BUILD_PROPERTY_TESTS
+        OR CARTAN_BUILD_PACKAGING_TESTS)
     add_subdirectory(tests)
 endif ()
 

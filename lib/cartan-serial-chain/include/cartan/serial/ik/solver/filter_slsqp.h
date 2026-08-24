@@ -15,7 +15,9 @@
 #include "cartan/serial/ik/detail/convergence.h"
 #include "cartan/serial/ik/detail/argmin_problem.h"
 #include "cartan/serial/ik/detail/stall_detection.h"
+#include "cartan/serial/ik/detail/setup_validation.h"
 #include "cartan/serial/ik/detail/limit_enforcement.h"
+#include "cartan/serial/ik/detail/argmin_convergence.h"
 
 #include "cartan/lie/se3.h"
 #include "cartan/serial/chain/joint_state.h"
@@ -24,7 +26,7 @@
 
 #include <argmin/solver/options.h>
 #include <argmin/solver/convergence.h>
-#include <argmin/solver/basic_solver.h>
+#include <argmin/solver/step_budget_solver.h>
 #include <argmin/solver/filter_slsqp_policy.h>
 
 #include <Eigen/Core>
@@ -33,7 +35,6 @@
 #include <limits>
 #include <memory>
 #include <vector>
-#include <array>
 #include <optional>
 #include <random>
 #include <type_traits>
@@ -74,10 +75,15 @@ public:
         double step_threshold_rel{1e-10};
     };
 
-    filter_slsqp() = default;
+    filter_slsqp()
+        : filter_slsqp(options{})
+    {
+    }
 
     explicit filter_slsqp(const options& opts)
         : m_options{opts}
+        , m_q(detail::poison_joint_position<scalar_type, joints>())
+        , m_best_q(detail::poison_joint_position<scalar_type, joints>())
     {}
 
     void setup(
@@ -86,6 +92,15 @@ public:
         const position_type& q0,
         const convergence_criteria<scalar_type>& criteria)
     {
+        if (auto held = cartan::detail::validate_solve_inputs(chain, target, q0); !held)
+        {
+            m_status = held.error();
+            return;
+        }
+
+        m_q = detail::poison_joint_position<scalar_type, joints>(chain.num_joints());
+        m_setup_joints = chain.num_joints();
+
         m_chain = &chain;
         m_target = target;
         m_criteria = criteria;
@@ -101,11 +116,11 @@ public:
         if (m_options.rng_seed)
             m_rng.seed(*m_options.rng_seed);
 
-        auto fk = forward_kinematics(chain, q0);
+        auto fk = forward_kinematics_unchecked(chain, q0);
         auto V_b = (target.inverse() * fk.end_effector).log();
         m_initial_error = V_b.norm();
 
-        m_problem.emplace(chain, target, m_weight);
+        m_problem.emplace(chain, target, error_weight<scalar_type>{});
 
         int n = chain.num_joints();
         Eigen::VectorXd x0(n);
@@ -122,6 +137,8 @@ public:
 
     step_result<scalar_type> step(const Chain& chain, int N)
     {
+        m_status = cartan::detail::chain_bound_status(m_status, m_setup_joints, chain);
+
         int units = 0;
         m_chain = &chain;
         while (units < N && m_status == ik_status::running)
@@ -140,7 +157,7 @@ public:
 
             sync_solution_from_solver();
 
-            auto fk = forward_kinematics(chain, m_q);
+            auto fk = forward_kinematics_unchecked(chain, m_q);
             auto V_b = (m_target.inverse() * fk.end_effector).log();
             m_error_norm = V_b.norm();
             update_best(chain);
@@ -180,7 +197,7 @@ public:
                     auto q_perturbed = perturb_solution(m_q, *m_chain);
 
                     m_error_history.clear();
-                    auto fk_new = forward_kinematics(*m_chain, q_perturbed);
+                    auto fk_new = forward_kinematics_unchecked(*m_chain, q_perturbed);
                     auto V_b_new = (m_target.inverse() * fk_new.end_effector).log();
                     m_initial_error = V_b_new.norm();
 
@@ -236,23 +253,24 @@ public:
             return 0;
     }
 
-    auto last_check_results() const
+    cartan::detail::convergence_check_results<Convergence> last_check_results() const
     {
         if constexpr (requires { m_nab_opts.convergence.last_check_results(); })
             return m_nab_opts.convergence.last_check_results();
         else
-            return std::array<std::optional<argmin::solver_status>, 4>{};
+            return {};
     }
 
     void abort()
     {
-        m_status = ik_status::stalled;
+        m_status = ik_status::aborted;
         m_termination_reason = ik_termination_reason::solver_aborted;
     }
 
 private:
-    using argmin_solver = argmin::basic_solver<
-        argmin::filter_slsqp_policy<joints>, joints, cartan::detail::argmin_ik_problem<Chain>>;
+    using argmin_solver = argmin::step_budget_solver<
+        argmin::filter_slsqp_policy<joints>, joints, cartan::detail::argmin_ik_problem<Chain>,
+        Convergence>;
     using argmin_opts_type = argmin::solver_options<Convergence>;
 
     position_type perturb_solution(const position_type& q, const Chain& chain)
@@ -268,14 +286,14 @@ private:
         for (int i = 0; i < n; ++i)
         {
             auto idx = static_cast<std::size_t>(i);
-            const auto raw_range = limits[idx].position_max - limits[idx].position_min;
+            const auto raw_range = limits[idx].position_max() - limits[idx].position_min();
             const auto range = cartan::detail::finite_range_or(raw_range,
                 cartan::detail::k_unbounded_angular_range_v<scalar_type>);
             auto perturbation = static_cast<scalar_type>(dist(m_rng)) * m_options.restart_scale * range;
             q_new[i] = std::clamp(
                 q[i] + perturbation,
-                limits[idx].position_min,
-                limits[idx].position_max);
+                limits[idx].position_min(),
+                limits[idx].position_max());
         }
         return q_new;
     }
@@ -372,10 +390,9 @@ private:
     const Chain* m_chain{nullptr};
     se3<scalar_type> m_target{se3<scalar_type>::identity()};
     convergence_criteria<scalar_type> m_criteria{};
-    error_weight<scalar_type> m_weight{};
     options m_options{};
-    position_type m_q{};
-    position_type m_best_q{};
+    position_type m_q;
+    position_type m_best_q;
     scalar_type m_best_q_error{std::numeric_limits<scalar_type>::max()};
     bool m_best_feasible{false};
     bool m_best_valid{false};
@@ -383,7 +400,8 @@ private:
     scalar_type m_initial_error{};
     scalar_type m_error_norm{std::numeric_limits<scalar_type>::max()};
     int m_iterations{};
-    ik_status m_status{ik_status::running};
+    int m_setup_joints{-1};
+    ik_status m_status{ik_status::not_initialized};
     ik_termination_reason m_termination_reason{ik_termination_reason::unknown};
     std::optional<cartan::detail::argmin_ik_problem<Chain>> m_problem;
     std::optional<argmin_solver> m_solver;

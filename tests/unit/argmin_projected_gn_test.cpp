@@ -1,4 +1,7 @@
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
+
+#include "../support/kinematics_helpers.h"
+#include "../support/joint_limits_helpers.h"
 
 #include <cartan/serial/ik/solver/argmin_projected_gn.h>
 #include <cartan/serial/ik/concepts/solve_concept.h>
@@ -31,7 +34,7 @@ static chain_t make_ur5_like_chain()
     home_trans << 0.817, 0.191, -0.006;
     auto home = cartan::se3<double>(cartan::so3<double>::identity(), home_trans);
 
-    cartan::joint_limits<double> lim{-2 * std::numbers::pi, 2 * std::numbers::pi};
+    auto lim = cartan::testing::limits(-2 * std::numbers::pi, 2 * std::numbers::pi);
     return chain_t(home, {s1, s2, s3, s4, s5, s6}, {lim, lim, lim, lim, lim, lim});
 }
 
@@ -44,7 +47,7 @@ TEST_CASE("argmin_projected_gn converges on reachable target", "[ik][argmin][pro
 
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.5, 0.8, -0.3, 0.6, -0.2;
-    auto target = cartan::forward_kinematics(chain, q_known).end_effector;
+    auto target = cartan::testing::fk_at(chain, q_known).end_effector;
 
     cartan::argmin_projected_gn<chain_t> solver{};
     Eigen::Vector<double, 6> q_seed = Eigen::Vector<double, 6>::Zero();
@@ -109,7 +112,7 @@ TEST_CASE("argmin_projected_gn zero restarts on easy target", "[ik][argmin][proj
 
     Eigen::Vector<double, 6> q_known;
     q_known << 0.1, -0.2, 0.3, -0.1, 0.2, -0.05;
-    auto target = cartan::forward_kinematics(chain, q_known).end_effector;
+    auto target = cartan::testing::fk_at(chain, q_known).end_effector;
 
     cartan::argmin_projected_gn<chain_t> solver{};
     Eigen::Vector<double, 6> q_seed;
@@ -162,7 +165,7 @@ TEST_CASE("argmin_projected_gn abort from running state transitions to stalled",
 
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.5, 0.8, -0.3, 0.6, -0.2;
-    auto target = cartan::forward_kinematics(chain, q_known).end_effector;
+    auto target = cartan::testing::fk_at(chain, q_known).end_effector;
 
     cartan::argmin_projected_gn<chain_t> solver{};
     Eigen::Vector<double, 6> q_seed = Eigen::Vector<double, 6>::Zero();
@@ -171,7 +174,7 @@ TEST_CASE("argmin_projected_gn abort from running state transitions to stalled",
 
     REQUIRE(solver.status() == cartan::ik_status::running);
     solver.abort();
-    REQUIRE(solver.status() == cartan::ik_status::stalled);
+    REQUIRE(solver.status() == cartan::ik_status::aborted);
     REQUIRE(solver.termination_reason() == cartan::ik_termination_reason::solver_aborted);
 }
 

@@ -1,0 +1,2 @@
+table,robot,stratum,solver,wall_ns_median
+c,franka_panda,reachable,cartan_lm,5120

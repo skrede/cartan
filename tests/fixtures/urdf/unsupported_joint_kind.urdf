@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<!-- A joint kind the description format defines and a serial chain has no
+     representation for. Well-formed and correctly connected in every other
+     respect, so a refusal here can only be the joint kind. -->
+<robot name="unsupported_joint_kind">
+
+  <link name="base_link"/>
+  <link name="tip"/>
+
+  <joint name="floating_joint" type="floating">
+    <parent link="base_link"/>
+    <child link="tip"/>
+    <origin xyz="0 0 0.1" rpy="0 0 0"/>
+  </joint>
+
+</robot>

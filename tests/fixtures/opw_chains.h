@@ -17,6 +17,9 @@
 /// agree everywhere; the numbers below are trusted only because that gate holds,
 /// not because they were read from a datasheet.
 
+#include "../support/expected_helpers.h"
+#include "../support/joint_limits_helpers.h"
+
 #include <cartan/types.h>
 #include <cartan/analytical.h>
 #include <cartan/lie/se3.h>
@@ -87,8 +90,8 @@ auto make_kr6_r900_opw_chain()
 {
     using vec3 = cartan::vector3<Scalar>;
 
-    const Scalar a1(0.025), a2(-0.035), c1(0.400), c2(0.455), c3(0.420),
-        c4(0.080);
+    const Scalar a1 = Scalar(0.025), a2 = Scalar(-0.035), c1 = Scalar(0.400),
+        c2 = Scalar(0.455), c3 = Scalar(0.420), c4 = Scalar(0.080);
     const Scalar half_pi = std::numbers::pi_v<Scalar> / Scalar(2);
 
     // Physical joint lines at the user home (arm horizontal-forward).
@@ -120,15 +123,76 @@ auto make_kr6_r900_opw_chain()
     vec3 flange(a1 + c2 + c3 + c4, Scalar(0), c1 - a2);
     auto home = cartan::se3<Scalar>(home_rotation, flange);
 
-    cartan::joint_limits<Scalar> lim{
-        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
+    auto lim = cartan::testing::limits(
+        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>);
     std::array<cartan::joint_limits<Scalar>, 6> limits = {
         lim, lim, lim, lim, lim, lim};
 
-    return cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y,
-                                cartan::revolute_y, cartan::revolute_x,
-                                cartan::revolute_y, cartan::revolute_x>(
-        home, {s0, s1, s2, s3, s4, s5}, limits);
+    using chain_type = cartan::static_chain<Scalar,
+        cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
+        cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>;
+    return cartan::testing::unwrap(
+        chain_type::make(home, {s0, s1, s2, s3, s4, s5}, limits),
+        "cartan::fixtures::make_kr6_r900_opw_chain");
+}
+
+/// A synthetic ortho-parallel spherical-wrist arm carrying a nonzero
+/// out-of-plane offset b. The KR6 above has b = 0, which collapses the lateral
+/// cylinder the wrist center must lie outside of onto the base axis.
+template <typename Scalar>
+cartan::opw_parameters<Scalar> offset_plane_opw_parameters()
+{
+    cartan::opw_parameters<Scalar> params{};
+    params.a1 = Scalar(0.15);
+    params.a2 = Scalar(0);
+    params.b  = Scalar(0.2);
+    params.c1 = Scalar(0.5);
+    params.c2 = Scalar(0.6);
+    params.c3 = Scalar(0.3);
+    params.c4 = Scalar(0.1);
+    params.offsets = {Scalar(0), Scalar(0), Scalar(0), Scalar(0), Scalar(0), Scalar(0)};
+    params.sign_corrections = {1, 1, 1, 1, 1, 1};
+    return params;
+}
+
+/// The screw model of the same arm: axis 1 about +z through the origin, the
+/// shoulder and elbow about +y through (a1, b, c1) and (a1, b, c1 + c2), and a
+/// spherical wrist (z, y, z) through (a1 + a2, b, c1 + c2 + c3). Zero offsets
+/// and unit signs make the user angles the internal ones. Like the KR6 pair
+/// above, trusted only because the reconstruction gate asserts the two agree.
+template <typename Scalar>
+auto make_offset_plane_opw_chain()
+    -> cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y,
+                            cartan::revolute_y, cartan::revolute_z,
+                            cartan::revolute_y, cartan::revolute_z>
+{
+    using vec3 = cartan::vector3<Scalar>;
+    const auto p = offset_plane_opw_parameters<Scalar>();
+    const vec3 z(Scalar(0), Scalar(0), Scalar(1));
+    const vec3 y(Scalar(0), Scalar(1), Scalar(0));
+    const vec3 shoulder(p.a1, p.b, p.c1);
+    const vec3 elbow(p.a1, p.b, p.c1 + p.c2);
+    const vec3 wrist(p.a1 + p.a2, p.b, p.c1 + p.c2 + p.c3);
+    auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::identity(),
+        vec3(p.a1 + p.a2, p.b, p.c1 + p.c2 + p.c3 + p.c4));
+
+    auto lim = cartan::testing::limits(
+        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>);
+    std::array<cartan::joint_limits<Scalar>, 6> limits = {lim, lim, lim, lim, lim, lim};
+
+    using chain_type = cartan::static_chain<Scalar,
+        cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
+        cartan::revolute_z, cartan::revolute_y, cartan::revolute_z>;
+    return cartan::testing::unwrap(
+        chain_type::make(home,
+            {cartan::screw_axis<Scalar>::revolute(z, vec3::Zero()),
+             cartan::screw_axis<Scalar>::revolute(y, shoulder),
+             cartan::screw_axis<Scalar>::revolute(y, elbow),
+             cartan::screw_axis<Scalar>::revolute(z, wrist),
+             cartan::screw_axis<Scalar>::revolute(y, wrist),
+             cartan::screw_axis<Scalar>::revolute(z, wrist)},
+            limits),
+        "cartan::fixtures::make_offset_plane_opw_chain");
 }
 
 }

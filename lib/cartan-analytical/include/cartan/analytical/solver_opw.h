@@ -21,6 +21,7 @@
 #include <limits>
 #include "cartan/expected.h"
 #include <numbers>
+#include <optional>
 #include <algorithm>
 #include <type_traits>
 
@@ -271,11 +272,14 @@ public:
     static constexpr int joints = 6;
     static constexpr int max_solutions = 8;
 
-    /// Acceptance tolerance for the FK position/orientation back-check, matching
-    /// detail::verify_analytical_solution. The construction-time spherical-wrist
-    /// gate is anchored to the same value so a constructed solver is always
-    /// solvable to the tolerance it verifies against.
-    static constexpr scalar_type default_position_tolerance = scalar_type(1e-6);
+    /// The module default's two fields, republished one scalar at a time
+    /// because the Python bindings need each as a default argument and cannot
+    /// spell the two-field type. Prefer `default_verification_tolerance_v` in
+    /// C++; these exist for the binding layer.
+    static constexpr scalar_type default_position_tolerance
+        = default_verification_tolerance_v<scalar_type>.position();
+    static constexpr scalar_type default_orientation_tolerance
+        = default_verification_tolerance_v<scalar_type>.orientation();
 
     /// Threshold on |sin(theta5)| below which the wrist is treated as singular
     /// and the fold path (pin theta4 = 0, recover theta6 by projection) is
@@ -305,7 +309,8 @@ public:
     ///   3. parallel basis: axis 2 is parallel to axis 3
     ///      (|omega1 . omega2| > 1 - sqrt_epsilon);
     ///   4. spherical wrist: axes 4, 5, 6 meet at a common center within the
-    ///      acceptance tolerance (detail::find_wrist_intersection).
+    ///      acceptance tolerance's position field
+    ///      (detail::find_wrist_intersection).
     ///
     /// The lateral shoulder offset (a1 != 0) is accepted -- this is precisely
     /// the geometry Pieper's shoulder-intersection gate rejects. Any
@@ -315,20 +320,21 @@ public:
     static cartan::expected<opw_6r_solver, analytical_error<scalar_type>>
     make(const Chain& chain,
          const opw_parameters<scalar_type>& params,
-         scalar_type position_tolerance = default_position_tolerance,
+         verification_tolerance<scalar_type> tolerance
+             = default_verification_tolerance_v<scalar_type>,
          scalar_type singularity_tolerance = default_singularity_tolerance)
     {
         if (chain.num_joints() != 6)
         {
             return cartan::unexpected(analytical_error<scalar_type>{
-                analytical_failure::degenerate_geometry, scalar_type(0)});
+                analytical_failure::degenerate_geometry, std::nullopt});
         }
         for (int i = 0; i < 6; ++i)
         {
             if (!chain.axis(i).is_revolute())
             {
                 return cartan::unexpected(analytical_error<scalar_type>{
-                    analytical_failure::degenerate_geometry, scalar_type(0)});
+                    analytical_failure::degenerate_geometry, std::nullopt});
             }
         }
 
@@ -341,7 +347,7 @@ public:
         if (ortho >= detail::sqrt_epsilon_v<scalar_type>)
         {
             return cartan::unexpected(analytical_error<scalar_type>{
-                analytical_failure::degenerate_geometry, ortho});
+                analytical_failure::degenerate_geometry, std::nullopt});
         }
 
         // Parallel basis: axis 2 parallel to axis 3.
@@ -349,21 +355,20 @@ public:
         if (parallel <= scalar_type(1) - detail::sqrt_epsilon_v<scalar_type>)
         {
             return cartan::unexpected(analytical_error<scalar_type>{
-                analytical_failure::degenerate_geometry,
-                scalar_type(1) - parallel});
+                analytical_failure::degenerate_geometry, std::nullopt});
         }
 
         // Spherical wrist at the acceptance tolerance.
         auto wrist = detail::find_wrist_intersection(
-            chain.axis(3), chain.axis(4), chain.axis(5), position_tolerance);
+            chain.axis(3), chain.axis(4), chain.axis(5), tolerance.position());
         if (!wrist)
         {
             return cartan::unexpected(analytical_error<scalar_type>{
-                analytical_failure::degenerate_geometry, scalar_type(0)});
+                analytical_failure::degenerate_geometry, std::nullopt});
         }
 
         return opw_6r_solver(
-            chain, params, position_tolerance, singularity_tolerance);
+            chain, params, tolerance, singularity_tolerance);
     }
 
     cartan::expected<
@@ -374,33 +379,40 @@ public:
         if (!m_valid)
         {
             return cartan::unexpected(analytical_error<scalar_type>{
-                analytical_failure::degenerate_geometry, scalar_type(0)});
+                analytical_failure::degenerate_geometry, std::nullopt});
         }
 
         const opw_parameters<Scalar>& p = m_params;
         const matrix3<Scalar> matrix = target.rotation().matrix();
         const vector3<Scalar> translation = target.translation();
 
-        const Scalar pi = std::numbers::pi_v<Scalar>;
+        const Scalar half_turn = std::numbers::pi_v<Scalar>;
         const Scalar sqrt_eps = detail::sqrt_epsilon_v<Scalar>;
 
         // Step 1: wrist center = flange - c4 * approach axis.
         const vector3<Scalar> center = translation - p.c4 * matrix.col(2);
 
-        // Domain and reach diagnostics: only genuine out-of-workspace targets
-        // set domain_failed; near-singular loci are left to the FK back-check.
+        // Only genuine out-of-workspace targets set domain_failed; near-singular
+        // loci are left to the FK back-check. The deficit stays absent wherever
+        // no inequality measured one: zero already means "on the boundary".
         bool domain_failed = false;
-        Scalar workspace_distance = Scalar(0);
+        std::optional<Scalar> workspace_deficit;
 
-        // Step 2: theta1 -- guard the lateral-offset cylinder the wrist center
-        // must lie outside of (c.x^2 + c.y^2 >= b^2).
+        // Step 2: theta1 -- guard the lateral-offset cylinder of radius |b| the
+        // wrist center must lie outside of. The excess is radial, the difference
+        // of the two lengths: the square root of the difference of their squares
+        // is a chord half-length, which overstates the radial excess without
+        // bound as the radius approaches the offset. The guard reads the same
+        // quantity the clamp below does, so it fires exactly when nx1 is clamped.
         const Scalar nx1_arg =
             center.x() * center.x() + center.y() * center.y() - p.b * p.b;
-        if (nx1_arg < -sqrt_eps)
+        if (nx1_arg < Scalar(0))
         {
             domain_failed = true;
-            workspace_distance = std::sqrt(-nx1_arg);
+            workspace_deficit =
+                std::abs(p.b) - std::hypot(center.x(), center.y());
         }
+
         const Scalar nx1 = std::sqrt(std::clamp(
             nx1_arg, Scalar(0), std::numeric_limits<Scalar>::infinity()))
             - p.a1;
@@ -408,7 +420,7 @@ public:
         const Scalar tmp1 = std::atan2(center.y(), center.x());
         const Scalar tmp2 = std::atan2(p.b, nx1 + p.a1);
         const Scalar theta1_i = tmp1 - tmp2;
-        const Scalar theta1_ii = tmp1 + tmp2 - pi;
+        const Scalar theta1_ii = tmp1 + tmp2 - half_turn;
 
         // Step 3: theta2 / theta3 -- law of cosines over the shoulder-wrist
         // triangle, two elbow branches for each theta1 branch.
@@ -425,24 +437,35 @@ public:
             s2_2, Scalar(0), std::numeric_limits<Scalar>::infinity()));
         const Scalar k_reach = std::sqrt(kappa_2);
 
-        // Triangle-inequality reach check (diagnostic; routes to unreachable).
+        // Triangle-inequality reach check on both shoulder families. They are
+        // alternatives, so the target is out of reach only when both violate it,
+        // and the deficit is then the smaller of the two -- the motion that
+        // brings the nearer family into reach.
+        //
+        // The cylinder and the reach are instead a conjunction, so their
+        // deficits merge with the larger. Where nx1 was clamped the distances
+        // below are measured from the nearest point on the cylinder, which makes
+        // the shortfall they report the one that remains after the radial motion
+        // rather than a length in place of it.
         const Scalar reach_max = p.c2 + k_reach;
         const Scalar reach_min = std::abs(p.c2 - k_reach);
-        const Scalar reach_deficit = std::max(
-            {Scalar(0), s1 - reach_max, reach_min - s1});
+        const Scalar reach_deficit_front = std::max({Scalar(0), s1 - reach_max, reach_min - s1});
+        const Scalar reach_deficit_back = std::max({Scalar(0), s2 - reach_max, reach_min - s2});
+        const Scalar reach_deficit = std::min(reach_deficit_front, reach_deficit_back);
         if (reach_deficit > sqrt_eps)
         {
             domain_failed = true;
-            workspace_distance = std::max(workspace_distance, reach_deficit);
+            workspace_deficit =
+                std::max(workspace_deficit.value_or(Scalar(0)), reach_deficit);
         }
 
         // acos with domain clamping; a genuine (beyond-rounding) out-of-range
-        // ratio marks the target unreachable, while a vanishing denominator is
-        // a singular locus (not a reach failure).
-        auto acos_ratio = [&](Scalar num, Scalar den) -> Scalar
+        // ratio marks the target unreachable with no deficit to report, and a
+        // vanishing denominator leaves the angle undefined rather than substituted.
+        auto acos_ratio = [&](Scalar num, Scalar den) -> std::optional<Scalar>
         {
             if (std::abs(den) < sqrt_eps)
-                return detail::safe_acos(Scalar(0));
+                return std::nullopt;
             const Scalar ratio = num / den;
             if (std::abs(ratio) > Scalar(1) + sqrt_eps)
                 domain_failed = true;
@@ -450,36 +473,44 @@ public:
         };
 
         const Scalar tmp5 = s1_2 + c2_2 - kappa_2;
-        const Scalar tmp13 = acos_ratio(tmp5, Scalar(2) * s1 * p.c2);
+        const std::optional<Scalar> tmp13 = acos_ratio(tmp5, Scalar(2) * s1 * p.c2);
         const Scalar tmp14 = std::atan2(nx1, tmp3);
-        const Scalar theta2_i = -tmp13 + tmp14;
-        const Scalar theta2_ii = tmp13 + tmp14;
 
         const Scalar tmp6 = s2_2 + c2_2 - kappa_2;
-        const Scalar tmp15 = acos_ratio(tmp6, Scalar(2) * s2 * p.c2);
+        const std::optional<Scalar> tmp15 = acos_ratio(tmp6, Scalar(2) * s2 * p.c2);
         const Scalar tmp16 = std::atan2(nx1 + Scalar(2) * p.a1, tmp3);
-        const Scalar theta2_iii = -tmp15 - tmp16;
-        const Scalar theta2_iv = tmp15 - tmp16;
 
         const Scalar tmp7 = s1_2 - c2_2 - kappa_2;
         const Scalar tmp8 = s2_2 - c2_2 - kappa_2;
         const Scalar tmp9 = Scalar(2) * p.c2 * k_reach;
         const Scalar tmp10 = std::atan2(p.a2, p.c3);
-        const Scalar tmp11 = acos_ratio(tmp7, tmp9);
-        const Scalar theta3_i = tmp11 - tmp10;
-        const Scalar theta3_ii = -tmp11 - tmp10;
-        const Scalar tmp12 = acos_ratio(tmp8, tmp9);
-        const Scalar theta3_iii = tmp12 - tmp10;
-        const Scalar theta3_iv = -tmp12 - tmp10;
+        const std::optional<Scalar> tmp11 = acos_ratio(tmp7, tmp9);
+        const std::optional<Scalar> tmp12 = acos_ratio(tmp8, tmp9);
 
         // Per (theta1, theta2, theta3) branch j = shoulder * 2 + elbow:
-        //   j = 0 front/up, 1 front/down, 2 back/up, 3 back/down.
+        //   j = 0 front/up, 1 front/down, 2 back/up, 3 back/down. A family whose
+        //   theta2 arc-cosine is undefined emits no branch below; the two theta3
+        //   arc-cosines share a denominator that is a constant of the arm, so
+        //   theirs is a condition on the parameters and not on the family.
+        const bool front_defined = tmp13.has_value() && tmp11.has_value();
+        const bool back_defined = tmp15.has_value() && tmp12.has_value();
+
         const std::array<Scalar, 4> theta1_j{
             theta1_i, theta1_i, theta1_ii, theta1_ii};
-        const std::array<Scalar, 4> theta2_j{
-            theta2_i, theta2_ii, theta2_iii, theta2_iv};
-        const std::array<Scalar, 4> theta3_j{
-            theta3_i, theta3_ii, theta3_iii, theta3_iv};
+        std::array<Scalar, 4> theta2_j{};
+        std::array<Scalar, 4> theta3_j{};
+        if (front_defined)
+        {
+            theta2_j = {tmp14 - *tmp13, tmp14 + *tmp13, Scalar(0), Scalar(0)};
+            theta3_j = {*tmp11 - tmp10, -*tmp11 - tmp10, Scalar(0), Scalar(0)};
+        }
+        if (back_defined)
+        {
+            theta2_j[2] = -*tmp15 - tmp16;
+            theta2_j[3] = *tmp15 - tmp16;
+            theta3_j[2] = *tmp12 - tmp10;
+            theta3_j[3] = -*tmp12 - tmp10;
+        }
         const std::array<Scalar, 4> sin1{
             std::sin(theta1_i), std::sin(theta1_i),
             std::sin(theta1_ii), std::sin(theta1_ii)};
@@ -556,15 +587,17 @@ public:
             const int elbow = (key >> 1) & 1;
             const int wrist = key & 1;
             const std::size_t j = static_cast<std::size_t>(shoulder * 2 + elbow);
+            if (!(shoulder == 0 ? front_defined : back_defined))
+                continue;
 
             Scalar q4 = theta4_base[j];
             Scalar q5 = theta5_base[j];
             Scalar q6 = theta6_base[j];
             if (wrist != 0)
             {
-                q4 = theta4_base[j] + pi;
+                q4 = theta4_base[j] + half_turn;
                 q5 = -theta5_base[j];
-                q6 = theta6_base[j] - pi;
+                q6 = theta6_base[j] - half_turn;
             }
 
             Eigen::Vector<Scalar, 6> q_internal;
@@ -590,14 +623,8 @@ public:
 
             if constexpr (std::is_same_v<Verification, opw_verified>)
             {
-                // Gate both position and orientation on the same acceptance
-                // tolerance: `make()` exposes a single tolerance, so it must bind
-                // the orientation check too (verify_analytical_solution otherwise
-                // leaves orientation at its own 1e-6 default, silently ignoring a
-                // tightened tolerance).
                 if (detail::verify_analytical_solution(
-                        m_chain, q_user, target, true,
-                        m_position_tolerance, m_position_tolerance))
+                        m_chain, q_user, target, true, m_tolerance))
                 {
                     const Eigen::Vector<Scalar, 6> q_wrapped = wrap_config(q_user);
                     if (is_duplicate_config(result, q_wrapped))
@@ -629,10 +656,10 @@ public:
         if (domain_failed)
         {
             return cartan::unexpected(analytical_error<scalar_type>{
-                analytical_failure::unreachable, workspace_distance});
+                analytical_failure::unreachable, workspace_deficit});
         }
         return cartan::unexpected(analytical_error<scalar_type>{
-            analytical_failure::singular_configuration, scalar_type(0)});
+            analytical_failure::singular_configuration, std::nullopt});
     }
 
     const chain_type& chain() const { return m_chain; }
@@ -643,11 +670,11 @@ private:
     opw_6r_solver(
         const Chain& chain,
         const opw_parameters<scalar_type>& params,
-        scalar_type position_tolerance,
+        verification_tolerance<scalar_type> tolerance,
         scalar_type singularity_tolerance)
         : m_chain(chain)
         , m_params(params)
-        , m_position_tolerance(position_tolerance)
+        , m_tolerance(tolerance)
         , m_singularity_tolerance(singularity_tolerance)
     {
         if (chain.num_joints() != 6)
@@ -712,13 +739,10 @@ private:
     opw_parameters<scalar_type> m_params;
     std::array<vector3<Scalar>, 6> m_omega;
     std::array<vector3<Scalar>, 6> m_q;
-    Scalar m_position_tolerance{default_position_tolerance};
+    verification_tolerance<Scalar> m_tolerance;
     Scalar m_singularity_tolerance{default_singularity_tolerance};
     bool m_valid{false};
 };
-
-template <chain Chain>
-opw_6r_solver(const Chain&) -> opw_6r_solver<Chain>;
 
 static_assert(analytical_solver<opw_6r_solver<static_chain<double,
     revolute_z, revolute_y, revolute_y, revolute_z, revolute_y, revolute_z>>>,

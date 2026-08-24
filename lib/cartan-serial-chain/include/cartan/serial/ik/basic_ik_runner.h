@@ -15,16 +15,16 @@
 
 #include "cartan/serial/ik/ik_result.h"
 #include "cartan/serial/ik/ik_status.h"
+#include "cartan/serial/ik/detail/convergence.h"
+#include "cartan/serial/ik/detail/feasible_set.h"
 #include "cartan/serial/ik/concepts/solve_concept.h"
+#include "cartan/serial/ik/detail/setup_validation.h"
+#include "cartan/serial/ik/detail/selection_metrics.h"
 #include "cartan/serial/ik/solver/detail/halton_seed_generator.h"
 
 #include "cartan/lie/se3.h"
-#include "cartan/serial/fk/jacobian.h"
 #include "cartan/serial/chain/joint_state.h"
 #include "cartan/serial/chain/chain_concept.h"
-#include "cartan/serial/fk/forward_kinematics.h"
-
-#include <Eigen/SVD>
 
 #include <array>
 #include <cmath>
@@ -33,6 +33,7 @@
 #include <optional>
 #include "cartan/expected.h"
 #include <concepts>
+#include <algorithm>
 #include <functional>
 #include <type_traits>
 
@@ -97,10 +98,16 @@ public:
 
     using position_type = typename joint_state<scalar_type, joints>::position_type;
 
-    basic_ik_runner() = default;
+    basic_ik_runner()
+        : m_best_q(detail::poison_joint_position<scalar_type, joints>())
+        , m_reference_q(detail::poison_joint_position<scalar_type, joints>())
+    {
+    }
 
     explicit basic_ik_runner(Policies... policies)
         : m_policies(std::move(policies)...)
+        , m_best_q(detail::poison_joint_position<scalar_type, joints>())
+        , m_reference_q(detail::poison_joint_position<scalar_type, joints>())
     {
     }
 
@@ -115,30 +122,22 @@ public:
         m_target = target;
         m_criteria = criteria;
         m_objective = options.objective;
-        m_status = ik_status::running;
-        m_best_error = std::numeric_limits<scalar_type>::max();
-        m_best_manipulability = scalar_type(0);
-        m_best_isotropy = scalar_type(0);
-        m_total_iterations = 0;
-        m_found_convergence = false;
-        m_best_q = q0;
+        m_length = options.characteristic_length;
+        m_restart_index = static_cast<int>(options.halton_seed);
+        reset_state(chain);
 
-        if constexpr (sizeof...(Policies) == 1)
+        if (auto refused = refuse_setup(chain, target, q0); refused)
         {
-            std::get<0>(m_policies).setup(chain, target, q0, criteria);
+            m_status = *refused;
+            return;
         }
-        else
+
+        m_best_q = q0;
+        m_reference_q = q0;
+        std::get<0>(m_policies).setup(chain, target, q0, criteria);
+
+        if constexpr (sizeof...(Policies) > 1)
         {
-            m_max_total_iterations = options.max_total_iterations;
-            m_early_stop = false;
-            m_parked = {};
-            m_results = {};
-            m_best_solver_index = -1;
-
-            m_seed_gen.emplace(chain);
-
-            std::get<0>(m_policies).setup(chain, target, q0, criteria);
-
             setup_remaining_policies(chain, target, criteria, options.halton_seed,
                 std::make_index_sequence<sizeof...(Policies) - 1>{});
         }
@@ -157,39 +156,21 @@ public:
         const solver_options<scalar_type>& = {}) = delete;
 
     /// Precondition: setup() must be called before step(). Invoked beforehand,
-    /// step() has no chain to drive and returns a terminal status
-    /// (ik_status::iteration_limit) rather than dereferencing an empty borrow.
+    /// step() has no chain to drive and returns ik_status::not_initialized --
+    /// the same answer status() and solve() give -- rather than dereferencing
+    /// an empty borrow.
     ik_status step()
     {
-        if (!m_chain)
-        {
-            return ik_status::iteration_limit;
-        }
-
-        if (m_status != ik_status::running)
-        {
-            return m_status;
-        }
-
-        if constexpr (sizeof...(Policies) == 1)
-        {
-            // Single tick: drive the inner policy for one algorithmic work unit.
-            return step_single_metrics(1).status;
-        }
-        else
-        {
-            return step_multi();
-        }
+        return charge_and_step(1).status;
     }
 
     ik_status step_n(int n)
     {
         for (int i = 0; i < n; ++i)
         {
-            auto s = step();
-            if (s != ik_status::running)
+            if (charge_and_step(1).status != ik_status::running)
             {
-                return s;
+                break;
             }
         }
         return m_status;
@@ -203,41 +184,8 @@ public:
                 ik_error<scalar_type, joints>{.reason = ik_failure::not_initialized});
         }
 
-        if constexpr (sizeof...(Policies) == 1)
+        while (charge_and_step(m_criteria.max_total_work_units).status == ik_status::running)
         {
-            // Total-budget accumulator loop: ask the inner policy for as many
-            // algorithmic work units as the remaining runner budget allows;
-            // the policy returns the actual units consumed (which may be less
-            // than the request on convergence / stall / per-attempt cap hit).
-            int total_units = 0;
-            while (total_units < m_criteria.max_total_work_units
-                   && m_status == ik_status::running)
-            {
-                int remaining = m_criteria.max_total_work_units - total_units;
-                auto result = step_single_metrics(remaining);
-                total_units += result.metrics.units_consumed;
-                m_total_iterations = total_units;
-                if (result.status != ik_status::running)
-                    break;
-                // min_units_per_step contract: a step that returns
-                // ik_status::running must bill at least one work unit.
-                // A `{running, units=0}` return signals a solver that
-                // cannot make forward progress (e.g. inner converged at
-                // entry q with no work, then runner restarted inner at
-                // the same q under a non-speed objective). Without this
-                // guard the accumulator loop runs forever.
-                if (result.metrics.units_consumed == 0)
-                {
-                    m_status = m_found_convergence
-                        ? ik_status::converged
-                        : ik_status::iteration_limit;
-                    break;
-                }
-            }
-        }
-        else
-        {
-            while (step() == ik_status::running) {}
         }
 
         return build_result();
@@ -245,19 +193,25 @@ public:
 
     bool converged() const { return m_status == ik_status::converged; }
 
+    /// A runner whose setup was refused, or never called, has no policy behind
+    /// it that measured anything; a policy's own accumulator reads zero there,
+    /// which is the value a converged solve reports.
     scalar_type error_norm() const
     {
+        if (cartan::detail::is_setup_failure(m_status))
+        {
+            return std::numeric_limits<scalar_type>::quiet_NaN();
+        }
         if constexpr (sizeof...(Policies) == 1)
         {
-            return std::get<0>(m_policies).error_norm();
+            return m_best_error_norm.value_or(std::get<0>(m_policies).error_norm());
         }
         else
         {
-            if (m_best_solver_index >= 0)
+            const int selected = selected_index(std::index_sequence_for<Policies...>{});
+            if (selected >= 0)
             {
-                scalar_type best = std::numeric_limits<scalar_type>::max();
-                find_best_error(best, std::index_sequence_for<Policies...>{});
-                return best;
+                return m_results[static_cast<std::size_t>(selected)]->error_norm;
             }
             return lowest_error_norm(std::index_sequence_for<Policies...>{});
         }
@@ -267,10 +221,21 @@ public:
     const position_type& current_q() const { return m_best_q; }
     ik_status status() const { return m_status; }
 
+    /// Abort interrupts a solve that is running and nothing else. There is no
+    /// terminal state a caller can abort out of: latching over one would replace
+    /// a converged result, or the reason a search actually gave up, with a claim
+    /// that the caller stopped it. A refused setup is the same case -- the
+    /// arguments are still the ones setup() rejected, so clearing the latch
+    /// would let the next solve() run against a policy that was never
+    /// configured. Call setup() again to start over.
     void abort()
     {
+        if (m_status != ik_status::running)
+        {
+            return;
+        }
         abort_all(std::index_sequence_for<Policies...>{});
-        m_status = ik_status::running;
+        m_status = ik_status::aborted;
     }
 
 private:
@@ -278,10 +243,97 @@ private:
     {
         position_type q;
         scalar_type error_norm{};
+        std::optional<scalar_type> metric{};
         int iterations{};
         bool converged{false};
         ik_termination_reason termination_reason{ik_termination_reason::unknown};
+        feasible_set solved_feasible_set{feasible_set::declared};
     };
+
+    /// Recorded per policy rather than per runner: the pack may mix a policy
+    /// that substitutes a finite interval for a non-finite bound with one that
+    /// box-projects against the declared bounds, and those two race over
+    /// different feasible sets.
+    template <typename Policy>
+    feasible_set policy_feasible_set() const
+    {
+        return cartan::detail::feasible_set_solved<Policy>(m_chain->get());
+    }
+
+    /// Everything setup() establishes before a policy is touched, so a rejected
+    /// call leaves neither a half-configured policy nor the previous solve's
+    /// convergence flag, iterate and counters readable.
+    std::optional<ik_status> refuse_setup(
+        const chain_type& chain,
+        const se3<scalar_type>& target,
+        const position_type& q0) const
+    {
+        if (auto held = cartan::detail::validate_solve_inputs(chain, target, q0); !held)
+        {
+            return held.error();
+        }
+        return cartan::detail::selection_admissibility(m_objective, chain, m_length);
+    }
+
+    /// The single owner of the work-unit accumulator and of the total-budget
+    /// comparison. step(), step_n() and solve() reach the policies only through
+    /// here, so the three agree on the budget, on the terminal status they
+    /// latch and on the metrics they report by construction rather than by
+    /// three implementations happening to coincide.
+    ///
+    /// min_units_per_step contract: a step that returns ik_status::running must
+    /// bill at least one work unit. A `{running, units=0}` return signals a
+    /// solver that cannot make forward progress (e.g. the inner policy
+    /// converged at the entry q with no work and was restarted there under a
+    /// non-speed objective), and is terminated on the same rule as an exhausted
+    /// budget.
+    step_result<scalar_type> charge_and_step(int requested)
+    {
+        if (m_status != ik_status::running)
+        {
+            return {m_status, {0, error_norm()}};
+        }
+
+        const int remaining = m_criteria.max_total_work_units - m_total_iterations;
+        auto stepped = dispatch_step(std::min(requested, remaining));
+        m_total_iterations += stepped.metrics.units_consumed;
+
+        const bool spent = stepped.metrics.units_consumed == 0
+            || m_total_iterations >= m_criteria.max_total_work_units;
+
+        if (spent && m_status == ik_status::running)
+        {
+            m_status = m_found_convergence ? ik_status::converged : ik_status::iteration_limit;
+        }
+
+        return {m_status, stepped.metrics};
+    }
+
+    step_result<scalar_type> dispatch_step(int units)
+    {
+        if constexpr (sizeof...(Policies) == 1)
+        {
+            return step_single_metrics(units);
+        }
+        else
+        {
+            return step_multi();
+        }
+    }
+
+    void reset_state(const chain_type& chain)
+    {
+        m_status = ik_status::running;
+        m_best_metric = std::nullopt;
+        m_best_error_norm = std::nullopt;
+        m_total_iterations = 0;
+        m_found_convergence = false;
+        m_best_q = detail::poison_joint_position<scalar_type, joints>(chain.num_joints());
+        m_early_stop = false;
+        m_parked = {};
+        m_results = {};
+        m_best_solver_index = -1;
+    }
 
     step_result<scalar_type> step_single_metrics(int N)
     {
@@ -292,24 +344,18 @@ private:
         if (policy_status == ik_status::converged)
         {
             m_found_convergence = true;
+            const scalar_type err = std::get<0>(m_policies).error_norm();
 
             if (m_objective == ik_objective::speed)
             {
                 m_status = ik_status::converged;
                 m_best_q = q;
+                m_best_error_norm = err;
                 return inner;
             }
 
-            update_best(q);
-
-            if (m_total_iterations + inner.metrics.units_consumed
-                    >= m_criteria.max_total_work_units)
-            {
-                m_status = ik_status::converged;
-                return inner;
-            }
-
-            std::get<0>(m_policies).setup(m_chain->get(), m_target, q, m_criteria);
+            update_best(q, err);
+            std::get<0>(m_policies).setup(m_chain->get(), m_target, restart_seed(), m_criteria);
             return {ik_status::running, inner.metrics};
         }
 
@@ -324,42 +370,40 @@ private:
         return inner;
     }
 
-    ik_status step_multi()
+    /// One round-robin across the active policies. A tick is atomic, so it bills
+    /// the sum of the units its policies consumed and the caller's budget is
+    /// honored at tick granularity: the last tick can carry the accumulator
+    /// past the budget by at most one unit per still-active policy.
+    step_result<scalar_type> step_multi()
         requires (sizeof...(Policies) > 1)
     {
         bool any_running = false;
+        int units = 0;
 
         [&]<std::size_t... Is>(std::index_sequence<Is...>)
         {
-            (tick_policy<Is>(any_running), ...);
+            (tick_policy<Is>(any_running, units), ...);
         }(std::index_sequence_for<Policies...>{});
-
-        ++m_total_iterations;
-
-        if (m_total_iterations >= m_max_total_iterations)
-        {
-            m_status = m_found_convergence ? ik_status::converged : ik_status::iteration_limit;
-            return m_status;
-        }
 
         if (!any_running)
         {
             m_status = m_found_convergence ? ik_status::converged : ik_status::iteration_limit;
-            return m_status;
         }
 
-        return ik_status::running;
+        return {m_status, {units, error_norm()}};
     }
 
     template <std::size_t I>
-    void tick_policy(bool& any_running)
+    void tick_policy(bool& any_running, int& units)
         requires (sizeof...(Policies) > 1)
     {
         if (m_early_stop || m_parked[I])
             return;
 
         auto& policy = std::get<I>(m_policies);
-        auto status = policy.step(m_chain->get(), 1).status;
+        auto ticked = policy.step(m_chain->get(), 1);
+        auto status = ticked.status;
+        units += ticked.metrics.units_consumed;
 
         if (status == ik_status::converged)
         {
@@ -367,9 +411,11 @@ private:
             m_results[I].emplace(parked_result{
                 .q = policy.solution(),
                 .error_norm = policy.error_norm(),
+                .metric = candidate_metric(policy.solution(), policy.error_norm()),
                 .iterations = policy.iterations(),
                 .converged = true,
-                .termination_reason = policy_termination_reason(policy)
+                .termination_reason = policy_termination_reason(policy),
+                .solved_feasible_set = policy_feasible_set<std::tuple_element_t<I, std::tuple<Policies...>>>()
             });
             m_found_convergence = true;
 
@@ -390,7 +436,8 @@ private:
                 .error_norm = policy.error_norm(),
                 .iterations = policy.iterations(),
                 .converged = false,
-                .termination_reason = policy_termination_reason(policy)
+                .termination_reason = policy_termination_reason(policy),
+                .solved_feasible_set = policy_feasible_set<std::tuple_element_t<I, std::tuple<Policies...>>>()
             });
         }
         else
@@ -399,12 +446,12 @@ private:
         }
     }
 
+    /// Total by construction: an enumeration of the terminal statuses would read
+    /// a status added later as still running, and the policy holding it would
+    /// never be parked.
     static bool is_terminal(ik_status s)
     {
-        return s == ik_status::diverged
-            || s == ik_status::stalled
-            || s == ik_status::iteration_limit
-            || s == ik_status::joint_limit_hit;
+        return s != ik_status::running && s != ik_status::converged;
     }
 
     void park_all()
@@ -432,72 +479,41 @@ private:
         unsigned int halton_seed_offset,
         std::size_t policy_index)
     {
-        auto seed = (*m_seed_gen)(static_cast<int>(policy_index + halton_seed_offset));
+        auto seed = halton_seed_generator<chain_type>{chain, m_reference_q}(
+            static_cast<int>(policy_index + halton_seed_offset));
         std::get<I>(m_policies).setup(chain, target, seed, criteria);
     }
 
-    void update_best(const position_type& q)
+    std::optional<scalar_type> candidate_metric(const position_type& q, scalar_type error_norm) const
     {
-        scalar_type err = std::get<0>(m_policies).error_norm();
+        return cartan::detail::selection_metric(
+            m_objective, m_chain->get(), q, m_reference_q, error_norm, m_length);
+    }
 
-        switch (m_objective)
+    /// The residual is recorded with the configuration it was measured at. The
+    /// policy is re-seeded after every convergence, so its live residual belongs
+    /// to the last restart while the winner comes from the best-ranked one, and
+    /// reading the two from different places reports a converged solve at a
+    /// residual its own tolerance rejects.
+    void update_best(const position_type& q, scalar_type error_norm)
+    {
+        auto metric = candidate_metric(q, error_norm);
+
+        if (cartan::detail::improves_on(m_objective, metric, m_best_metric))
         {
-            case ik_objective::min_distance:
-            {
-                if (err < m_best_error)
-                {
-                    m_best_error = err;
-                    m_best_q = q;
-                }
-                break;
-            }
-            case ik_objective::max_manipulability:
-            {
-                auto fk = forward_kinematics(m_chain->get(), q);
-                auto J_b = body_jacobian(m_chain->get(), fk);
-                constexpr unsigned int svd_opts = (joints == dynamic)
-                    ? (Eigen::ComputeThinU | Eigen::ComputeThinV)
-                    : (Eigen::ComputeFullU | Eigen::ComputeFullV);
-                Eigen::JacobiSVD<jacobian_matrix<scalar_type, joints>> svd(J_b, svd_opts);
-                auto sigma = svd.singularValues();
-                scalar_type manip = scalar_type(1);
-                for (int i = 0; i < static_cast<int>(sigma.size()); ++i)
-                {
-                    manip *= sigma(i);
-                }
-                if (manip > m_best_manipulability)
-                {
-                    m_best_manipulability = manip;
-                    m_best_q = q;
-                }
-                break;
-            }
-            case ik_objective::max_isotropy:
-            {
-                auto fk = forward_kinematics(m_chain->get(), q);
-                auto J_b = body_jacobian(m_chain->get(), fk);
-                constexpr unsigned int svd_opts = (joints == dynamic)
-                    ? (Eigen::ComputeThinU | Eigen::ComputeThinV)
-                    : (Eigen::ComputeFullU | Eigen::ComputeFullV);
-                Eigen::JacobiSVD<jacobian_matrix<scalar_type, joints>> svd(J_b, svd_opts);
-                auto sigma = svd.singularValues();
-                int rank = static_cast<int>(sigma.size());
-                scalar_type isotropy = (sigma(0) > scalar_type(0))
-                    ? sigma(rank - 1) / sigma(0)
-                    : scalar_type(0);
-                if (isotropy > m_best_isotropy)
-                {
-                    m_best_isotropy = isotropy;
-                    m_best_q = q;
-                }
-                break;
-            }
-            default:
-            {
-                m_best_q = q;
-                break;
-            }
+            m_best_metric = metric;
+            m_best_error_norm = error_norm;
+            m_best_q = q;
         }
+    }
+
+    /// A continuation under a non-speed objective needs a start the policy has
+    /// not already converged at: re-seeding it at the candidate it just returned
+    /// converges again for zero work, which the budget guard reads as a spent
+    /// solve, so a single start would be reported as a multistart.
+    position_type restart_seed()
+    {
+        return halton_seed_generator<chain_type>{m_chain->get(), m_reference_q}(m_restart_index++);
     }
 
     cartan::expected<ik_result<scalar_type, joints>, ik_error<scalar_type, joints>> build_result()
@@ -509,8 +525,12 @@ private:
                 ik_result<scalar_type, joints> result;
                 result.solution = joint_state<scalar_type, joints>::from_position(m_best_q);
                 result.iterations = m_total_iterations;
-                result.final_error_norm = std::get<0>(m_policies).error_norm();
+                result.final_error_norm =
+                    m_best_error_norm.value_or(std::numeric_limits<scalar_type>::quiet_NaN());
                 result.solver_index = 0;
+                result.selection_metric = m_best_metric;
+                result.selection_objective = m_objective;
+                result.solved_feasible_set = policy_feasible_set<first_policy>();
                 return result;
             }
             else
@@ -527,45 +547,43 @@ private:
     select_best_result(std::index_sequence<Is...>)
         requires (sizeof...(Policies) > 1)
     {
-        if (m_objective == ik_objective::speed && m_best_solver_index >= 0)
+        const int selected = selected_index(std::index_sequence_for<Policies...>{});
+        if (selected >= 0)
         {
-            return make_result_from_parked(m_best_solver_index);
-        }
-
-        int best_index = -1;
-        scalar_type best_metric = std::numeric_limits<scalar_type>::max();
-
-        auto check = [&]<std::size_t I>()
-        {
-            if (m_results[I] && m_results[I]->converged)
-            {
-                scalar_type metric = m_results[I]->error_norm;
-                if (m_objective == ik_objective::min_distance)
-                {
-                    if (metric < best_metric)
-                    {
-                        best_metric = metric;
-                        best_index = static_cast<int>(I);
-                    }
-                }
-                else
-                {
-                    if (best_index < 0 || metric < best_metric)
-                    {
-                        best_metric = metric;
-                        best_index = static_cast<int>(I);
-                    }
-                }
-            }
-        };
-        (check.template operator()<Is>(), ...);
-
-        if (best_index >= 0)
-        {
-            return make_result_from_parked(best_index);
+            return make_result_from_parked(selected);
         }
 
         return build_error();
+    }
+
+    /// The parked candidate the objective ranks highest, and the single answer
+    /// to which policy won: the result and the runner's error norm both read it,
+    /// so the residual an accessor reports is the residual of the configuration
+    /// the result carries. `speed` ranks nothing and accepts the first to
+    /// converge, which the racing tick records as it parks the rest.
+    template <std::size_t... Is>
+    int selected_index(std::index_sequence<Is...>) const
+        requires (sizeof...(Policies) > 1)
+    {
+        if (m_objective == ik_objective::speed)
+        {
+            return m_best_solver_index;
+        }
+
+        int best_index = -1;
+        std::optional<scalar_type> best_metric{};
+
+        auto check = [&]<std::size_t I>()
+        {
+            if (m_results[I] && m_results[I]->converged
+                && cartan::detail::improves_on(m_objective, m_results[I]->metric, best_metric))
+            {
+                best_metric = m_results[I]->metric;
+                best_index = static_cast<int>(I);
+            }
+        };
+        (check.template operator()<Is>(), ...);
+        return best_index;
     }
 
     cartan::expected<ik_result<scalar_type, joints>, ik_error<scalar_type, joints>>
@@ -578,15 +596,29 @@ private:
         result.iterations = m_total_iterations;
         result.final_error_norm = pr.error_norm;
         result.solver_index = index;
+        result.selection_metric = pr.metric;
+        result.selection_objective = m_objective;
+        result.solved_feasible_set = pr.solved_feasible_set;
         return result;
     }
 
     cartan::expected<ik_result<scalar_type, joints>, ik_error<scalar_type, joints>> build_error()
     {
         ik_error<scalar_type, joints> err;
-        err.near_singular = false;
-        err.condition_number = scalar_type(0);
         err.termination_reason = ik_termination_reason::unknown;
+
+        // A refused setup ran no iteration, so neither field was measured and
+        // both keep the poison: reading an iterate off a policy would hand back
+        // the previous solve's, a zero vector reads as the home configuration,
+        // and the largest representable residual reads as a measured distance.
+        // The iterate carries the chain's joint count so its size stays
+        // readable, which the type's own default cannot supply.
+        if (cartan::detail::is_setup_failure(m_status))
+        {
+            err.last_q = m_best_q;
+            err.reason = cartan::detail::failure_reason_for(m_status);
+            return cartan::unexpected(err);
+        }
 
         if constexpr (sizeof...(Policies) == 1)
         {
@@ -615,43 +647,32 @@ private:
             }
             else
             {
-                err.last_q = m_best_q;
-                err.last_error_norm = std::numeric_limits<scalar_type>::max();
+                report_live_iterate(err, std::index_sequence_for<Policies...>{});
             }
         }
 
-        switch (m_status)
-        {
-            case ik_status::diverged:
-                err.reason = ik_failure::diverged;
-                break;
-            case ik_status::stalled:
-                err.reason = ik_failure::stalled;
-                break;
-            case ik_status::iteration_limit:
-                err.reason = ik_failure::iteration_limit;
-                break;
-            case ik_status::joint_limit_hit:
-                err.reason = ik_failure::joint_limit_violation;
-                break;
-            default:
-                err.reason = ik_failure::iteration_limit;
-                break;
-        }
-
+        err.reason = cartan::detail::failure_reason_for(m_status);
         return cartan::unexpected(err);
     }
 
+    /// The lowest-residual live iterate, for a budget exhausted with every
+    /// policy still running: no policy parked, so those iterates are the only
+    /// configurations the solve measured. Reporting the seed instead would name
+    /// the configuration the solve started at as the one it failed at.
     template <std::size_t... Is>
-    void find_best_error(scalar_type& best, std::index_sequence<Is...>) const
+    void report_live_iterate(ik_error<scalar_type, joints>& err, std::index_sequence<Is...>) const
         requires (sizeof...(Policies) > 1)
     {
+        scalar_type best = std::numeric_limits<scalar_type>::max();
         auto check = [&]<std::size_t I>()
         {
-            if (m_results[I] && m_results[I]->converged)
+            const auto& policy = std::get<I>(m_policies);
+            if (policy.error_norm() < best)
             {
-                if (m_results[I]->error_norm < best)
-                    best = m_results[I]->error_norm;
+                best = policy.error_norm();
+                err.last_q = policy.solution();
+                err.last_error_norm = best;
+                err.termination_reason = policy_termination_reason(policy);
             }
         };
         (check.template operator()<Is>(), ...);
@@ -682,19 +703,19 @@ private:
     std::optional<std::reference_wrapper<const chain_type>> m_chain{};
     se3<scalar_type> m_target{se3<scalar_type>::identity()};
     convergence_criteria<scalar_type> m_criteria{};
-    position_type m_best_q{};
-    scalar_type m_best_manipulability{};
-    scalar_type m_best_isotropy{};
-    scalar_type m_best_error{};
+    position_type m_best_q;
+    position_type m_reference_q;
+    std::optional<scalar_type> m_best_metric{};
+    std::optional<scalar_type> m_best_error_norm{};
     ik_objective m_objective{ik_objective::speed};
-    ik_status m_status{ik_status::running};
+    ik_status m_status{ik_status::not_initialized};
+    scalar_type m_length{1};
     int m_total_iterations{};
+    int m_restart_index{};
     bool m_found_convergence{false};
 
     std::array<bool, sizeof...(Policies)> m_parked{};
     std::array<std::optional<parked_result>, sizeof...(Policies)> m_results{};
-    std::optional<halton_seed_generator<chain_type>> m_seed_gen{};
-    int m_max_total_iterations{500};
     int m_best_solver_index{-1};
     bool m_early_stop{false};
 };

@@ -1,0 +1,206 @@
+name: Benchmarks
+
+# Nothing else in this repository builds the benchmark suite, so its hard
+# dependencies -- the description reader, the kinematics library the study
+# programs link against, and the pinned robot descriptions the study reads its
+# joint bounds from -- are otherwise unguarded. This workflow builds them and
+# runs a bounded capture.
+#
+# It publishes no number. No step here compares two solvers by speed and no
+# check reads an elapsed time: a solver bounded by a wall-clock cap and a solver
+# bounded by a count of kernel evaluations are not commensurable, a shared
+# runner is contended by construction, and a gate on a time measured there is a
+# gate on the runner. What this job can honestly check is that the harness
+# builds, that it completes, that it ran the solvers this file says it expects,
+# and that the analysis script rebuilds a table from the records it just wrote.
+on:
+  push:
+    branches: [master, develop, 'milestone/**']
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.planning/**'
+  pull_request:
+    branches: [master]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.planning/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    name: the whole benchmark suite builds
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The study programs link the kinematics library that supplies the
+      # comparator's chain, and the suite skips itself entirely without it. The
+      # peer solvers are deliberately not installed here: a runner without them
+      # is the ordinary case this study is built to record rather than a broken
+      # machine, and the smoke job below checks that their absence is written
+      # down instead of being read off a narrower table.
+      - name: Install the libraries the suite links
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libeigen3-dev liborocos-kdl-dev ninja-build
+
+      - name: Configure
+        run: cmake --preset bench
+
+      - name: Build
+        run: cmake --build build/bench
+
+      # A suite that skipped every target exits zero and looks exactly like one
+      # that built. These four programs are what the study is, so their absence
+      # is the failure this job exists to catch.
+      - name: Check the study programs exist
+        run: |
+          for program in ik_study_capture ik_study_calibrate ik_study_benchmarks \
+                         study_description_gate; do
+            if [ ! -x "build/bench/benchmarks/$program" ]; then
+              echo "build/bench/benchmarks/$program was not built"
+              exit 1
+            fi
+          done
+
+  # One robot per periodic rule, plus the seven-axis arm so the study's other
+  # joint count is exercised. A few targets per stratum: wide enough that a
+  # stratum generator producing nothing is caught, small enough that this stays
+  # a smoke test rather than becoming an unattended measurement.
+  smoke:
+    runs-on: ubuntu-24.04
+    name: bounded capture, table rebuilt (${{ matrix.table }}, ${{ matrix.robot }})
+    timeout-minutes: 60
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - table: a
+            robot: irb120
+          - table: b
+            robot: kr6_r900
+          - table: c
+            robot: ur3e
+          - table: c
+            robot: lbr_med14_r820
+
+    env:
+      # What this job expects the capture to declare, and what it expects to
+      # resolve on a runner that provides neither peer library. A job that
+      # quietly ran one solver and went green is the same defect as a table
+      # quietly missing a column, and it has occurred twice in this suite.
+      EXPECTED_DECLARED: cartan_lm cartan_restart_lm pinocchio_lm pinocchio_restart_lm trac_ik
+      EXPECTED_RESOLVED: cartan_lm cartan_restart_lm
+      SMOKE_TARGETS: 25
+      STRATA: reachable boundary near_singular limit_adjacent unreachable warm_start_trajectory
+      TABLE: ${{ matrix.table }}
+      ROBOT: ${{ matrix.robot }}
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Install the libraries the suite links
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libeigen3-dev liborocos-kdl-dev ninja-build
+
+      - name: Configure
+        run: cmake --preset bench
+
+      - name: Build the capture program
+        run: cmake --build build/bench --target ik_study_capture
+
+      - name: Capture a bounded subset of every stratum
+        run: |
+          for stratum in $STRATA; do
+            ./build/bench/benchmarks/ik_study_capture \
+              --table "$TABLE" --robot "$ROBOT" --stratum "$stratum" \
+              --targets "$SMOKE_TARGETS" \
+              --out-dir "smoke/$stratum/records" \
+              --sidecar-dir "smoke/$stratum/sidecar"
+          done
+
+      # The script is what the reproducibility claim rests on: a reader is
+      # offered these records and this file and nothing else. So it runs against
+      # the rows the capture has just written.
+      #
+      # The aggregate tier holds paired per-target differences, which are defined
+      # only where two participants accepted the same target. A runner that
+      # resolves one solver therefore has no pairs to rebuild from, and demanding
+      # a paired table there would assert a quantity with no subject. The
+      # per-target tier is rebuilt and checked non-empty either way; the
+      # cross-check between the two tiers runs only where both exist.
+      - name: Rebuild the table from the records just written
+        run: |
+          resolved=$(echo $EXPECTED_RESOLVED | wc -w)
+          for stratum in $STRATA; do
+            python3 tools/bench_study_report.py \
+              --root "smoke/$stratum" --table "$TABLE" --from targets \
+              --out "smoke/$stratum/from-targets.md" \
+              --strata-out "smoke/$stratum/records/table_${TABLE}_strata.csv"
+            if [ ! -s "smoke/$stratum/from-targets.md" ]; then
+              echo "the table rebuilt for the $stratum stratum is empty"
+              exit 1
+            fi
+            if [ "$resolved" -lt 2 ]; then
+              echo "$stratum: $resolved participant resolved, so no paired tier to rebuild"
+              continue
+            fi
+            python3 tools/bench_study_report.py \
+              --root "smoke/$stratum" --table "$TABLE" --from aggregates \
+              --out "smoke/$stratum/rebuilt.md" --cross-check
+            if [ ! -s "smoke/$stratum/rebuilt.md" ]; then
+              echo "the paired table rebuilt for the $stratum stratum is empty"
+              exit 1
+            fi
+          done
+
+      # The comparators a runner does not provide are omitted by the build with
+      # a warning, so the set that ran is a fact this job has to check rather
+      # than infer. Every solver this file declares and the capture did not run
+      # must appear in the capture's own absence list with a reason.
+      - name: Check the solvers that ran against the ones this job expects
+        run: |
+          python3 - <<'PY'
+          import csv, json, os, sys
+          from pathlib import Path
+
+          root = Path("smoke/reachable")
+          record = json.loads((root / "records" / "environment.json").read_text())
+          declared = {entry["name"] for entry in record["declared_participants"]}
+          absent = {entry["name"]: entry["reason"] for entry in record["absent_participants"]}
+          rows = (root / "sidecar" / f"table_{os.environ['TABLE']}_targets.csv")
+          with rows.open(newline="", encoding="utf-8") as handle:
+              resolved = {row["solver"] for row in csv.DictReader(handle)}
+
+          print("declared:", sorted(declared))
+          print("resolved:", sorted(resolved))
+          for name, reason in sorted(absent.items()):
+              print(f"absent:   {name} -- {reason}")
+
+          faults = []
+          for label, found, wanted in (
+                  ("declared", declared, set(os.environ["EXPECTED_DECLARED"].split())),
+                  ("resolved", resolved, set(os.environ["EXPECTED_RESOLVED"].split()))):
+              if found != wanted:
+                  faults.append(f"the capture {label} {sorted(found)}, "
+                                f"and this job expects {sorted(wanted)}")
+          if declared - resolved != set(absent):
+              faults.append(f"declared minus resolved is {sorted(declared - resolved)}, "
+                            f"and the recorded absences are {sorted(absent)}")
+          faults += [f"{name} is recorded absent with an empty reason"
+                     for name, reason in absent.items() if not reason.strip()]
+          if faults:
+              sys.exit("\n".join(faults))
+          PY

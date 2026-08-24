@@ -4,12 +4,12 @@
 /// Binding-internal value types and unwrap helpers for the closed-form
 /// analytical IK surface. AnalyticalResult is the always-returned shape
 /// carrying the multi-solution joint vectors, a coarse-grained status
-/// enum (py_analytical_status), and an error_metric magnitude.
+/// enum (py_analytical_status), and an optional error_metric magnitude.
 ///
 /// py_analytical_status mirrors cartan::analytical_failure plus a Python
 /// success sentinel "ok". The C++ analytical_failure variants are
-/// unreachable, degenerate_geometry, singular_configuration, and
-/// verification_failed. The to_py_status helper translates a C++
+/// unreachable, degenerate_geometry, singular_configuration,
+/// verification_failed and non_finite_input. The to_py_status helper translates a C++
 /// failure value to the Python enum; the success branch is handled at
 /// the caller, which constructs an AnalyticalResult with status=ok.
 ///
@@ -20,6 +20,11 @@
 /// emplaces fresh Eigen::VectorXd instances that nanobind marshals to
 /// a Python list[ndarray]. On failure it captures the analytical_error
 /// reason and workspace_distance.
+///
+/// error_metric mirrors the optionality of the C++ workspace_distance and
+/// reaches Python as None wherever no geometric inequality was evaluated,
+/// including on the success path. Zero is a reachable deficit, so it cannot
+/// also stand for an absent one.
 
 #include "cartan/expected.h"
 #include "cartan/analytical/range_status.h"
@@ -30,6 +35,7 @@
 #include <vector>
 #include <cstddef>
 #include <utility>
+#include <optional>
 
 namespace cartan::python {
 
@@ -39,7 +45,8 @@ enum class py_analytical_status : int
     unreachable,
     degenerate_geometry,
     singular_configuration,
-    verification_failed
+    verification_failed,
+    non_finite_input
 };
 
 inline py_analytical_status to_py_status(cartan::analytical_failure f)
@@ -54,6 +61,8 @@ inline py_analytical_status to_py_status(cartan::analytical_failure f)
             return py_analytical_status::singular_configuration;
         case cartan::analytical_failure::verification_failed:
             return py_analytical_status::verification_failed;
+        case cartan::analytical_failure::non_finite_input:
+            return py_analytical_status::non_finite_input;
     }
     return py_analytical_status::degenerate_geometry;
 }
@@ -62,7 +71,7 @@ struct AnalyticalResult
 {
     std::vector<Eigen::VectorXd> solutions;
     py_analytical_status status{py_analytical_status::ok};
-    double error_metric{0.0};
+    std::optional<double> error_metric;
 };
 
 struct UnwrappedResult
@@ -70,7 +79,7 @@ struct UnwrappedResult
     std::vector<Eigen::VectorXd> solutions;
     std::vector<cartan::range_status> tags;
     py_analytical_status status{py_analytical_status::ok};
-    double error_metric{0.0};
+    std::optional<double> error_metric;
 };
 
 inline AnalyticalResult to_analytical_error_result(const cartan::analytical_error<double> &err)
@@ -96,7 +105,7 @@ inline AnalyticalResult to_analytical_result(cartan::expected<cartan::analytical
         out.solutions.emplace_back(r->solutions[static_cast<std::size_t>(i)]);
     }
     out.status       = py_analytical_status::ok;
-    out.error_metric = 0.0;
+    out.error_metric = std::nullopt;
     return out;
 }
 

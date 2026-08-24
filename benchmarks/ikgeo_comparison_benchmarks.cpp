@@ -107,9 +107,15 @@ void make_ikgeo_hp(const kr6_chain& chain,
     const Eigen::Vector3d wrist = lhs.ldlt().solve(rhs);
     g[3] = g[4] = g[5] = wrist;
 
-    const Eigen::Vector3d flange =
-        cartan::forward_kinematics(chain, Eigen::Vector<double, 6>::Zero())
-            .end_effector.translation();
+    const auto home_fk =
+        cartan::forward_kinematics(chain, Eigen::Vector<double, 6>::Zero());
+    if (!home_fk)
+    {
+        std::cerr << "ik-geo geometry: cartan FK refused the home configuration: "
+                  << cartan::message(home_fk.error()) << '\n';
+        std::abort();
+    }
+    const Eigen::Vector3d flange = home_fk->end_effector.translation();
 
     Eigen::Matrix<double, 3, 7> pm;
     pm.col(0) = g[0];
@@ -155,10 +161,15 @@ ikgeo_fixture build_fixture()
     std::array<double, 21> p_flat{};
     make_ikgeo_hp(chain, h_flat, p_flat);
 
-    const Eigen::Matrix3d r_home =
-        cartan::forward_kinematics(chain, Eigen::Vector<double, 6>::Zero())
-            .end_effector.rotation()
-            .matrix();
+    const auto home_fk =
+        cartan::forward_kinematics(chain, Eigen::Vector<double, 6>::Zero());
+    if (!home_fk)
+    {
+        std::cerr << "fixture build: cartan FK refused the home configuration: "
+                  << cartan::message(home_fk.error()) << '\n';
+        std::abort();
+    }
+    const Eigen::Matrix3d r_home = home_fk->end_effector.rotation().matrix();
     const Eigen::Matrix3d r_home_inv = r_home.transpose();
 
     std::vector<cartan::se3<double>> targets;
@@ -175,7 +186,14 @@ ikgeo_fixture build_fixture()
         Eigen::Vector<double, 6> q;
         for (int j = 0; j < 6; ++j)
             q(j) = dist(rng);
-        auto pose = cartan::forward_kinematics(chain, q).end_effector;
+        auto fk = cartan::forward_kinematics(chain, q);
+        if (!fk)
+        {
+            std::cerr << "fixture build: cartan FK refused a drawn configuration: "
+                      << cartan::message(fk.error()) << '\n';
+            std::abort();
+        }
+        auto pose = fk->end_effector;
 
         const Eigen::Matrix3d rq = pose.rotation().matrix() * r_home_inv;
         std::array<double, 9> er{};
@@ -259,10 +277,13 @@ parity_stats run_parity(const ikgeo_fixture& fx)
             for (int j = 0; j < 6; ++j)
                 q(j) = outq[k * 6 + static_cast<unsigned long>(j)];
 
-            const auto fk = cartan::forward_kinematics(fx.chain, q).end_effector;
-            const double pe = (fk.translation() - target.translation()).norm();
+            const auto fk = cartan::forward_kinematics(fx.chain, q);
+            if (!fk)
+                continue;
+            const auto& pose = fk->end_effector;
+            const double pe = (pose.translation() - target.translation()).norm();
             const double oe =
-                (fk.rotation().inverse() * target.rotation()).log().norm();
+                (pose.rotation().inverse() * target.rotation()).log().norm();
             if (std::max(pe, oe) > verify_tol)
                 continue;
 

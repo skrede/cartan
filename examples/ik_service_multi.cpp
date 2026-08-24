@@ -12,6 +12,7 @@
 
 #include "cartan/serial_chain.h"
 
+#include <atomic>
 #include <chrono>
 #include <deque>
 #include <future>
@@ -25,7 +26,7 @@
 
 // --- LBR iiwa 7-DOF chain geometry (hardcoded PoE parameters) ---
 
-cartan::kinematic_chain<double, 7> make_lbr_iiwa()
+cartan::expected<cartan::kinematic_chain<double, 7>, cartan::chain_failure> make_lbr_iiwa()
 {
     using vec3 = cartan::vector3<double>;
 
@@ -40,10 +41,15 @@ cartan::kinematic_chain<double, 7> make_lbr_iiwa()
     vec3 home_trans(0, 0, 1.306);
     auto home = cartan::se3<double>(cartan::so3<double>::identity(), home_trans);
 
-    cartan::joint_limits<double> lim{-std::numbers::pi, std::numbers::pi};
+    auto lim = cartan::joint_limits<double>::make(-std::numbers::pi, std::numbers::pi);
+    if (!lim.has_value())
+    {
+        return cartan::unexpected(lim.error());
+    }
+
     return cartan::kinematic_chain<double, 7>(
         home, {s1, s2, s3, s4, s5, s6, s7},
-        {lim, lim, lim, lim, lim, lim, lim});
+        {*lim, *lim, *lim, *lim, *lim, *lim, *lim});
 }
 
 // --- IK service types ---
@@ -62,7 +68,7 @@ struct ik_response
 // --- Multi-threaded IK service pool ---
 //
 // Architecture:
-//   - M worker jthreads pull requests from a shared queue
+//   - M worker threads pull requests from a shared queue
 //   - Each request is solved by a multi-policy basic_ik_runner (speed + convergence)
 //   - solve() internally calls step() which round-robins across both policies
 //   - No thread-per-solver: a single worker thread drives both policies cooperatively
@@ -76,20 +82,23 @@ class ik_service_pool
 public:
     ik_service_pool(cartan::kinematic_chain<double, 7> chain, int num_workers)
         : m_chain(std::move(chain))
+        , m_stop(false)
     {
         for (int i = 0; i < num_workers; ++i)
         {
-            m_workers.emplace_back([this](std::stop_token stoken) {
-                worker_loop(stoken);
-            });
+            m_workers.emplace_back([this] { worker_loop(); });
         }
     }
 
     ~ik_service_pool()
     {
-        for (auto& w : m_workers)
-            w.request_stop();
+        {
+            std::lock_guard lock(m_mutex);
+            m_stop.store(true);
+        }
         m_cv.notify_all();
+        for (auto& w : m_workers)
+            w.join();
     }
 
     /// Submit an IK request. Returns a future for the response.
@@ -114,19 +123,17 @@ private:
         std::shared_ptr<std::promise<ik_response>> promise;
     };
 
-    void worker_loop(std::stop_token stoken)
+    void worker_loop()
     {
         cartan::convergence_criteria<double> criteria{1e-6, 1e-6, 200};
         std::mt19937 rng(42);
 
-        while (!stoken.stop_requested())
+        while (!m_stop.load())
         {
             std::unique_lock lock(m_mutex);
-            m_cv.wait(lock, [this, &stoken] {
-                return !m_queue.empty() || stoken.stop_requested();
-            });
+            m_cv.wait(lock, [this] { return !m_queue.empty() || m_stop.load(); });
 
-            if (stoken.stop_requested())
+            if (m_stop.load())
                 break;
 
             pending_request item = std::move(m_queue.front());
@@ -144,8 +151,8 @@ private:
             Eigen::Vector<double, 7> q0;
             for (int j = 0; j < 7; ++j)
             {
-                auto lo = m_chain.limits()[static_cast<std::size_t>(j)].position_min;
-                auto hi = m_chain.limits()[static_cast<std::size_t>(j)].position_max;
+                auto lo = m_chain.limits()[static_cast<std::size_t>(j)].position_min();
+                auto hi = m_chain.limits()[static_cast<std::size_t>(j)].position_max();
                 std::uniform_real_distribution<double> dist(lo, hi);
                 q0(j) = dist(rng);
             }
@@ -161,18 +168,29 @@ private:
 
     cartan::kinematic_chain<double, 7> m_chain;
     std::mutex m_mutex;
-    std::condition_variable_any m_cv;
+    std::condition_variable m_cv;
     std::deque<pending_request> m_queue;
-    std::vector<std::jthread> m_workers;
+    // std::jthread would carry the stop flag and the join, but libc++ still
+    // ships <stop_token> behind an experimental opt-in, so an example meant to
+    // build on every supported toolchain owns both explicitly.
+    std::atomic<bool> m_stop;
+    std::vector<std::thread> m_workers;
 };
 
 int main()
 {
     auto chain = make_lbr_iiwa();
+    if (!chain.has_value())
+    {
+        std::cerr << "chain construction failed: "
+                  << cartan::message(chain.error()) << "\n";
+        return 1;
+    }
+
     constexpr int num_workers = 4;
     constexpr int num_requests = 10;
 
-    ik_service_pool pool(chain, num_workers);
+    ik_service_pool pool(*chain, num_workers);
 
     // Generate targets via FK at known configurations
     std::vector<Eigen::Vector<double, 7>> configs = {
@@ -194,8 +212,16 @@ int main()
 
     for (int i = 0; i < num_requests; ++i)
     {
-        auto target = cartan::forward_kinematics(chain, configs[static_cast<std::size_t>(i)]).end_effector;
-        futures.push_back(pool.submit({target}));
+        auto fk = cartan::forward_kinematics(
+            *chain, configs[static_cast<std::size_t>(i)]);
+        if (!fk.has_value())
+        {
+            std::cerr << "forward kinematics rejected configuration " << i << ": "
+                      << cartan::message(fk.error()) << "\n";
+            return 1;
+        }
+
+        futures.push_back(pool.submit({fk->end_effector}));
     }
 
     // Collect and print results
@@ -208,7 +234,7 @@ int main()
 
         if (response.result.has_value())
         {
-            auto& r = response.result.value();
+            auto& r = *response.result;
             std::cout << "Request " << i << ": converged in "
                       << r.iterations << " steps (policy "
                       << r.solver_index << "), "
@@ -220,4 +246,6 @@ int main()
                       << response.solve_time.count() << " us\n";
         }
     }
+
+    return 0;
 }

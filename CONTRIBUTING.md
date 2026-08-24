@@ -66,12 +66,22 @@ cmake --build build/dev -j$(nproc)
 ctest --test-dir build/dev --output-on-failure
 ```
 
-The `dev-full` preset also builds examples, fuzz, and property tests.
-The benchmark suite is gated behind `CARTAN_BUILD_BENCHMARKS`; each
-third-party comparison dependency (orocos-kdl, TRAC-IK, pinocchio) is
-auto-detected, and any benchmark whose dependency is missing is omitted with
-a warning. Set `CARTAN_FETCH_BENCHMARK_DEPS=ON` to fetch missing benchmark
-dependencies instead of only using installed ones.
+The `dev-full` preset adds examples, property tests, the URDF module and
+the fuzz targets. The fuzz targets are built with libFuzzer and are
+guarded on the compiler reporting itself as `Clang` exactly, so the preset
+configures only under LLVM Clang: GCC rejects `-fsanitize=fuzzer`, and
+Apple's toolchain reports `AppleClang`, which the guard does not accept.
+On macOS, and with GCC, build the other targets with `dev` and set the
+fuzz option separately under an LLVM Clang.
+
+The benchmark suite is gated behind `CARTAN_BUILD_BENCHMARKS`. Each
+third-party comparison dependency (orocos-kdl, TRAC-IK, pinocchio and the
+rest) is discovered on your machine and never downloaded by this build; any
+benchmark whose dependency is missing is omitted, and the omission is
+announced at configure time, at the start of a capture, and in the record
+the capture writes. `CARTAN_FETCH_BENCHMARK_DEPS=ON` fetches the measurement
+harness and nothing else. `benchmarks/README.md` states the acquisition
+policy in full.
 
 ## Coding Conventions
 
@@ -99,9 +109,10 @@ public contributions.
 - **Return types:** prefer the traditional form (`T func()`) over
   trailing return types (`auto func() -> T`) unless the trailing form
   is required by templates or concepts.
-- **File / class size guidance:** classes around 100 NLOC (200 max
-  ideal); functions 5-15 lines with delegation; files match class
-  length. Readability overrides these when splitting hurts comprehension.
+- **File and function size:** see the size section of
+  [CONVENTIONS.md](CONVENTIONS.md), which states the budget once, and
+  `EXCEPTIONS.md`, which registers the files sanctioned to exceed it.
+  Do not work from a second formulation of the rule.
 
 ### Headers
 

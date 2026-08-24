@@ -8,35 +8,335 @@ on:
       - 'docs/**'
       - '.planning/**'
   pull_request:
-    branches: [master,develop]
+    branches: [master]
     paths-ignore:
       - '**.md'
       - 'docs/**'
       - '.planning/**'
+  # Exploration on a cadence rather than only when someone pushes. Scheduled
+  # runs use the default branch and take the larger budget selected below.
+  # Monday 03:17 UTC, following the weekly-cron pattern already in this
+  # repository.
+  schedule:
+    - cron: "17 3 * * 1"
   workflow_dispatch:
 
 jobs:
   fuzz:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+
+    # Read access and nothing else. A job that pushed a grown corpus to a
+    # durable store would need write access to that store, and keeping this
+    # block minimal is what makes granting it a visible, reviewable edit
+    # rather than an inherited default nobody chose.
+    permissions:
+      contents: read
+
     env:
-      CC: clang
-      CXX: clang++
+      CC: clang-18
+      CXX: clang++-18
+      # The targets are compiled with -fno-sanitize-recover=undefined, so a
+      # finding aborts regardless of the environment. This is set as well
+      # because both have been observed to be, on their own, the only thing
+      # between a real undefined-behavior finding and a green tick.
+      UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+      CARTAN_FUZZ_TARGETS: >-
+        fuzz_urdf_parse
+        fuzz_urdf_build
+        fuzz_screw_axis
+        fuzz_joint_limits
+        fuzz_analytical_target
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Install Clang and LLVM
+      # Pinned, because this gate's verdict is a sanitizer's verdict: which
+      # reporter fires first, what exit code it uses and how libFuzzer treats a
+      # corpus directory are properties of one toolchain generation. libFuzzer's
+      # archive ships in the compiler runtime package, which clang alone does
+      # not pull in.
+      - name: Install the pinned Clang
         run: |
+          set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y clang llvm
+          sudo apt-get install -y clang-18 llvm-18 libclang-rt-18-dev
+          clang++-18 --version
 
+      # The fuzz block hard-errors without the URDF module: its two document
+      # targets cover the only boundary where the library parses a byte stream
+      # from outside the process, and a fuzz build that silently omitted them
+      # would report success over the boundary that matters.
       - name: Configure
         run: >
           cmake -B build
-          -DCMAKE_C_COMPILER=clang
-          -DCMAKE_CXX_COMPILER=clang++
+          -DCMAKE_C_COMPILER=clang-18
+          -DCMAKE_CXX_COMPILER=clang++-18
           -DCARTAN_BUILD_FUZZ_TESTS=ON
+          -DCARTAN_BUILD_URDF=ON
           -DCARTAN_CMAKE_FETCH_DEPS=ON
 
       - name: Build fuzz targets
         run: cmake --build build -j$(nproc)
+
+      # A build step reports success when its target list resolves empty, and
+      # this job's did exactly that for as long as the fuzz block was a comment.
+      # The count is asserted in both directions so that a target added to the
+      # build and not to the list above is a failure rather than a binary
+      # nobody fuzzes.
+      - name: Assert every target was built
+        run: |
+          set -euo pipefail
+          for target in $CARTAN_FUZZ_TARGETS; do
+            if [ ! -x build/fuzz/"$target" ]; then
+              echo "::error::build/fuzz/$target is missing: the build produced no such target" >&2
+              exit 1
+            fi
+          done
+          built=$(find build/fuzz -maxdepth 1 -type f -executable | wc -l)
+          listed=$(echo $CARTAN_FUZZ_TARGETS | wc -w)
+          if [ "$built" -ne "$listed" ]; then
+            echo "::error::built $built targets but this job runs $listed of them" >&2
+            exit 1
+          fi
+          echo "built and listed: $built targets"
+
+      # Seeded at configure time from the committed fixtures. A run over an
+      # empty directory is the exact shape of a check that passes because it
+      # tested nothing, so an empty or missing corpus fails here rather than
+      # producing a fast green campaign.
+      - name: Assert every corpus is populated
+        run: |
+          set -euo pipefail
+          for target in $CARTAN_FUZZ_TARGETS; do
+            dir=build/fuzz/corpus/"$target"
+            if [ ! -d "$dir" ]; then
+              echo "::error::$dir does not exist: nothing seeded the corpus" >&2
+              exit 1
+            fi
+            inputs=$(find "$dir" -type f | wc -l)
+            if [ "$inputs" -lt 1 ]; then
+              echo "::error::$dir holds no inputs" >&2
+              exit 1
+            fi
+            echo "$target: $inputs seed inputs"
+          done
+
+      # Every stored input executed once, no mutation. This proves the targets
+      # execute and that the fixtures still parse; --no-tests=error so a filter
+      # that matches nothing fails instead of reporting success. This runs before
+      # the accumulated corpus is layered on, so it stays a regression check over
+      # the committed fixtures rather than over whatever last week's run found.
+      - name: Regression replay over the committed corpus
+        run: ctest --test-dir build --output-on-failure --no-tests=error
+
+      # Layered on top of the seeds, not in place of them: a run that always
+      # starts from the committed fixtures rediscovers the same shallow inputs
+      # every week and never reaches past them. Restoring into the build tree
+      # copy keeps the committed fixtures unwritable by any run, which is the
+      # property the seeding function was written for.
+      #
+      # The store is public, so reading it needs no credential and this step is
+      # unconditional -- a fork's pull request accumulates on read exactly as a
+      # branch push does. Only writing back needs the key, and only that step is
+      # gated on it.
+      #
+      # An empty store is the expected state on the first run and is not an
+      # error. An unreachable one is: a silently skipped restore would degrade
+      # every subsequent run to seed-only while still reporting green.
+      - name: Restore the accumulated corpus
+        run: |
+          set -euo pipefail
+
+          # The branch is named on both sides rather than inherited from the
+          # store's default HEAD. A clone that follows a default pointing at a
+          # branch the push step never writes checks out nothing, restores
+          # nothing, and reports success -- accumulation would silently never
+          # happen. Measured: that is exactly what a default clone of a store
+          # written this way does.
+          git init -q accumulated
+          cd accumulated
+          git remote add origin https://github.com/skrede/cartan-fuzz-corpus.git
+
+          # Reachability and emptiness, separately: ls-remote succeeds with no
+          # output against a store that exists and is empty, and fails against
+          # one that is unreachable. Only the first is a legitimate first run.
+          if ! git ls-remote origin > /tmp/store-refs 2>/tmp/store-err; then
+            echo "::error::the corpus store is unreachable" >&2
+            cat /tmp/store-err >&2
+            exit 1
+          fi
+          if ! grep -q 'refs/heads/master$' /tmp/store-refs; then
+            echo "::notice::the store has no master branch yet; fuzzing from the committed seeds only"
+            exit 0
+          fi
+
+          git fetch -q --depth 1 origin master
+          git checkout -q FETCH_HEAD
+          cd ..
+          restored=0
+          for target in $CARTAN_FUZZ_TARGETS; do
+            if [ -d accumulated/"$target" ]; then
+              count=$(find accumulated/"$target" -type f | wc -l)
+              cp -a accumulated/"$target"/. build/fuzz/corpus/"$target"/
+              restored=$((restored + count))
+              echo "$target: restored $count accumulated inputs"
+            fi
+          done
+          if [ "$restored" -lt 1 ]; then
+            echo "::error::the store carries a master branch but no inputs for any target" >&2
+            exit 1
+          fi
+          echo "restored $restored input(s) from the store"
+
+      # The gate proper. Everything above this point either builds the targets
+      # or replays inputs that already exist, and neither can discover a defect
+      # that needs a mutation to reach: measured against a seeded off-by-one,
+      # replay missed it and a budgeted run found it in one to three seconds.
+      # The replay above is a separate regression check and may never replace
+      # this budgeted run — if this step ever has to get cheaper, cut the
+      # budget, do not convert it into a replay.
+      #
+      # Any non-zero exit fails the step. libFuzzer's own error exit and a
+      # sanitizer's differ, both are findings, and matching one would let the
+      # other pass.
+      - name: Fuzz every target
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.ref }}" = "refs/heads/master" ]; then
+            budget=300
+            seed=
+          else
+            budget=60
+            seed=-seed=1
+          fi
+          mkdir -p fuzz-artifacts
+          for target in $CARTAN_FUZZ_TARGETS; do
+            log=fuzz-artifacts/"$target".log
+            build/fuzz/"$target" \
+              -max_total_time="$budget" \
+              -timeout=25 \
+              -rss_limit_mb=2048 \
+              -print_final_stats=1 \
+              -artifact_prefix=fuzz-artifacts/"$target"- \
+              $seed \
+              build/fuzz/corpus/"$target" 2>&1 | tee "$log"
+            executed=$(awk '/stat::number_of_executed_units/ { print $2 }' "$log")
+            if [ "${executed:-0}" -lt 1 ]; then
+              echo "::error::$target exited zero having executed ${executed:-no} inputs" >&2
+              exit 1
+            fi
+            echo "$target executed $executed inputs in ${budget}s"
+          done
+
+      # The input a durable corpus store would consume the day one exists.
+      # Producing it now costs one step and makes accumulation a matter of
+      # keeping an artifact rather than of building a mechanism.
+      - name: Minimize the corpus
+        run: |
+          set -euo pipefail
+          for target in $CARTAN_FUZZ_TARGETS; do
+            mkdir -p minimized-corpus/"$target"
+            build/fuzz/"$target" -merge=1 -timeout=25 -rss_limit_mb=2048 \
+              minimized-corpus/"$target" build/fuzz/corpus/"$target"
+          done
+
+      - name: Upload the minimized corpus
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: minimized-corpus
+          path: minimized-corpus/
+
+      # Only from master, and never from a pull request. A corpus grown against
+      # unmerged code is a corpus of inputs for a program that does not exist,
+      # and it would be indistinguishable from the rest once stored.
+      #
+      # The store receives the merged set only. Crash inputs land under
+      # fuzz-artifacts/ and travel as a failure artifact; they are never written
+      # here, and a failed run does not reach this step at all.
+      #
+      # This pushes to a different repository than the one GITHUB_TOKEN governs,
+      # so the job's contents:read permission block is still correct and is
+      # deliberately left alone.
+      - name: Push the merged corpus to the store
+        if: >-
+          github.event_name != 'pull_request'
+          && github.ref == 'refs/heads/master'
+        env:
+          CORPUS_KEY: ${{ secrets.FUZZ_CORPUS_DEPLOY_KEY }}
+        run: |
+          # Never add -x to this line. This repository is public, so its job logs
+          # are too, and -x echoes every command with its arguments expanded --
+          # which would put the private key below into a world-readable log. The
+          # key reaches disk only by redirection and is never printed; masking is
+          # a backstop, not the protection.
+          set -euo pipefail
+
+          # Writing is the only half that needs the key; reading the public store
+          # above did not. An absent secret is reported and skipped rather than
+          # failed, so the gate itself does not depend on the store existing.
+          if [ -z "${CORPUS_KEY:-}" ]; then
+            echo "::notice::no corpus credential; the merged set was uploaded as an artifact but not stored"
+            exit 0
+          fi
+          mkdir -p ~/.ssh
+          # Pinned rather than keyscanned. ssh-keyscan trusts whatever the
+          # network answers with, which is the one unpinned trust decision in a
+          # workflow that pins its actions and its dependencies by digest. This
+          # is github.com's published ed25519 host key; if GitHub rotates it the
+          # push fails loudly and this line is the fix, which is the failure
+          # direction this repository prefers.
+          printf '%s\n' \
+            'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' \
+            > ~/.ssh/known_hosts
+          printf '%s\n' "${CORPUS_KEY}" > ~/.ssh/corpus_key
+          chmod 600 ~/.ssh/corpus_key
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/corpus_key -o IdentitiesOnly=yes"
+
+          # A merge that produced nothing would empty the store on push. That is
+          # the same count-over-an-empty-set failure this job guards everywhere
+          # else, and here it would destroy accumulated work rather than just
+          # report a false green.
+          total=$(find minimized-corpus -type f | wc -l)
+          if [ "$total" -lt 1 ]; then
+            echo "::error::the merge produced no inputs; refusing to overwrite the store" >&2
+            exit 1
+          fi
+          for target in $CARTAN_FUZZ_TARGETS; do
+            count=$(find minimized-corpus/"$target" -type f 2>/dev/null | wc -l)
+            if [ "$count" -lt 1 ]; then
+              echo "::error::$target merged to zero inputs; refusing to overwrite the store" >&2
+              exit 1
+            fi
+          done
+
+          cd accumulated
+          # The restore read the store anonymously over https; pushing needs the
+          # key, so the same remote is re-pointed at its ssh URL here.
+          git remote set-url origin git@github.com:skrede/cartan-fuzz-corpus.git
+          git config user.name "cartan fuzz"
+          git config user.email "noreply@github.com"
+          # An empty store leaves HEAD symbolic but unborn, so the branch has to
+          # be created on the first push and only then.
+          git rev-parse --verify HEAD > /dev/null 2>&1 || git checkout -b master
+          for target in $CARTAN_FUZZ_TARGETS; do
+            rm -rf "$target"
+            cp -a ../minimized-corpus/"$target" "$target"
+          done
+          git add -A
+          if git diff --cached --quiet; then
+            echo "the merged set is identical to the store; nothing to push"
+            exit 0
+          fi
+          git commit -m "Merge corpus from ${GITHUB_SHA:0:12} (${total} inputs)"
+          git push origin HEAD:master
+          echo "pushed ${total} input(s) to the store"
+
+      # A crash input nobody kept is a crash nobody can reproduce, which is most
+      # of what a finding is worth. The per-target log travels with it because
+      # it carries the seed the run used.
+      - name: Upload crash inputs and run logs
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fuzz-findings
+          path: fuzz-artifacts/

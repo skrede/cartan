@@ -20,6 +20,7 @@
 #include "cartan/serial/ik/solver/detail/analytical_gradient.h"
 #include "cartan/serial/ik/detail/convergence.h"
 #include "cartan/serial/ik/detail/stall_detection.h"
+#include "cartan/serial/ik/detail/setup_validation.h"
 #include "cartan/serial/ik/detail/limit_enforcement.h"
 
 #include "cartan/lie/se3.h"
@@ -73,10 +74,17 @@ public:
         int stall_window{15};
     };
 
-    builtin_lbfgsb() = default;
+    builtin_lbfgsb()
+        : builtin_lbfgsb(options{})
+    {
+    }
 
     explicit builtin_lbfgsb(const options& opts)
-        : m_options(opts)
+        : m_q(detail::poison_joint_position<scalar_type, joints>())
+        , m_gradient(detail::poison_joint_position<scalar_type, joints>())
+        , m_lower(detail::poison_joint_position<scalar_type, joints>())
+        , m_upper(detail::poison_joint_position<scalar_type, joints>())
+        , m_options(opts)
     {
     }
 
@@ -96,6 +104,18 @@ public:
         const convergence_criteria<scalar_type>& criteria,
         const error_weight<scalar_type>& weight)
     {
+        // Half of what the iteration loop below is entitled to assume; the
+        // joint count recorded here is the other half, re-checked against the
+        // chain step() is handed. Latching a failure into the status member is
+        // how a void setup() reports: the loop's running guard refuses to run.
+        if (auto held = cartan::detail::validate_solve_inputs(chain, target, q0); !held)
+        {
+            m_status = held.error();
+            return;
+        }
+
+        m_setup_joints = chain.num_joints();
+
         m_target = target;
         m_q = q0;
         m_criteria = criteria;
@@ -110,8 +130,8 @@ public:
         m_upper.resize(n);
         for (std::size_t i = 0; i < static_cast<std::size_t>(n); ++i)
         {
-            m_lower(static_cast<int>(i)) = chain.limits()[i].position_min;
-            m_upper(static_cast<int>(i)) = chain.limits()[i].position_max;
+            m_lower(static_cast<int>(i)) = chain.limits()[i].position_min();
+            m_upper(static_cast<int>(i)) = chain.limits()[i].position_max();
         }
 
         m_q = m_q.cwiseMax(m_lower).cwiseMin(m_upper);
@@ -131,6 +151,8 @@ public:
 
     step_result<scalar_type> step(const Chain& chain, int N)
     {
+        m_status = cartan::detail::chain_bound_status(m_status, m_setup_joints, chain);
+
         int units = 0;
         while (units < N && m_status == ik_status::running)
         {
@@ -183,7 +205,7 @@ public:
     const position_type& solution() const { return m_q; }
     scalar_type error_norm() const { return m_error_norm; }
     int iterations() const { return m_iterations; }
-    void abort() {}
+    void abort() { m_status = ik_status::aborted; }
     ik_status status() const { return m_status; }
 
 private:
@@ -368,10 +390,10 @@ private:
     }
 
     se3<scalar_type> m_target{se3<scalar_type>::identity()};
-    position_type m_q{};
-    position_type m_gradient{};
-    position_type m_lower{};
-    position_type m_upper{};
+    position_type m_q;
+    position_type m_gradient;
+    position_type m_lower;
+    position_type m_upper;
     vector6<scalar_type> m_body_error{vector6<scalar_type>::Zero()};
     vector6<scalar_type> m_weighted_error{vector6<scalar_type>::Zero()};
     convergence_criteria<scalar_type> m_criteria{};
@@ -386,24 +408,13 @@ private:
     scalar_type m_f{};
     scalar_type m_gamma{scalar_type(1)};
     int m_iterations{};
-    ik_status m_status{ik_status::running};
+    int m_setup_joints{-1};
+    ik_status m_status{ik_status::not_initialized};
 };
 
-#ifndef CARTAN_BUILD_ARGMIN
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 using lbfgsb = builtin_lbfgsb<Chain, LimitsPolicy>;
-#endif
 
 }
-
-#ifdef CARTAN_BUILD_ARGMIN
-#include "cartan/serial/ik/solver/argmin_lbfgsb.h"
-
-namespace cartan
-{
-template <chain Chain, typename LimitsPolicy = clamp_limits>
-using lbfgsb = argmin_lbfgsb<Chain, LimitsPolicy>;
-}
-#endif
 
 #endif

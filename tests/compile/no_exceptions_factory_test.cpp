@@ -1,8 +1,11 @@
-// Compile-only proof that the validated Lie factories can be instantiated and
-// called without C++ exceptions. Built twice: once with -fno-exceptions
-// -fno-rtti (the embedded posture) and once with the default flags. If the
-// exceptions-off build ever fails to compile, an ungated throw has crept back
-// into cartan::expected::value() on a path these factories reach.
+// Compile-only proof that the validated factories and the checked kinematics
+// entry points can be instantiated and called without C++ exceptions. Built
+// twice: once with -fno-exceptions -fno-rtti (the embedded posture) and once
+// with the default flags. If the exceptions-off build ever fails to compile, an
+// ungated throw has crept back into a path these factories reach.
+
+#include "no_exceptions_chain_slice.h"
+#include "no_exceptions_kinematics_slice.h"
 
 #include "cartan/expected.h"
 
@@ -28,9 +31,7 @@ struct base
 // factory call: this makes each one a genuine ODR use rather than dead code.
 volatile float g_sink = 0.0F;
 
-}
-
-int main()
+float lie_factories()
 {
     using cartan::matrix3;
     using cartan::matrix4;
@@ -70,6 +71,18 @@ int main()
         acc += (*tf_result).matrix().trace();
     }
 
-    g_sink = acc;
+    return acc;
+}
+
+}
+
+int main()
+{
+    namespace gate = cartan::compile_gate;
+
+    g_sink = lie_factories() + gate::checked_limits_factory()
+        + gate::checked_chain_factory() + gate::checked_forward_kinematics()
+        + gate::checked_jacobians() + gate::checked_velocity()
+        + gate::chain_constructor_guard();
     return 0;
 }

@@ -43,11 +43,18 @@ inline Scalar default_feasibility_tol() noexcept
     return std::sqrt(std::numeric_limits<Scalar>::epsilon());
 }
 
-/// Feasibility predicate: true iff every finitely-bounded joint of q lies within
-/// [position_min - tol, position_max + tol]. Joints whose bound is non-finite
-/// (unbounded / continuous joints using +/-infinity) are skipped on that side,
-/// so a joint with one finite and one infinite bound is still checked against
-/// the finite side. This is a CHECK only -- it never mutates q. It is the gate a
+/// Feasibility predicate: true iff every joint value of q is finite and every
+/// finitely-bounded joint lies within [position_min - tol, position_max + tol].
+/// Joints whose bound is non-finite (unbounded / continuous joints using
+/// +/-infinity) are skipped on that side, so a joint with one finite and one
+/// infinite bound is still checked against the finite side.
+///
+/// The finiteness test is on the joint value and is separate from the tests on
+/// the bounds: both bound comparisons are false for a NaN joint value, so
+/// without it a NaN was reported feasible -- including against an unbounded
+/// joint, where neither comparison runs at all.
+///
+/// This is a CHECK only -- it never mutates q. It is the gate a
 /// no_limits trust-region solver consults before declaring convergence so that a
 /// pose-converged but out-of-range configuration is reported as a joint-limit
 /// failure rather than a trustworthy solution.
@@ -61,9 +68,13 @@ bool within_limits(
     int n = chain.num_joints();
     for (int i = 0; i < n; ++i)
     {
+        if (!std::isfinite(q(i)))
+        {
+            return false;
+        }
         auto idx = static_cast<std::size_t>(i);
-        auto lo = limits[idx].position_min;
-        auto hi = limits[idx].position_max;
+        auto lo = limits[idx].position_min();
+        auto hi = limits[idx].position_max();
         if (std::isfinite(lo) && q(i) < lo - tol)
         {
             return false;
@@ -140,16 +151,16 @@ inline Scalar canonical_angle_in_limits(
         return theta;
     }
 
-    constexpr Scalar two_pi = Scalar(2) * std::numbers::pi_v<Scalar>;
+    constexpr Scalar full_turn = Scalar(2) * std::numbers::pi_v<Scalar>;
     if (std::isfinite(lo))
     {
-        const Scalar k = std::ceil((lo - theta - tol) / two_pi);
-        return theta + two_pi * k;
+        const Scalar k = std::ceil((lo - theta - tol) / full_turn);
+        return theta + full_turn * k;
     }
     if (std::isfinite(hi))
     {
-        const Scalar k = std::floor((hi - theta + tol) / two_pi);
-        return theta + two_pi * k;
+        const Scalar k = std::floor((hi - theta + tol) / full_turn);
+        return theta + full_turn * k;
     }
     return theta;
 }
@@ -184,7 +195,7 @@ void canonicalize_into_limits(
         }
         auto idx = static_cast<std::size_t>(i);
         q(i) = canonical_angle_in_limits(
-            q(i), limits[idx].position_min, limits[idx].position_max, tol);
+            q(i), limits[idx].position_min(), limits[idx].position_max(), tol);
     }
 }
 
@@ -226,23 +237,38 @@ void enforce_limits(
     }
     else if constexpr (has_extended_enforce<LimitsPolicy, Chain>)
     {
-        auto fk = forward_kinematics(chain, q);
-        auto J_b = body_jacobian(chain, fk);
+        auto fk = forward_kinematics_unchecked(chain, q);
+        auto J_b = body_jacobian_unchecked(chain, fk);
 
         // V must be full: matrixV() is then n x n and V.rightCols(n - rank)
         // spans the true Jacobian kernel. A thin V is only n x min(m, n), so
         // for a wide (redundant) Jacobian it omits the kernel columns and hands
         // back row-space directions instead, corrupting the null-space step.
-        // U may stay thin for a dynamic matrix (thin U is illegal for a
-        // fixed-size one, hence the branch), and its 6 rows make thin and full
-        // U identical in size regardless.
+        // U may stay thin for a dynamic matrix, whose decomposition runs over a
+        // fully dynamic copy; thin U is illegal for a fixed-size one, hence the
+        // branch.
         constexpr unsigned int svd_options = (N == dynamic)
             ? (Eigen::ComputeThinU | Eigen::ComputeFullV)
             : (Eigen::ComputeFullU | Eigen::ComputeFullV);
-        Eigen::JacobiSVD<jacobian_matrix<Scalar, N>> svd(J_b, svd_options);
+        // Eigen counts the non-zero singular values inside the decomposition
+        // and rank() reads that count back. Once the constructor and the
+        // policy's rank() call are inlined into one function, GCC loses the
+        // write and reports the count as possibly unwritten; the constructor
+        // that takes a matrix always decomposes, so it is always written. The
+        // pop has to follow the call rather than the declaration because the
+        // read happens inside the callee. Only -O3 raises this, on every GCC
+        // tried rather than one version, and clang is clean on the same source.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
+        enforcement_svd<Scalar, N> svd(J_b, svd_options);
 
         LimitsPolicy::template enforce_extended<Chain>(
             q, chain.limits(), J_b, svd);
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
     }
     else
     {

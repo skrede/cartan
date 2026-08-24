@@ -1,0 +1,25 @@
+{
+  "declared_participants": [
+    {
+      "name": "cartan_lm",
+      "supplier": "",
+      "kernel_countable": true
+    },
+    {
+      "name": "pinocchio_lm",
+      "supplier": "pinocchio",
+      "kernel_countable": true
+    },
+    {
+      "name": "trac_ik",
+      "supplier": "trac_ik",
+      "kernel_countable": false
+    }
+  ],
+  "absent_participants": [
+    {
+      "name": "trac_ik",
+      "reason": "no installed trac_ik was found and CARTAN_TRAC_IK_SOURCE_DIR is unset, install it or point that variable at a checkout"
+    }
+  ]
+}

@@ -30,6 +30,7 @@
 #include "cartan/serial/ik/concepts/solve_concept.h"
 #include "cartan/serial/ik/detail/convergence.h"
 #include "cartan/serial/ik/detail/stall_detection.h"
+#include "cartan/serial/ik/detail/setup_validation.h"
 #include "cartan/serial/ik/detail/limit_enforcement.h"
 #include "cartan/serial/ik/solver/detail/halton_seed_generator.h"
 
@@ -45,7 +46,6 @@
 #include <array>
 #include <vector>
 #include <limits>
-#include <optional>
 #include <algorithm>
 #include <type_traits>
 
@@ -133,10 +133,18 @@ public:
         scalar_type trust_region_radius{scalar_type(1.0)};
     };
 
-    projected_lm() = default;
+    projected_lm()
+        : projected_lm(options{})
+    {
+    }
 
     explicit projected_lm(const options& opts)
-        : m_options(opts)
+        : m_q(detail::poison_joint_position<scalar_type, joints>())
+        , m_best_q(detail::poison_joint_position<scalar_type, joints>())
+        , m_q_min(detail::poison_joint_position<scalar_type, joints>())
+        , m_q_max(detail::poison_joint_position<scalar_type, joints>())
+        , m_seed_reference(detail::poison_joint_position<scalar_type, joints>())
+        , m_options(opts)
     {
     }
 
@@ -156,7 +164,19 @@ public:
         const convergence_criteria<scalar_type>& criteria,
         const error_weight<scalar_type>& weight)
     {
-        m_seed_gen.emplace(chain);
+        // Half of what every attempt below is entitled to assume; the joint
+        // count recorded here is the other half, re-checked against the chain
+        // step() is handed. Latching a failure into the status member is how a
+        // void setup() reports.
+        if (auto held = cartan::detail::validate_solve_inputs(chain, target, q0); !held)
+        {
+            m_status = held.error();
+            return;
+        }
+
+        m_setup_joints = chain.num_joints();
+
+        m_seed_reference = q0;
         m_restart_count = 0;
         m_total_iterations = 0;
         m_best_error = std::numeric_limits<scalar_type>::max();
@@ -169,10 +189,20 @@ public:
 
     step_result<scalar_type> step(const Chain& chain, int N)
     {
+        m_status = cartan::detail::chain_bound_status(m_status, m_setup_joints, chain);
+
+        // The loop below admits any status that is not converged, which a
+        // terminal setup status would pass. The predicate is load-bearing for
+        // restart-on-stall and is left alone; the failed setup returns here.
+        if (cartan::detail::is_setup_failure(m_status))
+        {
+            return {m_status, {0, m_error_norm}};
+        }
+
         int units = 0;
         if (m_aborted)
         {
-            return {ik_status::stalled, {0, m_error_norm}};
+            return {ik_status::aborted, {0, m_error_norm}};
         }
         while (units < N && m_status != ik_status::converged)
         {
@@ -201,7 +231,7 @@ public:
                 break;
             }
 
-            auto q_new = (*m_seed_gen)(m_restart_count);
+            auto q_new = halton_seed_generator<Chain>{chain, m_seed_reference}(m_restart_count);
             ++m_restart_count;
 
             // Free restart event: re-initialize the attempt without billing
@@ -217,7 +247,13 @@ public:
     const position_type& solution() const { return m_best_valid ? m_best_q : m_q; }
     scalar_type error_norm() const { return m_best_valid ? m_best_error : m_error_norm; }
     int iterations() const { return m_total_iterations; }
-    void abort() { m_aborted = true; }
+    // The step loop admits any non-converged status, so the latch rather than
+    // the status is what stops it; the status is set so status() agrees.
+    void abort()
+    {
+        m_aborted = true;
+        m_status = ik_status::aborted;
+    }
     scalar_type lambda() const { return m_lambda; }
     void set_lambda(scalar_type l) { m_lambda = l; }
     ik_status status() const { return m_status; }
@@ -272,19 +308,21 @@ private:
         }
         for (int i = 0; i < n; ++i)
         {
-            m_q_min(i) = chain.limits()[static_cast<std::size_t>(i)].position_min;
-            m_q_max(i) = chain.limits()[static_cast<std::size_t>(i)].position_max;
+            m_q_min(i) = chain.limits()[static_cast<std::size_t>(i)].position_min();
+            m_q_max(i) = chain.limits()[static_cast<std::size_t>(i)].position_max();
         }
 
         m_q = m_q.cwiseMax(m_q_min).cwiseMin(m_q_max);
 
-        auto fk = forward_kinematics(chain, m_q);
+        auto fk = forward_kinematics_unchecked(chain, m_q);
         m_V_b = (fk.end_effector.inverse() * m_target).log();
         m_error_norm = m_V_b.norm();
-        m_initial_error = m_error_norm;
+        m_weighted_error_norm = m_weight.apply(m_V_b).norm();
+        m_initial_error = m_weighted_error_norm;
 
-        auto J_b = body_jacobian(chain, fk);
-        auto JtJ = (J_b.transpose() * J_b).eval();
+        auto J_b = body_jacobian_unchecked(chain, fk);
+        auto J_w = weighted_jacobian(J_b);
+        auto JtJ = (J_w.transpose() * J_w).eval();
         scalar_type max_diag{0};
         for (int i = 0; i < n; ++i)
         {
@@ -304,7 +342,7 @@ private:
             return m_status;
         }
 
-        auto fk = forward_kinematics(chain, m_q);
+        auto fk = forward_kinematics_unchecked(chain, m_q);
         m_V_b = (fk.end_effector.inverse() * m_target).log();
 
         if (auto s = check_convergence_and_limits(chain); s != ik_status::running)
@@ -312,21 +350,24 @@ private:
             return s;
         }
 
-        auto J_b = body_jacobian(chain, fk);
-        int n = static_cast<int>(J_b.cols());
-        auto H = (J_b.transpose() * J_b).eval();
-        auto g = (J_b.transpose() * m_V_b).eval();
+        auto J_b = body_jacobian_unchecked(chain, fk);
+        auto J_w = weighted_jacobian(J_b);
+        auto e_w = m_weight.apply(m_V_b);
+        int n = static_cast<int>(J_w.cols());
+        auto H = (J_w.transpose() * J_w).eval();
+        auto g = (J_w.transpose() * e_w).eval();
 
         auto free_indices = identify_active_set(g, n);
-        position_type dq = solve_projected_system(J_b, H, g, free_indices, n);
+        position_type dq = solve_projected_system(J_w, H, g, free_indices, n);
 
         auto [q_trial, V_b_trial, rho] = evaluate_trial_step(chain, dq, H, g);
 
         update_damping(rho, dq, q_trial, V_b_trial);
 
         m_error_norm = m_V_b.norm();
+        m_weighted_error_norm = m_weight.apply(m_V_b).norm();
         auto stall_result = cartan::detail::check_stall_divergence(
-            m_error_history, m_error_norm, m_initial_error,
+            m_error_history, m_weighted_error_norm, m_initial_error,
             m_options.stall_window, m_options.stall_threshold,
             m_options.divergence_factor);
         if (stall_result != ik_status::running)
@@ -337,6 +378,17 @@ private:
 
         cartan::detail::enforce_limits<LimitsPolicy>(m_q, chain);
         return m_status;
+    }
+
+    // Scaling the Jacobian's rows up front, rather than placing a diagonal
+    // between the transpose and its operand, keeps the normal-equation products
+    // in the same two-factor expression shape Eigen sees today. At a unit weight
+    // the scaling is an exact multiply by one, so the trajectory is unchanged to
+    // the last mantissa bit.
+    jacobian_matrix<scalar_type, joints> weighted_jacobian(
+        const jacobian_matrix<scalar_type, joints>& J_b) const
+    {
+        return m_weight.weights.asDiagonal() * J_b;
     }
 
     ik_status check_convergence_and_limits(const Chain& chain)
@@ -400,7 +452,7 @@ private:
 
     template <typename JacobianType, typename HessianType, typename GradientType>
     position_type solve_projected_system(
-        const JacobianType& J_b,
+        const JacobianType& J_w,
         const HessianType& H,
         const GradientType& g,
         const active_set& free_indices,
@@ -436,7 +488,7 @@ private:
         free_vec dq_free;
         if (m_options.use_dogleg)
         {
-            dq_free = dogleg_step(J_b, H_free, g_free, free_indices, n_free);
+            dq_free = dogleg_step(J_w, H_free, g_free, free_indices, n_free);
         }
         else
         {
@@ -471,11 +523,11 @@ private:
         const GradientType& g) -> trial_result<HessianType, GradientType>
     {
         position_type q_trial = (m_q + dq).cwiseMax(m_q_min).cwiseMin(m_q_max);
-        auto fk_trial = forward_kinematics(chain, q_trial);
+        auto fk_trial = forward_kinematics_unchecked(chain, q_trial);
         auto V_b_trial = (fk_trial.end_effector.inverse() * m_target).log();
 
-        scalar_type error_old_sq = m_V_b.squaredNorm();
-        scalar_type error_new_sq = V_b_trial.squaredNorm();
+        scalar_type error_old_sq = m_weight.apply(m_V_b).squaredNorm();
+        scalar_type error_new_sq = m_weight.apply(V_b_trial).squaredNorm();
         scalar_type actual_reduction = scalar_type(0.5) * (error_old_sq - error_new_sq);
 
         scalar_type predicted_reduction;
@@ -542,7 +594,7 @@ private:
 
     template <typename JacobianType>
     free_vec dogleg_step(
-        const JacobianType& J_b,
+        const JacobianType& J_w,
         const free_mat& H_free,
         const free_vec& g_free,
         const active_set& free_indices,
@@ -550,14 +602,14 @@ private:
     {
         free_vec delta_sd = g_free;
 
-        free_jac J_b_free(6, n_free);
+        free_jac J_w_free(6, n_free);
         for (int i = 0; i < n_free; ++i)
         {
-            J_b_free.col(i) = J_b.col(free_indices[i]);
+            J_w_free.col(i) = J_w.col(free_indices[i]);
         }
 
         scalar_type g_sq = g_free.squaredNorm();
-        auto Jg = (J_b_free * g_free).eval();
+        auto Jg = (J_w_free * g_free).eval();
         scalar_type Jg_sq = Jg.squaredNorm();
         scalar_type t = (Jg_sq > std::numeric_limits<scalar_type>::epsilon())
             ? g_sq / Jg_sq
@@ -587,9 +639,24 @@ private:
         free_vec b = delta_gn;
         free_vec d = b - a;
 
+        // These vectors are max-size-fixed, so Eigen picks its vectorized reduction
+        // traversal from the dynamic-size branch and computes the packet count at
+        // run time. Whenever the run-time free-joint count is below the packet
+        // width that count is zero and the loop body never executes, but GCC cannot
+        // prove it and models a speculative full-width load bounded by the
+        // compile-time maximum instead. Clang is clean on the same source and the
+        // reported access width follows the vector register width, which is what
+        // marks this as a modeling artifact rather than a live over-read.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds"
+#endif
         scalar_type a_sq = a.squaredNorm();
         scalar_type d_sq = d.squaredNorm();
         scalar_type a_dot_d = a.dot(d);
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
         scalar_type delta_sq = m_delta * m_delta;
 
         scalar_type discriminant = a_dot_d * a_dot_d - d_sq * (a_sq - delta_sq);
@@ -600,18 +667,22 @@ private:
     }
 
     se3<scalar_type> m_target{se3<scalar_type>::identity()};
-    position_type m_q{};
-    position_type m_best_q{};
-    position_type m_q_min{};
-    position_type m_q_max{};
+    position_type m_q;
+    position_type m_best_q;
+    position_type m_q_min;
+    position_type m_q_max;
+    position_type m_seed_reference;
     vector6<scalar_type> m_V_b{vector6<scalar_type>::Zero()};
     convergence_criteria<scalar_type> m_criteria{};
     error_weight<scalar_type> m_weight{};
     options m_options{};
-    std::optional<halton_seed_generator<Chain>> m_seed_gen{};
     cartan::detail::error_ring<scalar_type> m_error_history;
     scalar_type m_initial_error{};
+    // The reported norm keeps its unweighted meaning for the public accessor and
+    // the best-so-far ranking; the weighted one is what the step minimizes, so it
+    // is the quantity the stall and divergence detector watches.
     scalar_type m_error_norm{};
+    scalar_type m_weighted_error_norm{};
     scalar_type m_lambda{};
     scalar_type m_nu{scalar_type(2)};
     scalar_type m_delta{scalar_type(1)};
@@ -619,7 +690,8 @@ private:
     int m_iterations{};
     int m_total_iterations{};
     int m_restart_count{};
-    ik_status m_status{ik_status::running};
+    int m_setup_joints{-1};
+    ik_status m_status{ik_status::not_initialized};
     bool m_best_feasible{false};
     bool m_best_valid{false};
     bool m_aborted{false};

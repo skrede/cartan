@@ -1,6 +1,8 @@
 #ifndef HPP_GUARD_CARTAN_ANALYTICAL_DETAIL_FK_VERIFICATION_H
 #define HPP_GUARD_CARTAN_ANALYTICAL_DETAIL_FK_VERIFICATION_H
 
+#include "cartan/analytical/analytical_types.h"
+
 #include "cartan/serial/chain/chain_concept.h"
 #include "cartan/serial/fk/forward_kinematics.h"
 
@@ -18,16 +20,29 @@ namespace cartan::detail
 /// chain itself may be statically- or dynamically-sized; the helper bridges
 /// the two by constructing a runtime-sized copy of q when the chain is
 /// dynamic, and forwarding directly otherwise.
+///
+/// The two thresholds measure two physically distinct quantities -- a distance
+/// in the chain's linear unit and the norm of a residual rotation vector in
+/// radians -- so they arrive as two separately named fields. The parameter has
+/// no default: a caller that owns an acceptance tolerance must say which one it
+/// means, and a caller that forgets does not silently get a third one.
 template <chain Chain, int N>
 bool verify_analytical_solution(
     const Chain& chain,
     const Eigen::Vector<typename Chain::scalar_type, N>& q,
     const se3<typename Chain::scalar_type>& target,
     bool check_orientation,
-    typename Chain::scalar_type position_tolerance = typename Chain::scalar_type(1e-6),
-    typename Chain::scalar_type orientation_tolerance = typename Chain::scalar_type(1e-6))
+    const verification_tolerance<typename Chain::scalar_type>& tolerance)
 {
     using Scalar = typename Chain::scalar_type;
+
+    // First, and not left to the comparisons below. A nonfinite candidate makes
+    // the position comparison false, which reads as "inside tolerance", so the
+    // candidate is admitted whenever the orientation check is off -- and one
+    // solver passes that flag off unconditionally. A guard whose effectiveness
+    // depends on a caller's flag is not a guard.
+    if (!q.allFinite())
+        return false;
 
     auto fk = [&]
     {
@@ -49,13 +64,19 @@ bool verify_analytical_solution(
         }
     }();
 
-    Scalar position_error = (fk.end_effector.translation() - target.translation()).norm();
-    if (position_error >= position_tolerance)
+    // The branch above is taken exactly when the chain's joint count differs
+    // from the solver's, so the checked entry point is what turns that into a
+    // typed refusal instead of a read past the vector.
+    if (!fk)
+        return false;
+
+    Scalar position_error = (fk->end_effector.translation() - target.translation()).norm();
+    if (position_error >= tolerance.position())
         return false;
     if (!check_orientation)
         return true;
-    Scalar orientation_error = (fk.end_effector.rotation().inverse() * target.rotation()).log().norm();
-    return orientation_error < orientation_tolerance;
+    Scalar orientation_error = (fk->end_effector.rotation().inverse() * target.rotation()).log().norm();
+    return orientation_error < tolerance.orientation();
 }
 
 }

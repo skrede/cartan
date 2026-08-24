@@ -18,12 +18,14 @@
 #include "cartan/serial/ik/concepts/solve_concept.h"
 #include "cartan/serial/ik/detail/convergence.h"
 #include "cartan/serial/ik/detail/stall_detection.h"
+#include "cartan/serial/ik/detail/setup_validation.h"
 #include "cartan/serial/ik/detail/limit_enforcement.h"
 
 #include "cartan/lie/se3.h"
 #include "cartan/serial/fk/jacobian.h"
 #include "cartan/serial/chain/joint_state.h"
 #include "cartan/serial/chain/chain_concept.h"
+#include "cartan/serial/fk/singular_spectrum.h"
 #include "cartan/serial/fk/forward_kinematics.h"
 
 #include <Eigen/SVD>
@@ -80,10 +82,14 @@ public:
         int stall_window{5};
     };
 
-    dls() = default;
+    dls()
+        : dls(options{})
+    {
+    }
 
     explicit dls(const options& opts)
-        : m_options(opts)
+        : m_q(detail::poison_joint_position<scalar_type, joints>())
+        , m_options(opts)
     {
     }
 
@@ -93,6 +99,18 @@ public:
         const position_type& q0,
         const convergence_criteria<scalar_type>& criteria)
     {
+        // Half of what the iteration loop below is entitled to assume; the
+        // joint count recorded here is the other half, re-checked against the
+        // chain step() is handed. Latching a failure into the status member is
+        // how a void setup() reports: the loop's running guard refuses to run.
+        if (auto held = cartan::detail::validate_solve_inputs(chain, target, q0); !held)
+        {
+            m_status = held.error();
+            return;
+        }
+
+        m_setup_joints = chain.num_joints();
+
         m_target = target;
         m_q = q0;
         m_criteria = criteria;
@@ -102,7 +120,7 @@ public:
         m_condition_number = scalar_type(0);
         m_manipulability_value = scalar_type(0);
 
-        auto fk = forward_kinematics(chain, m_q);
+        auto fk = forward_kinematics_unchecked(chain, m_q);
         auto V_b = (fk.end_effector.inverse() * m_target).log();
         m_error_norm = V_b.norm();
         m_initial_error = m_error_norm;
@@ -110,10 +128,12 @@ public:
 
     step_result<scalar_type> step(const Chain& chain, int N)
     {
+        m_status = cartan::detail::chain_bound_status(m_status, m_setup_joints, chain);
+
         int units = 0;
         while (units < N && m_status == ik_status::running)
         {
-            auto fk = forward_kinematics(chain, m_q);
+            auto fk = forward_kinematics_unchecked(chain, m_q);
             auto V_b = (fk.end_effector.inverse() * m_target).log();
 
             if (cartan::detail::is_converged_unweighted(V_b, m_criteria))
@@ -137,7 +157,7 @@ public:
                 // is the work performed this iteration. Billing zero here
                 // breaks the runner's min_units_per_step contract on entry-
                 // is-converged paths (basic_ik_runner.solve() would loop
-                // forever under min_distance objective with no forward
+                // forever under min_error_norm objective with no forward
                 // progress on units).
                 ++m_iterations;
                 ++units;
@@ -153,18 +173,33 @@ public:
                 break;
             }
 
-            auto J_b = body_jacobian(chain, fk);
+            auto J_b = body_jacobian_unchecked(chain, fk);
 
             constexpr unsigned int svd_options = (joints == dynamic)
                 ? (Eigen::ComputeThinU | Eigen::ComputeThinV)
                 : (Eigen::ComputeFullU | Eigen::ComputeFullV);
-            Eigen::JacobiSVD<jacobian_matrix<scalar_type, joints>> svd(J_b, svd_options);
+            // Eigen sizes the singular-value vector from a run-time diagonal size
+            // even when both matrix dimensions are compile-time constants. Once the
+            // decomposition's write loop and the reads below are inlined into one
+            // function, GCC cannot prove that size equals min(rows, cols), so the
+            // last element reads as possibly unwritten; for a fixed-size Jacobian it
+            // is that minimum unconditionally. Only -O3 raises this -- -O0, -O1 and
+            // -O2 are clean, as is clang on the same source.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
+            Eigen::JacobiSVD<svd_matrix_t<jacobian_matrix<scalar_type, joints>>> svd(
+                J_b, svd_options);
 
-            auto sigma = svd.singularValues();
+            const auto& sigma = svd.singularValues();
             int rank = static_cast<int>(sigma.size());
 
             scalar_type sigma_min = sigma(rank - 1);
             scalar_type sigma_max = sigma(0);
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
             scalar_type lambda_sq{0};
 
             if (sigma_min < m_options.singularity_threshold)
@@ -216,25 +251,14 @@ public:
     const position_type& solution() const { return m_q; }
     scalar_type error_norm() const { return m_error_norm; }
     int iterations() const { return m_iterations; }
-    void abort() {}
+    void abort() { m_status = ik_status::aborted; }
     scalar_type condition_number() const { return m_condition_number; }
     scalar_type manipulability() const { return m_manipulability_value; }
     ik_status status() const { return m_status; }
 
 private:
     se3<scalar_type> m_target{se3<scalar_type>::identity()};
-    // Zero-initialize the fixed-size storage so a size-optimized build cannot
-    // flag the working iterate as maybe-uninitialized before setup() sets it.
-    position_type m_q{[] {
-        if constexpr (joints == dynamic)
-        {
-            return position_type{};
-        }
-        else
-        {
-            return position_type::Zero();
-        }
-    }()};
+    position_type m_q;
     convergence_criteria<scalar_type> m_criteria{};
     options m_options{};
     cartan::detail::error_ring<scalar_type> m_error_history;
@@ -243,7 +267,8 @@ private:
     scalar_type m_initial_error{};
     scalar_type m_error_norm{};
     int m_iterations{};
-    ik_status m_status{ik_status::running};
+    int m_setup_joints{-1};
+    ik_status m_status{ik_status::not_initialized};
 };
 
 }

@@ -1,6 +1,8 @@
 #ifndef HPP_GUARD_TESTS_UNIT_IK_FLOAT_TOLERANCE_SWEEP_TEST_H
 #define HPP_GUARD_TESTS_UNIT_IK_FLOAT_TOLERANCE_SWEEP_TEST_H
 
+#include "../support/kinematics_helpers.h"
+
 #include "../test_utils.h"
 
 #include <cartan/types.h>
@@ -115,8 +117,8 @@ void accumulate_cell(
             q_d(i) = dist(rng);
         Eigen::Vector<float, N> q_f = q_d.template cast<float>();
 
-        auto T_d = cartan::forward_kinematics(chain_d, q_d).end_effector;
-        auto T_f = cartan::forward_kinematics(chain_f, q_f).end_effector;
+        auto T_d = cartan::testing::fk_at(chain_d, q_d).end_effector;
+        auto T_f = cartan::testing::fk_at(chain_f, q_f).end_effector;
 
         // Position floor: ||p_float - p_double|| on the common geometry.
         Eigen::Vector3d p_d = T_d.translation();
@@ -248,7 +250,7 @@ TEST_CASE("float IK converges at the swept preset but not at a forced 1e-6 gate"
 
     Eigen::Vector<float, 7> q_known;
     q_known << 0.15f, 0.1f, -0.2f, 0.25f, 0.1f, -0.15f, 0.2f;
-    auto target = cartan::forward_kinematics(chain, q_known).end_effector;
+    auto target = cartan::testing::fk_at(chain, q_known).end_effector;
 
     Eigen::Vector<float, 7> q0 = Eigen::Vector<float, 7>::Zero();
 
@@ -287,7 +289,7 @@ TEST_CASE("float IK converges at the swept preset but not at a forced 1e-6 gate"
 
         REQUIRE(result.has_value());
 
-        auto fk_sol = cartan::forward_kinematics(chain, result->solution.position);
+        auto fk_sol = cartan::testing::fk_at(chain, result->solution.position);
         auto err = (fk_sol.end_effector.inverse() * target).log();
         const double ori_err = static_cast<double>(err.head<3>().norm());
         const double pos_err = static_cast<double>(err.tail<3>().norm());
@@ -337,7 +339,7 @@ void convergence_contrast(
         Eigen::Vector<float, N> q_known;
         for (int i = 0; i < N; ++i)
             q_known(i) = static_cast<float>(dist(rng));
-        auto target = cartan::forward_kinematics(chain, q_known).end_effector;
+        auto target = cartan::testing::fk_at(chain, q_known).end_effector;
 
         Eigen::Vector<float, N> q0 = q_known;
         for (int i = 0; i < N; ++i)

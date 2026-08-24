@@ -1,3 +1,5 @@
+#include "../support/kinematics_helpers.h"
+
 #include "cartan/analytical.h"
 #include "cartan/serial_chain.h"
 
@@ -15,7 +17,8 @@ using namespace cartan;
 // Solve and re-verify at the same 1e-9 bar the OPW round-trip uses: the closed
 // form never gets to grade its own homework, every returned branch is checked
 // by an independent forward map.
-static constexpr double tolerance = 1e-9;
+static constexpr double check_tolerance = 1e-9;
+static constexpr verification_tolerance<double> acceptance(check_tolerance, check_tolerance);
 
 // Worst of position and orientation reconstruction error of q against target.
 template <typename Chain>
@@ -23,7 +26,7 @@ static double fk_error(const Chain& chain,
                        const Eigen::Vector<double, 6>& q,
                        const se3<double>& target)
 {
-    auto fk = forward_kinematics(chain, q);
+    auto fk = testing::fk_at(chain, q);
     const double pe =
         (fk.end_effector.translation() - target.translation()).norm();
     const double oe = (fk.end_effector.rotation().inverse()
@@ -35,7 +38,7 @@ TEST_CASE("IRB120: the reconciled chain factory is a spherical wrist Pieper "
           "admits")
 {
     auto chain = fixtures::make_abb_irb120_chain<double>();
-    auto solver = pieper_6r_solver<decltype(chain)>::make(chain, tolerance);
+    auto solver = pieper_6r_solver<decltype(chain)>::make(chain, acceptance);
 
     // Before the wrist-center reconciliation axes 4,5,6 missed a common point
     // and this gate rejected the chain; now it passes.
@@ -46,7 +49,7 @@ TEST_CASE("IRB120: reconciled-geometry FK accuracy over a workspace-spanning "
           "sample")
 {
     auto chain = fixtures::make_abb_irb120_chain<double>();
-    auto solver = pieper_6r_solver<decltype(chain)>::make(chain, tolerance);
+    auto solver = pieper_6r_solver<decltype(chain)>::make(chain, acceptance);
     REQUIRE(solver.has_value());
 
     std::mt19937_64 rng(0xABB120ull);
@@ -61,7 +64,7 @@ TEST_CASE("IRB120: reconciled-geometry FK accuracy over a workspace-spanning "
         for (int k = 0; k < 6; ++k)
             q_known(k) = angle(rng);
 
-        auto target = forward_kinematics(chain, q_known).end_effector;
+        auto target = testing::fk_at(chain, q_known).end_effector;
         auto result = solver->solve(target);
 
         INFO("sample " << t << " q_known = " << q_known.transpose());
@@ -75,11 +78,11 @@ TEST_CASE("IRB120: reconciled-geometry FK accuracy over a workspace-spanning "
                 CHECK_FALSE(std::isnan(sol(k)));
             const double e = fk_error(chain, sol, target);
             worst = std::max(worst, e);
-            CHECK(e < tolerance);
+            CHECK(e < check_tolerance);
         }
     }
     INFO("worst per-call FK error = " << worst);
-    CHECK(worst < tolerance);
+    CHECK(worst < check_tolerance);
 }
 
 TEST_CASE("IRB120: reconciled chain and static factory agree on FK away from "
@@ -99,8 +102,8 @@ TEST_CASE("IRB120: reconciled chain and static factory agree on FK away from "
     constexpr double tol = 1e-12;
     for (const auto& q : configs)
     {
-        auto a = forward_kinematics(kc, q).end_effector;
-        auto b = forward_kinematics(sc, q).end_effector;
+        auto a = testing::fk_at(kc, q).end_effector;
+        auto b = testing::fk_at(sc, q).end_effector;
         const double pe = (a.translation() - b.translation()).norm();
         const double oe =
             (a.rotation().inverse() * b.rotation()).log().norm();

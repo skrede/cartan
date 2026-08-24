@@ -52,6 +52,9 @@
 /// noise floor) fails, unlike the previous 10^7 * eps ~ 1.19 value, which was
 /// roughly a billion times the floor it claimed to bound and could never fail.
 
+#include "../support/kinematics_helpers.h"
+#include "../support/joint_limits_helpers.h"
+
 #include "../fixtures/chain_factories.h"
 #include "../fixtures/prismatic_chains.h"
 #include "../test_utils.h"
@@ -139,8 +142,8 @@ cartan::jacobian_matrix<Scalar, N> fd_space_jacobian(
         q_plus(i) += h;
         q_minus(i) -= h;
 
-        auto fk_plus = cartan::forward_kinematics(chain, q_plus);
-        auto fk_minus = cartan::forward_kinematics(chain, q_minus);
+        auto fk_plus = cartan::testing::fk_at(chain, q_plus);
+        auto fk_minus = cartan::testing::fk_at(chain, q_minus);
 
         auto delta =
             (fk_plus.end_effector * fk_minus.end_effector.inverse()).log();
@@ -166,12 +169,12 @@ void collect_fd_errors(
         for (int j = 0; j < n; ++j)
         {
             const auto& lim = chain.limits()[static_cast<std::size_t>(j)];
-            q(j) = lim.position_min
-                 + (lim.position_max - lim.position_min) * unit(rng);
+            q(j) = lim.position_min()
+                 + (lim.position_max() - lim.position_min()) * unit(rng);
         }
 
-        auto fk = cartan::forward_kinematics(chain, q);
-        auto Js = cartan::space_jacobian(chain, fk);
+        auto fk = cartan::testing::fk_at(chain, q);
+        auto Js = cartan::testing::space_jacobian_at(chain, fk);
         auto Jfd = fd_space_jacobian(chain, q, h);
 
         for (int c = 0; c < n; ++c)
@@ -224,12 +227,12 @@ void jac_gate_robot(MakeChain make_chain, const char* name)
         for (int j = 0; j < n; ++j)
         {
             const auto& lim = chain.limits()[static_cast<std::size_t>(j)];
-            q(j) = lim.position_min
-                 + (lim.position_max - lim.position_min) * unit(rng);
+            q(j) = lim.position_min()
+                 + (lim.position_max() - lim.position_min()) * unit(rng);
         }
 
-        auto fk = cartan::forward_kinematics(chain, q);
-        auto Js = cartan::space_jacobian(chain, fk);
+        auto fk = cartan::testing::fk_at(chain, q);
+        auto Js = cartan::testing::space_jacobian_at(chain, fk);
         auto Jfd = fd_space_jacobian(chain, q, h);
 
         REQUIRE(Js.rows() == 6);
@@ -258,23 +261,10 @@ auto make_ppp_chain() -> cartan::kinematic_chain<Scalar, 3>
 
     auto home = cartan::se3<Scalar>(
         cartan::so3<Scalar>::identity(), vec3(Scalar(0), Scalar(0), Scalar(0)));
-    cartan::joint_limits<Scalar> lim{Scalar(-1), Scalar(1)};
+    auto lim = cartan::testing::limits(Scalar(-1), Scalar(1));
 
     return cartan::kinematic_chain<Scalar, 3>(
         home, {s1, s2, s3}, {lim, lim, lim});
-}
-
-// Zero-DOF dynamic chain: empty axis/limit storage, non-trivial home pose.
-template <typename Scalar>
-auto make_zero_dof_chain() -> cartan::kinematic_chain<Scalar, cartan::dynamic>
-{
-    auto home = cartan::se3<Scalar>(
-        cartan::so3<Scalar>::identity(),
-        cartan::vector3<Scalar>(Scalar(0.1), Scalar(0.2), Scalar(0.3)));
-    return cartan::kinematic_chain<Scalar, cartan::dynamic>(
-        home,
-        std::vector<cartan::screw_axis<Scalar>>{},
-        std::vector<cartan::joint_limits<Scalar>>{});
 }
 
 }
@@ -367,9 +357,9 @@ TEMPLATE_TEST_CASE("Jacobian sweep: nine robots x fifty seeded configs",
 }
 
 // ---------------------------------------------------------------------------
-// Prismatic, mixed, and zero-DOF coverage.
+// Prismatic and mixed coverage.
 // ---------------------------------------------------------------------------
-TEMPLATE_TEST_CASE("Jacobian sweep: prismatic, mixed, and zero-DOF coverage",
+TEMPLATE_TEST_CASE("Jacobian sweep: prismatic and mixed coverage",
     "[jacobian][sweep][prismatic]", double, float)
 {
     using Scalar = TestType;
@@ -383,17 +373,5 @@ TEMPLATE_TEST_CASE("Jacobian sweep: prismatic, mixed, and zero-DOF coverage",
     {
         jac_gate_robot(
             cartan::fixtures::make_rppr_signed_chain<Scalar>, "RPPR mixed");
-    }
-
-    SECTION("zero-DOF chain has a 6x0 space Jacobian")
-    {
-        auto chain = make_zero_dof_chain<Scalar>();
-        REQUIRE(chain.num_joints() == 0);
-
-        Eigen::VectorX<Scalar> q(0);
-        auto fk = cartan::forward_kinematics(chain, q);
-        auto Js = cartan::space_jacobian(chain, fk);
-        REQUIRE(Js.rows() == 6);
-        REQUIRE(Js.cols() == 0);
     }
 }

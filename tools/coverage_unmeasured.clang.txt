@@ -1,0 +1,89 @@
+# Tracked headers Clang's coverage instrument does not reach, and why.
+#
+# gcov emits data only for translation units the build compiled, so a header no
+# build touches is not scored zero -- it leaves the denominator entirely, and the
+# published rate improves. check_coverage_report.py therefore compares the headers
+# named in the report against every tracked header under the module include trees
+# and refuses a difference that is not recorded here. An absent header with no row
+# fails the check; so does a row naming a header git no longer tracks, and so does
+# a row for a header the report names, whatever the row claims. This record cannot
+# accumulate.
+#
+# There is one record per coverage instrument, and this one is Clang's. It is
+# three rows shorter than GCC's because Clang emits records for implicitly-defined
+# special members and attributes them to the declaring line, so urdf/error.h,
+# urdf/schema.h and ik/ik_result.h are named by this instrument and not by GCC's.
+# The difference runs one way only: every header GCC's report names, this one names
+# too. Sharing one record would force the check to stop refuting a whole class of
+# row, which is how a wrong row survives.
+#
+# Comparing whole headers has a limit worth stating, because this record's own
+# history shows it: this instrument named ik_status.h all along, for the struct
+# declarations in it, while the two message() switches beside them went unexercised
+# until a test drove every enumerator through them at run time. Whether a named
+# header's lines run is what the percentage answers; this record only answers
+# whether the header reaches the denominator.
+#
+# One row per header: the path, then the reason. A reason is legitimate only when
+# a reader holding nothing but this repository can check it. Three reasons say
+# that, and no other spelling is accepted:
+#
+#   declaration-only        The header declares types, concepts, constants or
+#                           aliases and defines no executable line, so gcov has
+#                           nothing to emit for it. Open the file to check. Every
+#                           row below carries this reason, and one of them is not
+#                           obvious from a glance: argmin_convergence.h is
+#                           instantiated by the solve policies, but its only
+#                           definitions are a constexpr function consumed as an
+#                           array extent and an alias template, and neither can
+#                           emit a line for an instantiation to reach.
+#   backend-not-built <OPT> Nothing the build compiles includes this header unless
+#                           the named option is on, so gcov emits no record for it.
+#                           Check the option's effect in CMake together with the
+#                           includes of the header or of whatever includes it,
+#                           since an option usually gates the includers rather than
+#                           the header itself. No row carries this reason, because
+#                           the measured configuration below builds the optional
+#                           solver backend. The spelling stays accepted so that a
+#                           header behind an option this configuration does not set
+#                           remains recordable.
+#   no-instantiating-test   The build compiles the header, but nothing in it calls
+#                           or instantiates what the header defines, so gcov emits
+#                           no record. This is a real coverage gap, not an
+#                           exemption. No row carries it: a row appearing here
+#                           again names work to do, not a surface to excuse.
+#
+# This is not a place to excuse a header that ought to be measured. If a header
+# belongs in the denominator, the repair is the build configuration, not a row.
+#
+# Recorded against the measured configuration: the tests, the URDF module, the
+# optional solver backend, the examples and tutorials, the property tests, the
+# extended URDF parity tests, the doc snippets, the Python bindings and the
+# instantiation targets are all built, and the bindings' own suite runs under
+# instrumentation. The fuzz targets, the packaging matrix and the profiling
+# targets stay out, each for a reason the lane's configure step states rather than
+# leaves to be inferred.
+#
+# The instantiation targets force every advertised combination of a solver family
+# into the build, and they move no row below: regenerating this record with their
+# option off produces the same rows. What they add is per-instantiation records on
+# headers the report already names, not a header the report was missing.
+
+lib/cartan-analytical/include/cartan/analytical.h                                       declaration-only
+lib/cartan-analytical/include/cartan/analytical/analytical_solver.h                     declaration-only
+lib/cartan-analytical/include/cartan/analytical/range_status.h                          declaration-only
+lib/cartan-lie/include/cartan/detail/epsilon.h                                          declaration-only
+lib/cartan-lie/include/cartan/frames/frames.h                                           declaration-only
+lib/cartan-lie/include/cartan/lie.h                                                     declaration-only
+lib/cartan-lie/include/cartan/lie/fwd.h                                                 declaration-only
+lib/cartan-lie/include/cartan/lie/policy.h                                              declaration-only
+lib/cartan-lie/include/cartan/types.h                                                   declaration-only
+lib/cartan-serial-chain/include/cartan/serial/chain/chain.h                             declaration-only
+lib/cartan-serial-chain/include/cartan/serial/chain/chain_concept.h                     declaration-only
+lib/cartan-serial-chain/include/cartan/serial/chain/storage_trait.h                     declaration-only
+lib/cartan-serial-chain/include/cartan/serial/fk.h                                      declaration-only
+lib/cartan-serial-chain/include/cartan/serial/fk/kinematics.h                           declaration-only
+lib/cartan-serial-chain/include/cartan/serial/ik.h                                      declaration-only
+lib/cartan-serial-chain/include/cartan/serial/ik/detail/argmin_convergence.h            declaration-only
+lib/cartan-serial-chain/include/cartan/serial/ik/ik.h                                   declaration-only
+lib/cartan-serial-chain/include/cartan/serial_chain.h                                   declaration-only

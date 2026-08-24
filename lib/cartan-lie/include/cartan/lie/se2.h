@@ -229,6 +229,11 @@ public:
     static cartan::expected<se2, lie_failure>
     from_matrix(const Eigen::Matrix<Scalar, 3, 3>& T)
     {
+        if (!T.allFinite())
+        {
+            return cartan::unexpected(lie_failure::non_finite_input);
+        }
+
         Scalar tol = detail::sqrt_epsilon_v<Scalar>;
 
         // Check bottom row is [0, 0, 1]

@@ -10,6 +10,8 @@
 /// All numeric literals use Scalar(...) casts to avoid implicit narrowing.
 /// All geometries expressed as Product of Exponentials screw parameters.
 
+#include "support/joint_limits_helpers.h"
+
 #include <cartan/types.h>
 
 #include <cartan/lie/se3.h>
@@ -72,8 +74,8 @@ auto make_lbr_iiwa_chain() -> cartan::kinematic_chain<Scalar, 7>
     vec3 home_trans(Scalar(0), Scalar(0), Scalar(1.306));
     auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::identity(), home_trans);
 
-    cartan::joint_limits<Scalar> lim{
-        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
+    auto lim = cartan::testing::limits(
+        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>);
 
     return cartan::kinematic_chain<Scalar, 7>(
         home,
@@ -120,8 +122,8 @@ auto make_ur3e_chain() -> cartan::kinematic_chain<Scalar, 6>
     vec3 home_trans(Scalar(-0.45675), Scalar(0.22315), Scalar(0.0665));
     auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::identity(), home_trans);
 
-    cartan::joint_limits<Scalar> lim{
-        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
+    auto lim = cartan::testing::limits(
+        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>);
 
     return cartan::kinematic_chain<Scalar, 6>(
         home,
@@ -181,8 +183,8 @@ auto make_kr6_sixx_chain() -> cartan::kinematic_chain<Scalar, 6>
     vec3 home_trans(Scalar(0.935), Scalar(0), Scalar(0.400));
     auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::identity(), home_trans);
 
-    cartan::joint_limits<Scalar> lim{
-        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
+    auto lim = cartan::testing::limits(
+        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>);
 
     return cartan::kinematic_chain<Scalar, 6>(
         home,
@@ -236,8 +238,8 @@ auto make_puma560_5dof_chain() -> cartan::kinematic_chain<Scalar, 5>
     vec3 home_trans(Scalar(0.4521), Scalar(0.58185), Scalar(0.6718));
     auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::identity(), home_trans);
 
-    cartan::joint_limits<Scalar> lim{
-        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
+    auto lim = cartan::testing::limits(
+        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>);
 
     return cartan::kinematic_chain<Scalar, 5>(
         home,
@@ -268,8 +270,8 @@ auto make_4r_spatial_chain() -> cartan::kinematic_chain<Scalar, 4>
     vec3 home_trans(Scalar(0.8), Scalar(0), Scalar(0.5));
     auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::identity(), home_trans);
 
-    cartan::joint_limits<Scalar> lim{
-        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
+    auto lim = cartan::testing::limits(
+        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>);
 
     return cartan::kinematic_chain<Scalar, 4>(
         home,
@@ -298,8 +300,8 @@ auto make_3r_planar_chain() -> cartan::kinematic_chain<Scalar, 3>
     vec3 home_trans(Scalar(3), Scalar(0), Scalar(0));
     auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::identity(), home_trans);
 
-    cartan::joint_limits<Scalar> lim{
-        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
+    auto lim = cartan::testing::limits(
+        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>);
 
     return cartan::kinematic_chain<Scalar, 3>(
         home,
@@ -324,8 +326,8 @@ auto make_2r_planar_chain() -> cartan::kinematic_chain<Scalar, 2>
     vec3 home_trans(Scalar(2), Scalar(0), Scalar(0));
     auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::identity(), home_trans);
 
-    cartan::joint_limits<Scalar> lim{
-        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
+    auto lim = cartan::testing::limits(
+        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>);
 
     return cartan::kinematic_chain<Scalar, 2>(
         home,
@@ -347,8 +349,8 @@ auto make_1r_chain() -> cartan::kinematic_chain<Scalar, 1>
     vec3 home_trans(Scalar(1), Scalar(0), Scalar(0));
     auto home = cartan::se3<Scalar>(cartan::so3<Scalar>::identity(), home_trans);
 
-    cartan::joint_limits<Scalar> lim{
-        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
+    auto lim = cartan::testing::limits(
+        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>);
 
     return cartan::kinematic_chain<Scalar, 1>(
         home,

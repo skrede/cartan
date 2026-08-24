@@ -20,3 +20,6 @@ set_target_properties(cartan_all PROPERTIES EXPORT_NAME cartan)
 if (CARTAN_ENABLE_INSTALL)
     install(TARGETS cartan_all EXPORT cartanTargets)
 endif ()
+
+cartan_define_optional_backend_components()
+cartan_assert_optional_backend_contract()

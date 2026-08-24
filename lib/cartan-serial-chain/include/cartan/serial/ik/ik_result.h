@@ -11,12 +11,20 @@
 #include "cartan/serial/chain/storage_trait.h"
 
 #include <limits>
+#include <optional>
 #include <type_traits>
 
 namespace cartan
 {
 
 /// Successful IK result containing solution configuration and diagnostics.
+///
+/// `selection_metric` is the value the winning candidate was ranked on, under
+/// `selection_objective`. It is absent where the objective ranks nothing, which
+/// is the `speed` case, so an unranked win reads as absent rather than as zero.
+///
+/// `solved_feasible_set` is the bounds the winning policy actually solved over,
+/// which is not always the chain's declared bounds.
 template <typename Scalar = double, int N = dynamic>
 struct ik_result
 {
@@ -26,37 +34,20 @@ struct ik_result
     Scalar final_error_norm{};
     int iterations{};
     int solver_index{};
+    std::optional<Scalar> selection_metric{};
+    ik_objective selection_objective{ik_objective::speed};
+    feasible_set solved_feasible_set{feasible_set::declared};
 };
 
-namespace detail
-{
-
-/// Poison default for an ik_error's diagnostic joint vector: NaN-filled for a
-/// fixed-size chain, empty for a dynamic one. A field left at this default was
-/// never populated by the solver; a NaN sentinel makes an accidental read fail
-/// loudly -- it propagates through arithmetic and, unlike a large finite value,
-/// survives angle wrapping -- instead of masquerading as the plausible all-zero
-/// home configuration.
-template <typename Scalar, int N>
-typename joint_state<Scalar, N>::position_type poison_joint_position()
-{
-    using position_type = typename joint_state<Scalar, N>::position_type;
-    if constexpr (N == dynamic)
-    {
-        return position_type{};
-    }
-    else
-    {
-        return position_type::Constant(std::numeric_limits<Scalar>::quiet_NaN());
-    }
-}
-
-}
-
-/// IK error containing failure diagnostics. Every payload field defaults to a
-/// NaN poison so an unpopulated diagnostic surfaces as an obvious failure rather
-/// than a plausible value (a zero last_q reads as the home pose; a zero
+/// IK error containing failure diagnostics. Every numeric payload field defaults
+/// to a NaN poison so an unpopulated diagnostic surfaces as an obvious failure
+/// rather than a plausible value (a zero last_q reads as the home pose; a zero
 /// last_error_norm reads as "converged").
+///
+/// The conditioning of the Jacobian at the failing iterate is not carried here.
+/// It is computed from last_q through fk/singularity_analysis.h, which answers
+/// the same question at any configuration rather than only at the one a solve
+/// happened to fail at.
 template <typename Scalar = double, int N = dynamic>
 struct ik_error
 {
@@ -66,8 +57,6 @@ struct ik_error
     ik_termination_reason termination_reason{ik_termination_reason::unknown};
     typename joint_state<Scalar, N>::position_type last_q{detail::poison_joint_position<Scalar, N>()};
     Scalar last_error_norm{std::numeric_limits<Scalar>::quiet_NaN()};
-    Scalar condition_number{std::numeric_limits<Scalar>::quiet_NaN()};
-    bool near_singular{};
 };
 
 }

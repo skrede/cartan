@@ -1,3 +1,6 @@
+#include "../support/kinematics_helpers.h"
+#include "../support/joint_limits_helpers.h"
+
 #include "cartan/serial_chain.h"
 
 #include <catch2/catch_approx.hpp>
@@ -24,7 +27,7 @@ static spp::kinematic_chain<double, 3> make_3r_chain()
     auto s2 = spp::screw_axis<double>::revolute({0, 0, 1}, {L, 0, 0});
     auto s3 = spp::screw_axis<double>::revolute({0, 0, 1}, {2 * L, 0, 0});
 
-    spp::joint_limits<double> lim{-std::numbers::pi, std::numbers::pi};
+    auto lim = spp::testing::limits(-std::numbers::pi, std::numbers::pi);
 
     return spp::kinematic_chain<double, 3>(
         home,
@@ -43,7 +46,7 @@ TEST_CASE("Velocity at dq=0 is zero", "[velocity]")
     q << 0.3, -0.5, 0.7;
     Eigen::Vector3d dq = Eigen::Vector3d::Zero();
 
-    auto vel = spp::end_effector_velocity(chain, q, dq);
+    spp::vector6<double> vel = spp::testing::velocity_at(chain, q, dq);
 
     REQUIRE(vel.norm() < 1e-15);
 }
@@ -55,7 +58,7 @@ TEST_CASE("Velocity at dq=0 is zero", "[velocity]")
 TEST_CASE("Single-joint velocity equals screw axis", "[velocity]")
 {
     auto s1 = spp::screw_axis<double>::revolute({0, 0, 1}, {0, 0, 0});
-    spp::joint_limits<double> lim{-std::numbers::pi, std::numbers::pi};
+    auto lim = spp::testing::limits(-std::numbers::pi, std::numbers::pi);
     auto home = spp::se3<double>::identity();
 
     spp::kinematic_chain<double, 1> chain(home, {s1}, {lim});
@@ -65,7 +68,7 @@ TEST_CASE("Single-joint velocity equals screw axis", "[velocity]")
     Eigen::Vector<double, 1> dq;
     dq << 1.0;
 
-    auto vel = spp::end_effector_velocity(chain, q, dq);
+    spp::vector6<double> vel = spp::testing::velocity_at(chain, q, dq);
 
     auto s1_vec = s1.to_vector();
     for (int i = 0; i < 6; ++i)
@@ -88,13 +91,13 @@ TEST_CASE("Velocity matches finite-difference FK", "[velocity]")
     Eigen::Vector3d dq;
     dq << 1.0, -0.5, 0.3;
 
-    auto vel = spp::end_effector_velocity(chain, q, dq);
+    spp::vector6<double> vel = spp::testing::velocity_at(chain, q, dq);
 
     // Finite-difference: log(FK(q + dt*dq) * FK(q)^{-1}) / dt
     double dt = 1e-8;
-    auto fk_base = spp::forward_kinematics(chain, q);
+    auto fk_base = spp::testing::fk_at(chain, q);
     Eigen::Vector3d q_perturbed = q + dt * dq;
-    auto fk_pert = spp::forward_kinematics(chain, q_perturbed);
+    auto fk_pert = spp::testing::fk_at(chain, q_perturbed);
 
     auto delta = (fk_pert.end_effector * fk_base.end_effector.inverse()).log();
     spp::vector6<double> vel_fd = delta / dt;

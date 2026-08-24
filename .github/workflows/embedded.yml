@@ -8,7 +8,7 @@ on:
       - 'docs/**'
       - '.planning/**'
   pull_request:
-    branches: [master, develop]
+    branches: [master]
     paths-ignore:
       - '**.md'
       - 'docs/**'
@@ -33,7 +33,7 @@ jobs:
     name: arm (${{ matrix.name }})
 
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install arm-none-eabi toolchain and Eigen
         run: sudo apt-get update && sudo apt-get install -y gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib libeigen3-dev
@@ -58,7 +58,7 @@ jobs:
     name: esp-idf (${{ matrix.target }})
 
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Eigen sits outside ESP-IDF's component graph; provide it as a local
       # checkout and hand it to the containerized build via CARTAN_EIGEN_DIR.

@@ -11,15 +11,19 @@ on:
       - 'docs/**'
       - 'lib/**'
       - '**.h'
+      - 'README.md'
       - 'tools/extract_doc_snippets.py'
+      - 'tools/doc_snippets/**'
       - '.github/workflows/docs.yml'
   pull_request:
-    branches: [master, develop]
+    branches: [master]
     paths:
       - 'docs/**'
       - 'lib/**'
       - '**.h'
+      - 'README.md'
       - 'tools/extract_doc_snippets.py'
+      - 'tools/doc_snippets/**'
       - '.github/workflows/docs.yml'
   workflow_dispatch:
 
@@ -29,18 +33,21 @@ jobs:
     name: compile documentation snippets
 
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Eigen
         run: sudo apt-get update && sudo apt-get install -y libeigen3-dev
 
-      # argmin is an optional additive backend not yet embeddable via
-      # FetchContent; build the docs against the native-only configuration.
-      # Restore -DCARTAN_BUILD_ARGMIN=ON once argmin builds embeddably.
+      # A group's snippets compile only against the component that owns them, so
+      # the gate covers a documented component's API only with that component
+      # enabled. URDF is on for the same reason, and so that a snippet marked for
+      # it compiles the day one is written rather than being silently skipped.
       - name: Configure
         run: >
           cmake -B build
           -DCARTAN_BUILD_DOC_TESTS=ON
+          -DCARTAN_BUILD_ARGMIN=ON
+          -DCARTAN_BUILD_URDF=ON
           -DCARTAN_CMAKE_FETCH_DEPS=ON
 
       - name: Compile documentation snippets

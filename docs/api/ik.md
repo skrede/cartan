@@ -24,18 +24,21 @@ See [IK Methods](../background/ik-methods.md) | [IK Composition Guide](../guides
 |------|--------|
 | All IK | `#include <cartan/serial/ik.h>` |
 | `cartan::basic_ik_runner` | `#include <cartan/serial/ik/basic_ik_runner.h>` |
-| `cartan::convergence_criteria`, `cartan::ik_status`, `cartan::ik_termination_reason`, `cartan::ik_failure`, `cartan::ik_objective`, `cartan::step_metrics`, `cartan::step_result`, `cartan::solver_options` | `#include <cartan/serial/ik/ik_status.h>` |
+| `cartan::convergence_criteria`, `cartan::ik_status`, `cartan::ik_termination_reason`, `cartan::ik_failure`, `cartan::ik_objective`, `cartan::feasible_set`, `cartan::step_metrics`, `cartan::step_result`, `cartan::solver_options` | `#include <cartan/serial/ik/ik_status.h>` |
 | `cartan::ik_result`, `cartan::ik_error` | `#include <cartan/serial/ik/ik_result.h>` |
+| `cartan::condition_number`, `manipulability`, `isotropy`, `is_near_singular` | `#include <cartan/serial/fk/singularity_analysis.h>` |
+| `cartan::singular_values` | `#include <cartan/serial/fk/singular_spectrum.h>` |
+| `cartan::singularity_failure` | `#include <cartan/serial/fk/singularity_failure.h>` |
 | `cartan::solve_policy` concept, `cartan::step_one` | `#include <cartan/serial/ik/concepts/solve_concept.h>` |
 | `cartan::no_limits`, `cartan::clamp_limits`, `cartan::null_space_limits` | `#include <cartan/serial/ik/policy/limits_policy.h>` |
 | `cartan::error_weight` | `#include <cartan/serial/ik/policy/error_weight.h>` |
 | `cartan::lm` (alias for `builtin_lm`) | `#include <cartan/serial/ik/solver/lm.h>` |
 | `cartan::lbfgsb` (alias for `builtin_lbfgsb`) | `#include <cartan/serial/ik/solver/lbfgsb.h>` |
 | `cartan::projected_lm`, `cartan::dls`, `cartan::newton_raphson` | `#include <cartan/serial/ik/solver/{projected_lm,dls,newton_raphson}.h>` |
-| argmin-backed: `cartan::argmin_lm`, `argmin_lbfgsb`, `argmin_slsqp`, `argmin_bobyqa`, `argmin_projected_gn`, `argmin_projected_gradient_gn` | `#include <cartan/serial/ik/solver/argmin_*.h>` |
-| NLopt-backed: `cartan::nlopt_slsqp`, `cartan::nlopt_bobyqa` | `#include <cartan/serial/ik/solver/nlopt_*.h>` (requires `CARTAN_HAS_NLOPT`) |
+| argmin-backed: `cartan::argmin_lm`, `argmin_lbfgsb`, `argmin_slsqp`, `argmin_bobyqa`, `argmin_projected_gn`, `argmin_projected_gradient_gn` | `#include <cartan/serial/ik/solver/argmin_*.h>` (requires `CARTAN_HAS_ARGMIN`) |
+| NLopt-backed: `cartan_examples::nlopt_slsqp`, `cartan_examples::nlopt_bobyqa` | carried as a solve-policy example, not library surface: see `examples/nlopt_policy/` |
 | SQP family: `cartan::nw_sqp`, `filter_nw_sqp`, `filter_slsqp` | `#include <cartan/serial/ik/solver/{nw_sqp,filter_nw_sqp,filter_slsqp}.h>` |
-| MMA / GCMMA / CMA-ES / aug. Lagrangian: `cartan::mma`, `gcmma`, `cmaes`, `augmented_lagrangian` | `#include <cartan/serial/ik/solver/{mma,gcmma,cmaes,augmented_lagrangian}.h>` |
+| MMA / aug. Lagrangian: `cartan::mma`, `augmented_lagrangian` | `#include <cartan/serial/ik/solver/{mma,augmented_lagrangian}.h>` |
 | `cartan::restart_wrapper` | `#include <cartan/serial/ik/wrapper/restart_wrapper.h>` |
 | `cartan::exhaustive_ik_runner`, `cartan::exhaustive_options`, `cartan::exhaustive_result`, `cartan::ranking_strategy` | `#include <cartan/serial/ik/solver/exhaustive_ik_runner.h>` |
 | `cartan::verify_solution`, `cartan::filter_valid_solutions` | `#include <cartan/serial/ik/ik_validation.h>` |
@@ -43,8 +46,16 @@ See [IK Methods](../background/ik-methods.md) | [IK Composition Guide](../guides
 
 ## Quick Start
 
-Minimal working example on a 3-DOF planar arm using the LM policy:
+Minimal working example on a 3-DOF planar arm using the LM policy. This is a
+fragment, not a program, so it has nowhere to return a failure to and unwraps
+`joint_limits::make` and `forward_kinematics` with `.value()`. That accessor
+throws `bad_expected_access` carrying the failure, or fail-stops on the
+exceptions-off targets cartan supports — either way it is not the form to copy.
+Branch on the result and report through `cartan::message` instead, as the
+complete example in the
+[IK composition guide](../guides/ik-composition.md#complete-example) does.
 
+<!-- cartan:unbuilt kind=illustration reason="carries its own include directives above the statements, which a fragment wrapper cannot host inside a function" -->
 ```cpp
 #include <cartan/serial_chain.h>
 #include <numbers>
@@ -54,11 +65,11 @@ auto s1 = cartan::screw_axis<double>::revolute(z, {0, 0, 0});
 auto s2 = cartan::screw_axis<double>::revolute(z, {1, 0, 0});
 auto s3 = cartan::screw_axis<double>::revolute(z, {2, 0, 0});
 auto home = cartan::se3<double>(cartan::so3<double>::identity(), {3, 0, 0});
-cartan::joint_limits<double> lim{-std::numbers::pi, std::numbers::pi};
+auto lim = cartan::joint_limits<double>::make(-std::numbers::pi, std::numbers::pi).value();
 cartan::kinematic_chain<double, 3> chain(home, {s1, s2, s3}, {lim, lim, lim});
 
 Eigen::Vector3d q_known{0.3, -0.5, 0.2};
-auto target = cartan::forward_kinematics(chain, q_known).end_effector;
+auto target = cartan::forward_kinematics(chain, q_known).value().end_effector;
 
 Eigen::Vector3d q0{0.0, 0.0, 0.0};
 cartan::convergence_criteria<double> criteria{1e-6, 1e-6, 100, 200};
@@ -82,6 +93,7 @@ payload).
 
 ## basic_ik_runner
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename... Policies>
     requires (sizeof...(Policies) >= 1)
@@ -101,6 +113,7 @@ the first policy.
 
 ### setup
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 void setup(
     const chain_type& chain,
@@ -117,6 +130,7 @@ deterministic Halton seeds within joint limits.
 
 ### step
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 ik_status step();
 ```
@@ -127,6 +141,7 @@ active (non-parked) policies.
 
 ### step_n
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 ik_status step_n(int n);
 ```
@@ -135,19 +150,24 @@ Execute `n` round-robin rounds, stopping early on terminal status.
 
 ### solve
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 cartan::expected<ik_result<scalar_type, joints>, ik_error<scalar_type, joints>>
 solve();
 ```
 
 Convenience method: drives the runner until convergence or the work-unit
-cap is hit. Single-policy mode uses the total-budget accumulator loop
-(asks the inner policy for as many units as remain in the budget;
-accumulates returned `units_consumed`). Multi-policy mode loops `step()`
-until all policies are parked or `max_total_iterations` is hit.
+cap is hit. `step()`, `step_n()` and `solve()` share one charging path, so
+all three accumulate `units_consumed` against
+`convergence_criteria::max_total_work_units`, stop once it is spent, and
+latch a terminal status before returning. A multi-policy round-robin tick
+is atomic and bills the sum of its policies' units, so the last tick can
+carry the accumulator past the cap by at most one unit per still-active
+policy.
 
 ### Query methods
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 bool converged() const;
 scalar_type error_norm() const;
@@ -156,6 +176,27 @@ const position_type& current_q() const;
 ik_status status() const;
 void abort();
 ```
+
+`abort()` is terminal for the solve it interrupts. It latches `aborted`, every
+policy observes that at its next step boundary and consumes no further work, and
+a `solve()` afterwards fails with `ik_failure::aborted`. To run again, call
+`setup()` afresh — that is what clears the abort; there is no resume.
+
+`abort()` acts only on a solve that is running. On a runner that has already
+converged, given up, or had its `setup()` refused it does nothing: there is no
+solve to interrupt, and latching would replace a result, or the reason a search
+actually stopped, with a claim that the caller stopped it. A refused setup also
+still holds the arguments that were rejected and no configured policy behind
+them, so clearing that latch would let the next `solve()` run against nothing.
+
+`error_norm()` and `current_q()` report NaN on a runner whose `setup()` was
+refused, and on one that was never set up. No iteration ran, so neither was
+measured; a policy that `setup()` never configured holds a zero residual and a
+zero iterate, which read as a converged solve at the home configuration.
+
+Once a candidate has been accepted, `error_norm()` is that candidate's residual
+and agrees with the `final_error_norm` a `solve()` returns. Before then it is
+the live policy's, which is what a caller stepping the solve is watching.
 
 ### Thread safety
 
@@ -167,6 +208,7 @@ threads without synchronization.
 
 Defined in `<cartan/serial/ik/solvers.h>`:
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain>
 using speed_ik_runner = cartan::restart_wrapper<Chain,
@@ -188,6 +230,7 @@ races the two via `basic_ik_runner`.
 
 ### Builders
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain> auto make_solver();
 template <chain Chain> auto make_speed_ik_runner();
@@ -200,6 +243,7 @@ materialization point. The composable `make_solver` accepts chained
 `.policy(p)` calls and produces a `basic_ik_runner` of the accumulated
 policies:
 
+<!-- cartan:unbuilt kind=sketch reason="names a chain type the page never defines, so it shows the builder's shape" -->
 ```cpp
 auto solver = cartan::make_solver<MyChain>()
     .policy(cartan::lm<MyChain>{})
@@ -209,6 +253,7 @@ auto solver = cartan::make_solver<MyChain>()
 
 ## solve_policy concept
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 namespace cartan {
 
@@ -247,6 +292,7 @@ accumulates `units_consumed` against `convergence_criteria::max_total_work_units
 
 ### step_one helper
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename S>
     requires cartan::solve_policy<S>
@@ -260,6 +306,7 @@ step-by-step visibility into solver progress.
 
 ## convergence_criteria
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar = double>
 struct convergence_criteria
@@ -291,6 +338,7 @@ Lynch & Park, Modern Robotics, Ch. 6.2.
 
 ### ik_status
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 enum class ik_status
 {
@@ -299,14 +347,43 @@ enum class ik_status
     diverged,
     stalled,
     joint_limit_hit,
-    iteration_limit
+    iteration_limit,
+    aborted,
+    not_initialized,
+    dimension_mismatch,
+    non_finite_input,
+    unsupported_configuration
 };
+
+constexpr const char* message(ik_status status);
 ```
 
 Stepper-level control flow signal returned by `step()` calls.
 
+The values from `not_initialized` onward are terminal before any iteration
+runs. Every solve policy starts
+in `not_initialized`, so stepping one that was never set up performs no iteration
+and consumes no work units instead of reading a default-constructed joint
+vector, and every policy's work loop refuses to run from a latched terminal
+status.
+
+`setup()` returns `void`, so it reports a rejected seed or target by latching
+`dimension_mismatch` or `non_finite_input`, and `basic_ik_runner` reports a
+selection it cannot rank by latching `unsupported_configuration`. Every solve policy validates its
+arguments this way, as do `basic_ik_runner`, `restart_wrapper` and
+`exhaustive_ik_runner`; the policies that require the optional numeric backend
+are no exception, so a solve driven straight through one of them, rather than
+through a runner or the wrapper, is checked exactly as the others are. Because
+the chain is a parameter of `step()` and not only of `setup()`, each policy also
+records the setup-time joint count and refuses a `step()` whose chain does not
+match it. `basic_ik_runner` maps a latched status onto the same-named
+`ik_failure` reason.
+
+`message()` returns a static diagnostic string; it allocates nothing.
+
 ### ik_termination_reason
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 enum class ik_termination_reason
 {
@@ -338,11 +415,13 @@ propagates the reported value into `ik_error::termination_reason`.
 
 ### ik_objective
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 enum class ik_objective
 {
     speed,
-    min_distance,
+    min_error_norm,
+    min_joint_distance,
     max_manipulability,
     max_isotropy
 };
@@ -350,27 +429,52 @@ enum class ik_objective
 
 Controls multi-policy racing selection. `speed` stops at the first
 converging policy; the other objectives keep all policies running and
-select the best converged result by min error norm, max manipulability
+select the best converged result by min error norm, min joint-space
+displacement from the seed configuration, max manipulability
 (`product of singular values`), or max isotropy (`sigma_min / sigma_max`).
+
+Each objective has one definition, read by both the single-policy and the
+racing selection paths. The two Jacobian measures divide the body Jacobian's
+linear rows by `solver_options::characteristic_length` before the
+decomposition, so the singular values are commensurable. `min_joint_distance`
+measures a Euclidean displacement, so it is refused on a chain mixing revolute
+and prismatic joints, where the components carry different units.
+
+The winning candidate's metric is reported on `ik_result::selection_metric`
+together with the objective it was computed under. Under `speed` nothing is
+ranked and the metric is absent.
 
 ### ik_failure
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 enum class ik_failure
 {
-    unreachable,
     diverged,
     stalled,
     iteration_limit,
     joint_limit_violation,
-    aborted
+    aborted,
+    not_initialized,
+    dimension_mismatch,
+    non_finite_input,
+    unsupported_configuration
 };
+
+constexpr const char* message(ik_failure failure);
 ```
 
-Failure reason reported in `ik_error`.
+Failure reason reported in `ik_error`. The last four name a solve that was
+refused before it ran: `solve()` without a preceding `setup()`, a seed whose
+length differs from the chain's joint count, a seed or target holding a NaN or
+an infinity, and a selection objective the chain or the characteristic length
+leaves undefined.
+
+`message()` returns a static diagnostic string; it allocates nothing.
 
 ### step_metrics
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar = double>
 struct step_metrics
@@ -386,6 +490,7 @@ is the number of algorithmic work units charged by the call;
 
 ### step_result
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar = double>
 struct step_result
@@ -401,22 +506,51 @@ shape.
 
 ### solver_options
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar = double>
 struct solver_options
 {
     ik_objective objective{ik_objective::speed};
-    int max_total_iterations{500};
     unsigned int halton_seed{42};
+    Scalar characteristic_length{1};
 };
 ```
 
-Controls multi-policy racing behavior: the racing objective, the
-aggregate round-robin tick cap, and the Halton seed offset for
-reproducible secondary-policy seeding.
+Controls multi-policy racing behavior: the racing objective, the Halton seed
+offset for reproducible secondary-policy seeding, and the characteristic length
+the two Jacobian objectives normalize by. The total work budget lives on
+`convergence_criteria::max_total_work_units` and bounds the racing loop as well.
+
+`characteristic_length` is in the chain's linear unit and applies to the
+selection objectives alone; it is not a library-wide scale. Its default of one
+reproduces the unnormalized arithmetic exactly, so it states the unit scale
+those measures always assumed rather than changing any ranking. A zero,
+negative or non-finite value is refused at `setup()`.
+
+### feasible_set
+
+<!-- cartan:unbuilt kind=declaration -->
+```cpp
+enum class feasible_set
+{
+    declared,
+    substituted
+};
+```
+
+Which joint bounds a policy actually solved over. A backend that cannot accept
+an infinite coordinate -- the active-set QP behind `nw_sqp`, `filter_nw_sqp` and
+`augmented_lagrangian` -- receives a finite interval substituted for a
+non-finite bound, so on a chain carrying an unbounded joint it solves a
+different problem from a policy that box-projects against the declared bounds.
+Racing the two is legitimate; reporting which one produced the answer is what
+keeps the split from being silent. A fully bounded chain reports `declared` for
+every policy.
 
 ### ik_result
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar = double, int N = dynamic>
 struct ik_result
@@ -425,29 +559,166 @@ struct ik_result
     Scalar final_error_norm{};
     int iterations{};
     int solver_index{};
+    std::optional<Scalar> selection_metric{};
+    ik_objective selection_objective{ik_objective::speed};
+    feasible_set solved_feasible_set{feasible_set::declared};
 };
 ```
 
-Successful IK outcome. `solver_index` identifies which policy produced
-the solution in multi-policy racing.
+Successful IK outcome. `final_error_norm` is the residual measured at
+`solution` and not at any other configuration the solve passed through: under a
+non-`speed` objective the runner restarts after every convergence, so the policy
+holding the last restart's residual is generally not the one that produced the
+winner. `solver_index` identifies which policy produced the solution in
+multi-policy racing. `selection_metric` is the value that candidate was ranked
+on under `selection_objective`, and is absent where the objective ranks nothing. `solved_feasible_set` reports whether the winning
+policy solved over the chain's declared joint bounds or over a finite interval
+substituted for a non-finite one, which a backend that cannot accept an
+infinite coordinate requires.
 
 ### ik_error
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar = double, int N = dynamic>
 struct ik_error
 {
-    ik_failure reason;
+    ik_failure reason{ik_failure::iteration_limit};
     ik_termination_reason termination_reason{ik_termination_reason::unknown};
-    typename joint_state<Scalar, N>::position_type last_q;
-    Scalar last_error_norm{};
-    Scalar condition_number{};
-    bool near_singular{};
+    typename joint_state<Scalar, N>::position_type last_q{detail::poison_joint_position<Scalar, N>()};
+    Scalar last_error_norm{std::numeric_limits<Scalar>::quiet_NaN()};
 };
 ```
 
 Failure diagnostic. `last_q` is the joint configuration at the time of
-failure; `last_error_norm` is the residual at that configuration.
+failure; `last_error_norm` is the residual at that configuration. Both default
+to a NaN poison, so a refused setup -- which measured neither -- reports them as
+unmeasured rather than as a home pose at an enormous residual. The two are
+always read from the same configuration: a race the budget cuts off with every
+policy still running reports the best of the live iterates and its residual, not
+the seed the solve started from.
+
+Jacobian conditioning is not carried here. It is computed from `last_q` through
+[`fk/singularity_analysis.h`](#singularity-analysis), which answers the same
+question at any configuration rather than only at the one a solve failed at.
+
+## Singularity Analysis
+
+Free functions over a body Jacobian, in `cartan/serial/fk/singularity_analysis.h`.
+They need only a Jacobian, so singularity analysis and manipulability-ellipsoid
+plotting along a trajectory do not pull in the IK stack. The selection
+objectives read the same definitions.
+
+<!-- cartan:unbuilt kind=declaration -->
+```cpp
+enum class singularity_failure
+{
+    zero_spectrum,
+    invalid_configuration,
+    invalid_length
+};
+
+constexpr const char* message(singularity_failure failure);
+constexpr bool is_invalid_argument(singularity_failure failure);
+
+template <typename Scalar>
+bool is_valid_characteristic_length(Scalar length);
+
+template <typename Derived>
+cartan::expected<singular_values_t<Derived>, singularity_failure> singular_values(
+    const Eigen::MatrixBase<Derived>& jacobian,
+    typename Derived::Scalar length = typename Derived::Scalar(1));
+
+template <typename Chain, typename Vector>
+cartan::expected<
+    singular_values_t<jacobian_matrix<typename Chain::scalar_type, Chain::joints>>,
+    singularity_failure>
+singular_values(const Chain& chain, const Vector& q, typename Chain::scalar_type length = 1);
+
+template <typename Vector>
+cartan::expected<typename Vector::Scalar, singularity_failure> condition_number(const Vector& sigma);
+template <typename Vector>
+cartan::expected<typename Vector::Scalar, singularity_failure> manipulability(const Vector& sigma);
+template <typename Vector>
+cartan::expected<typename Vector::Scalar, singularity_failure> isotropy(const Vector& sigma);
+
+template <typename Scalar>
+inline constexpr Scalar default_singularity_threshold_v = Scalar(1e3);
+
+template <typename Vector>
+cartan::expected<bool, singularity_failure> is_near_singular(
+    const Vector& sigma,
+    typename Vector::Scalar threshold = default_singularity_threshold_v<typename Vector::Scalar>);
+
+template <typename Chain, typename Vector>
+cartan::expected<bool, singularity_failure> is_near_singular(
+    const Chain& chain, const Vector& q,
+    typename Chain::scalar_type threshold = default_singularity_threshold_v<typename Chain::scalar_type>,
+    typename Chain::scalar_type length = 1);
+```
+
+Ask for the spectrum once and read every measure off it; there is deliberately
+no per-measure `(chain, q)` form, because four of them would hide four
+decompositions behind four one-line calls.
+
+`length` divides the Jacobian's three linear rows so they are commensurable with
+the dimensionless angular rows above them. The default of one reproduces the
+unnormalized arithmetic exactly. Only a positive finite value can divide, and
+`is_valid_characteristic_length` is the one predicate that says so: the analysis
+surface refuses anything else with `invalid_length`, and `solver_options`'
+`characteristic_length` is admitted at `setup()` through the same test, so no
+length one accepts is a length the other rejects.
+
+Every way of having no answer carries a name. `zero_spectrum` is the entirely
+zero Jacobian, where the isotropy ratio has nothing to divide by.
+`invalid_configuration` is a `q` whose length disagrees with the chain or which
+carries a non-finite component; the `(chain, q)` overloads run through the
+checked forward kinematics and Jacobian, so such a `q` is reported rather than
+read past. `invalid_length` is a characteristic length that cannot divide. A
+zero or NaN one leaves the decomposition reporting a spectrum it never computed
+-- with a negative largest value, which no spectrum has -- an infinite one
+annihilates the linear rows and answers a plausible spectrum for a Jacobian the
+caller did not ask about, and a negative one negates three rows, an orthogonal
+transformation, so it answers exactly as its magnitude would without saying so.
+
+`condition_number` is infinite at an exactly singular Jacobian. That is a
+measurement and not a failure -- a singular configuration has an infinite
+condition number.
+
+`is_near_singular` takes the threshold as an argument because how close is too
+close is a property of the robot and the task. Note that an errored `expected`
+is falsy exactly as an empty optional was, so test the value rather than the
+result: `is_near_singular(chain, q)` answers "was the question answerable", not
+"is this configuration near a singularity".
+
+<!-- cartan:unbuilt kind=sketch reason="names a chain and a configuration the page never defines, so it shows the call shape and the expected's truth-test trap" -->
+```cpp
+auto sigma = cartan::singular_values(chain, q);
+if (!sigma)
+{
+    log(cartan::message(sigma.error()));
+    return;
+}
+if (auto near = cartan::is_near_singular(*sigma); near && *near)
+{
+    // back off along the trajectory
+}
+```
+
+Python splits the names by kind rather than mapping them all to one outcome, on
+the classification `is_invalid_argument` carries. `invalid_configuration` and
+`invalid_length` raise `ValueError`, the same exception `forward_kinematics` and
+both Jacobians raise for the same underlying `chain_failure`: a mis-sized or
+non-finite `q`, and a length that cannot divide, are bad arguments.
+`zero_spectrum` returns `None`, because nothing was wrong with the call -- an
+entirely zero Jacobian is a valid Jacobian, and the measure is simply
+undefined on it. The annotations are
+`float | None` and `bool | None`, and the idiom is:
+
+```python
+if (kappa := cartan.condition_number(sigma)) is not None:
+    ...
+```
 
 ## Limits Policies
 
@@ -455,12 +726,13 @@ Stateless policy structs controlling joint-limit enforcement on the hot path.
 
 ### no_limits
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 struct no_limits;
 ```
 
 No-op: applies no enforcement. Use when the policy handles constraints
-internally (e.g., `projected_lm`, NLopt/argmin policies with box
+internally (e.g., `projected_lm`, argmin policies with box
 constraints). Default for `cartan::lm` and `cartan::projected_lm`
 — the LM trust-region family for which post-step clamping would
 invalidate the trust-region step.
@@ -469,17 +741,20 @@ semantics; `no_limits` is the correct default for the LM family.
 
 ### clamp_limits
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 struct clamp_limits;
 ```
 
 Hard clamping: clamps each `q(i)` to `[position_min, position_max]`.
 Simple and robust, but may cause discontinuities at boundaries. Default
-for argmin/NLopt policies that already enforce box constraints
-internally (`argmin_slsqp`, `argmin_bobyqa`, `nlopt_*`, `lbfgsb`).
+for the native `lbfgsb`, and for the argmin policies that already
+enforce box constraints internally (`argmin_slsqp`, `argmin_bobyqa`,
+the argmin policies).
 
 ### null_space_limits
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 struct null_space_limits;
 ```
@@ -495,6 +770,7 @@ Reference: Lynch & Park, Modern Robotics, Ch. 6.3, p. 235-237.
 
 ## error_weight
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar = double>
 struct error_weight
@@ -502,8 +778,6 @@ struct error_weight
     vector6<Scalar> weights{vector6<Scalar>::Ones()};
 
     vector6<Scalar> apply(const vector6<Scalar>& v) const;
-    Scalar weighted_angular_norm(const vector6<Scalar>& v) const;
-    Scalar weighted_linear_norm(const vector6<Scalar>& v) const;
 };
 ```
 
@@ -512,10 +786,19 @@ orientation components can be weighted independently for tasks where
 one dominates the other. The default (all-ones) gives equal weight to
 all components.
 
+A weight is supplied through the five-argument `setup()` overload, which
+`newton_raphson`, `lbfgsb` and `projected_lm` provide; those three apply it
+throughout their step mathematics. Policies without that overload do not
+accept a weight, and `restart_wrapper` offers the overload only when its
+inner policy does, so passing one where it cannot be honored fails to
+compile rather than being ignored. The weight steers the step; the
+convergence gate always reads the raw component norms.
+
 ## Solvers
 
 ### cartan::lm
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename LimitsPolicy = no_limits>
 using lm = builtin_lm<Chain, LimitsPolicy>;
@@ -532,6 +815,7 @@ Reference: Lynch & Park, Modern Robotics, Ch. 6.2, p. 227-233.
 
 ### cartan::lbfgsb
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 using lbfgsb = builtin_lbfgsb<Chain, LimitsPolicy>;
@@ -547,6 +831,7 @@ Reference: Byrd, Lu, Nocedal, Zhu, "A Limited Memory Algorithm for Bound
 
 ### cartan::projected_lm
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename LimitsPolicy = no_limits>
 class projected_lm;
@@ -561,6 +846,7 @@ the bare `projected_lm` already delivers the multi-start behavior.
 
 ### cartan::dls
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 class dls;
@@ -572,6 +858,7 @@ as the smallest singular value drops below a threshold.
 
 ### cartan::newton_raphson
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 class newton_raphson;
@@ -586,6 +873,7 @@ Reference: Nocedal & Wright, *Numerical Optimization*, Ch. 3 (line
 
 ### cartan::argmin_lm
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename LimitsPolicy = no_limits>
 class argmin_lm;
@@ -598,6 +886,7 @@ LM is unconstrained.
 
 ### cartan::argmin_lbfgsb
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 class argmin_lbfgsb;
@@ -610,6 +899,7 @@ Reference: Byrd, Lu, Nocedal, Zhu (1995).
 
 ### cartan::argmin_slsqp
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain,
           typename LimitsPolicy = clamp_limits,
@@ -626,6 +916,7 @@ four-criterion convergence policy in favor of alternatives like
 
 ### cartan::argmin_bobyqa
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 class argmin_bobyqa;
@@ -640,6 +931,7 @@ Reference: Powell, M.J.D., "The BOBYQA Algorithm for Bound Constrained
 
 ### cartan::argmin_projected_gn
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 class argmin_projected_gn;
@@ -649,6 +941,7 @@ argmin-backed projected Gauss-Newton with active-set bounds.
 
 ### cartan::argmin_projected_gradient_gn
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 class argmin_projected_gradient_gn;
@@ -656,28 +949,9 @@ class argmin_projected_gradient_gn;
 
 argmin-backed projected-gradient Gauss-Newton with Armijo backtracking.
 
-### cartan::nlopt_slsqp
-
-```cpp
-template <chain Chain, typename LimitsPolicy = clamp_limits>
-class nlopt_slsqp;
-```
-
-NLopt SLSQP solver. Same algorithm as `argmin_slsqp` but backed by
-NLopt. Guarded by `CARTAN_HAS_NLOPT`.
-
-### cartan::nlopt_bobyqa
-
-```cpp
-template <chain Chain, typename LimitsPolicy = clamp_limits>
-class nlopt_bobyqa;
-```
-
-NLopt BOBYQA solver. Same algorithm as `argmin_bobyqa` but backed by
-NLopt. Guarded by `CARTAN_HAS_NLOPT`.
-
 ### cartan::nw_sqp
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 class nw_sqp;
@@ -689,6 +963,7 @@ Reference: Nocedal & Wright, *Numerical Optimization*, Ch. 18 (SQP).
 
 ### cartan::filter_nw_sqp
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 class filter_nw_sqp;
@@ -698,6 +973,7 @@ argmin-backed filter Nocedal-Wright SQP.
 
 ### cartan::filter_slsqp
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 class filter_slsqp;
@@ -707,6 +983,7 @@ argmin-backed filter SLSQP with box constraints.
 
 ### cartan::mma
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 class mma;
@@ -714,31 +991,9 @@ class mma;
 
 argmin-backed Method of Moving Asymptotes.
 
-### cartan::gcmma
-
-```cpp
-template <chain Chain, typename LimitsPolicy = clamp_limits>
-class gcmma;
-```
-
-argmin-backed Globally Convergent MMA. Extends MMA with per-component
-conservativity coefficients that grow on non-conservative inner-loop
-trials and decay between outer iterations, yielding the global
-convergence guarantee.
-
-### cartan::cmaes
-
-```cpp
-template <chain Chain, typename LimitsPolicy = clamp_limits>
-class cmaes;
-```
-
-argmin-backed Covariance Matrix Adaptation Evolution Strategy.
-Derivative-free, population-based; useful when the analytical gradient
-is unavailable or unreliable.
-
 ### cartan::augmented_lagrangian
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename LimitsPolicy = clamp_limits>
 class augmented_lagrangian;
@@ -748,6 +1003,7 @@ argmin-backed augmented Lagrangian solver for constrained IK.
 
 ## restart_wrapper
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 namespace cartan {
 
@@ -762,7 +1018,15 @@ class restart_wrapper;
 Restart wrapper around any inner policy satisfying `solve_policy`. When
 the inner policy reports `stalled`, `diverged`, or `iteration_limit`, the
 wrapper generates a new seed configuration from a Halton sequence and
-re-initializes the inner policy. The best damping parameter (lambda)
+re-initializes the inner policy. A rejected seed or target is not one of those:
+every `setup()` overload validates its arguments and latches the terminal status
+in the wrapper, so `step()` returns `dimension_mismatch` or `non_finite_input`
+unchanged without consuming a restart, and `restarts()` stays at zero. A later
+well-formed `setup()` clears the latch, so a wrapper that refused one call is
+still usable. `converged()`, `solution()` and `error_norm()` read through the
+same latch: a refused setup ran no attempt, so they report `false`, a zero
+configuration and `numeric_limits<scalar_type>::max()` rather than the previous
+solve's answer. The best damping parameter (lambda)
 from near-miss attempts is preserved across restarts for warm-starting
 (when the inner policy supports `set_lambda()`/`lambda()`). Budgets via
 the work-unit contract: the restart event itself charges zero additional
@@ -780,6 +1044,7 @@ Reference: Beeson & Ames, "TRAC-IK", 2015 (multi-start strategy).
 
 ### exhaustive_ik_runner
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename Policy>
     requires cartan::solve_policy<Policy>
@@ -791,6 +1056,7 @@ enumeration, deduplicating by joint-space proximity.
 
 ### exhaustive_options
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar = double>
 struct exhaustive_options
@@ -807,19 +1073,28 @@ struct exhaustive_options
 
 ### exhaustive_result
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Scalar = double, int N = dynamic>
 struct exhaustive_result
 {
     std::vector<ik_result<Scalar, N>> solutions;
+    std::optional<ik_failure> failure{};
     int restarts_attempted{};
     int solutions_before_dedup{};
     int fk_validations_failed{};
 };
 ```
 
+`failure` is engaged only when the enumeration was refused before it could run:
+a seed of the wrong length, or a nonfinite seed or target. The runner returns at
+once in that case rather than working through the remaining seeds, so
+`restarts_attempted` is 1. An enumeration that ran and found nothing reports an
+empty `solutions` with no `failure`, which is a different answer.
+
 ### ranking_strategy
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 enum class ranking_strategy
 {
@@ -843,6 +1118,7 @@ FK-based validation free functions for IK results. Both live in
 
 ### verify_solution
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain>
 bool verify_solution(
@@ -852,14 +1128,16 @@ bool verify_solution(
     const convergence_criteria<typename Chain::scalar_type>& criteria);
 ```
 
-Recomputes forward kinematics at `q`, takes the body-frame log of
-`fk.end_effector.inverse() * target`, and returns `true` iff the
-orientation and position components are both below the corresponding
-tolerances in `criteria`. Used by `exhaustive_ik_runner` and by callers
+Recomputes forward kinematics at `q` through the checked entry point, takes the
+body-frame log of `fk.end_effector.inverse() * target`, and returns `true` iff
+the orientation and position components are both below the corresponding
+tolerances in `criteria`. A `q` the boundary refuses -- wrong length, or holding
+a NaN or an infinity -- is not verified: the function returns `false`. Used by `exhaustive_ik_runner` and by callers
 building custom multi-start drivers that need an explicit FK back-check.
 
 ### filter_valid_solutions
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain, typename Scalar, int N>
 std::vector<ik_result<Scalar, N>> filter_valid_solutions(

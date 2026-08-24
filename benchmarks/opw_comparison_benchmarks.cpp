@@ -167,7 +167,14 @@ opw_fixture build_fixture()
         Eigen::Vector<double, 6> q;
         for (int j = 0; j < 6; ++j)
             q(j) = dist(rng);
-        auto pose = cartan::forward_kinematics(chain, q).end_effector;
+        auto fk = cartan::forward_kinematics(chain, q);
+        if (!fk)
+        {
+            std::cerr << "fixture build: cartan FK refused a drawn configuration: "
+                      << cartan::message(fk.error()) << '\n';
+            std::abort();
+        }
+        auto pose = fk->end_effector;
         targets.push_back(pose);
         iso_targets.push_back(se3_to_isometry(pose));
     }
@@ -249,10 +256,13 @@ parity_stats run_parity(const opw_fixture& fx)
             if (!finite)
                 continue;
 
-            const auto fk = cartan::forward_kinematics(fx.chain, q).end_effector;
-            const double pe = (fk.translation() - target.translation()).norm();
+            const auto fk = cartan::forward_kinematics(fx.chain, q);
+            if (!fk)
+                continue;
+            const auto& pose = fk->end_effector;
+            const double pe = (pose.translation() - target.translation()).norm();
             const double oe =
-                (fk.rotation().inverse() * target.rotation()).log().norm();
+                (pose.rotation().inverse() * target.rotation()).log().norm();
             if (std::max(pe, oe) > verify_tol)
                 continue;
 

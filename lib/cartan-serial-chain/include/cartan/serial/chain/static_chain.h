@@ -9,42 +9,25 @@
 /// dispatch and specialization in FK/Jacobian/IK while retaining full
 /// runtime flexibility for link geometry.
 
-#include "cartan/serial/chain/joint_kind.h"
 #include "cartan/serial/chain/joint_tags.h"
 #include "cartan/serial/chain/screw_axis.h"
-#include "cartan/serial/chain/joint_limits.h"
 #include "cartan/serial/chain/chain_concept.h"
+#include "cartan/serial/chain/chain_failure.h"
+#include "cartan/serial/chain/joint_limits.h"
+
+#include "cartan/serial/chain/detail/tag_axis_check.h"
 
 #include "cartan/lie/se3.h"
 
+#include "cartan/expected.h"
+
 #include <array>
-#include <tuple>
-#include <cassert>
 #include <cstddef>
 #include <utility>
-#include <concepts>
 #include <type_traits>
 
 namespace cartan
 {
-
-namespace detail
-{
-
-/// Map a compile-time joint tag to the runtime joint_kind it describes. Used to
-/// check that a static_chain's stored screw axes agree with their tags.
-template <joint_tag Tag>
-constexpr joint_kind tag_joint_kind()
-{
-    if constexpr (std::same_as<Tag, revolute_x>) return joint_kind::revolute_x;
-    else if constexpr (std::same_as<Tag, revolute_y>) return joint_kind::revolute_y;
-    else if constexpr (std::same_as<Tag, revolute_z>) return joint_kind::revolute_z;
-    else if constexpr (std::same_as<Tag, prismatic_x>) return joint_kind::prismatic_x;
-    else if constexpr (std::same_as<Tag, prismatic_y>) return joint_kind::prismatic_y;
-    else return joint_kind::prismatic_z;
-}
-
-}
 
 /// Compile-time parameterized serial kinematic chain.
 ///
@@ -66,33 +49,38 @@ public:
     using limits_storage = std::array<joint_limits<Scalar>, sizeof...(Joints)>;
     using axes_storage = std::array<screw_axis<Scalar>, sizeof...(Joints)>;
 
-    /// Construct a static chain from home configuration, screw axes, and limits.
-    static_chain(
+    /// Validated construction, the only path to a static_chain value.
+    ///
+    /// An axis that contradicts its tag is refused as a value rather than as a
+    /// debug assert: the tag-dispatched evaluation reads the component the tag
+    /// names as the signed magnitude, so a y-axis screw under a revolute_z tag
+    /// silently freezes that joint, and an assert reporting it would vanish
+    /// under the NDEBUG a release build defines. Finiteness is checked here
+    /// because the normalizing screw-axis factories are deliberately
+    /// unvalidated and a chain is the first place that sees all of its axes;
+    /// this is the same reason kinematic_chain validates at construction.
+    ///
+    /// A prismatic tag requires its axis's angular part to be exactly zero,
+    /// which is stricter than screw_axis::from_vector's sqrt-epsilon test for
+    /// the same question: a six-vector with a tiny but nonzero omega is
+    /// accepted there as prismatic and refused here. Deliberate -- the
+    /// prismatic specialization returns a pure translation, so a residual
+    /// rotation it silently drops is the same class of wrong model the tag
+    /// check exists to refuse.
+    static cartan::expected<static_chain, chain_failure> make(
         const se3<Scalar>& home,
         axes_storage axes,
         limits_storage limits)
-        : m_home(home)
-        , m_axes(std::move(axes))
-        , m_limits(std::move(limits))
     {
-        assert(axes_match_tags(m_axes)
-               && "static_chain screw axis contradicts its compile-time joint tag");
-    }
-
-    /// True when every stored screw axis classifies to the joint_kind implied
-    /// by its compile-time tag. A tag/axis mismatch (e.g. a y-axis revolute
-    /// screw under a revolute_z tag) would otherwise be silently mis-evaluated
-    /// by the tag-dispatched FK/Jacobian fast paths, so the constructor asserts
-    /// on this predicate in debug builds.
-    static bool axes_match_tags(const axes_storage& axes)
-    {
-        return [&]<std::size_t... Is>(std::index_sequence<Is...>)
+        if (!home.matrix().allFinite() || !axes_are_finite(axes))
         {
-            using joint_tuple = std::tuple<Joints...>;
-            return (... && (detect_joint_kind(axes[Is])
-                            == detail::tag_joint_kind<
-                                   std::tuple_element_t<Is, joint_tuple>>()));
-        }(std::make_index_sequence<sizeof...(Joints)>{});
+            return cartan::unexpected(chain_failure::non_finite_input);
+        }
+        if (!detail::axes_match_tags_exactly<Scalar, Joints...>(axes))
+        {
+            return cartan::unexpected(chain_failure::tag_axis_contradiction);
+        }
+        return static_chain(home, std::move(axes), std::move(limits));
     }
 
     /// Home configuration (M matrix): end-effector pose at zero joint angles.
@@ -117,6 +105,28 @@ private:
     se3<Scalar> m_home;
     axes_storage m_axes;
     limits_storage m_limits;
+
+    static_chain(
+        const se3<Scalar>& home,
+        axes_storage axes,
+        limits_storage limits)
+        : m_home(home)
+        , m_axes(std::move(axes))
+        , m_limits(std::move(limits))
+    {
+    }
+
+    static bool axes_are_finite(const axes_storage& axes)
+    {
+        for (const auto& axis : axes)
+        {
+            if (!axis.to_vector().allFinite())
+            {
+                return false;
+            }
+        }
+        return true;
+    }
 };
 
 static_assert(chain<static_chain<double, revolute_z, revolute_y, revolute_z>>,

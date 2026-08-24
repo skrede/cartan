@@ -33,8 +33,8 @@ auto random_within_limits(
     for (int i = 0; i < n; ++i)
     {
         const auto& lim = chain.limits()[static_cast<std::size_t>(i)];
-        Scalar lo = lim.position_min;
-        Scalar hi = lim.position_max;
+        Scalar lo = lim.position_min();
+        Scalar hi = lim.position_max();
         if (!std::isfinite(lo)) lo = -Scalar(3.14159265358979);
         if (!std::isfinite(hi)) hi = +Scalar(3.14159265358979);
         std::uniform_real_distribution<Scalar> dist(lo, hi);
@@ -47,8 +47,9 @@ auto random_within_limits(
 
 int main(int argc, char** argv)
 {
-    // Pass your robot's URDF as the first argument; otherwise this walkthrough
-    // loads a synthetic test robot bundled with cartan. The math is identical
+    // Pass your robot's description as the first argument -- a .urdf or a
+    // .urdf.xacro, the loader takes either; otherwise this walkthrough loads a
+    // synthetic test robot bundled with cartan. The math is identical
     // regardless -- try the bundled robot first, then point this at your
     // hardware.
     const std::filesystem::path urdf_file = (argc > 1)
@@ -58,11 +59,12 @@ int main(int argc, char** argv)
     std::cout << "Loading URDF: " << urdf_file << "\n";
 
     // cartan::load_urdf returns cartan::expected<urdf_load_result<Scalar>,
-    // urdf_error>. Surface the parser's diagnostic string on failure so a
-    // broken path or malformed URDF fails loudly under CTest rather than
-    // silently producing a default-constructed chain. The underlying parser
-    // is pugixml-backed; the error.detail message names the line and the
-    // failed schema rule.
+    // urdf_error>. Surface the diagnostic string on failure so a broken path or
+    // malformed description fails loudly under CTest rather than silently
+    // producing a default-constructed chain. The loader is a bridge onto a
+    // description reader that handles both URDF and xacro, so this same call
+    // takes a .urdf.xacro file; error.detail names the failure and
+    // error.location carries the file and line the reader reported it at.
     auto loaded = cartan::load_urdf<double>(urdf_file);
     if (!loaded)
     {
@@ -70,10 +72,9 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    // urdf_load_result is an aggregate -- structured binding peels off the
-    // kinematic_chain<double, cartan::dynamic> and the side-table of names
-    // and inertials. The chain itself is string-free; everything that needs
-    // a name lives in the metadata.
+    // urdf_load_result carries the kinematic_chain<double, cartan::dynamic>
+    // alongside the side-table of names and inertials. The chain itself is
+    // string-free; everything that needs a name lives in the metadata.
     auto& chain = loaded->chain;
     auto& meta  = loaded->metadata;
 
@@ -93,8 +94,19 @@ int main(int argc, char** argv)
     std::mt19937 rng{42};
     auto q_truth = random_within_limits(chain, rng);
 
+    // forward_kinematics validates that q_truth holds one finite component per
+    // joint and returns cartan::expected<fk_result, chain_failure>. The same
+    // branch-and-report shape the URDF load above uses applies here, and
+    // cartan::message turns the typed failure into a diagnostic string.
     auto fk_target = cartan::forward_kinematics(chain, q_truth);
-    auto target = fk_target.end_effector;
+    if (!fk_target.has_value())
+    {
+        std::cerr << "forward_kinematics rejected q_truth: "
+                  << cartan::message(fk_target.error()) << "\n";
+        return 1;
+    }
+
+    auto target = fk_target->end_effector;
 
     std::cout << "Ground-truth q: " << q_truth.transpose() << "\n";
     std::cout << "FK-walked target pose:\n" << target.matrix() << "\n\n";
@@ -125,16 +137,16 @@ int main(int argc, char** argv)
     if (!result.has_value())
     {
         // Convergence failure is a teaching outcome, not a CI failure: the
-        // tutorial exits 0 so CTest does not flag it red. Parser failures
-        // (file-not-found, malformed URDF) above remain non-zero exits since
-        // those indicate a broken build-time path injection.
+        // tutorial exits 0 so CTest does not flag it red. Load failures
+        // (file-not-found, malformed description) above remain non-zero exits
+        // since those indicate a broken build-time path injection.
         std::cout << "IK did not converge -- target may lie outside the "
                      "dexterous workspace; this is a teaching outcome, not a "
                      "hard error.\n";
         return 0;
     }
 
-    auto& sol = result.value();
+    auto& sol = *result;
 
     // --- Step 3: back-verify the solution by FK-walking the recovered q ---
     //
@@ -145,7 +157,14 @@ int main(int argc, char** argv)
     // solver converged to a configuration that genuinely reproduces the
     // target pose, not merely a numerically close joint vector.
     auto fk_verify = cartan::forward_kinematics(chain, sol.solution.position);
-    auto pose_err = (fk_verify.end_effector.inverse() * target).log().norm();
+    if (!fk_verify.has_value())
+    {
+        std::cerr << "forward_kinematics rejected the recovered configuration: "
+                  << cartan::message(fk_verify.error()) << "\n";
+        return 1;
+    }
+
+    auto pose_err = (fk_verify->end_effector.inverse() * target).log().norm();
 
     std::cout << "IK converged in " << sol.iterations << " iterations\n";
     std::cout << "Recovered q:   " << sol.solution.position.transpose() << "\n";

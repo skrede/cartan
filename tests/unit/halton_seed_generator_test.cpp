@@ -8,6 +8,8 @@
 #include <cartan/serial/chain/joint_limits.h>
 #include <cartan/serial/chain/kinematic_chain.h>
 
+#include "../support/joint_limits_helpers.h"
+
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
@@ -33,7 +35,8 @@ static spp::kinematic_chain<double, 6> make_ur5_like_chain()
     home_trans << 0.817, 0.191, -0.006;
     auto home = spp::se3<double>(spp::so3<double>::identity(), home_trans);
 
-    spp::joint_limits<double> lim{-2 * std::numbers::pi, 2 * std::numbers::pi};
+    auto lim = spp::testing::limits(
+        -2 * std::numbers::pi, 2 * std::numbers::pi);
     return spp::kinematic_chain<double, 6>(home, {s1, s2, s3, s4, s5, s6},
                                   {lim, lim, lim, lim, lim, lim});
 }
@@ -68,7 +71,7 @@ TEST_CASE("halton_element base 3 values", "[halton][element]")
 TEST_CASE("halton_seed_generator produces seeds within limits", "[halton][generator]")
 {
     auto chain = make_ur5_like_chain();
-    spp::halton_seed_generator<spp::kinematic_chain<double, 6>> gen(chain);
+    spp::halton_seed_generator<spp::kinematic_chain<double, 6>> gen(chain, Eigen::Vector<double, 6>::Zero());
 
     for (int i = 0; i < 100; ++i)
     {
@@ -77,8 +80,8 @@ TEST_CASE("halton_seed_generator produces seeds within limits", "[halton][genera
         for (int j = 0; j < 6; ++j)
         {
             auto lim = chain.limits()[static_cast<std::size_t>(j)];
-            CHECK(seed[j] >= lim.position_min);
-            CHECK(seed[j] <= lim.position_max);
+            CHECK(seed[j] >= lim.position_min());
+            CHECK(seed[j] <= lim.position_max());
         }
     }
 }
@@ -86,7 +89,7 @@ TEST_CASE("halton_seed_generator produces seeds within limits", "[halton][genera
 TEST_CASE("halton_seed_generator is deterministic", "[halton][generator]")
 {
     auto chain = make_ur5_like_chain();
-    spp::halton_seed_generator<spp::kinematic_chain<double, 6>> gen(chain);
+    spp::halton_seed_generator<spp::kinematic_chain<double, 6>> gen(chain, Eigen::Vector<double, 6>::Zero());
 
     auto seed_a = gen(42);
     auto seed_b = gen(42);
@@ -100,7 +103,7 @@ TEST_CASE("halton_seed_generator is deterministic", "[halton][generator]")
 TEST_CASE("halton_seed_generator seeds have low discrepancy", "[halton][generator]")
 {
     auto chain = make_ur5_like_chain();
-    spp::halton_seed_generator<spp::kinematic_chain<double, 6>> gen(chain);
+    spp::halton_seed_generator<spp::kinematic_chain<double, 6>> gen(chain, Eigen::Vector<double, 6>::Zero());
 
     // Generate seeds at indices 21-30 and check no two are within epsilon
     std::vector<Eigen::Vector<double, 6>> seeds;
@@ -130,7 +133,7 @@ TEST_CASE("halton_seed_generator handles more than ten joints", "[halton][genera
     const int n = chain.num_joints();
     REQUIRE(n == 12);
 
-    spp::halton_seed_generator<spp::kinematic_chain<double, spp::dynamic>> gen(chain);
+    spp::halton_seed_generator<spp::kinematic_chain<double, spp::dynamic>> gen(chain, Eigen::VectorXd::Zero(n));
 
     for (int i = 0; i < 32; ++i)
     {
@@ -139,8 +142,8 @@ TEST_CASE("halton_seed_generator handles more than ten joints", "[halton][genera
         for (int j = 0; j < n; ++j)
         {
             auto lim = chain.limits()[static_cast<std::size_t>(j)];
-            CHECK(seed[j] >= lim.position_min);
-            CHECK(seed[j] <= lim.position_max);
+            CHECK(seed[j] >= lim.position_min());
+            CHECK(seed[j] <= lim.position_max());
         }
     }
 }

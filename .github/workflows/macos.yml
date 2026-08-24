@@ -8,7 +8,7 @@ on:
       - "docs/**"
       - ".planning/**"
   pull_request:
-    branches: [master,develop]
+    branches: [master]
     paths-ignore:
       - "**.md"
       - "docs/**"
@@ -24,51 +24,140 @@ jobs:
     runs-on: macos-14
     name: build (Xcode ${{ matrix.xcode }})
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Select Xcode ${{ matrix.xcode }}
         run: sudo xcode-select -s /Applications/Xcode_${{ matrix.xcode }}.app
 
+      # The exclusion list for the examples is empty: every example and tutorial
+      # is built here and the three tutorials run as registered tests. Nothing is
+      # skipped for being known broken.
       - name: Configure
         run: |
-          # argmin is an optional additive backend not yet embeddable via
-          # FetchContent (its CMake requires an installed Eigen3 config), so CI
-          # builds native-only. Restore -DCARTAN_BUILD_ARGMIN=ON when embeddable.
+          set -eu
           cmake . -B build -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_CXX_FLAGS="-Werror" \
+            -DCARTAN_WERROR=ON \
             -DCARTAN_BUILD_TESTS=ON \
-            -DCARTAN_BUILD_EXAMPLES=OFF \
+            -DCARTAN_BUILD_EXAMPLES=ON \
+            -DCARTAN_BUILD_URDF=ON \
             -DCARTAN_CMAKE_FETCH_DEPS=ON
 
       - name: Build
         run: cmake --build build
 
       - name: Test
-        run: cd build && ctest --output-on-failure
+        run: cd build && ctest --output-on-failure --no-tests=error
+
+  # cartan's own suite and its warnings-as-errors build are exercised on arm64
+  # only; consumability.yml reaches x86_64 macOS through the published
+  # FetchContent recipe alone, so a codegen or diagnostic difference inside the
+  # library would not surface there. This leg becomes vacuous the moment the
+  # macos-15-intel label is repointed at arm64 hardware -- it would keep passing
+  # while retesting arm64 -- which is what the architecture check guards against.
+  #
+  # No Xcode is selected: the release the arm64 matrix pins is absent from this
+  # image, and the question this leg asks is the architecture, not the compiler
+  # release. Whatever toolchain the image ships is printed instead.
+  build-intel:
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Record the toolchain this image ships
+        run: |
+          set -eu
+          cc --version
+          cmake --version
+          sw_vers
+          uname -m
+
+      - name: Confirm the runner is x86_64
+        run: |
+          set -eu
+          arch="$(uname -m)"
+          if [ "${arch}" != "x86_64" ]; then
+            echo "the runner reports ${arch}, not x86_64; this lane tests nothing" >&2
+            exit 1
+          fi
+
+      - name: Configure
+        run: |
+          set -eu
+          cmake . -B build -DCMAKE_BUILD_TYPE=Release \
+            -DCARTAN_WERROR=ON \
+            -DCARTAN_BUILD_TESTS=ON \
+            -DCARTAN_BUILD_EXAMPLES=ON \
+            -DCARTAN_BUILD_URDF=ON \
+            -DCARTAN_CMAKE_FETCH_DEPS=ON
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        run: cd build && ctest --output-on-failure --no-tests=error
 
   install-test:
     runs-on: macos-14
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Install Eigen
-        run: brew install eigen
+      - name: Install Eigen and NLopt
+        run: brew install eigen nlopt
 
-      - name: Build and install
+      # The matrix installs, relocates and consumes cartan in every configuration
+      # it covers, including the backend cells, so the job needs nothing built
+      # here: each cell drives its own trees from the checkout.
+      - name: Configure the install matrix
         run: |
+          set -eu
           cmake . -B build -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install \
+            -DCARTAN_BUILD_PACKAGING_TESTS=ON \
+            -DCARTAN_BUILD_NETWORK_TESTS=ON \
             -DCARTAN_CMAKE_FETCH_DEPS=OFF
-          cmake --build build
-          cmake --install build
 
-      - name: Build consumer
-        run: |
-          cmake tests/integration/consumer -B build-consumer \
-            -DCMAKE_PREFIX_PATH=${{ github.workspace }}/install \
-            -DCMAKE_BUILD_TYPE=Release
-          cmake --build build-consumer
+      - name: Install, relocate and consume
+        run: ctest --test-dir build -R install_matrix --output-on-failure --no-tests=error
 
-      - name: Run consumer test
+  # The find_package half of the same commitment, which the arm64 job covers for
+  # Apple Silicon alone. brew --prefix is recorded because nothing here sets
+  # CMAKE_PREFIX_PATH: discovery rests on CMake's Darwin platform module
+  # prepending the Homebrew prefix to the system prefix path, /usr/local on Intel
+  # against /opt/homebrew on arm64, and the log is where that assumption is
+  # either confirmed or refuted. The architecture check guards the same
+  # repointed-label failure as the build leg above.
+  install-test-intel:
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Record the toolchain this image ships
         run: |
-          ./build-consumer/integration_test
+          set -eu
+          cc --version
+          cmake --version
+          sw_vers
+          uname -m
+          brew --prefix
+
+      - name: Confirm the runner is x86_64
+        run: |
+          set -eu
+          arch="$(uname -m)"
+          if [ "${arch}" != "x86_64" ]; then
+            echo "the runner reports ${arch}, not x86_64; this lane tests nothing" >&2
+            exit 1
+          fi
+
+      - name: Install Eigen and NLopt
+        run: brew install eigen nlopt
+
+      - name: Configure the install matrix
+        run: |
+          set -eu
+          cmake . -B build -DCMAKE_BUILD_TYPE=Release \
+            -DCARTAN_BUILD_PACKAGING_TESTS=ON \
+            -DCARTAN_BUILD_NETWORK_TESTS=ON \
+            -DCARTAN_CMAKE_FETCH_DEPS=OFF
+
+      - name: Install, relocate and consume
+        run: ctest --test-dir build -R install_matrix --output-on-failure --no-tests=error

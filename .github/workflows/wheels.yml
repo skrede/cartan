@@ -8,7 +8,7 @@ on:
       - "docs/**"
       - ".planning/**"
   pull_request:
-    branches: [master, develop]
+    branches: [master]
     paths-ignore:
       - "**.md"
       - "docs/**"
@@ -25,11 +25,15 @@ on:
           - limited
           - smoke
           - auto
-      publish_pypi:
-        description: "Publish the built wheels to PyPI (production release). Bump the version in pyproject.toml first; runs the full matrix and only from master."
+      publish:
+        description: "Publish target. testpypi: any branch, uploads <version>.dev<run>. pypi: master only, uploads the real version -- bump pyproject.toml first. Either forces the full matrix."
         required: false
-        default: false
-        type: boolean
+        default: none
+        type: choice
+        options:
+          - none
+          - testpypi
+          - pypi
   schedule:
     # Weekly full-matrix drift check: catches runner-image / toolchain changes
     # that turn a green build red with no code change. Scheduled runs use the
@@ -41,7 +45,7 @@ permissions:
 
 env:
   CIBW_BUILD: "cp310-* cp311-* cp312-* cp313-* cp314-*"
-  CIBW_SKIP: "cp3??t-* pp* *-musllinux_* *-win32 *-manylinux_i686"
+  CIBW_SKIP: "cp3??t-* *-musllinux_* *-win32 *-manylinux_i686"
   # numpy is intentionally omitted: the wheel's own runtime dependency already
   # pins numpy>=1.23,<2.5, and a bare "<" here is parsed as stdin redirection by
   # the Windows test shell, breaking the wheel test step.
@@ -94,9 +98,9 @@ jobs:
           ref='${{ github.ref }}'
           base='${{ github.base_ref }}'
           requested='${{ github.event.inputs.tier }}'
-          publish='${{ github.event.inputs.publish_pypi }}'
+          publish='${{ github.event.inputs.publish }}'
 
-          if [ "$event" = "workflow_dispatch" ] && [ "$publish" = "true" ]; then
+          if [ "$event" = "workflow_dispatch" ] && [ "$publish" != "none" ] && [ -n "$publish" ]; then
             tier="full"
           elif [ "$event" = "workflow_dispatch" ] && [ "$requested" != "auto" ]; then
             tier="$requested"
@@ -185,9 +189,9 @@ jobs:
       CIBW_MANYLINUX_X86_64_IMAGE: ${{ matrix.manylinux_image }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
 
@@ -213,7 +217,7 @@ jobs:
             --require-no-libgcc-s
 
       - name: Upload baseline probe artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: baseline-probe-${{ matrix.manylinux_image }}
           path: |
@@ -232,9 +236,9 @@ jobs:
       CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
 
@@ -264,7 +268,7 @@ jobs:
           mkdir -p reports
           python tools/wheel_abi_bench.py --repeats 5 --iterations 1000 > reports/per-cpython-cp312.json
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
 
@@ -277,7 +281,7 @@ jobs:
           python -m pip install --no-index --find-links wheelhouse-abi3 --no-deps cartan-bindings
           python tools/wheel_abi_bench.py --repeats 5 --iterations 1000 > reports/abi3-cp312.json
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13"
 
@@ -292,7 +296,7 @@ jobs:
           python -m pip install --no-index --find-links wheelhouse-abi3 --no-deps cartan-bindings
           python -m pytest python/tests/test_wheel_smoke.py -q
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14"
 
@@ -352,7 +356,7 @@ jobs:
 
       - name: Upload ABI probe artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: abi3-probe
           path: |
@@ -376,13 +380,20 @@ jobs:
       CIBW_MANYLINUX_AARCH64_IMAGE: ${{ matrix.manylinux_image }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # TestPyPI needs a unique PEP 440 dev version per run; inject it before
-      # cibuildwheel reads pyproject.toml so the wheels carry it. develop only.
+      # cibuildwheel reads pyproject.toml so the wheels carry it. Without this a
+      # rehearsal would consume the real version number on TestPyPI, which
+      # refuses re-upload of a version for good.
       - name: Inject dev version for TestPyPI
-        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
-        run: sed -i -E 's/^version = "([^"]+)"/version = "\1.dev${{ github.run_number }}"/' pyproject.toml
+        if: github.event.inputs.publish == 'testpypi'
+        # BSD sed reads the argument after -i as the backup suffix, so the
+        # suffix must be attached or -E is swallowed and \1 goes undefined.
+        shell: bash
+        run: |
+          sed -i.bak -E 's/^version = "([^"]+)"/version = "\1.dev${{ github.run_number }}"/' pyproject.toml
+          rm -f pyproject.toml.bak
 
       - name: Build wheels
         uses: pypa/cibuildwheel@v3.4.1
@@ -390,7 +401,7 @@ jobs:
           output-dir: wheelhouse
 
       - name: Upload wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: wheels-${{ matrix.name }}
           path: wheelhouse/*.whl
@@ -405,14 +416,14 @@ jobs:
       matrix: ${{ fromJSON(needs.select.outputs.artifact_test_matrix) }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
 
       - name: Download wheel artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: downloaded-wheels
           pattern: wheels-*
@@ -442,14 +453,14 @@ jobs:
       matrix: ${{ fromJSON(needs.select.outputs.numpy_matrix) }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Download wheel artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: downloaded-wheels
           pattern: wheels-linux-x86_64-*
@@ -484,10 +495,10 @@ jobs:
       matrix: ${{ fromJSON(needs.select.outputs.portability_matrix) }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Download Linux wheel artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: downloaded-wheels
           pattern: wheels-linux-x86_64-*
@@ -504,7 +515,7 @@ jobs:
             | tee reports/${{ matrix.name }}.log
 
       - name: Upload portability report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: linux-portability-smoke-${{ matrix.name }}
           path: reports/*.log
@@ -512,32 +523,37 @@ jobs:
   sdist:
     if: >-
       (github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/master')) ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_pypi == 'true' && github.ref == 'refs/heads/master')
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.publish != 'none')
     name: build sdist
     needs: select
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
 
       - name: Inject dev version for TestPyPI
-        if: github.ref == 'refs/heads/develop'
-        run: sed -i -E 's/^version = "([^"]+)"/version = "\1.dev${{ github.run_number }}"/' pyproject.toml
+        if: github.event.inputs.publish == 'testpypi'
+        # BSD sed reads the argument after -i as the backup suffix, so the
+        # suffix must be attached or -E is swallowed and \1 goes undefined.
+        shell: bash
+        run: |
+          sed -i.bak -E 's/^version = "([^"]+)"/version = "\1.dev${{ github.run_number }}"/' pyproject.toml
+          rm -f pyproject.toml.bak
 
       - name: Build sdist
         run: pipx run build --sdist
 
       - name: Upload sdist
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: sdist
           path: dist/*.tar.gz
 
   publish-testpypi:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'testpypi'
     name: publish to TestPyPI
     needs: [select, build-wheels, test-wheel-artifacts, sdist]
     runs-on: ubuntu-latest
@@ -546,25 +562,29 @@ jobs:
       id-token: write
     steps:
       - name: Download built wheels
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: dist
           pattern: wheels-*
           merge-multiple: true
 
       - name: Download sdist
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: sdist
           path: dist
 
+      # Rehearsals are manual: dispatch this workflow with publish=testpypi from
+      # any branch. The version carries a .dev<run> suffix, so no upload can
+      # collide with another or be mistaken for a release.
       - name: Publish to TestPyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
+          skip-existing: true
 
   publish-pypi:
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish_pypi == 'true' && github.ref == 'refs/heads/master'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'pypi' && github.ref == 'refs/heads/master'
     name: publish to PyPI
     needs: [select, build-wheels, test-wheel-artifacts, sdist]
     runs-on: ubuntu-latest
@@ -573,21 +593,21 @@ jobs:
       id-token: write
     steps:
       - name: Download built wheels
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: dist
           pattern: wheels-*
           merge-multiple: true
 
       - name: Download sdist
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: sdist
           path: dist
 
       # Releases are manual: dispatch this workflow from master with
-      # publish_pypi=true after bumping the version in pyproject.toml. No push
-      # or PR publishes. skip-existing keeps a re-dispatched unchanged version a
+      # publish=pypi after bumping the version in pyproject.toml. No push or PR
+      # publishes. skip-existing keeps a re-dispatched unchanged version a
       # no-op rather than failing on PyPI's rule against re-uploading a version.
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1

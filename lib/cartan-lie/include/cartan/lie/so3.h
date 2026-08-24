@@ -281,6 +281,11 @@ public:
     static cartan::expected<so3, lie_failure>
     from_matrix(const matrix3<Scalar>& R)
     {
+        if (!R.allFinite())
+        {
+            return cartan::unexpected(lie_failure::non_finite_input);
+        }
+
         Scalar tol = detail::sqrt_epsilon_v<Scalar>;
 
         matrix3<Scalar> RtR = R.transpose() * R;
@@ -303,6 +308,11 @@ public:
     static cartan::expected<so3, lie_failure>
     from_quaternion(const quaternion<Scalar>& q)
     {
+        if (!q.coeffs().allFinite())
+        {
+            return cartan::unexpected(lie_failure::non_finite_input);
+        }
+
         if (std::abs(q.squaredNorm() - Scalar(1)) > detail::sqrt_epsilon_v<Scalar>)
         {
             return cartan::unexpected(lie_failure::non_unit_quaternion);

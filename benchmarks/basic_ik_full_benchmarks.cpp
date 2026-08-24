@@ -7,7 +7,7 @@
 /// (speed, convergence, restart+LM, Newton-Raphson, Gauss-Newton, aggressive
 /// L-BFGS-B), the variadic racing solver, and TRAC-IK baseline.
 ///
-/// NLopt solvers (BOBYQA, SLSQP) are gated behind CARTAN_HAS_NLOPT.
+/// NLopt solvers (BOBYQA, SLSQP) are gated behind CARTAN_EXAMPLE_HAS_NLOPT.
 ///
 /// Target count: 1,000 (full matrix with 9 robots x 12+ configs; 10,000 would
 /// take prohibitively long for a single benchmark run).
@@ -25,7 +25,7 @@
 #include <cartan/serial/ik/solver/newton_raphson.h>
 #include <cartan/serial/ik/solvers.h>
 
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 #include <cartan/serial/ik/solver/argmin_slsqp.h>
 #include <cartan/serial/ik/solver/nw_sqp.h>
 #include <cartan/serial/ik/solver/argmin_lm.h>
@@ -37,9 +37,9 @@
 #include <cartan/serial/ik/solver/argmin_projected_gradient_gn.h>
 #endif
 
-#ifdef CARTAN_HAS_NLOPT
-#include <cartan/serial/ik/solver/nlopt_bobyqa.h>
-#include <cartan/serial/ik/solver/nlopt_slsqp.h>
+#ifdef CARTAN_EXAMPLE_HAS_NLOPT
+#include <cartan_examples/nlopt/nlopt_bobyqa.h>
+#include <cartan_examples/nlopt/nlopt_slsqp.h>
 #endif
 
 #include <trac_ik/trac_ik.hpp>
@@ -171,8 +171,7 @@ template <int N, typename Solver>
 void bm_racing_solver(
     benchmark::State& state,
     const cartan::kinematic_chain<double, N>& chain,
-    const target_set<double, N>& ts,
-    int max_total_iterations)
+    const target_set<double, N>& ts)
 {
     cartan::convergence_criteria<double> criteria{
         .position_tol               = 1e-5,
@@ -197,7 +196,6 @@ void bm_racing_solver(
 
         Solver solver;
         cartan::solver_options<double> opts;
-        opts.max_total_iterations = max_total_iterations;
         opts.halton_seed = static_cast<unsigned int>(idx);
         solver.setup(chain, target, q0, criteria, opts);
         auto result = solver.solve();
@@ -584,21 +582,21 @@ template <int N>
 using nr_ik_solver = cartan::basic_ik_runner<nr_restart<N>>;
 
 // NLopt solvers
-#ifdef CARTAN_HAS_NLOPT
+#ifdef CARTAN_EXAMPLE_HAS_NLOPT
 template <int N>
-using bobyqa_restart = cartan::restart_wrapper<chain_t<N>, cartan::nlopt_bobyqa<chain_t<N>>>;
+using bobyqa_restart = cartan::restart_wrapper<chain_t<N>, cartan_examples::nlopt_bobyqa<chain_t<N>>>;
 
 template <int N>
 using bobyqa_ik_solver = cartan::basic_ik_runner<bobyqa_restart<N>>;
 
 template <int N>
-using slsqp_restart = cartan::restart_wrapper<chain_t<N>, cartan::nlopt_slsqp<chain_t<N>>>;
+using slsqp_restart = cartan::restart_wrapper<chain_t<N>, cartan_examples::nlopt_slsqp<chain_t<N>>>;
 
 template <int N>
 using slsqp_ik_solver = cartan::basic_ik_runner<slsqp_restart<N>>;
 #endif
 
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 // argmin solvers (available when argmin is built)
 template <int N>
 using argmin_slsqp_restart = cartan::restart_wrapper<chain_t<N>, cartan::argmin_slsqp<chain_t<N>>>;
@@ -687,7 +685,7 @@ inline cartan::convergence_criteria<double> bobyqa_criteria()
     { return {.position_tol = 1e-5, .orientation_tol = 1e-5, .max_iterations_per_attempt = 500, .max_total_work_units = 500}; }
 inline cartan::convergence_criteria<double> slsqp_criteria()
     { return {.position_tol = 1e-5, .orientation_tol = 1e-5, .max_iterations_per_attempt = 500, .max_total_work_units = 500}; }
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 inline cartan::convergence_criteria<double> argmin_slsqp_criteria()
     { return {.position_tol = 1e-5, .orientation_tol = 1e-5, .max_iterations_per_attempt = 500, .max_total_work_units = 500}; }
 inline cartan::convergence_criteria<double> argmin_lbfgsb_criteria()
@@ -801,27 +799,26 @@ static void bm_full_##ROBOT##_cartan_racing(benchmark::State& state)            
 {                                                                                                    \
     auto chain = cartan::fixtures::CHAIN_FN<double>();                                              \
     static const target_set<double, 6> ts(chain, num_targets, 42);                                   \
-    bm_racing_solver<6, racing_solver<6>>(state, chain, ts, 1000);                                \
+    bm_racing_solver<6, racing_solver<6>>(state, chain, ts);                                     \
 }                                                                                                    \
 BENCHMARK(bm_full_##ROBOT##_cartan_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 // Register TRAC-IK baseline for a 6-DOF robot.
-// ROBOT: lowercase name, KDL_FN: KDL chain factory, LIMITS_FN: KDL limits factory
-#define REGISTER_6DOF_TRAC_IK(ROBOT, CHAIN_FN, KDL_FN, LIMITS_FN)                                   \
+#define REGISTER_6DOF_TRAC_IK(ROBOT, CHAIN_FN, KDL_FN)                                              \
                                                                                                      \
 static void bm_full_##ROBOT##_trac_ik(benchmark::State& state)                                    \
 {                                                                                                    \
     auto cartan_chain = cartan::fixtures::CHAIN_FN<double>();                                        \
     auto kdl_chain = cartan::fixtures::KDL_FN();                                                    \
     KDL::JntArray q_min(6), q_max(6);                                                                \
-    cartan::fixtures::LIMITS_FN(q_min, q_max);                                                      \
+    cartan::fixtures::kdl_bounds_from<6>(cartan_chain, q_min, q_max);                                \
     static const target_set<double, 6> ts(cartan_chain, num_targets, 42);                             \
     bm_trac_ik_baseline<6>(state, cartan_chain, kdl_chain, q_min, q_max, ts);                         \
 }                                                                                                    \
 BENCHMARK(bm_full_##ROBOT##_trac_ik)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 // Register NLopt solver benchmarks for a 6-DOF robot.
-#ifdef CARTAN_HAS_NLOPT
+#ifdef CARTAN_EXAMPLE_HAS_NLOPT
 #define REGISTER_6DOF_NLOPT(ROBOT, CHAIN_FN)                                                         \
                                                                                                      \
 static void bm_full_##ROBOT##_nlopt_bobyqa(benchmark::State& state)                                     \
@@ -843,7 +840,7 @@ BENCHMARK(bm_full_##ROBOT##_nlopt_slsqp)->Iterations(1000)->Unit(benchmark::kMic
 #define REGISTER_6DOF_NLOPT(ROBOT, CHAIN_FN)
 #endif
 
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 // Register argmin solver benchmarks for a 6-DOF robot.
 #define REGISTER_6DOF_ARGMIN(ROBOT, CHAIN_FN)                                                        \
                                                                                                       \
@@ -1011,26 +1008,26 @@ static void bm_full_##ROBOT##_cartan_racing(benchmark::State& state)            
 {                                                                                                    \
     auto chain = cartan::fixtures::CHAIN_FN<double>();                                              \
     static const target_set<double, 7> ts(chain, num_targets, 42);                                   \
-    bm_racing_solver<7, racing_solver<7>>(state, chain, ts, 1000);                                \
+    bm_racing_solver<7, racing_solver<7>>(state, chain, ts);                                     \
 }                                                                                                    \
 BENCHMARK(bm_full_##ROBOT##_cartan_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 // Register TRAC-IK baseline for a 7-DOF robot.
-#define REGISTER_7DOF_TRAC_IK(ROBOT, CHAIN_FN, KDL_FN, LIMITS_FN)                                   \
+#define REGISTER_7DOF_TRAC_IK(ROBOT, CHAIN_FN, KDL_FN)                                              \
                                                                                                      \
 static void bm_full_##ROBOT##_trac_ik(benchmark::State& state)                                    \
 {                                                                                                    \
     auto cartan_chain = cartan::fixtures::CHAIN_FN<double>();                                        \
     auto kdl_chain = cartan::fixtures::KDL_FN();                                                    \
     KDL::JntArray q_min(7), q_max(7);                                                                \
-    cartan::fixtures::LIMITS_FN(q_min, q_max);                                                      \
+    cartan::fixtures::kdl_bounds_from<7>(cartan_chain, q_min, q_max);                                \
     static const target_set<double, 7> ts(cartan_chain, num_targets, 42);                             \
     bm_trac_ik_baseline<7>(state, cartan_chain, kdl_chain, q_min, q_max, ts);                         \
 }                                                                                                    \
 BENCHMARK(bm_full_##ROBOT##_trac_ik)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
 // Register NLopt solver benchmarks for a 7-DOF robot.
-#ifdef CARTAN_HAS_NLOPT
+#ifdef CARTAN_EXAMPLE_HAS_NLOPT
 #define REGISTER_7DOF_NLOPT(ROBOT, CHAIN_FN)                                                         \
                                                                                                      \
 static void bm_full_##ROBOT##_nlopt_bobyqa(benchmark::State& state)                                     \
@@ -1052,7 +1049,7 @@ BENCHMARK(bm_full_##ROBOT##_nlopt_slsqp)->Iterations(1000)->Unit(benchmark::kMic
 #define REGISTER_7DOF_NLOPT(ROBOT, CHAIN_FN)
 #endif
 
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 // Register argmin solver benchmarks for a 7-DOF robot.
 #define REGISTER_7DOF_ARGMIN(ROBOT, CHAIN_FN)                                                        \
                                                                                                       \
@@ -1138,22 +1135,22 @@ BENCHMARK(bm_full_##ROBOT##_argmin_projected_gradient_gn)->Iterations(1000)->Uni
 // ============================================================================
 
 REGISTER_6DOF_BENCHMARKS(ur3e,       make_ur3e_chain)
-REGISTER_6DOF_TRAC_IK(ur3e,         make_ur3e_chain, make_ur3e_kdl_chain, make_ur3e_kdl_limits)
+REGISTER_6DOF_TRAC_IK(ur3e,         make_ur3e_chain, make_ur3e_kdl_chain)
 REGISTER_6DOF_NLOPT(ur3e,           make_ur3e_chain)
 REGISTER_6DOF_ARGMIN(ur3e,         make_ur3e_chain)
 
 REGISTER_6DOF_BENCHMARKS(kr6_sixx,   make_kr6_sixx_chain)
-REGISTER_6DOF_TRAC_IK(kr6_sixx,     make_kr6_sixx_chain, make_kr6_sixx_kdl_chain, make_kr6_sixx_kdl_limits)
+REGISTER_6DOF_TRAC_IK(kr6_sixx,     make_kr6_sixx_chain, make_kr6_sixx_kdl_chain)
 REGISTER_6DOF_NLOPT(kr6_sixx,       make_kr6_sixx_chain)
 REGISTER_6DOF_ARGMIN(kr6_sixx,     make_kr6_sixx_chain)
 
 REGISTER_6DOF_BENCHMARKS(abb_irb120, make_abb_irb120_chain)
-REGISTER_6DOF_TRAC_IK(abb_irb120,   make_abb_irb120_chain, make_abb_irb120_kdl_chain, make_abb_irb120_kdl_limits)
+REGISTER_6DOF_TRAC_IK(abb_irb120,   make_abb_irb120_chain, make_abb_irb120_kdl_chain)
 REGISTER_6DOF_NLOPT(abb_irb120,     make_abb_irb120_chain)
 REGISTER_6DOF_ARGMIN(abb_irb120,   make_abb_irb120_chain)
 
 REGISTER_6DOF_BENCHMARKS(jaco2,      make_jaco2_chain)
-REGISTER_6DOF_TRAC_IK(jaco2,        make_jaco2_chain, make_jaco2_kdl_chain, make_jaco2_kdl_limits)
+REGISTER_6DOF_TRAC_IK(jaco2,        make_jaco2_chain, make_jaco2_kdl_chain)
 REGISTER_6DOF_NLOPT(jaco2,          make_jaco2_chain)
 REGISTER_6DOF_ARGMIN(jaco2,        make_jaco2_chain)
 
@@ -1162,27 +1159,27 @@ REGISTER_6DOF_ARGMIN(jaco2,        make_jaco2_chain)
 // ============================================================================
 
 REGISTER_7DOF_BENCHMARKS(lbr_med14,  make_lbr_med14_chain)
-REGISTER_7DOF_TRAC_IK(lbr_med14,    make_lbr_med14_chain, make_lbr_med14_kdl_chain, make_lbr_med14_kdl_limits)
+REGISTER_7DOF_TRAC_IK(lbr_med14,    make_lbr_med14_chain, make_lbr_med14_kdl_chain)
 REGISTER_7DOF_NLOPT(lbr_med14,      make_lbr_med14_chain)
 REGISTER_7DOF_ARGMIN(lbr_med14,    make_lbr_med14_chain)
 
 REGISTER_7DOF_BENCHMARKS(panda,      make_panda_chain)
-REGISTER_7DOF_TRAC_IK(panda,        make_panda_chain, make_panda_kdl_chain, make_panda_kdl_limits)
+REGISTER_7DOF_TRAC_IK(panda,        make_panda_chain, make_panda_kdl_chain)
 REGISTER_7DOF_NLOPT(panda,          make_panda_chain)
 REGISTER_7DOF_ARGMIN(panda,        make_panda_chain)
 
 REGISTER_7DOF_BENCHMARKS(fetch,      make_fetch_chain)
-REGISTER_7DOF_TRAC_IK(fetch,        make_fetch_chain, make_fetch_kdl_chain, make_fetch_kdl_limits)
+REGISTER_7DOF_TRAC_IK(fetch,        make_fetch_chain, make_fetch_kdl_chain)
 REGISTER_7DOF_NLOPT(fetch,          make_fetch_chain)
 REGISTER_7DOF_ARGMIN(fetch,        make_fetch_chain)
 
 REGISTER_7DOF_BENCHMARKS(baxter,     make_baxter_chain)
-REGISTER_7DOF_TRAC_IK(baxter,       make_baxter_chain, make_baxter_kdl_chain, make_baxter_kdl_limits)
+REGISTER_7DOF_TRAC_IK(baxter,       make_baxter_chain, make_baxter_kdl_chain)
 REGISTER_7DOF_NLOPT(baxter,         make_baxter_chain)
 REGISTER_7DOF_ARGMIN(baxter,       make_baxter_chain)
 
 REGISTER_7DOF_BENCHMARKS(kuka_lwr4,  make_kuka_lwr4_chain)
-REGISTER_7DOF_TRAC_IK(kuka_lwr4,    make_kuka_lwr4_chain, make_kuka_lwr4_kdl_chain, make_kuka_lwr4_kdl_limits)
+REGISTER_7DOF_TRAC_IK(kuka_lwr4,    make_kuka_lwr4_chain, make_kuka_lwr4_kdl_chain)
 REGISTER_7DOF_NLOPT(kuka_lwr4,      make_kuka_lwr4_chain)
 REGISTER_7DOF_ARGMIN(kuka_lwr4,    make_kuka_lwr4_chain)
 
@@ -1194,7 +1191,7 @@ REGISTER_7DOF_ARGMIN(kuka_lwr4,    make_kuka_lwr4_chain)
 // dynamic-dimension chain_t<cartan::dynamic> (runtime N) using the same argmin
 // policy. Quantifies the compile-time dimension benefit from argmin develop.
 
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 using dynamic_chain = cartan::kinematic_chain<double, cartan::dynamic>;
 
 using argmin_slsqp_dynamic_restart = cartan::restart_wrapper<dynamic_chain, cartan::argmin_slsqp<dynamic_chain>>;

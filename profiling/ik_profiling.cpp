@@ -12,15 +12,15 @@
 #include <cartan/serial/ik/solver/dls.h>
 #include <cartan/serial/ik/solver/lbfgsb.h>
 
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 #include <cartan/serial/ik/solver/argmin_slsqp.h>
 #endif
 #include <cartan/serial/ik/wrapper/restart_wrapper.h>
 #include <cartan/serial/ik/solver/projected_lm.h>
 #include <cartan/serial/ik/solver/newton_raphson.h>
 
-#ifdef CARTAN_HAS_NLOPT
-#include <cartan/serial/ik/solver/nlopt_slsqp.h>
+#ifdef CARTAN_EXAMPLE_HAS_NLOPT
+#include <cartan_examples/nlopt/nlopt_slsqp.h>
 #endif
 
 #include <benchmark/benchmark.h>
@@ -129,7 +129,7 @@ template <int N>
 using convergence_ik_solver = cartan::basic_ik_runner<cartan::robust_ik_runner<chain_t<N>>>;
 
 template <int N>
-using restart_lm = cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::lm<chain_t<N>, cartan::no_limits>>;
+using restart_lm = cartan::restart_wrapper<chain_t<N>, cartan::lm<chain_t<N>, cartan::no_limits>>;
 
 template <int N>
 using restart_lm_ik_solver = cartan::basic_ik_runner<restart_lm<N>>;
@@ -137,19 +137,19 @@ using restart_lm_ik_solver = cartan::basic_ik_runner<restart_lm<N>>;
 template <int N>
 using racing_solver = cartan::dual_ik_runner<chain_t<N>>;
 
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 // argmin family (available when argmin is built)
 template <int N>
-using argmin_slsqp_restart = cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::argmin_slsqp<chain_t<N>>>;
+using argmin_slsqp_restart = cartan::restart_wrapper<chain_t<N>, cartan::argmin_slsqp<chain_t<N>>>;
 
 template <int N>
 using argmin_slsqp_solver = cartan::basic_ik_runner<argmin_slsqp_restart<N>>;
 #endif
 
-// NLopt family (behind CARTAN_HAS_NLOPT)
-#ifdef CARTAN_HAS_NLOPT
+// NLopt family (behind CARTAN_EXAMPLE_HAS_NLOPT)
+#ifdef CARTAN_EXAMPLE_HAS_NLOPT
 template <int N>
-using nlopt_slsqp_restart = cartan::ik::restart_wrapper<chain_t<N>, cartan::ik::nlopt_slsqp<chain_t<N>>>;
+using nlopt_slsqp_restart = cartan::restart_wrapper<chain_t<N>, cartan_examples::nlopt_slsqp<chain_t<N>>>;
 
 template <int N>
 using nlopt_slsqp_solver = cartan::basic_ik_runner<nlopt_slsqp_restart<N>>;
@@ -162,10 +162,12 @@ using nlopt_slsqp_solver = cartan::basic_ik_runner<nlopt_slsqp_restart<N>>;
 inline cartan::convergence_criteria<double> speed_criteria()                { return {1e-5, 1e-5, 200}; }
 inline cartan::convergence_criteria<double> convergence_criteria_tuned()    { return {1e-5, 1e-5, 500}; }
 inline cartan::convergence_criteria<double> restart_lm_criteria()           { return {1e-5, 1e-5, 200}; }
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 inline cartan::convergence_criteria<double> argmin_criteria()              { return {1e-5, 1e-5, 500}; }
 #endif
+#ifdef CARTAN_EXAMPLE_HAS_NLOPT
 inline cartan::convergence_criteria<double> nlopt_criteria()                { return {1e-5, 1e-5, 500}; }
+#endif
 
 // ============================================================================
 // Macro-based benchmark registration
@@ -206,7 +208,7 @@ static void bm_profiling_##ROBOT##_cartan_racing(benchmark::State& state)       
 }                                                                                                      \
 BENCHMARK(bm_profiling_##ROBOT##_cartan_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 #define REGISTER_6DOF_ARGMIN_PROFILING(ROBOT, CHAIN_FN)                                               \
                                                                                                        \
 static void bm_profiling_##ROBOT##_argmin_slsqp(benchmark::State& state)                              \
@@ -221,7 +223,7 @@ BENCHMARK(bm_profiling_##ROBOT##_argmin_slsqp)->Iterations(1000)->Unit(benchmark
 #endif
 
 // Register NLopt solver benchmarks for a 6-DOF robot.
-#ifdef CARTAN_HAS_NLOPT
+#ifdef CARTAN_EXAMPLE_HAS_NLOPT
 #define REGISTER_6DOF_NLOPT_PROFILING(ROBOT, CHAIN_FN)                                                 \
                                                                                                        \
 static void bm_profiling_##ROBOT##_nlopt_slsqp(benchmark::State& state)                                \
@@ -270,7 +272,7 @@ static void bm_profiling_##ROBOT##_cartan_racing(benchmark::State& state)       
 }                                                                                                      \
 BENCHMARK(bm_profiling_##ROBOT##_cartan_racing)->Iterations(1000)->Unit(benchmark::kMicrosecond);
 
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 #define REGISTER_7DOF_ARGMIN_PROFILING(ROBOT, CHAIN_FN)                                               \
                                                                                                        \
 static void bm_profiling_##ROBOT##_argmin_slsqp(benchmark::State& state)                              \
@@ -285,7 +287,7 @@ BENCHMARK(bm_profiling_##ROBOT##_argmin_slsqp)->Iterations(1000)->Unit(benchmark
 #endif
 
 // Register NLopt solver benchmarks for a 7-DOF robot.
-#ifdef CARTAN_HAS_NLOPT
+#ifdef CARTAN_EXAMPLE_HAS_NLOPT
 #define REGISTER_7DOF_NLOPT_PROFILING(ROBOT, CHAIN_FN)                                                 \
                                                                                                        \
 static void bm_profiling_##ROBOT##_nlopt_slsqp(benchmark::State& state)                                \

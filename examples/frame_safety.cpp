@@ -29,8 +29,13 @@ int main()
     // Would NOT compile (frame mismatch):
     // auto bad = world_base * world_tool;  // Base != World
 
-    // Inverse flips frame tags: World->Base -> Base->World
+    // Inverse flips frame tags: World->Base -> Base->World, so composing it
+    // back onto World->Tool is the one Base->Tool the type system admits.
     auto base_world = world_base.inverse();
+    auto base_tool_again = base_world * world_tool;
+    std::cout << "Base->Tool recovered, translation error: "
+              << (base_tool_again.translation() - base_tool.translation()).norm()
+              << "\n";
 
     // Rotation frame safety works the same way
     using R_wb = cartan::rotation<World, Base>;

@@ -1,6 +1,9 @@
 // Cross-solver semantics: converged-implies-feasible, unweighted convergence
 // gate, and feasibility-first best-iterate retention.
 
+#include "../support/kinematics_helpers.h"
+#include "../support/joint_limits_helpers.h"
+
 #include <cartan/serial/ik/detail/limit_enforcement.h>
 #include <cartan/serial/ik/detail/convergence.h>
 #include <cartan/serial/ik/policy/error_weight.h>
@@ -10,7 +13,7 @@
 #include <cartan/serial/ik/solver/projected_lm.h>
 #include <cartan/serial/ik/solver/newton_raphson.h>
 #include <cartan/serial/ik/wrapper/restart_wrapper.h>
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 #include <cartan/serial/ik/solver/argmin_lm.h>
 #include <cartan/serial/ik/solver/argmin_slsqp.h>
 #endif
@@ -49,7 +52,7 @@ spp::kinematic_chain<double, 2> make_bounded_2r_chain(double limit)
     home_trans << 2, 0, 0;
     auto home = spp::se3<double>(spp::so3<double>::identity(), home_trans);
 
-    spp::joint_limits<double> lim{-limit, limit};
+    auto lim = spp::testing::limits(-limit, limit);
     return spp::kinematic_chain<double, 2>(home, {s1, s2}, {lim, lim});
 }
 
@@ -102,7 +105,7 @@ static void assert_no_converged_out_of_limits()
 
     Eigen::Vector<double, 2> q_out;
     q_out << 2.5, 1.8;  // both joints outside [-1, 1]
-    auto target = spp::forward_kinematics(chain, q_out).end_effector;
+    auto target = spp::testing::fk_at(chain, q_out).end_effector;
 
     spp::convergence_criteria<double> criteria{};
     criteria.max_iterations_per_attempt = 200;
@@ -125,7 +128,7 @@ TEST_CASE("builtin_lm does not report converged out of limits", "[ik][semantics]
     assert_no_converged_out_of_limits<spp::builtin_lm<spp::kinematic_chain<double, 2>>>();
 }
 
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 TEST_CASE("argmin_lm does not report converged out of limits", "[ik][semantics][feasibility]")
 {
     assert_no_converged_out_of_limits<spp::argmin_lm<spp::kinematic_chain<double, 2>>>();
@@ -140,7 +143,7 @@ TEST_CASE("projected_lm converged solutions are feasible", "[ik][semantics][feas
 
     Eigen::Vector<double, 2> q_known;
     q_known << 0.6, -0.7;
-    auto target = spp::forward_kinematics(chain, q_known).end_effector;
+    auto target = spp::testing::fk_at(chain, q_known).end_effector;
 
     spp::convergence_criteria<double> criteria{};
     criteria.max_iterations_per_attempt = 200;
@@ -168,7 +171,7 @@ static spp::kinematic_chain<double, 1> make_single_axis_chain(
     const spp::screw_axis<double>& axis, double lo, double hi)
 {
     auto home = spp::se3<double>::identity();
-    spp::joint_limits<double> lim{lo, hi};
+    auto lim = spp::testing::limits(lo, hi);
     return spp::kinematic_chain<double, 1>(home, {axis}, {lim});
 }
 
@@ -235,7 +238,7 @@ static void assert_accepts_2pi_equivalent()
     // Seed one joint a full turn away: same pose, but outside the box as returned.
     Eigen::Vector<double, 2> q_seed;
     q_seed << 0.5 + two_pi, -0.5;
-    auto target = spp::forward_kinematics(chain, q_seed).end_effector;
+    auto target = spp::testing::fk_at(chain, q_seed).end_effector;
 
     spp::convergence_criteria<double> criteria{};
     criteria.max_iterations_per_attempt = 200;
@@ -262,7 +265,7 @@ TEST_CASE("builtin_lm recovers the in-limits 2pi-equivalent solution", "[ik][sem
     assert_accepts_2pi_equivalent<spp::builtin_lm<spp::kinematic_chain<double, 2>>>();
 }
 
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 TEST_CASE("argmin_lm recovers the in-limits 2pi-equivalent solution", "[ik][semantics][feasibility]")
 {
     assert_accepts_2pi_equivalent<spp::argmin_lm<spp::kinematic_chain<double, 2>>>();
@@ -318,26 +321,6 @@ TEST_CASE("helical DOF is not wrapped by canonicalization", "[ik][semantics][fea
 // the convergence gate tests raw (unweighted) component norms
 // ============================================================================
 
-TEST_CASE("convergence gate ignores error_weight", "[ik][semantics][gate]")
-{
-    // A body error whose raw component norms sit just below the tolerance, but
-    // whose weighted norms are pushed above it by a non-unit weight. The gate
-    // the solvers now use must key off the raw norms.
-    cartan::convergence_criteria<double> criteria{};
-    criteria.orientation_tol = 1e-3;
-    criteria.position_tol = 1e-3;
-
-    Eigen::Vector<double, 6> body_error;
-    body_error << 8e-4, 0.0, 0.0,   // angular (head<3>): raw norm 8e-4 < 1e-3
-                  8e-4, 0.0, 0.0;   // linear  (tail<3>): raw norm 8e-4 < 1e-3
-
-    cartan::error_weight<double> heavy;
-    heavy.weights << 5.0, 5.0, 5.0, 5.0, 5.0, 5.0;  // weighted norm 4e-3 > 1e-3
-
-    REQUIRE(cartan::detail::is_converged_unweighted(body_error, criteria));
-    REQUIRE_FALSE(cartan::detail::is_converged(body_error, heavy, criteria));
-}
-
 // A solver carrying a heavy error_weight still declares convergence on a
 // reachable in-limit target, because the stopping test no longer weights the
 // body error. Seeding at the exact solution makes the gate fire on entry.
@@ -348,7 +331,7 @@ static void assert_weight_does_not_block_convergence()
 
     Eigen::Vector<double, 2> q_known;
     q_known << 0.4, -0.6;
-    auto target = spp::forward_kinematics(chain, q_known).end_effector;
+    auto target = spp::testing::fk_at(chain, q_known).end_effector;
 
     spp::convergence_criteria<double> criteria{};
     criteria.max_iterations_per_attempt = 200;
@@ -436,7 +419,7 @@ TEST_CASE("restart_wrapper returns the best-so-far iterate on a terminal solve",
     assert_retains_best_iterate<spp::restart_wrapper<spp::kinematic_chain<double, 2>>>();
 }
 
-#ifdef CARTAN_BUILD_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 TEST_CASE("argmin_slsqp returns the best-so-far iterate on a terminal solve",
           "[ik][semantics][retention]")
 {

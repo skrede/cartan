@@ -1,3 +1,5 @@
+#include "../support/joint_limits_helpers.h"
+
 #include "cartan/serial/ik/ik_status.h"
 #include "cartan/serial/ik/basic_ik_runner.h"
 #include "cartan/serial/ik/solver/lm.h"
@@ -63,7 +65,7 @@ chain_t make_ur5_like_chain()
     home_trans << 0.817, 0.191, -0.006;
     auto home = cartan::se3<double>(cartan::so3<double>::identity(), home_trans);
 
-    cartan::joint_limits<double> lim{-2 * std::numbers::pi, 2 * std::numbers::pi};
+    auto lim = cartan::testing::limits(-2 * std::numbers::pi, 2 * std::numbers::pi);
     return chain_t(home, {s1, s2, s3, s4, s5, s6}, {lim, lim, lim, lim, lim, lim});
 }
 
@@ -72,7 +74,9 @@ cartan::se3<double> make_reachable_target(const chain_t& chain)
 {
     Eigen::Vector<double, 6> q_truth;
     q_truth << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
-    return cartan::forward_kinematics(chain, q_truth).end_effector;
+    auto held = cartan::forward_kinematics(chain, q_truth);
+    REQUIRE(held.has_value());
+    return held->end_effector;
 }
 
 // An unreachable target: translation just outside the UR5 workspace

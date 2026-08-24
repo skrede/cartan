@@ -20,6 +20,7 @@ See [Frame Tags Design](../background/frame-tags.md)
 
 Compile-time frame-tagged wrapper over `so3`. Aggregate struct with public `m_value` member.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename From, typename To, typename Scalar = double, lie_group_policy Policy = strict_policy>
 struct rotation
@@ -32,6 +33,7 @@ struct rotation
 
 ### Methods
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename C, lie_group_policy P2>
 auto operator*(const rotation<To, C, Scalar, P2>& rhs) const
@@ -40,42 +42,49 @@ auto operator*(const rotation<To, C, Scalar, P2>& rhs) const
 
 Compose two rotations. **`operator*` only compiles when the `To` frame of the left operand matches the `From` frame of the right operand.** `rotation<A,B> * rotation<B,C>` produces `rotation<A,C>`.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 rotation<To, From, Scalar, Policy> inverse() const;
 ```
 
 Inverse flips frame tags: `rotation<A,B>.inverse()` produces `rotation<B,A>`.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 matrix3<Scalar> matrix() const;
 ```
 
 Convert to 3x3 rotation matrix.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 const quaternion<Scalar>& quaternion_ref() const;
 ```
 
 Access the internal quaternion (read-only).
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 vector3<Scalar> log() const;
 ```
 
 Logarithmic map: SO(3) to `so(3)`.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 vector3<Scalar> act(const vector3<Scalar>& v) const;
 ```
 
 Rotate a 3D vector.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 static rotation identity();
 ```
 
 Identity rotation.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 static cartan::expected<rotation, lie_failure> from_matrix(const matrix3<Scalar>& R);
 static cartan::expected<rotation, lie_failure> from_quaternion(const quaternion<Scalar>& q);
@@ -87,6 +96,7 @@ Validated constructors from matrix or quaternion. On failure they return a `cart
 
 Compile-time frame-tagged wrapper over `se3`. Aggregate struct with public `m_value` member.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename From, typename To, typename Scalar = double, lie_group_policy Policy = strict_policy>
 struct transform
@@ -97,6 +107,7 @@ struct transform
 
 ### Methods
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename C, lie_group_policy P2>
 auto operator*(const transform<To, C, Scalar, P2>& rhs) const
@@ -105,48 +116,56 @@ auto operator*(const transform<To, C, Scalar, P2>& rhs) const
 
 Compose two transforms. **`operator*` only compiles when the `To` frame of the left operand matches the `From` frame of the right operand.** `transform<A,B> * transform<B,C>` produces `transform<A,C>`.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 transform<To, From, Scalar, Policy> inverse() const;
 ```
 
 Inverse flips frame tags: `transform<A,B>.inverse()` produces `transform<B,A>`.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 matrix4<Scalar> matrix() const;
 ```
 
 Convert to 4x4 homogeneous transformation matrix.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 const so3<Scalar, Policy>& rotation() const;
 ```
 
 Access the rotation component.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 const vector3<Scalar>& translation() const;
 ```
 
 Access the translation component.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 vector6<Scalar> log() const;
 ```
 
 Logarithmic map: SE(3) to `se(3)`.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 vector3<Scalar> act(const vector3<Scalar>& p) const;
 ```
 
 Transform a 3D point: `R * p + t`.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 static transform identity();
 ```
 
 Identity transform.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 static cartan::expected<transform, lie_failure> from_matrix(const matrix4<Scalar>& T);
 ```
@@ -157,6 +176,7 @@ Validated constructor from 4x4 homogeneous matrix. On failure it returns a `cart
 
 Compile-time frame-tagged wrapper over `twist`. The `Frame` tag indicates the frame in which the twist is expressed.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Frame, typename Scalar = double>
 struct framed_twist
@@ -167,6 +187,7 @@ struct framed_twist
 
 ### Methods
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 const vector3<Scalar>& omega() const;
 const vector3<Scalar>& v() const;
@@ -174,12 +195,14 @@ const vector3<Scalar>& v() const;
 
 Access angular and linear velocity components.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 vector6<Scalar> to_vector() const;
 ```
 
 Convert to 6-vector (omega-first).
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 static framed_twist from_vector(const vector6<Scalar>& vec);
 ```
@@ -188,6 +211,7 @@ Construct from 6-vector.
 
 ### Free Function: adjoint_map
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename From, typename To, typename Scalar, lie_group_policy Policy>
 framed_twist<From, Scalar>
@@ -201,6 +225,7 @@ Adjoint map: transforms a twist from frame `To` to frame `From`. Computes `Ad_T 
 
 Compile-time frame-tagged wrapper over a 6-vector wrench. Moment-first `[moment; force]` ordering consistent with omega-first twist convention.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename Frame, typename Scalar = double>
 struct framed_wrench
@@ -211,6 +236,7 @@ struct framed_wrench
 
 ### Methods
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 auto moment() const;  // First 3 elements
 auto force() const;   // Last 3 elements
@@ -218,6 +244,7 @@ auto force() const;   // Last 3 elements
 
 Access moment and force components.
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 static framed_wrench from_moment_force(const vector3<Scalar>& m, const vector3<Scalar>& f);
 ```
@@ -226,6 +253,7 @@ Construct from separate moment and force vectors.
 
 ### Free Function: coadjoint_map
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <typename From, typename To, typename Scalar, lie_group_policy Policy>
 framed_wrench<From, Scalar>

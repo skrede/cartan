@@ -9,6 +9,8 @@
 /// cycles stay fast; it is intended to be run on demand to update the
 /// fallback constant when the surrounding solver code or geometry changes.
 
+#include "../support/joint_limits_helpers.h"
+
 #include "cartan/urdf.h"
 
 #include "cartan/serial/ik/solver/lm.h"
@@ -50,18 +52,16 @@ using argmin_pgn_t = cartan::argmin_projected_gn<chain_t>;
 chain_t synthesize_chain_with_range(const chain_t& source, double candidate_range)
 {
     auto axes = source.axes();
-    auto limits = source.limits();
     const double half = candidate_range / 2.0;
-    for (auto& lim : limits)
+    std::vector<cartan::joint_limits<double>> li_v;
+    li_v.reserve(source.limits().size());
+    for (const auto& lim : source.limits())
     {
-        if (!std::isfinite(lim.position_min) || !std::isfinite(lim.position_max))
-        {
-            lim.position_min = -half;
-            lim.position_max = +half;
-        }
+        const bool bounded =
+            std::isfinite(lim.position_min()) && std::isfinite(lim.position_max());
+        li_v.push_back(bounded ? lim : cartan::testing::limits(-half, +half));
     }
     std::vector<cartan::screw_axis<double>> ax_v(axes.begin(), axes.end());
-    std::vector<cartan::joint_limits<double>> li_v(limits.begin(), limits.end());
     return chain_t(source.home(), std::move(ax_v), std::move(li_v));
 }
 
@@ -101,7 +101,11 @@ trial_result run_one_trial(const chain_t& chain,
         return {false, wall_us};
     }
     auto fk_sol = cartan::forward_kinematics(chain, solver.solution());
-    const auto err = (fk_sol.end_effector.inverse() * target).log();
+    if (!fk_sol)
+    {
+        return {false, wall_us};
+    }
+    const auto err = (fk_sol->end_effector.inverse() * target).log();
     const bool ok = err.template head<3>().norm() < 1e-5
         && err.template tail<3>().norm() < 1e-5;
     return {ok, wall_us};
@@ -129,7 +133,8 @@ sweep_cell sweep_solver(const chain_t& chain,
 
     for (const auto& q : targets_q)
     {
-        auto fk = cartan::forward_kinematics(chain, q);
+        auto fk = cartan::testing::unwrap(
+            cartan::forward_kinematics(chain, q), "fallback sweep target");
         Eigen::VectorXd q0(chain.num_joints());
         q0.setZero();
         auto r = run_one_trial<Solver>(chain, fk.end_effector, q0);

@@ -13,6 +13,8 @@
 
 #include "chain_factories.h"
 
+#include "../support/joint_limits_helpers.h"
+
 #include <cartan/types.h>
 #include <cartan/lie/se3.h>
 #include <cartan/lie/so3.h>
@@ -53,8 +55,8 @@ auto make_highdof_12r_chain_dynamic() -> cartan::kinematic_chain<Scalar, cartan:
     axes.reserve(dof);
     limits.reserve(dof);
 
-    const cartan::joint_limits<Scalar> lim{
-        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>};
+    const auto lim = cartan::testing::limits(
+        -std::numbers::pi_v<Scalar>, std::numbers::pi_v<Scalar>);
 
     for (int i = 0; i < dof; ++i)
     {

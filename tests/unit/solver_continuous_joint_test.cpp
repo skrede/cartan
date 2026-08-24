@@ -1,3 +1,5 @@
+#include "../support/kinematics_helpers.h"
+
 #include <cartan/urdf.h>
 
 #include <cartan/serial/ik/ik_status.h>
@@ -6,7 +8,7 @@
 #include <cartan/serial/ik/wrapper/restart_wrapper.h>
 #include <cartan/serial/ik/solver/detail/halton_seed_generator.h>
 
-#ifdef CARTAN_TEST_HAVE_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 #include <cartan/serial/ik/solver/filter_nw_sqp.h>
 #include <cartan/serial/ik/solver/filter_slsqp.h>
 #include <cartan/serial/ik/solver/argmin_slsqp.h>
@@ -55,7 +57,7 @@ void verify_continuous_wrist_roundtrip(unsigned seed_offset)
 
     Eigen::Vector<double, Eigen::Dynamic> q_known(chain.num_joints());
     q_known << 0.4, -0.6, 0.9;
-    auto fk_target = cartan::forward_kinematics(chain, q_known);
+    auto fk_target = cartan::testing::fk_at(chain, q_known);
     auto target = fk_target.end_effector;
 
     Solver solver{};
@@ -81,7 +83,7 @@ void verify_continuous_wrist_roundtrip(unsigned seed_offset)
 
     REQUIRE(solver.converged());
 
-    auto fk_sol = cartan::forward_kinematics(chain, solver.solution());
+    auto fk_sol = cartan::testing::fk_at(chain, solver.solution());
     const auto err = (fk_sol.end_effector.inverse() * target).log();
     REQUIRE(err.template head<3>().norm() < 1e-5);
     REQUIRE(err.template tail<3>().norm() < 1e-5);
@@ -98,7 +100,7 @@ using restart_lm = cartan::restart_wrapper<chain_t,
 using restart_lbfgsb = cartan::restart_wrapper<chain_t,
     cartan::builtin_lbfgsb<chain_t, cartan::no_limits>, cartan::no_limits>;
 
-#ifdef CARTAN_TEST_HAVE_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 using filter_nw_sqp_solver = cartan::filter_nw_sqp<chain_t>;
 using filter_slsqp_solver = cartan::filter_slsqp<chain_t>;
 using argmin_slsqp_solver = cartan::argmin_slsqp<chain_t>;
@@ -113,7 +115,7 @@ TEMPLATE_TEST_CASE("continuous joint: IK roundtrip via builtin restart paths",
     verify_continuous_wrist_roundtrip<TestType>(0);
 }
 
-#ifdef CARTAN_TEST_HAVE_ARGMIN
+#ifdef CARTAN_HAS_ARGMIN
 TEMPLATE_TEST_CASE("continuous joint: IK roundtrip via argmin-backed solvers",
                    "[solver_continuous_joint]",
                    filter_nw_sqp_solver,
@@ -130,7 +132,8 @@ TEST_CASE("continuous joint: Halton seed generator produces finite seeds",
           "[solver_continuous_joint]")
 {
     auto chain = load_continuous_wrist_chain();
-    cartan::halton_seed_generator<chain_t> gen{chain};
+    cartan::halton_seed_generator<chain_t> gen{chain,
+        Eigen::Vector<double, Eigen::Dynamic>::Zero(chain.num_joints())};
 
     for (int i = 0; i < 100; ++i)
     {

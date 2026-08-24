@@ -1,0 +1,2 @@
+table,robot,limits_provenance,stratum,budget_index,solver_a,solver_b,n_paired,delta_wall_ns_median,delta_wall_ns_p95,delta_wall_ns_p99,delta_pos_err_median_m,delta_kernel_evals_median
+c,irb120,description,reachable,5,cartan_lm,pinocchio_lm,4,-1000,-1000,-1000,0,11

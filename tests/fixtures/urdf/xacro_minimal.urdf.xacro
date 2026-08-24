@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<!-- Three links and two revolute joints written as xacro: a property, a macro
+     with parameters, and an arithmetic expression in a joint origin. Plain
+     URDF cannot express any of the three. -->
+<robot name="xacro_minimal" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:property name="segment_length" value="0.2"/>
+
+  <xacro:macro name="segment" params="name parent index">
+    <link name="${name}"/>
+    <joint name="${name}_joint" type="revolute">
+      <parent link="${parent}"/>
+      <child link="${name}"/>
+      <origin xyz="0 0 ${segment_length * index}" rpy="0 0 0"/>
+      <axis xyz="0 0 1"/>
+      <limit lower="-3.14159" upper="3.14159" velocity="2.0" effort="50.0"/>
+    </joint>
+  </xacro:macro>
+
+  <link name="base_link"/>
+
+  <xacro:segment name="link_1" parent="base_link" index="1"/>
+  <xacro:segment name="tool" parent="link_1" index="2"/>
+
+</robot>

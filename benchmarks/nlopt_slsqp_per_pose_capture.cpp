@@ -1,7 +1,7 @@
 /// @file nlopt_slsqp_per_pose_capture.cpp
 /// @brief Per-pose NLopt SLSQP timing/accuracy capture (control to slsqp_per_pose_capture).
 ///
-/// Runs cartan::nlopt_slsqp wrapped in basic_ik_runner + restart_wrapper,
+/// Runs cartan_examples::nlopt_slsqp wrapped in basic_ik_runner + restart_wrapper,
 /// emitting one CSV row per (robot, pose). The pose set, seeds, and convergence
 /// criteria match slsqp_per_pose_capture.cpp exactly so the two CSVs join on
 /// (robot, pose_index) without any further alignment. Schema is identical to
@@ -10,7 +10,7 @@
 /// Stack:
 ///   - convergence_criteria<double>{1e-5, 1e-5, 500}
 ///   - target_set with seed 42, 1000 poses per robot
-///   - cartan::nlopt_slsqp default options + restart_wrapper default
+///   - cartan_examples::nlopt_slsqp default options + restart_wrapper default
 ///
 /// Usage: nlopt_slsqp_per_pose_capture <output.csv>
 
@@ -20,7 +20,7 @@
 #include <cartan/serial/ik/ik_result.h>
 #include <cartan/serial/ik/basic_ik_runner.h>
 #include <cartan/serial/ik/wrapper/restart_wrapper.h>
-#include <cartan/serial/ik/solver/nlopt_slsqp.h>
+#include <cartan_examples/nlopt/nlopt_slsqp.h>
 
 #include <chrono>
 #include <cstdlib>
@@ -63,19 +63,22 @@ using chain_t = cartan::kinematic_chain<double, N>;
 
 template <int N>
 using nlopt_slsqp_solver = cartan::basic_ik_runner<
-    cartan::restart_wrapper<chain_t<N>, cartan::nlopt_slsqp<chain_t<N>>>>;
+    cartan::restart_wrapper<chain_t<N>, cartan_examples::nlopt_slsqp<chain_t<N>>>>;
 
 constexpr std::string_view to_string(cartan::ik_failure r) noexcept
 {
     using F = cartan::ik_failure;
     switch (r)
     {
-        case F::unreachable:           return "unreachable";
-        case F::diverged:              return "diverged";
-        case F::stalled:               return "stalled";
-        case F::iteration_limit:       return "iteration_limit";
-        case F::joint_limit_violation: return "joint_limit_violation";
-        case F::aborted:               return "aborted";
+        case F::diverged:                  return "diverged";
+        case F::stalled:                   return "stalled";
+        case F::iteration_limit:           return "iteration_limit";
+        case F::joint_limit_violation:     return "joint_limit_violation";
+        case F::aborted:                   return "aborted";
+        case F::not_initialized:           return "not_initialized";
+        case F::dimension_mismatch:        return "dimension_mismatch";
+        case F::non_finite_input:          return "non_finite_input";
+        case F::unsupported_configuration: return "unsupported_configuration";
     }
     return "unknown_failure";
 }
@@ -145,13 +148,21 @@ void run_per_pose(
             iters = result->iterations;
             const auto& q = result->solution.position;
             auto fk = cartan::forward_kinematics(chain, q);
-            auto Vb = (target.inverse() * fk.end_effector).log();
-            ori_err = static_cast<double>(Vb.template head<3>().norm());
-            pos_err = static_cast<double>(Vb.template tail<3>().norm());
-            final_obj = 0.5 * static_cast<double>(Vb.squaredNorm());
-            pose_hit = pos_err <= criteria.position_tol
-                    && ori_err <= criteria.orientation_tol;
-            status_str = pose_hit ? "runner_success_pose_hit" : "runner_success_pose_miss";
+            if (fk)
+            {
+                auto Vb = (target.inverse() * fk->end_effector).log();
+                ori_err = static_cast<double>(Vb.template head<3>().norm());
+                pos_err = static_cast<double>(Vb.template tail<3>().norm());
+                final_obj = 0.5 * static_cast<double>(Vb.squaredNorm());
+                pose_hit = pos_err <= criteria.position_tol
+                        && ori_err <= criteria.orientation_tol;
+            }
+            // A refused re-evaluation leaves the error columns empty for a
+            // reason a reader cannot infer from them, so it gets its own
+            // status rather than reading as a genuine geometric miss.
+            status_str = !fk ? "runner_success_fk_refused"
+                       : pose_hit ? "runner_success_pose_hit"
+                                  : "runner_success_pose_miss";
             termination_str = "converged";
         }
         else
@@ -159,11 +170,9 @@ void run_per_pose(
             const auto& e = result.error();
             status_str = to_string(e.reason);
             termination_str = to_string(e.termination_reason);
-            const auto& q = e.last_q;
-            if (q.size() == chain.num_joints())
+            if (auto fk = cartan::forward_kinematics(chain, e.last_q))
             {
-                auto fk = cartan::forward_kinematics(chain, q);
-                auto Vb = (target.inverse() * fk.end_effector).log();
+                auto Vb = (target.inverse() * fk->end_effector).log();
                 ori_err = static_cast<double>(Vb.template head<3>().norm());
                 pos_err = static_cast<double>(Vb.template tail<3>().norm());
                 final_obj = 0.5 * static_cast<double>(Vb.squaredNorm());
