@@ -24,7 +24,7 @@ jobs:
     runs-on: macos-14
     name: build (Xcode ${{ matrix.xcode }})
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Select Xcode ${{ matrix.xcode }}
         run: sudo xcode-select -s /Applications/Xcode_${{ matrix.xcode }}.app
@@ -61,7 +61,7 @@ jobs:
   build-intel:
     runs-on: macos-15-intel
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Record the toolchain this image ships
         run: |
@@ -99,7 +99,7 @@ jobs:
   install-test:
     runs-on: macos-14
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Eigen and NLopt
         run: brew install eigen nlopt
@@ -128,7 +128,7 @@ jobs:
   install-test-intel:
     runs-on: macos-15-intel
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Record the toolchain this image ships
         run: |

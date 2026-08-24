@@ -51,7 +51,7 @@ jobs:
     name: ${{ matrix.compiler }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Two of the four numbers this job publishes differ only by one gcovr flag's
       # semantics, so an unpinned gcovr is an unpinned verdict. The next three
@@ -234,7 +234,7 @@ jobs:
       # reading; skipped when an earlier step failed and there is nothing to keep.
       - name: Upload coverage reports
         if: always() && matrix.coverage && steps.coverage.conclusion != 'skipped'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage-${{ matrix.compiler }}
           if-no-files-found: error
@@ -273,7 +273,7 @@ jobs:
     name: sanitize (${{ matrix.name }})
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Configure
         env:
@@ -305,7 +305,7 @@ jobs:
     name: optional backends
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Configure
         env:
@@ -331,7 +331,7 @@ jobs:
     name: core only (URDF module off)
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Every other Linux job builds with -DCARTAN_BUILD_URDF=ON, so this is
       # the only automated check that the kinematics core still builds and
@@ -363,7 +363,7 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Eigen and NLopt
         run: sudo apt-get update && sudo apt-get install -y libeigen3-dev libnlopt-cxx-dev

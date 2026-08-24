@@ -19,7 +19,7 @@ jobs:
   build:
     runs-on: windows-2022
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # No standard flag is passed here. The compile features declared on the
       # cartan targets are the single source of the standard, and a flag in this
@@ -54,7 +54,7 @@ jobs:
   install-test:
     runs-on: windows-2022
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Eigen and NLopt
         run: vcpkg install eigen3:x64-windows nlopt:x64-windows
