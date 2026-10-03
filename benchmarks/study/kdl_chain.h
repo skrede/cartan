@@ -41,7 +41,8 @@ struct comparator_bounds
 /// The comparator reads bounds as arrays rather than off a chain, so these are
 /// derived from the chain the study solves rather than written beside it. A
 /// joint declaring no bound reaches the comparator through the library's own
-/// substituted interval, which is the interval four of its solvers already use.
+/// substituted interval, which is the interval its multistart seeder already
+/// draws from.
 template <int N>
 comparator_bounds derive_comparator_bounds(const cartan::kinematic_chain<double, N>& chain)
 {

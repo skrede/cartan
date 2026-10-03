@@ -140,33 +140,8 @@ set(CARTAN_HAVE_TRAC_IK ${CARTAN_BENCH_TRAC_IK_FOUND})
 if (CARTAN_HAVE_TRAC_IK)
     cartan_add_benchmark(basic_ik_full_benchmarks basic_ik_full_benchmarks.cpp)
     target_link_libraries(basic_ik_full_benchmarks PRIVATE TracIK::trac_ik)
-    if(CARTAN_BUILD_ARGMIN)
-        target_link_libraries(basic_ik_full_benchmarks PRIVATE cartan::argmin)
-    endif()
     if(TARGET cartan_examples::nlopt_policy)
         target_link_libraries(basic_ik_full_benchmarks PRIVATE cartan_examples::nlopt_policy)
-    endif()
-
-    if(CARTAN_BUILD_ARGMIN)
-        add_executable(slsqp_per_pose_capture slsqp_per_pose_capture.cpp)
-        target_link_libraries(slsqp_per_pose_capture
-            PRIVATE
-            cartan::cartan
-            cartan::argmin)
-
-        add_executable(slsqp_per_pose_trace slsqp_per_pose_trace.cpp)
-        target_link_libraries(slsqp_per_pose_trace
-            PRIVATE
-            cartan::cartan
-            cartan::argmin)
-    endif()
-
-    if(TARGET cartan_examples::nlopt_policy)
-        add_executable(nlopt_slsqp_per_pose_capture nlopt_slsqp_per_pose_capture.cpp)
-        target_link_libraries(nlopt_slsqp_per_pose_capture
-            PRIVATE
-            cartan::cartan
-            cartan_examples::nlopt_policy)
     endif()
 
     cartan_add_benchmark(fk_comparison_benchmarks fk_comparison_benchmarks.cpp)
@@ -195,18 +170,12 @@ if (CARTAN_BENCH_PINOCCHIO_FOUND)
         target_link_libraries(ik_comparison_pinocchio_benchmarks PRIVATE TracIK::trac_ik)
         target_compile_definitions(ik_comparison_pinocchio_benchmarks PRIVATE CARTAN_BENCH_HAS_TRAC_IK)
     endif ()
-    if (CARTAN_BUILD_ARGMIN)
-        target_link_libraries(ik_comparison_pinocchio_benchmarks PRIVATE cartan::argmin)
-    endif ()
 
     cartan_add_benchmark(closed_form_ik_benchmarks closed_form_ik_benchmarks.cpp)
     target_link_libraries(closed_form_ik_benchmarks PRIVATE pinocchio::pinocchio)
     if (CARTAN_HAVE_TRAC_IK)
         target_link_libraries(closed_form_ik_benchmarks PRIVATE TracIK::trac_ik)
         target_compile_definitions(closed_form_ik_benchmarks PRIVATE CARTAN_BENCH_HAS_TRAC_IK)
-    endif ()
-    if (CARTAN_BUILD_ARGMIN)
-        target_link_libraries(closed_form_ik_benchmarks PRIVATE cartan::argmin)
     endif ()
 endif ()
 

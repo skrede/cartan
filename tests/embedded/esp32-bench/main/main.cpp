@@ -7,7 +7,7 @@
 ///
 /// The telemetry UART TX pin defaults to GPIO4; set CARTAN_TELE_TX to match the
 /// GPIO your FTDI RX is wired to. The sweep uses only native steppers, so it
-/// reflects the allocation-free, argmin-free RT path.
+/// reflects the allocation-free RT path.
 
 #include "cartan/serial_chain.h"
 

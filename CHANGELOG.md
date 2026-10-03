@@ -21,15 +21,6 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   close is too close is a property of the robot and the task. The selection objectives
   read these same definitions, so a caller analyzing a configuration and the
   racing selection ranking it cannot drift apart.
-- `cartan::feasible_set` and `ik_result::solved_feasible_set` (Python:
-  `cartan.FeasibleSet` and `IkResult.solved_feasible_set`). A backend that cannot
-  accept an infinite coordinate -- the active-set QP behind `nw_sqp`,
-  `filter_nw_sqp` and `augmented_lagrangian` -- receives a finite interval
-  substituted for a non-finite joint bound, so on a chain with an unbounded joint
-  it solves a different problem from a policy that box-projects. Racing the two
-  is legitimate and unchanged; the result now says which one produced the answer
-  instead of leaving the split silent. A fully bounded chain reports `declared`
-  for every policy.
 - `cartan::lie_failure::non_finite_input`, reported by `so2`/`so3`/`se2`/`se3`
   `from_matrix`, `so3::from_quaternion`, the frame-tagged `rotation`/`transform`
   wrappers and `screw_axis::from_vector` when an input component is NaN or
@@ -276,10 +267,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   unsatisfied constraint. `cartan::detail::is_converged` — a weighted
   convergence check no solver called — is removed along with
   `error_weight::weighted_angular_norm` and `error_weight::weighted_linear_norm`,
-  which were reachable only through it. Ten backend-adapted policies
-  (`argmin_bobyqa`, `argmin_lbfgsb`, `argmin_slsqp`, `augmented_lagrangian`,
-  `cmaes`, `filter_nw_sqp`, `filter_slsqp`, `gcmma`, `mma`, `nw_sqp`) no longer
-  carry a weight member; none was settable, so each was permanently the identity.
+  which were reachable only through it.
 - **Behavior change.** `newton_raphson` keeps its current configuration when the
   line search accepts no step length, and reports `stalled` on the spot. It
   previously committed the last rejected trial regardless, which raised the error
@@ -289,15 +277,15 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   stepping now stops; a restart-wrapped one reseeds instead of spending its whole
   budget drifting, which is where the behavior improves most.
 - **Behavior change.** A joint with one infinite bound gets a substituted search
-  interval anchored to its finite side. The two consumers that need an absolute
-  coordinate — the constrained-problem adapter and the multistart seed generator
-  — previously took half the fallback width as a coordinate, so a `[10, +inf)`
-  joint was given `[10, 6.283]`, an empty interval, and every multistart seed for
-  it landed below its lower bound. A fully unbounded joint is now centered on a
-  caller-supplied reference configuration instead of on zero, and that reference
-  is a required constructor argument at both consumers. `unwrap_to_range_nearest`
-  with both bounds infinite returns the equivalent angle nearest its reference
-  rather than the input unchanged. Chains with finite bounds are unaffected.
+  interval anchored to its finite side. The multistart seed generator, which
+  needs an absolute coordinate, previously took half the fallback width as a
+  coordinate, so a `[10, +inf)` joint was given `[10, 6.283]`, an empty
+  interval, and every multistart seed for it landed below its lower bound. A
+  fully unbounded joint is now centered on a caller-supplied reference
+  configuration instead of on zero, and that reference is a required constructor
+  argument. `unwrap_to_range_nearest` with both bounds infinite returns the
+  equivalent angle nearest its reference rather than the input unchanged. Chains
+  with finite bounds are unaffected.
 - **Behavior change.** Inputs that were previously accepted are now rejected, and
   some that were rejected now report a different code. A NaN was accepted by all
   of the factories above; an infinity was accepted by `so3::from_matrix` outside
@@ -387,16 +375,6 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   loaded as a chain with an identity home pose and a tool link equal to its base
   link. A link whose extra leaves are all wrappers is unaffected: that is the end
   of the chain, not a branch.
-
-### Fixed
-- The argmin-backed solve policies size the joint vector they report at `setup()`.
-  Where a policy reported no progress on its first step -- a seed that already
-  meets its target -- the vector it handed back was empty on a runtime-sized
-  chain, and a caller indexing it by the chain's joint count wrote past its end.
-  `nw_sqp` and `argmin_lbfgsb` reached that state; the rest of the family is
-  sized for the same reason. The vector still carries the not-a-number sentinel
-  rather than the seed, so an unpopulated answer stays distinguishable from a
-  measured one.
 
 ## [0.4.2] - 2026-07-11
 
@@ -547,9 +525,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   `step(chain, int N) -> step_result<Scalar>{ ik_status status; step_metrics{ int units_consumed; Scalar error_norm; } metrics; }`.
   The runner asks each solver for up to N units of work per cycle; the solver
   returns the actual units consumed. Wrapper-style restarts
-  (`restart_wrapper`, `projected_lm`'s baked-in restart, `argmin_slsqp`
-  cold-restart) charge zero for the restart event; only the underlying
-  iterations bill.
+  (`restart_wrapper`, `projected_lm`'s baked-in restart) charge zero for the
+  restart event; only the underlying iterations bill.
 - `cartan::ik::step_one(s, chain)` free helper as the ergonomic one-unit shim.
 - Stream B: head-to-head closed-form vs iterative IK bench matrix on
   `(planar 2R, spatial 3R, ABB IRB120, KR6 R900)` with wall + accuracy +
@@ -563,8 +540,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   `ik_comparison_pinocchio_benchmarks.cpp` with empirical-basis rationale
   comments.
 - `tests/unit/solver_unit_count_test.cpp` regression test fan-out across the
-  11 in-tree iterative solver types (43 cases / 107 assertions / 5 property
-  blocks).
+  in-tree iterative solver types.
 
 ### Changed
 - `convergence_criteria<Scalar>` split its single `max_iterations` field into
@@ -578,37 +554,18 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   saturation-ladder walk (`lm=400/800/1600/3200`; saturation reached at 800,
   with `lm=1600` and `lm=3200` bit-identical cell-by-cell). +6.90 pp net
   Success_pct across the 36-cell LM gate vs the v0.2.0 baseline.
-- Pose-batch IK bench cells gain a `multiplier_reest_every_k` knob forwarded
-  to `argmin_slsqp` options.
 
 ### Fixed
-- Three argmin shim restart-count regressions surfaced by the finer-grained
-  `step_n(N)` granularity (`is_inner_terminal` now includes the per-attempt
-  cap; restart fires before stall-detector preempts).
 - `basic_ik_runner::solve()` infinite-loop guard when an inner solver returns
   `{units=0, status=converged}` on `min_distance`-objective restart.
-- `cmaes` precision tolerance flake observed under the finer step granularity.
 
 ### Notes
-- The v0.3.0 runner-budget refactor exposes a structural asymmetry that no
-  single per-family budget value can close cell-by-cell: 5
-  `builtin_lm_restart` cells saturate at 100% (positive-delta, worst
-  `ur3e_builtin_lm_restart` at +4.30 pp above the pre-refactor truncated
-  baseline), 4 `argmin_lm` default cells sit 0.25-0.50 pp below baseline
-  (negative-delta from argmin's higher per-iter cost). Gate criterion revised
-  from cell-by-cell `±0.20 pp` to net-SR-non-regression + per-cell
-  negative-only `-1.00 pp` floor — a durable lesson for any future bench
-  budget reform.
-
-## [0.2.2] — 2026-04-14
-
-### Added
-- `cartan::ik::argmin_projected_gn` and `cartan::ik::argmin_projected_gradient_gn`
-  wrappers over nablapp's projected Gauss-Newton policies.
-- PGN entries wired into `basic_ik_full_benchmarks` (9-robot) and
-  `ik_comparison_benchmarks` (UR3e head-to-head).
-- `cartan::ik::mma` and `cartan::ik::gcmma` wrappers over nablapp's method of
-  moving asymptotes policies.
+- The v0.3.0 runner-budget refactor moves cells off their baseline in a way no
+  single per-family budget value can undo cell-by-cell: 5 `builtin_lm_restart`
+  cells saturate at 100% (worst `ur3e_builtin_lm_restart` at +4.30 pp above the
+  pre-refactor truncated baseline). The gate criterion is revised from
+  cell-by-cell `±0.20 pp` to net-SR-non-regression with a per-cell `-1.00 pp`
+  floor.
 
 ## [0.2.1] — 2026-04-13
 
@@ -616,17 +573,10 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 - `cartan::ik::` namespace with structured directory hierarchy (`solver/`,
   `wrapper/`, `concepts/`, `policy/`). Suffix-free type names
   (`cartan::ik::lm`, `cartan::ik::projected_lm`, `cartan::ik::lbfgsb`, ...).
-- Dual-implementation `builtin_*` and `argmin_*` prefixes with conditional
-  short-alias defaults.
+- `builtin_*`-prefixed implementations with short-alias defaults.
 - Convenience headers `<cartan/serial/ik.h>` and `<cartan/serial/fk.h>`.
 - `exhaustive_ik_runner` with FK validation, joint-space dedup, and three
   ranking strategies.
-- Cold-restart perturb-retry loop for `argmin_slsqp` (59.8% UR3e direct-drive
-  success, up from 19.9% one-shot baseline).
-
-### Changed
-- `CARTAN_BUILD_ARGMIN` guards on all benchmark and profiling files for clean
-  argmin-free builds.
 
 ## [0.2.0] — 2026-04-03
 
@@ -643,7 +593,6 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   2R, spatial 3R, 6R Pieper (spherical-wrist), plus Paden-Kahan subproblems
   SP1/SP2/SP3 as building blocks. Multi-solution output via
   `analytical_result<Scalar, N, MaxSolutions>`.
-- nablapp IK integration benchmarks across all robot geometries.
 
 ### Changed
 - `liepp` → `Cartan` rename across all code, CMake, docs, and tests.
@@ -656,15 +605,13 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   all scheduler types (`RacingScheduler`, `FallbackScheduler` deleted; one
   composable type via CTAD).
 - Factory functions with builder-pattern materialization.
-- nablapp integrated as default SLSQP/BOBYQA backend via FetchContent;
-  benchmark parity with NLopt confirmed within 0.5%.
 - Physical library split: `cartan-lie` (19 headers) and `cartan-kinematics`
   (35 headers, later renamed `cartan-serial-chain`) with three CMake
   INTERFACE targets and module umbrella headers.
 
 ### Changed
 - Template arg reorder to `<Scalar, N>` across all 23 IK headers (enables
-  CTAD, matches ctrlpp convention).
+  CTAD).
 - `_stepper` → `_solve_policy` rename with CTAD deduction guides.
 - Function decomposition: `projected_lm`, `lbfgsb`, and `lm` step() methods
   decomposed from 105-192 lines down to 47-75 lines via named algorithmic

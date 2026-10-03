@@ -618,7 +618,7 @@ void register_analytical(nb::module_ &m)
 
     // ------------------------------------------------------------------
     // Multi-solution helpers.
-    //   closest_to_seed: argmin by L2 distance over result.solutions;
+    //   closest_to_seed: minimizer of the L2 distance over result.solutions;
     //   verify_solution: FK back-check at a single tolerance mapped to
     //     both position and orientation tolerances of the C++ verifier;
     //   filter_valid_solutions: new AnalyticalResult keeping only the

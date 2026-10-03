@@ -1,9 +1,6 @@
-#include "../support/kinematics_helpers.h"
 #include "../support/joint_limits_helpers.h"
 
-#include <cartan/serial/ik/solver/nw_sqp.h>
 #include <cartan/serial/ik/detail/limit_enforcement.h>
-#include <cartan/serial/ik/detail/argmin_constrained_problem.h>
 #include <cartan/serial/ik/solver/detail/halton_seed_generator.h>
 
 #include <cartan/analytical/detail/angle_unwrap.h>
@@ -52,66 +49,6 @@ chain6 make_one_sided_chain()
     return chain6(home, {s1, s2, s3, s4, s5, s6}, {open, lim, lim, lim, lim, lim});
 }
 
-}
-
-TEST_CASE("one-sided joint yields a non-empty substituted interval", "[unbounded]")
-{
-    auto chain = make_one_sided_chain();
-    cartan::detail::argmin_constrained_ik_problem<chain6> problem(
-        chain, cartan::se3<double>::identity(), cartan::error_weight<double>{},
-        position6::Zero());
-
-    // The two inequality rows for joint 0 read q - lower >= 0 and upper - q >= 0,
-    // so evaluating at a feasible q recovers the substituted interval: lower is
-    // q - c[0] and upper is q + c[6]. Anchored to +/-half the fallback width
-    // about the origin instead, this is [10, 6.28319] -- empty, and no q makes
-    // both rows non-negative.
-    position6 q = position6::Zero();
-    q[0] = 12.0;
-    Eigen::VectorXd c(12);
-    problem.constraints(q, c);
-
-    const double lower = q[0] - c[0];
-    const double upper = q[0] + c[6];
-    CHECK_THAT(lower, WithinAbs(10.0, 1e-12));
-    CHECK(upper > lower);
-    CHECK(upper >= 10.0);
-    CHECK(c[0] >= 0.0);
-    CHECK(c[6] >= 0.0);
-}
-
-TEST_CASE("one-sided joint solves to a target reachable only above its bound", "[unbounded]")
-{
-    auto chain = make_one_sided_chain();
-
-    position6 q_known;
-    q_known << 11.0, 0.3, -0.4, 0.2, 0.5, -0.1;
-    auto target = cartan::testing::fk_at(chain, q_known).end_effector;
-
-    position6 q0;
-    q0 << 10.5, 0.0, 0.0, 0.0, 0.0, 0.0;
-
-    cartan::convergence_criteria<double> criteria{};
-    criteria.position_tol = 1e-7;
-    criteria.orientation_tol = 1e-7;
-    criteria.max_iterations_per_attempt = 400;
-    criteria.max_total_work_units = 4000;
-
-    cartan::nw_sqp<chain6> solver{};
-    solver.setup(chain, target, q0, criteria);
-
-    cartan::ik_status status = cartan::ik_status::running;
-    int safety = 4000;
-    while (status == cartan::ik_status::running && safety-- > 0)
-    {
-        status = solver.step(chain, 1).status;
-    }
-
-    REQUIRE(solver.converged());
-    auto fk = cartan::testing::fk_at(chain, solver.solution());
-    const auto err = (fk.end_effector.inverse() * target).log();
-    CHECK(err.head<3>().norm() < 1e-5);
-    CHECK(err.tail<3>().norm() < 1e-5);
 }
 
 TEST_CASE("every multistart seed satisfies a one-sided joint's real limits", "[unbounded]")

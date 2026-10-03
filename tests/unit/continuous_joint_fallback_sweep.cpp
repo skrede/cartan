@@ -2,8 +2,7 @@
 ///
 /// Determines which value of k_unbounded_angular_range_v (the fallback used
 /// when (position_max - position_min) is non-finite, e.g. for unbounded
-/// angular joints) maximizes IK success across three iterative solver
-/// families (LM via restart-wrapping, argmin SLSQP, argmin projected GN) on a
+/// angular joints) maximizes IK success for restart-wrapped LM on a
 /// continuous-wrist fixture. The harness is committed in-tree and gated to a
 /// manual ctest target via the DISABLED property so day-to-day regression
 /// cycles stay fast; it is intended to be run on demand to update the
@@ -14,8 +13,6 @@
 #include "cartan/urdf.h"
 
 #include "cartan/serial/ik/solver/lm.h"
-#include "cartan/serial/ik/solver/argmin_slsqp.h"
-#include "cartan/serial/ik/solver/argmin_projected_gn.h"
 #include "cartan/serial/ik/wrapper/restart_wrapper.h"
 
 #include "cartan/serial/chain/screw_axis.h"
@@ -26,6 +23,7 @@
 
 #include "cartan/lie/se3.h"
 
+#include <cmath>
 #include <chrono>
 #include <cstdio>
 #include <random>
@@ -41,8 +39,6 @@ namespace
 using chain_t = cartan::kinematic_chain<double, cartan::dynamic>;
 using restart_lm = cartan::restart_wrapper<chain_t,
     cartan::builtin_lm<chain_t, cartan::no_limits>, cartan::no_limits>;
-using argmin_slsqp_t = cartan::argmin_slsqp<chain_t>;
-using argmin_pgn_t = cartan::argmin_projected_gn<chain_t>;
 
 /// Replace the continuous joint's bounds with finite values of half-range
 /// (candidate / 2). The PoE chain math is unchanged; only the joint_limits
@@ -194,21 +190,12 @@ int main(int, char**)
         2.0 * std::numbers::pi,
         4.0 * std::numbers::pi,
     };
-    const char* candidate_names[] = {"pi/2", "pi", "2*pi", "4*pi"};
 
     std::vector<sweep_cell> records;
-    for (std::size_t ci = 0; ci < std::size(candidates); ++ci)
+    for (const double c : candidates)
     {
-        const double c = candidates[ci];
         chain_t chain = synthesize_chain_with_range(source_chain, c);
-
-        records.push_back(
-            sweep_solver<restart_lm>(chain, c, "restart_lm", targets_q));
-        records.push_back(
-            sweep_solver<argmin_slsqp_t>(chain, c, "argmin_slsqp", targets_q));
-        records.push_back(
-            sweep_solver<argmin_pgn_t>(chain, c, "argmin_projected_gn", targets_q));
-        (void)candidate_names[ci];
+        records.push_back(sweep_solver<restart_lm>(chain, c, "restart_lm", targets_q));
     }
 
     std::printf("| fallback | solver | success_rate | mean_wall_us | p99_wall_us |\n");
@@ -221,41 +208,16 @@ int main(int, char**)
             r.fallback, r.solver_name, rate, r.mean_wall_us, r.p99_wall_us);
     }
 
-    // Aggregate score per candidate: summed success across the 3 solvers (max
-    // 3 * trials), tiebroken by lowest summed mean wall time.
-    struct agg { double fallback; const char* name; int success_sum; double wall_sum; };
-    std::vector<agg> aggregates;
-    for (std::size_t ci = 0; ci < std::size(candidates); ++ci)
-    {
-        agg a{candidates[ci], candidate_names[ci], 0, 0.0};
-        for (const auto& r : records)
-        {
-            if (r.fallback == candidates[ci])
+    std::sort(records.begin(), records.end(),
+        [](const sweep_cell& l, const sweep_cell& r) {
+            if (l.successes != r.successes)
             {
-                a.success_sum += r.successes;
-                a.wall_sum += r.mean_wall_us;
+                return l.successes > r.successes;
             }
-        }
-        aggregates.push_back(a);
-    }
-
-    std::printf("\n| candidate | success_sum | mean_wall_sum_us |\n");
-    std::printf("|-----------|-------------|------------------|\n");
-    for (const auto& a : aggregates)
-    {
-        std::printf("| %s | %d | %.2f |\n", a.name, a.success_sum, a.wall_sum);
-    }
-
-    std::sort(aggregates.begin(), aggregates.end(),
-        [](const agg& l, const agg& r) {
-            if (l.success_sum != r.success_sum)
-            {
-                return l.success_sum > r.success_sum;
-            }
-            return l.wall_sum < r.wall_sum;
+            return l.mean_wall_us < r.mean_wall_us;
         });
 
-    std::printf("\nwinner: %s (success_sum=%d, mean_wall_sum_us=%.2f)\n",
-        aggregates[0].name, aggregates[0].success_sum, aggregates[0].wall_sum);
+    std::printf("\nwinner: %.6f (successes=%d, mean_wall_us=%.2f)\n",
+        records[0].fallback, records[0].successes, records[0].mean_wall_us);
     return 0;
 }

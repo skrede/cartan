@@ -25,17 +25,4 @@
 #include "cartan/serial/ik/policy/limits_policy.h"
 #include "cartan/serial/ik/policy/error_weight.h"
 
-#ifdef CARTAN_HAS_ARGMIN
-#include "cartan/serial/ik/solver/argmin_lm.h"
-#include "cartan/serial/ik/solver/argmin_lbfgsb.h"
-#include "cartan/serial/ik/solver/argmin_slsqp.h"
-#include "cartan/serial/ik/solver/argmin_bobyqa.h"
-#include "cartan/serial/ik/solver/nw_sqp.h"
-#include "cartan/serial/ik/solver/filter_slsqp.h"
-#include "cartan/serial/ik/solver/filter_nw_sqp.h"
-#include "cartan/serial/ik/solver/argmin_projected_gn.h"
-#include "cartan/serial/ik/solver/argmin_projected_gradient_gn.h"
-#include "cartan/serial/ik/solver/augmented_lagrangian.h"
-#endif
-
 #endif

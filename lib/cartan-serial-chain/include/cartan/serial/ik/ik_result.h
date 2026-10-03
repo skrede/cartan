@@ -22,9 +22,6 @@ namespace cartan
 /// `selection_metric` is the value the winning candidate was ranked on, under
 /// `selection_objective`. It is absent where the objective ranks nothing, which
 /// is the `speed` case, so an unranked win reads as absent rather than as zero.
-///
-/// `solved_feasible_set` is the bounds the winning policy actually solved over,
-/// which is not always the chain's declared bounds.
 template <typename Scalar = double, int N = dynamic>
 struct ik_result
 {
@@ -36,7 +33,6 @@ struct ik_result
     int solver_index{};
     std::optional<Scalar> selection_metric{};
     ik_objective selection_objective{ik_objective::speed};
-    feasible_set solved_feasible_set{feasible_set::declared};
 };
 
 /// IK error containing failure diagnostics. Every numeric payload field defaults
@@ -54,7 +50,6 @@ struct ik_error
     static_assert(std::is_floating_point_v<Scalar>, "ik_error requires a floating-point Scalar type");
 
     ik_failure reason{ik_failure::iteration_limit};
-    ik_termination_reason termination_reason{ik_termination_reason::unknown};
     typename joint_state<Scalar, N>::position_type last_q{detail::poison_joint_position<Scalar, N>()};
     Scalar last_error_norm{std::numeric_limits<Scalar>::quiet_NaN()};
 };

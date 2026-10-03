@@ -48,12 +48,10 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     ${_doc_snippet_markdown})
 
 # Each extractor group compiles in its own object library against the target that
-# owns that group's API, and takes its include roots, language level and feature
-# macro from that target's interface. Nothing here defines a macro by hand, and no
-# object library mixes translation units built under different configurations.
-set(_doc_snippet_groups core argmin urdf)
+# owns that group's API, and takes its include roots and language level from that
+# target's interface.
+set(_doc_snippet_groups core urdf)
 set(_doc_snippet_core_target cartan::cartan)
-set(_doc_snippet_argmin_target cartan::argmin)
 set(_doc_snippet_urdf_target cartan::urdf)
 
 # The name the rest of the tree builds. It aggregates whichever group libraries
@@ -91,8 +89,7 @@ foreach (_group IN LISTS _doc_snippet_groups)
     endif ()
 
     # The umbrella comes first in every group: a component links only its own
-    # subsystem and its backend, while the extractor's default preamble includes
-    # the whole public API. It carries no backend macro, so it cannot contaminate.
+    # subsystem, while the extractor's default preamble includes the whole public API.
     add_library(doc_snippets_${_group} OBJECT ${_group_sources})
     target_link_libraries(doc_snippets_${_group}
         PRIVATE cartan::cartan ${_doc_snippet_${_group}_target})

@@ -32,7 +32,7 @@ CASES = [
     ("a kernel count on a participant the harness does not drive is refused",
      "kernel_on_uncountable", TARGETS, 1, "'trac_ik' is declared without a countable kernel"),
     ("a participant the records carry and nothing declares is refused",
-     "undeclared_participant", TARGETS, 1, "carry rows for ['argmin_lbfgs']"),
+     "undeclared_participant", TARGETS, 1, "carry rows for ['undeclared_lbfgs']"),
     ("a verdict disagreeing with the self-report in both directions is summarized as both",
      "verdict_disagreement", TARGETS, 0, "| 1 / 6 (16.67%) | 1 / 6 (16.67%) |"),
     ("a non-finite error on an accepted solve is refused by line and column",

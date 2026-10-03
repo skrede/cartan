@@ -24,11 +24,6 @@
 #include <cartan/lie/se3.h>
 #include <cartan/serial/chain/kinematic_chain.h>
 
-#ifdef CARTAN_HAS_ARGMIN
-#include <cartan/serial/ik/solver/argmin_lbfgsb.h>
-#include <cartan/serial/ik/solver/argmin_projected_gn.h>
-#endif
-
 #include <catch2/catch_test_macros.hpp>
 
 namespace spp = cartan;
@@ -138,27 +133,6 @@ TEST_CASE("an aborted restarting Levenberg-Marquardt policy is terminal", "[ik][
     step_after_abort_is_terminal_and_free(policy);
     REQUIRE(policy.status() == spp::ik_status::aborted);
 }
-
-#ifdef CARTAN_HAS_ARGMIN
-
-TEST_CASE("an aborted L-BFGS-B policy reports the abort and its finer reason", "[ik][abort]")
-{
-    spp::argmin_lbfgsb<chain_t> policy;
-    step_after_abort_is_terminal_and_free(policy);
-    REQUIRE(policy.status() == spp::ik_status::aborted);
-    REQUIRE(policy.termination_reason() == spp::ik_termination_reason::solver_aborted);
-}
-
-TEST_CASE("an aborted projected Gauss-Newton policy reports the abort and its finer reason",
-    "[ik][abort]")
-{
-    spp::argmin_projected_gn<chain_t> policy;
-    step_after_abort_is_terminal_and_free(policy);
-    REQUIRE(policy.status() == spp::ik_status::aborted);
-    REQUIRE(policy.termination_reason() == spp::ik_termination_reason::solver_aborted);
-}
-
-#endif
 
 TEST_CASE("aborting the restart wrapper propagates to the wrapped policy", "[ik][abort]")
 {

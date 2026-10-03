@@ -16,7 +16,6 @@
 #include "cartan/serial/ik/ik_result.h"
 #include "cartan/serial/ik/ik_status.h"
 #include "cartan/serial/ik/detail/convergence.h"
-#include "cartan/serial/ik/detail/feasible_set.h"
 #include "cartan/serial/ik/concepts/solve_concept.h"
 #include "cartan/serial/ik/detail/setup_validation.h"
 #include "cartan/serial/ik/detail/selection_metrics.h"
@@ -50,24 +49,6 @@ consteval bool all_policies_agree()
         return ((std::same_as<typename First::scalar_type, typename Rest::scalar_type>
                  && std::same_as<typename First::chain_type, typename Rest::chain_type>
                  && First::joints == Rest::joints) && ...);
-}
-
-/// Detects whether a policy exposes `termination_reason()` for fine-grained
-/// failure diagnostics. Policies that opt out are reported as
-/// `ik_termination_reason::unknown`.
-template <typename Policy>
-concept reports_termination_reason = requires(const Policy& p)
-{
-    { p.termination_reason() } -> std::convertible_to<ik_termination_reason>;
-};
-
-template <typename Policy>
-constexpr ik_termination_reason policy_termination_reason(const Policy& p) noexcept
-{
-    if constexpr (reports_termination_reason<Policy>)
-        return p.termination_reason();
-    else
-        return ik_termination_reason::unknown;
 }
 
 /// Variadic policy-based IK solver with cooperative interleaved racing.
@@ -246,19 +227,7 @@ private:
         std::optional<scalar_type> metric{};
         int iterations{};
         bool converged{false};
-        ik_termination_reason termination_reason{ik_termination_reason::unknown};
-        feasible_set solved_feasible_set{feasible_set::declared};
     };
-
-    /// Recorded per policy rather than per runner: the pack may mix a policy
-    /// that substitutes a finite interval for a non-finite bound with one that
-    /// box-projects against the declared bounds, and those two race over
-    /// different feasible sets.
-    template <typename Policy>
-    feasible_set policy_feasible_set() const
-    {
-        return cartan::detail::feasible_set_solved<Policy>(m_chain->get());
-    }
 
     /// Everything setup() establishes before a policy is touched, so a rejected
     /// call leaves neither a half-configured policy nor the previous solve's
@@ -413,9 +382,7 @@ private:
                 .error_norm = policy.error_norm(),
                 .metric = candidate_metric(policy.solution(), policy.error_norm()),
                 .iterations = policy.iterations(),
-                .converged = true,
-                .termination_reason = policy_termination_reason(policy),
-                .solved_feasible_set = policy_feasible_set<std::tuple_element_t<I, std::tuple<Policies...>>>()
+                .converged = true
             });
             m_found_convergence = true;
 
@@ -435,9 +402,7 @@ private:
                 .q = policy.solution(),
                 .error_norm = policy.error_norm(),
                 .iterations = policy.iterations(),
-                .converged = false,
-                .termination_reason = policy_termination_reason(policy),
-                .solved_feasible_set = policy_feasible_set<std::tuple_element_t<I, std::tuple<Policies...>>>()
+                .converged = false
             });
         }
         else
@@ -530,7 +495,6 @@ private:
                 result.solver_index = 0;
                 result.selection_metric = m_best_metric;
                 result.selection_objective = m_objective;
-                result.solved_feasible_set = policy_feasible_set<first_policy>();
                 return result;
             }
             else
@@ -598,14 +562,12 @@ private:
         result.solver_index = index;
         result.selection_metric = pr.metric;
         result.selection_objective = m_objective;
-        result.solved_feasible_set = pr.solved_feasible_set;
         return result;
     }
 
     cartan::expected<ik_result<scalar_type, joints>, ik_error<scalar_type, joints>> build_error()
     {
         ik_error<scalar_type, joints> err;
-        err.termination_reason = ik_termination_reason::unknown;
 
         // A refused setup ran no iteration, so neither field was measured and
         // both keep the poison: reading an iterate off a policy would hand back
@@ -624,7 +586,6 @@ private:
         {
             err.last_q = std::get<0>(m_policies).solution();
             err.last_error_norm = std::get<0>(m_policies).error_norm();
-            err.termination_reason = policy_termination_reason(std::get<0>(m_policies));
         }
         else
         {
@@ -643,7 +604,6 @@ private:
                 const auto& best = *m_results[static_cast<std::size_t>(best_fail)];
                 err.last_q = best.q;
                 err.last_error_norm = best.error_norm;
-                err.termination_reason = best.termination_reason;
             }
             else
             {
@@ -672,7 +632,6 @@ private:
                 best = policy.error_norm();
                 err.last_q = policy.solution();
                 err.last_error_norm = best;
-                err.termination_reason = policy_termination_reason(policy);
             }
         };
         (check.template operator()<Is>(), ...);

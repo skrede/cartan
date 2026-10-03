@@ -57,7 +57,6 @@ quaternion<Scalar> matrix_to_quat(const matrix3<Scalar>& R)
 }
 
 /// Named quaternion constructor: w-first order (w, x, y, z).
-/// This matches the ctrlpp external API convention.
 /// Eigen's quaternion constructor is also w-first: Quaternion(w, x, y, z).
 /// Reference: Hamilton convention; Barfoot, Section 8.1.
 template <typename Scalar>
@@ -76,7 +75,7 @@ quaternion<Scalar> from_xyzw(Scalar x, Scalar y, Scalar z, Scalar w)
     return quaternion<Scalar>(w, x, y, z);
 }
 
-/// Serialize quaternion to [w, x, y, z] 4-vector per ctrlpp convention.
+/// Serialize quaternion to [w, x, y, z] 4-vector.
 /// Reference: Hamilton convention output format.
 template <typename Scalar>
 vector<Scalar, 4> to_wxyz(const quaternion<Scalar>& q)

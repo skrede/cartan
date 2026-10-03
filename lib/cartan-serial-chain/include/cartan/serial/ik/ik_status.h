@@ -66,20 +66,6 @@ constexpr const char* message(ik_status status)
     return "Unknown ik_status";
 }
 
-/// Which set of joint bounds a policy actually solved over.
-///
-/// A backend that cannot accept an infinite coordinate is handed a finite
-/// interval substituted for the non-finite one, so on a chain carrying an
-/// unbounded joint it solves a different problem from a policy that box-projects
-/// against the declared bounds. Racing the two is legitimate and the split is
-/// deliberate; reporting which one produced the answer is what keeps it from
-/// being silent.
-enum class feasible_set
-{
-    declared,
-    substituted
-};
-
 /// Objective for the IK solve -- controls secondary optimization.
 ///
 /// `min_error_norm` ranks on the pose residual and `min_joint_distance` on the
@@ -140,38 +126,6 @@ constexpr const char* message(ik_failure failure)
     }
     return "Unknown ik_failure";
 }
-
-/// Fine-grained termination reason reported by individual solve policies.
-///
-/// `ik_status` distinguishes only five terminal cases (converged, diverged,
-/// stalled, iteration_limit, joint_limit_hit), which is too coarse for
-/// diagnosing failure clusters in SQP/BFGS-backed solvers: six underlying
-/// argmin terminators collapse into `ik_status::stalled` without this.
-///
-/// Policies that wrap a lower-level solver (e.g. `argmin_slsqp` wrapping
-/// argmin's `kraft_slsqp_policy`) report the specific inner terminator via
-/// `termination_reason()`. Policies that do not opt in report
-/// `ik_termination_reason::unknown`, and `basic_ik_runner` propagates the
-/// reported value into `ik_error::termination_reason`.
-enum class ik_termination_reason
-{
-    unknown,                         ///< policy did not report a finer reason
-    converged,                       ///< pose tolerance met
-    iteration_limit,                 ///< cartan-side max_iterations exhausted
-    stall_detected,                  ///< cartan-side stall detection fired
-    divergence_detected,             ///< cartan-side divergence detection fired
-    joint_limit_hit,                 ///< cartan-side limits policy rejected
-    solver_converged_pose_missed,    ///< inner solver converged, pose tol not met
-    solver_ftol_reached,             ///< inner solver: objective tol reached, pose tol not met
-    solver_xtol_reached,             ///< inner solver: step tol reached
-    solver_objective_stalled,        ///< inner solver: objective stalled
-    solver_roundoff_limited,         ///< inner solver: roundoff-limited
-    solver_stalled,                  ///< inner solver: stall terminator
-    solver_aborted,                  ///< inner solver: aborted by callback
-    solver_budget_exhausted,         ///< inner solver: per-step budget exhausted
-    solver_max_iterations,           ///< inner solver: max_iterations exhausted
-    solver_diverged                  ///< inner solver: divergence detected
-};
 
 namespace detail
 {

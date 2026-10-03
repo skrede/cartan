@@ -166,8 +166,6 @@ ik_converged: bool = ik_result.converged
 ik_iterations: int = ik_result.iterations
 ik_error: float = ik_result.error_norm
 ik_failure_reason: str = ik_result.failure_reason
-ik_termination: cartan.IkTerminationReason = ik_result.termination_reason
-ik_feasible_set: cartan.FeasibleSet = ik_result.solved_feasible_set
 
 if (ik_sigma := cartan.singular_values(ik_chain, ik_result.q)) is not None:
     ik_condition_number: float | None = cartan.condition_number(ik_sigma)
@@ -325,33 +323,6 @@ exhaustive_solutions: list[cartan.IkResult] = exhaustive_runner.solve(
     max_restarts=10,
     ranking=exhaustive_ranking,
 )
-
-
-# ---------------------------------------------------------------------------
-# argmin-backed iterative IK trio.
-#
-# The three solve_ik_argmin_* symbols are only present when the wheel was
-# built with CARTAN_BUILD_ARGMIN=ON; cartan.has_argmin reports the build
-# flag. The has_argmin attribute is always present (its value differs across
-# builds). The getattr + cast indirection here mirrors the URDF block above:
-# strict mode sees the symbol come back as the correct callable signature
-# whether the build is ON or OFF, so the sample stays stub-portable.
-# ---------------------------------------------------------------------------
-
-has_argmin: bool = cartan.has_argmin
-
-SolverFn = Callable[
-    [cartan.KinematicChain, cartan.SE3, np.ndarray, cartan.IkConfig | None],
-    cartan.IkResult,
-]
-
-if has_argmin:
-    argmin_slsqp: SolverFn = cast(SolverFn, getattr(cartan, "solve_ik_argmin_slsqp"))
-    argmin_lm: SolverFn = cast(SolverFn, getattr(cartan, "solve_ik_argmin_lm"))
-    argmin_lbfgsb: SolverFn = cast(SolverFn, getattr(cartan, "solve_ik_argmin_lbfgsb"))
-    argmin_result_slsqp: cartan.IkResult = argmin_slsqp(ik_chain, ik_target, ik_q_seed, None)
-    argmin_result_lm: cartan.IkResult = argmin_lm(ik_chain, ik_target, ik_q_seed, None)
-    argmin_result_lbfgsb: cartan.IkResult = argmin_lbfgsb(ik_chain, ik_target, ik_q_seed, None)
 
 
 if __name__ == "__main__":

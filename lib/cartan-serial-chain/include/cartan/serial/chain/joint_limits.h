@@ -127,13 +127,11 @@ namespace detail
 /// e.g. for unbounded angular joints whose joint_limits use +/-infinity bounds.
 /// Empirically tuned via tests/unit/continuous_joint_fallback_sweep.cpp on an
 /// unbounded-wrist fixture: the sweep covers {pi/2, pi, 2*pi, 4*pi} against
-/// restart-wrapped LM, argmin SLSQP, and argmin projected GN, picks the
-/// candidate with the highest aggregate success rate, and breaks ties by
-/// lowest mean wall time. Two full revolutions (4*pi) gives the
-/// restart-perturbation step enough reach to escape unhelpful local minima on
-/// the unbounded joint while keeping the active-set QP's substituted bounds
-/// within numerical reach. Re-run the sweep harness when the surrounding
-/// solver code or test fixture changes; lock the winner here.
+/// restart-wrapped LM, picks the candidate with the highest success rate, and
+/// breaks ties by lowest mean wall time. Both 2*pi and 4*pi solve every target
+/// while pi and below fail most of them, so 4*pi holds its place on the wall-time
+/// tiebreak alone. Re-run the sweep harness when the surrounding solver code or
+/// test fixture changes; lock the winner here.
 ///
 /// The unit is turns and the sweep ran on angular joints only, so an unbounded
 /// prismatic joint receives a window of 4*pi of the chain's linear unit -- an
@@ -162,12 +160,12 @@ struct anchored_bounds
 
 /// Substitute a finite interval of the given width for a bound pair with a
 /// non-finite side: it runs inward from whichever side is finite, and is
-/// centered on reference when neither is. Feeds argmin's QP active-set and the
-/// multistart seeder, neither of which accepts an infinite coordinate.
+/// centered on reference when neither is. Feeds the multistart seeder, which
+/// does not accept an infinite coordinate.
 ///
 /// Anchoring to the finite side is load-bearing: +/-width/2 about the origin
 /// substitutes the empty interval [10, width/2] for a joint feasible from 10
-/// radians upward, handing a solvable problem to a backend as an unsolvable one.
+/// radians upward, and every seed drawn from it lands outside the bounds.
 template <typename Scalar>
 constexpr anchored_bounds<Scalar> anchor_bounds(
     Scalar lo, Scalar hi, Scalar width, Scalar reference) noexcept

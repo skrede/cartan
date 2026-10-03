@@ -56,13 +56,6 @@ The `lm<Chain>`, `dls<Chain>`, `projected_lm<Chain, no_limits>`, and
 steppers. Each takes the chain type as its first template argument and a limit
 policy (`no_limits` or `clamp_limits`) as its second.
 
-These names are configuration-invariant. `lm` and `lbfgsb` alias `builtin_lm`
-and `builtin_lbfgsb` unconditionally, so they denote the native implementations
-in every build; a backend's steppers are reachable only under their own prefixed
-names (`argmin_lm`, `argmin_slsqp`, `argmin_bobyqa`, and the rest). A policy name
-therefore means the same type in every translation unit, whichever backends the
-build enabled.
-
 ## Restart Wrapping
 
 The `restart_wrapper` wraps any inner policy with multi-start capability. When
@@ -116,6 +109,10 @@ For the other objectives (`min_error_norm`, `min_joint_distance`,
 best is selected, on one definition of the objective's metric shared with the
 single-policy path. The winning candidate's metric is reported on the result
 together with the objective it was computed under.
+
+Every policy in the pack must agree on `scalar_type` and `joints`; the runner
+enforces this with a `static_assert`, so a mismatched mix fails to compile
+rather than misbehaving at runtime.
 
 This cooperative model is the key differentiator versus TRAC-IK: **all policies
 run in the calling thread**, ticked round-robin, with no thread spawning or
@@ -281,38 +278,6 @@ static_assert(std::is_same_v<decltype(solver), cartan::basic_ik_runner<
     cartan::dls<Chain>>>);
 ```
 
-## argmin Solvers
-
-The argmin-backed policies (`argmin_slsqp`, `argmin_bobyqa`, and the rest of the
-argmin family) provide constrained optimization with joint limits as box bounds.
-`CARTAN_BUILD_ARGMIN` decides whether the `cartan::argmin` component is built at
-all; linking that component is what makes the policies visible, because it
-carries the backend headers and `CARTAN_HAS_ARGMIN` on its interface. Linking
-`cartan::cartan` alone never defines that macro, and no consumer ever defines it
-by hand:
-
-```cmake
-find_package(cartan CONFIG REQUIRED COMPONENTS argmin)
-target_link_libraries(app PRIVATE cartan::cartan cartan::argmin)
-```
-
-Requesting the component is what makes the package config resolve argmin itself.
-Omit it and the export file still names `argmin::argmin`, but nothing defines it,
-and configuring fails inside `cartanTargets.cmake`.
-
-<!-- cartan:snippet name=argmin-slsqp needs=argmin -->
-```cpp
-// SLSQP with box-bounded joint limits.
-cartan::basic_ik_runner solver{cartan::argmin_slsqp<Chain>{}};
-```
-
-BOBYQA is derivative-free, useful when the gradient is expensive or unreliable:
-
-<!-- cartan:snippet name=argmin-bobyqa needs=argmin -->
-```cpp
-cartan::basic_ik_runner solver{cartan::argmin_bobyqa<Chain>{}};
-```
-
 ## NLopt Solvers
 
 NLopt-backed policies are not library surface. They are carried as a solve-policy
@@ -328,23 +293,6 @@ target_link_libraries(app PRIVATE cartan::cartan cartan_examples::nlopt_policy)
 The example exists because wrapping an optimizer that only runs to completion is
 the case a natively steppable policy cannot demonstrate. See that directory's
 README for what it does and does not claim.
-
-## Mixing Families
-
-Any combination of native and argmin policies can race together in a single
-`basic_ik_runner`, as long as they all agree on `scalar_type` and `joints`:
-
-<!-- cartan:snippet name=mixing-families needs=argmin -->
-```cpp
-// Race a native restart+projected-LM against argmin SLSQP, cooperatively.
-cartan::basic_ik_runner solver{
-    cartan::speed_ik_runner<Chain>{},
-    cartan::argmin_slsqp<Chain>{}};
-```
-
-Because every policy is templated on the same `Chain`, the runner enforces the
-`scalar_type`/`joints` agreement across the pack with a `static_assert`: a
-mismatched mix fails to compile rather than misbehaving at runtime.
 
 ## Further Reading
 

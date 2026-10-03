@@ -39,9 +39,10 @@ find_package(cartan CONFIG REQUIRED)
 target_link_libraries(my_app PRIVATE cartan::cartan)
 ```
 
-Installing Cartan is the other way round: build it with Eigen, and any backend
-you enabled, available as findable packages rather than fetched, or the configure
-step refuses to generate an install surface it cannot make resolvable.
+Installing Cartan is the other way round: build it with Eigen, and the URDF
+module's description reader if you enabled it, available as findable packages
+rather than fetched, or the configure step refuses to generate an install surface
+it cannot make resolvable.
 
 ## Your first Lie group operation
 

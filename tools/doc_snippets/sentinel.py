@@ -14,7 +14,7 @@ rejected rather than silently truncated at the first space.
 import re
 import shlex
 
-CAPABILITIES = ("argmin", "urdf")
+CAPABILITIES = ("urdf",)
 CORE = "core"
 RECIPE = "recipe"
 

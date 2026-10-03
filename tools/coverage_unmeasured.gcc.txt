@@ -24,21 +24,16 @@
 #   declaration-only        The header declares types, concepts, constants or
 #                           aliases and defines no executable line, so gcov has
 #                           nothing to emit for it. Open the file to check. Every
-#                           row below carries this reason, and one of them is not
-#                           obvious from a glance: argmin_convergence.h is
-#                           instantiated by the solve policies, but its only
-#                           definitions are a constexpr function consumed as an
-#                           array extent and an alias template, and neither can
-#                           emit a line for an instantiation to reach.
-#   backend-not-built <OPT> Nothing the build compiles includes this header unless
+#                           row below carries this reason.
+#   option-not-built <OPT>  Nothing the build compiles includes this header unless
 #                           the named option is on, so gcov emits no record for it.
 #                           Check the option's effect in CMake together with the
 #                           includes of the header or of whatever includes it,
 #                           since an option usually gates the includers rather than
 #                           the header itself. No row carries this reason, because
-#                           the measured configuration below builds the optional
-#                           solver backend. The spelling stays accepted so that a
-#                           header behind an option this configuration does not set
+#                           the measured configuration below builds every optional
+#                           module. The spelling stays accepted so that a header
+#                           behind an option this configuration does not set
 #                           remains recordable.
 #   no-instantiating-test   The build compiles the header, but nothing in it calls
 #                           or instantiates what the header defines, so gcov emits
@@ -50,12 +45,11 @@
 # belongs in the denominator, the repair is the build configuration, not a row.
 #
 # Recorded against the measured configuration: the tests, the URDF module, the
-# optional solver backend, the examples and tutorials, the property tests, the
-# extended URDF parity tests, the doc snippets, the Python bindings and the
-# instantiation targets are all built, and the bindings' own suite runs under
-# instrumentation. The fuzz targets, the packaging matrix and the profiling
-# targets stay out, each for a reason the lane's configure step states rather than
-# leaves to be inferred.
+# examples and tutorials, the property tests, the extended URDF parity tests, the
+# doc snippets, the Python bindings and the instantiation targets are all built,
+# and the bindings' own suite runs under instrumentation. The fuzz targets, the
+# packaging matrix and the profiling targets stay out, each for a reason the
+# lane's configure step states rather than leaves to be inferred.
 #
 # The instantiation targets force every advertised combination of a solver family
 # into the build, and they move no row below: regenerating this record with their
@@ -77,7 +71,6 @@ lib/cartan-serial-chain/include/cartan/serial/chain/storage_trait.h             
 lib/cartan-serial-chain/include/cartan/serial/fk.h                                      declaration-only
 lib/cartan-serial-chain/include/cartan/serial/fk/kinematics.h                           declaration-only
 lib/cartan-serial-chain/include/cartan/serial/ik.h                                      declaration-only
-lib/cartan-serial-chain/include/cartan/serial/ik/detail/argmin_convergence.h            declaration-only
 lib/cartan-serial-chain/include/cartan/serial/ik/ik.h                                   declaration-only
 lib/cartan-serial-chain/include/cartan/serial/ik/ik_result.h                            declaration-only
 lib/cartan-serial-chain/include/cartan/serial_chain.h                                   declaration-only

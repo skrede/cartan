@@ -4,7 +4,6 @@
 #include <cartan/serial/ik/ik_status.h>
 #include <cartan/serial/ik/solver/lm.h>
 #include <cartan/serial/ik/basic_ik_runner.h>
-#include <cartan/serial/ik/detail/feasible_set.h>
 #include <cartan/serial/ik/detail/setup_validation.h>
 #include <cartan/serial/ik/detail/selection_metrics.h>
 
@@ -340,63 +339,4 @@ TEST_CASE("every status maps to a reason that does not misstate it", "[ik][diagn
         CHECK(failure_reason_for(status) == ik_failure::not_initialized);
         CHECK_FALSE(failure_reason_for(status) == ik_failure::iteration_limit);
     }
-}
-
-// ============================================================================
-// Which feasible set the policy solved over
-// ============================================================================
-
-namespace
-{
-
-struct substituting_policy
-{
-    static constexpr bool substitutes_unbounded_bounds = true;
-};
-
-struct projecting_policy
-{
-};
-
-chain_dyn make_unbounded_chain()
-{
-    auto s1 = spp::screw_axis<double>::revolute({0, 0, 1}, {0, 0, 0});
-    auto s2 = spp::screw_axis<double>::revolute({0, 1, 0}, {0, 0, 0.3});
-    auto unbounded = spp::testing::limits(
-        -std::numeric_limits<double>::infinity(), std::numeric_limits<double>::infinity());
-    return chain_dyn(spp::se3<double>::identity(), {s1, s2}, {unbounded, wide()});
-}
-
-}
-
-TEST_CASE("the substituted feasible set needs both a substituting policy and an unbounded joint",
-    "[ik][diagnostics]")
-{
-    using spp::detail::feasible_set_solved;
-    using spp::feasible_set;
-
-    auto unbounded = make_unbounded_chain();
-    auto bounded = make_ur5_like_chain();
-
-    CHECK(feasible_set_solved<substituting_policy>(unbounded) == feasible_set::substituted);
-    CHECK(feasible_set_solved<substituting_policy>(bounded) == feasible_set::declared);
-    CHECK(feasible_set_solved<projecting_policy>(unbounded) == feasible_set::declared);
-    CHECK(feasible_set_solved<projecting_policy>(bounded) == feasible_set::declared);
-}
-
-TEST_CASE("the result records the feasible set its policy solved over", "[ik][diagnostics]")
-{
-    auto chain = make_ur5_like_chain();
-    vec6 q;
-    q << 0.2, -0.6, 0.9, 0.2, -0.3, 0.5;
-    auto fk = spp::forward_kinematics(chain, q);
-    REQUIRE(fk.has_value());
-
-    spp::basic_ik_runner<spp::lm<chain6>> solver;
-    spp::convergence_criteria<double> criteria{1e-6, 1e-6, 200, 400};
-    solver.setup(chain, fk->end_effector, vec6::Zero(), criteria);
-
-    auto result = solver.solve();
-    REQUIRE(result.has_value());
-    CHECK(result->solved_feasible_set == spp::feasible_set::declared);
 }

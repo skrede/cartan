@@ -30,11 +30,6 @@ The parity matrix exercised here:
     FK-walked targets per (chain, policy=speed) cell; each `runner.solve`
     must return at least one solution. This is the non-slow smoke
     counterpart of the 100-target slow gate in `test_exhaustive.py`.
-
-(e) **argmin family under `importorskip` guard.** Spot-check that the three
-    argmin-backed entry points converge on a UR5e FK-walked target when
-    the wheel is built with `CARTAN_BUILD_ARGMIN=ON`; skip cleanly
-    otherwise.
 """
 
 from __future__ import annotations
@@ -217,44 +212,4 @@ def test_exhaustive_runner_gate_per_pieper_fixture(
         solutions = runner.solve(target, max_restarts=30)
         assert len(solutions) >= 1, (
             f"{chain_fixture} returned 0 solutions on target {i}"
-        )
-
-
-# ---------------------------------------------------------------------------
-# (e) argmin family parity under cartan.has_argmin guard.
-# ---------------------------------------------------------------------------
-
-
-def test_argmin_family_parity_under_importorskip(
-    ur5e_chain: cartan.KinematicChain,
-) -> None:
-    """When `cartan.has_argmin`, all three argmin solvers converge on UR5e.
-
-    Skips cleanly on -OFF builds where the symbols are absent.
-    """
-    if not cartan.has_argmin:
-        pytest.skip("cartan built without CARTAN_BUILD_ARGMIN=ON")
-
-    chain = ur5e_chain
-    rng = np.random.default_rng(seed=33)
-    q_truth = _draw_q(chain, rng)
-    target = cartan.forward_kinematics(chain, q_truth)
-    q_seed = q_truth + rng.uniform(-0.05, 0.05, size=q_truth.size)
-
-    # The argmin lambdas are single-policy and need a slightly higher inner
-    # budget than the dual-policy iterative trio's default; mirror the
-    # convergence-test budget from test_argmin.py.
-    cfg = cartan.IkConfig(
-        max_iterations_per_attempt=200, max_total_work_units=400
-    )
-
-    for solver, name in [
-        (cartan.solve_ik_argmin_slsqp, "argmin_slsqp"),
-        (cartan.solve_ik_argmin_lm, "argmin_lm"),
-        (cartan.solve_ik_argmin_lbfgsb, "argmin_lbfgsb"),
-    ]:
-        result = solver(chain, target, q_seed, cfg)
-        assert result.converged, f"{name} failed: {result!r}"
-        assert result.error_norm < POS_TOL, (
-            f"{name} did not reach tolerance: {result!r}"
         )

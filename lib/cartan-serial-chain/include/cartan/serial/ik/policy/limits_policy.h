@@ -45,7 +45,7 @@ concept has_extended_enforce = chain<Chain> && requires(
 };
 
 /// No-op limit policy: applies no enforcement.
-/// Use when the stepper itself handles constraints (e.g., SQP with box bounds).
+/// Use when the stepper itself handles constraints (e.g., projected_lm).
 struct no_limits
 {
     template <chain Chain>

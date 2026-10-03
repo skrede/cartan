@@ -17,7 +17,7 @@ written next to every capture:
 
 | Class | Members | How it is obtained |
 |---|---|---|
-| Owned / collaborator | the robot-description supplier, the optimization backend | fetched at an immutable commit, and the commit the build resolves is verified against the declared pin |
+| Owned / collaborator | the robot-description supplier | fetched at an immutable commit, and the commit the build resolves is verified against the declared pin |
 | Mainstream third-party | TRAC-IK, Pinocchio, orocos-kdl, NLopt, LAPACK, opw_kinematics, ik-geo | discovered through package configuration, a project find module, or a path you supply; never copied into this tree |
 | Generated | the IKFast solver source under `third_party/ikfast_kr6r900/` | stays here, with its codegen provenance in its own README |
 
@@ -102,38 +102,16 @@ was inconvenient, so each retirement is written down here.
   its cartan success column reported the solver's own status rather than an independently
   recomputed verdict. Both defects are structural, and the study replaces the harness with one
   feasible set no cell can opt out of and a verdict the harness computes for every participant.
-- **`cartan_restart_lm_clamped`, `argmin_mma` and `argmin_gcmma`.** Retired with that file: they
-  were benchmarked nowhere else, and the study does not declare them as participants. `mma` keeps
-  its compile coverage in `tests/unit/argmin_solver_instantiation_test.cpp` and now has no
-  measured cell at all; `gcmma` has since been removed from the library altogether.
+- **`cartan_restart_lm_clamped`.** Retired with that file: it was benchmarked nowhere else, and
+  the study does not declare it as a participant.
 - **Every `_no_limits` method variant (136 cells).** Retired: 136 of 136 limited-versus-unbounded
   pairs produced identical success rates, because the default cells clamp while the variant cells
   run unbounded and every target is drawn from inside the box, so no bound ever binds. The
   deliberate unbounded measurement now lives in the study as its own table over
   description-sourced bounds, where a bound can actually bind.
-- **The multiplier-re-estimation sweep (108 cells).** Retired: the optimization backend's own
-  test suite asserts, at the revision this build pins, that the parameter is not consumed at any
-  call site by the sequential-programming policy cartan resolves through, and that two different
-  values must produce bit-identical iteration counts and objectives. cartan forwards the field
-  correctly; the knob is inert by upstream design, so the cells measured nothing.
 - **`tools/ik_accuracy_sweep.py`.** Retired: it drove the deleted harness through an environment
   variable. Driving every participant at one accuracy is now `ik_study_calibrate` plus the
   capture's `--iso-accuracy` mode, which calibrates against achieved rather than requested error.
-
-### The BOBYQA cell reads near zero, and that is a budget statement
-
-`argmin_bobyqa` reports 0.00–0.05% success in this harness while genuinely spending 350–450 µs.
-That is not a wiring defect. Measured on UR3e, IRB 120 and LBR Med 14 at 2000 targets each: the
-harness caps a solver attempt at 100 iterations, and BOBYQA's accepted solves need 220–305 at
-the median on these chains. Lifting the cap alone takes the three cells to 9.30 / 14.80 / 21.15%.
-A derivative-free method needs an order of magnitude more objective evaluations than a
-Jacobian-driven one, and this harness gives every family the same per-attempt allowance; the
-near-zero row is what that allowance buys BOBYQA, not evidence that it is broken.
-
-A separate, real defect was found alongside it and fixed: cartan's generic stall detector aborted
-BOBYQA during normal trust-region contraction. With the cap lifted, that fix moves the same three
-cells from 9.30 / 14.80 / 21.15% to 22.30 / 35.70 / 58.75%. It changes nothing at the published
-cap, where the iteration limit binds first.
 
 ## Building
 
@@ -253,7 +231,6 @@ This runs the full 10,000-iteration benchmark 10 times and reports mean, median,
 | opw_kinematics | mainstream | `CARTAN_OPW_KINEMATICS_SOURCE_DIR` | OPW comparison benchmark |
 | ik-geo | mainstream | the crate registry, built by `cargo` through this project's own shim | ik-geo comparison benchmark |
 | robot-description supplier | owned | fetched at a verified immutable commit | the study's joint limits |
-| optimization backend | owned | fetched at a verified immutable commit | argmin cells |
 | IKFast solver (generated) | generated | `third_party/ikfast_kr6r900/`, provenance in its own README | IKFast comparison benchmark |
 
 ## Results

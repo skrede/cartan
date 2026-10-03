@@ -44,7 +44,6 @@ produced by a code generator and carries the generator's own provenance.
 |---|---|---|
 | `benchmark` | fetched | 1.9.5 at `192ef100` |
 | `meios` | fetched | `b772a310` |
-| `argmin` | fetched | `864d558c` |
 | `pinocchio` | discovered | 4.0.0 |
 | `orocos_kdl` | discovered | 1.5.3 |
 | `trac_ik` | discovered | 2.0.0 at `9511f2f3` |
@@ -542,11 +541,11 @@ project does not fetch, vendor or patch a library it does not own: `pinocchio`, 
 `trac_ik`, `nlopt` and `lapack` are discovered on the machine if they are there, and each
 comparison is omitted with a warning when its dependency is absent.
 
-The capture was configured and run with:
+To reproduce the capture:
 
 ```
 cmake -S . -B build/bench -G Ninja -DCMAKE_BUILD_TYPE=Release \
-    -DCARTAN_BUILD_BENCHMARKS=ON -DCARTAN_BUILD_URDF=ON -DCARTAN_BUILD_ARGMIN=ON \
+    -DCARTAN_BUILD_BENCHMARKS=ON -DCARTAN_BUILD_URDF=ON \
     -DCARTAN_FETCH_BENCHMARK_DEPS=ON -DCARTAN_TRAC_IK_SOURCE_DIR=<checkout> \
     -DCMAKE_PREFIX_PATH=<pinocchio environment>
 build/bench/benchmarks/ik_study_capture --table c --robot <robot> --limits description \

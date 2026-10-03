@@ -97,9 +97,8 @@ public contributions.
   polyfill (`cartan::expected`) to keep the baseline at C++20 and the public
   headers usable on the exceptions-off embedded backends. Don't reach for a
   feature purely for novelty; reach for it where it makes the code clearer.
-- **Eigen is the only required dependency.** NLopt, argmin/nablapp,
-  pinocchio, and TRAC-IK are optional and gated behind CMake feature
-  flags.
+- **Eigen is the only required dependency.** NLopt, pinocchio, and
+  TRAC-IK are optional and gated behind CMake feature flags.
 - **Naming:** lowercase types and functions (`so3`, `kinematic_chain`,
   `forward_kinematics`); member variable prefix `m_` (`m_omega`,
   `m_chain`); template parameters in `CamelCase` (`Scalar`, `Joints`).

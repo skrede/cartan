@@ -552,7 +552,7 @@ def test_paden_kahan_3_returns_distance_solutions() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_closest_to_seed_picks_argmin(
+def test_closest_to_seed_picks_the_nearest_branch(
     irb120_chain: cartan.KinematicChain,
 ) -> None:
     chain = irb120_chain
@@ -568,7 +568,7 @@ def test_closest_to_seed_picks_argmin(
     closest = cartan.analytical.closest_to_seed(result, seed)
     assert closest is not None
     assert closest.shape == (chain.num_joints(),)
-    # Verify it is in fact the argmin:
+    # Verify it is in fact the nearest:
     dists = [float(np.linalg.norm(q - seed)) for q in result.solutions]
     chosen_dist = float(np.linalg.norm(closest - seed))
     assert chosen_dist == pytest.approx(min(dists))
@@ -703,7 +703,7 @@ def test_solve_all_ranks_by_distance_to_seed(
     assert ranked.status == cartan.AnalyticalStatus.ok
     assert len(ranked.solutions) >= 1
     # First element must match closest_to_seed output computed against the
-    # unranked Pieper solve (both should pick the same argmin branch).
+    # unranked Pieper solve (both should pick the same nearest branch).
     plain = cartan.analytical.solve_pieper_6r(chain, target)
     expected_first = cartan.analytical.closest_to_seed(plain, seed)
     assert expected_first is not None

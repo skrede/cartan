@@ -28,7 +28,7 @@ using `FetchContent` (see below). Python bindings are available on PyPI: `pip in
 - **Header-only:** the Lie-group and serial-chain modules depend on no compiled library artifacts, with Eigen as their only required dependency. Use the system-install or have CMake fetch it automatically. The optional robot-description loader is the one exception &mdash; see Requirements.
 - **Compile-time frame safety:** Transforms and rotations are templated on frames, `transform<From_frame, To_frame>` and `rotation<From_frame, To_frame>`.
 - **Product of Exponentials kinematics:** Screw-theory-based FK through Product of Exponentials (PoE), either runtime-specified or compile-time (templated) for 1-7 DOF chains.
-- **Policy-based IK solvers:** Damped Least Squares (DLS), Levenberg-Marquardt (LM), and Sequential Quadratic Programming (SQP) &mdash; or roll your own.
+- **Policy-based IK solvers:** Damped Least Squares (DLS), Levenberg-Marquardt (LM), projected LM, L-BFGS-B and Newton-Raphson &mdash; or roll your own.
 - **Policy-based solver runners:** Run one or multiple Cartan IK solvers until a solution is found; tunable convergence criteria.
 - **Analytic IK solvers:** Solve kinematics analytically for 2R, 3R or 6R Pieper manipulators, or robots with Ortho-Parallel Wrists (OPW).
 - **Real-time friendly:** User controls the execution: solver runners can step until converged, follow a budget (perform N steps), or step once.
@@ -44,7 +44,7 @@ purpose-built tool cartan composes with:
 - **Collision detection** &mdash; use [hpp-fcl / Coal](https://github.com/coal-library/coal).
 - **Motion / trajectory planning** &mdash; use a planner (OMPL) or a time-parameterizer
   ([TOPP-RA](https://github.com/hungpham2511/toppra)).
-- **State estimation / filtering** &mdash; see [ctrlpp](https://github.com/skrede/ctrlpp).
+- **State estimation / filtering** &mdash; use a dedicated estimation library.
 - **Visualization** &mdash; use [threepp](https://github.com/markaren/threepp) or your own renderer.
 - **Middleware bindings** (ROS / KDL / orocos) &mdash; zero coupling by design.
 - **Custom linear algebra** &mdash; Eigen only; cartan reinvents no matrix math.
@@ -98,9 +98,10 @@ find_package(cartan CONFIG REQUIRED)
 target_link_libraries(my_app PRIVATE cartan::cartan)
 ```
 
-Installing Cartan is the other way round: build it with Eigen, and any backend
-you enabled, available as findable packages rather than fetched, or the configure
-step refuses to generate an install surface it cannot make resolvable.
+Installing Cartan is the other way round: build it with Eigen, and the URDF
+module's description reader if you enabled it, available as findable packages
+rather than fetched, or the configure step refuses to generate an install surface
+it cannot make resolvable.
 
 ### ESP-IDF Component Manager
 

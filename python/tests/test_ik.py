@@ -135,30 +135,6 @@ def test_ik_failure_enum_values() -> None:
         assert hasattr(cartan.IkFailure, name), f"IkFailure missing variant {name}"
 
 
-def test_ik_termination_reason_enum_values() -> None:
-    for name in (
-        "unknown",
-        "converged",
-        "iteration_limit",
-        "stall_detected",
-        "divergence_detected",
-        "joint_limit_hit",
-        "solver_converged_pose_missed",
-        "solver_ftol_reached",
-        "solver_xtol_reached",
-        "solver_objective_stalled",
-        "solver_roundoff_limited",
-        "solver_stalled",
-        "solver_aborted",
-        "solver_budget_exhausted",
-        "solver_max_iterations",
-        "solver_diverged",
-    ):
-        assert hasattr(cartan.IkTerminationReason, name), (
-            f"IkTerminationReason missing variant {name}"
-        )
-
-
 # ---------------------------------------------------------------------------
 # Convergence: FK-walked targets on cartanbot, parametrized over the trio.
 # ---------------------------------------------------------------------------
@@ -196,15 +172,12 @@ def test_solve_ik_trio_converges_on_fk_walked_target(
     assert result.q.shape == (chain.num_joints(),)
     assert result.q.dtype == np.float64
     assert result.iterations > 0
-    # On success the populated termination_reason is the converged variant.
-    assert result.termination_reason == cartan.IkTerminationReason.converged
     assert result.failure_reason == ""
     # The two fabricated diagnostics are gone from the result rather than
     # reporting a zero condition number and a definite negative on a solve that
     # measured neither. Conditioning is asked of the configuration instead.
     assert not hasattr(result, "condition_number")
     assert not hasattr(result, "near_singular")
-    assert result.solved_feasible_set == cartan.FeasibleSet.declared
 
 
 @pytest.mark.parametrize(
@@ -458,9 +431,3 @@ def test_singularity_analysis_refuses_a_length_that_cannot_divide(
             cartan.singular_values(chain, q, bad)
         with pytest.raises(ValueError, match="positive finite value"):
             cartan.is_near_singular(chain, q, 1e3, bad)
-
-
-def test_feasible_set_enum_values() -> None:
-    for name in ("declared", "substituted"):
-        assert hasattr(cartan.FeasibleSet, name), f"FeasibleSet missing variant {name}"
-    assert cartan.FeasibleSet.declared != cartan.FeasibleSet.substituted

@@ -29,17 +29,11 @@ foreach (setting IN ITEMS CMAKE_C_COMPILER CMAKE_CXX_COMPILER CMAKE_CXX_FLAGS
     endif ()
 endforeach ()
 
-# The pinned revisions and the backend registry have one source of truth in the tree, so
-# a backend added there is covered without editing this harness.
-include("${CARTAN_SOURCE_DIR}/cmake/CartanOptionalBackends.cmake")
-
-find_program(MATRIX_GIT NAMES git REQUIRED)
 get_filename_component(matrix_command_dir "${CMAKE_COMMAND}" DIRECTORY)
 find_program(MATRIX_CTEST NAMES ctest HINTS "${matrix_command_dir}" REQUIRED)
 
 include("${CMAKE_CURRENT_LIST_DIR}/matrix_assert.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/matrix_steps.cmake")
-include("${CMAKE_CURRENT_LIST_DIR}/matrix_dependency.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/matrix_selection.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/matrix_install_cells.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/matrix_build_cells.cmake")

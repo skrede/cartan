@@ -31,7 +31,7 @@ import subprocess
 import sys
 import xml.etree.ElementTree as ET
 
-REASONS = ("declaration-only", "backend-not-built", "no-instantiating-test")
+REASONS = ("declaration-only", "option-not-built", "no-instantiating-test")
 HEADER_SUFFIXES = (".h", ".hpp", ".hxx", ".inl", ".ipp")
 
 UNMERGED_NOTE = ("one entry per source line per template instantiation: a line instantiated "
@@ -116,8 +116,8 @@ def row(where, line):
         raise CheckError(f"{where}: row carries no reason")
     if words[0] not in REASONS:
         raise CheckError(f"{where}: reason must start with one of {REASONS}")
-    if words[0] == "backend-not-built" and len(words) < 2:
-        raise CheckError(f"{where}: backend-not-built must name the build option")
+    if words[0] == "option-not-built" and len(words) < 2:
+        raise CheckError(f"{where}: option-not-built must name the build option")
     return header, " ".join(words)
 
 

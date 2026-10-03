@@ -105,8 +105,8 @@ jobs:
         run: brew install eigen nlopt
 
       # The matrix installs, relocates and consumes cartan in every configuration
-      # it covers, including the backend cells, so the job needs nothing built
-      # here: each cell drives its own trees from the checkout.
+      # it covers, so the job needs nothing built here: each cell drives its own
+      # trees from the checkout.
       - name: Configure the install matrix
         run: |
           set -eu

@@ -39,14 +39,12 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libeigen3-dev
 
       # A group's snippets compile only against the component that owns them, so
-      # the gate covers a documented component's API only with that component
-      # enabled. URDF is on for the same reason, and so that a snippet marked for
-      # it compiles the day one is written rather than being silently skipped.
+      # URDF is on so that a snippet marked for it compiles the day one is
+      # written rather than being silently skipped.
       - name: Configure
         run: >
           cmake -B build
           -DCARTAN_BUILD_DOC_TESTS=ON
-          -DCARTAN_BUILD_ARGMIN=ON
           -DCARTAN_BUILD_URDF=ON
           -DCARTAN_CMAKE_FETCH_DEPS=ON
 

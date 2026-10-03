@@ -108,31 +108,8 @@ cartan_add_test(unwrapped_solver_test unwrapped_solver_test.cpp)
 cartan_add_test(closest_to_seed_test closest_to_seed_test.cpp)
 cartan_add_test(abb_irb120_reconciliation_test abb_irb120_reconciliation_test.cpp)
 
-if(CARTAN_BUILD_ARGMIN)
-    cartan_add_test(argmin_adapters_compile_test argmin_adapters_compile_test.cpp)
-    cartan_add_test(argmin_policies_test argmin_policies_test.cpp)
-    cartan_add_test(argmin_slsqp_restart_test argmin_slsqp_restart_test.cpp)
-    cartan_add_test(argmin_projected_gn_test argmin_projected_gn_test.cpp)
-    cartan_add_test(argmin_projected_gradient_gn_test argmin_projected_gradient_gn_test.cpp)
-    cartan_add_test(solver_unit_count_test solver_unit_count_test.cpp)
-    cartan_add_test(argmin_solver_instantiation_test argmin_solver_instantiation_test.cpp)
-    cartan_add_test(unbounded_joint_feasibility_test unbounded_joint_feasibility_test.cpp)
-    cartan_add_test(argmin_iterate_size_test argmin_iterate_size_test.cpp)
-    foreach (backend_test IN ITEMS
-        argmin_adapters_compile_test
-        argmin_iterate_size_test
-        argmin_policies_test
-        argmin_slsqp_restart_test
-        argmin_projected_gn_test
-        argmin_projected_gradient_gn_test
-        argmin_solver_instantiation_test
-        unbounded_joint_feasibility_test
-        solver_unit_count_test
-        exhaustive_ik_runner_test
-        solver_semantics_test)
-        target_link_libraries(${backend_test} PRIVATE cartan::argmin)
-    endforeach ()
-endif()
+cartan_add_test(solver_unit_count_test solver_unit_count_test.cpp)
+cartan_add_test(unbounded_joint_feasibility_test unbounded_joint_feasibility_test.cpp)
 
 if(CARTAN_BUILD_INSTANTIATION_TESTS)
     cartan_add_test(static_chain_instantiation_test static_chain_instantiation_test.cpp)
@@ -140,13 +117,6 @@ if(CARTAN_BUILD_INSTANTIATION_TESTS)
     cartan_add_test(runner_instantiation_test runner_instantiation_test.cpp)
     cartan_add_test(analytical_instantiation_test analytical_instantiation_test.cpp)
     cartan_add_test(lie_instantiation_test lie_instantiation_test.cpp)
-    # Nested rather than listed in the backend block's foreach above: that list
-    # names targets which exist unconditionally once the backend is on, and this
-    # one exists only when both options are.
-    if(CARTAN_BUILD_ARGMIN)
-        cartan_add_test(backend_policy_instantiation_test backend_policy_instantiation_test.cpp)
-        target_link_libraries(backend_policy_instantiation_test PRIVATE cartan::argmin)
-    endif()
 endif()
 
 cartan_add_test(fk_sweep_test fk_sweep_test.cpp)
@@ -216,17 +186,14 @@ if (CARTAN_BUILD_URDF)
     target_link_libraries(solver_continuous_joint_test PRIVATE cartan::urdf)
     target_compile_definitions(solver_continuous_joint_test PRIVATE
         CARTAN_TESTS_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures")
-    if (CARTAN_BUILD_ARGMIN)
-        target_link_libraries(solver_continuous_joint_test PRIVATE cartan::argmin)
 
-        cartan_add_test(continuous_joint_fallback_sweep continuous_joint_fallback_sweep.cpp)
-        target_link_libraries(continuous_joint_fallback_sweep PRIVATE cartan::urdf cartan::argmin)
-        target_compile_definitions(continuous_joint_fallback_sweep PRIVATE
-            CARTAN_TESTS_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures")
-        # Exclude from the default ctest run; invoke directly via
-        #   ctest -R continuous_joint_fallback_sweep
-        # or run the binary at tests/unit/continuous_joint_fallback_sweep.
-        set_tests_properties(continuous_joint_fallback_sweep
-            PROPERTIES LABELS "manual" DISABLED TRUE)
-    endif ()
+    cartan_add_test(continuous_joint_fallback_sweep continuous_joint_fallback_sweep.cpp)
+    target_link_libraries(continuous_joint_fallback_sweep PRIVATE cartan::urdf)
+    target_compile_definitions(continuous_joint_fallback_sweep PRIVATE
+        CARTAN_TESTS_FIXTURE_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures")
+    # Exclude from the default ctest run; invoke directly via
+    #   ctest -R continuous_joint_fallback_sweep
+    # or run the binary at tests/unit/continuous_joint_fallback_sweep.
+    set_tests_properties(continuous_joint_fallback_sweep
+        PROPERTIES LABELS "manual" DISABLED TRUE)
 endif ()

@@ -39,7 +39,6 @@ if (CARTAN_BUILD_TESTS)
     add_subdirectory(unit)
     add_subdirectory(compile)
     add_subdirectory(boundary)
-    add_subdirectory(odr)
 endif ()
 
 if (CARTAN_BUILD_PACKAGING_TESTS AND CARTAN_CMAKE_FETCH_DEPS)

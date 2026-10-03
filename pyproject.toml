@@ -36,7 +36,6 @@ wheel.packages = ["python/cartan"]
 CARTAN_BUILD_PYTHON = "ON"
 CARTAN_BUILD_URDF = "ON"
 CARTAN_CMAKE_FETCH_DEPS = "ON"
-CARTAN_BUILD_ARGMIN = { env = "CARTAN_BUILD_ARGMIN", default = "OFF" }
 
 [tool.cibuildwheel]
 build = "cp310-* cp311-* cp312-* cp313-* cp314-*"

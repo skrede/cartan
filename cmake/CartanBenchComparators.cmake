@@ -8,9 +8,9 @@ include_guard(GLOBAL)
 # here. Three acquisition classes, and the test is the same in both directions --
 # can a reader obtain this themselves:
 #
-#   owned       the robot-description supplier and the optimization backend.
-#               Nothing packages them, so they are fetched at an immutable commit
-#               and the commit the build resolved is verified against the pin.
+#   owned       the robot-description supplier. Nothing packages it, so it is
+#               fetched at an immutable commit and the commit the build resolved
+#               is verified against the pin.
 #   mainstream  every comparator. Discovered through package configuration or a
 #               caller-supplied path, recorded by the version it reports, and
 #               omitted with an announcement when it is not there.
@@ -226,19 +226,6 @@ elseif (TARGET ${CARTAN_MEIOS_TARGET})
     cartan_bench_refuse_unversioned(meios "${meios_VERSION}"
         "the version exported by its package configuration")
     cartan_bench_record(meios owned "the installed package" "${meios_VERSION}" "")
-endif ()
-
-if (CARTAN_BUILD_ARGMIN)
-    FetchContent_GetProperties(argmin SOURCE_DIR _argmin_source)
-    if (_argmin_source)
-        cartan_bench_verify_pin(argmin "${_argmin_source}" "${CARTAN_ARGMIN_REVISION}")
-        cartan_bench_record(argmin owned "a clone at the declared pin"
-            "${CARTAN_ARGMIN_REVISION}" "")
-    elseif (TARGET ${CARTAN_ARGMIN_TARGET})
-        cartan_bench_refuse_unversioned(argmin "${argmin_VERSION}"
-            "the version exported by its package configuration")
-        cartan_bench_record(argmin owned "the installed package" "${argmin_VERSION}" "")
-    endif ()
 endif ()
 
 # --- The generated class, whose single member states the boundary of the

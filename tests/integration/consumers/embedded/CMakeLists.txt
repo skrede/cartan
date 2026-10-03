@@ -34,13 +34,5 @@ endif ()
 add_executable(embedded_consumer main.cpp)
 target_link_libraries(embedded_consumer PRIVATE cartan::cartan)
 
-foreach (backend IN ITEMS argmin)
-    string(TOUPPER "${backend}" backend_upper)
-    if (CARTAN_BUILD_${backend_upper})
-        target_link_libraries(embedded_consumer PRIVATE cartan::${backend})
-        target_compile_definitions(embedded_consumer PRIVATE CONSUMER_EXPECTS_${backend_upper})
-    endif ()
-endforeach ()
-
 enable_testing()
 add_test(NAME embedded_consumer COMMAND embedded_consumer)

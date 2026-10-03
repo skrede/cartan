@@ -13,10 +13,6 @@
 #include <cartan/serial/ik/solver/projected_lm.h>
 #include <cartan/serial/ik/solver/newton_raphson.h>
 #include <cartan/serial/ik/wrapper/restart_wrapper.h>
-#ifdef CARTAN_HAS_ARGMIN
-#include <cartan/serial/ik/solver/argmin_lm.h>
-#include <cartan/serial/ik/solver/argmin_slsqp.h>
-#endif
 
 #include <limits>
 #include <algorithm>
@@ -127,13 +123,6 @@ TEST_CASE("builtin_lm does not report converged out of limits", "[ik][semantics]
 {
     assert_no_converged_out_of_limits<spp::builtin_lm<spp::kinematic_chain<double, 2>>>();
 }
-
-#ifdef CARTAN_HAS_ARGMIN
-TEST_CASE("argmin_lm does not report converged out of limits", "[ik][semantics][feasibility]")
-{
-    assert_no_converged_out_of_limits<spp::argmin_lm<spp::kinematic_chain<double, 2>>>();
-}
-#endif
 
 TEST_CASE("projected_lm converged solutions are feasible", "[ik][semantics][feasibility]")
 {
@@ -264,13 +253,6 @@ TEST_CASE("builtin_lm recovers the in-limits 2pi-equivalent solution", "[ik][sem
 {
     assert_accepts_2pi_equivalent<spp::builtin_lm<spp::kinematic_chain<double, 2>>>();
 }
-
-#ifdef CARTAN_HAS_ARGMIN
-TEST_CASE("argmin_lm recovers the in-limits 2pi-equivalent solution", "[ik][semantics][feasibility]")
-{
-    assert_accepts_2pi_equivalent<spp::argmin_lm<spp::kinematic_chain<double, 2>>>();
-}
-#endif
 
 // (b) Genuinely box-infeasible poses are still rejected, not force-accepted.
 TEST_CASE("genuinely infeasible configurations are rejected after canonicalization",
@@ -418,11 +400,3 @@ TEST_CASE("restart_wrapper returns the best-so-far iterate on a terminal solve",
 {
     assert_retains_best_iterate<spp::restart_wrapper<spp::kinematic_chain<double, 2>>>();
 }
-
-#ifdef CARTAN_HAS_ARGMIN
-TEST_CASE("argmin_slsqp returns the best-so-far iterate on a terminal solve",
-          "[ik][semantics][retention]")
-{
-    assert_retains_best_iterate<spp::argmin_slsqp<spp::kinematic_chain<double, 2>>>();
-}
-#endif

@@ -11,7 +11,7 @@
 - [frames](api/frames.md) &mdash; Compile-time frame-tagged wrappers (transform, rotation, twist, wrench).
 - [chain](api/chain.md) &mdash; Kinematic chain, screw axis, joint limits, joint state.
 - [kinematics](api/kinematics.md) &mdash; Forward kinematics, space/body Jacobians, velocity kinematics.
-- [ik](api/ik.md) &mdash; IK solvers (DLS, LM, SQP) and variadic-policy racing runners (`basic_ik_runner`, `restart_wrapper`).
+- [ik](api/ik.md) &mdash; IK solvers (DLS, LM, L-BFGS-B, Newton-Raphson) and variadic-policy racing runners (`basic_ik_runner`, `restart_wrapper`).
 - [analytical](api/analytical.md) &mdash; closed-form solvers (Pieper 6R, planar 2R, 3R, OPW) and Paden-Kahan subproblems.
 - [python](python.md) &mdash; Python install, API parity, tutorial mirrors, and example counterpart status.
 

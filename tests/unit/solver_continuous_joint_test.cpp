@@ -8,14 +8,6 @@
 #include <cartan/serial/ik/wrapper/restart_wrapper.h>
 #include <cartan/serial/ik/solver/detail/halton_seed_generator.h>
 
-#ifdef CARTAN_HAS_ARGMIN
-#include <cartan/serial/ik/solver/filter_nw_sqp.h>
-#include <cartan/serial/ik/solver/filter_slsqp.h>
-#include <cartan/serial/ik/solver/argmin_slsqp.h>
-#include <cartan/serial/ik/solver/argmin_projected_gn.h>
-#include <cartan/serial/ik/solver/argmin_projected_gradient_gn.h>
-#endif
-
 #include <cartan/serial/chain/kinematic_chain.h>
 #include <cartan/serial/fk/forward_kinematics.h>
 
@@ -100,33 +92,12 @@ using restart_lm = cartan::restart_wrapper<chain_t,
 using restart_lbfgsb = cartan::restart_wrapper<chain_t,
     cartan::builtin_lbfgsb<chain_t, cartan::no_limits>, cartan::no_limits>;
 
-#ifdef CARTAN_HAS_ARGMIN
-using filter_nw_sqp_solver = cartan::filter_nw_sqp<chain_t>;
-using filter_slsqp_solver = cartan::filter_slsqp<chain_t>;
-using argmin_slsqp_solver = cartan::argmin_slsqp<chain_t>;
-using argmin_projected_gn_solver = cartan::argmin_projected_gn<chain_t>;
-using argmin_projected_gradient_gn_solver = cartan::argmin_projected_gradient_gn<chain_t>;
-#endif
-
 TEMPLATE_TEST_CASE("continuous joint: IK roundtrip via builtin restart paths",
                    "[solver_continuous_joint]",
                    restart_lm, restart_lbfgsb)
 {
     verify_continuous_wrist_roundtrip<TestType>(0);
 }
-
-#ifdef CARTAN_HAS_ARGMIN
-TEMPLATE_TEST_CASE("continuous joint: IK roundtrip via argmin-backed solvers",
-                   "[solver_continuous_joint]",
-                   filter_nw_sqp_solver,
-                   filter_slsqp_solver,
-                   argmin_slsqp_solver,
-                   argmin_projected_gn_solver,
-                   argmin_projected_gradient_gn_solver)
-{
-    verify_continuous_wrist_roundtrip<TestType>(0);
-}
-#endif
 
 TEST_CASE("continuous joint: Halton seed generator produces finite seeds",
           "[solver_continuous_joint]")

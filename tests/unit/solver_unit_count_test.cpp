@@ -5,14 +5,8 @@
 #include "cartan/serial/ik/solver/lm.h"
 #include "cartan/serial/ik/solver/dls.h"
 #include "cartan/serial/ik/solver/lbfgsb.h"
-#include "cartan/serial/ik/solver/argmin_lm.h"
-#include "cartan/serial/ik/solver/argmin_slsqp.h"
-#include "cartan/serial/ik/solver/argmin_bobyqa.h"
 #include "cartan/serial/ik/solver/projected_lm.h"
-#include "cartan/serial/ik/solver/argmin_lbfgsb.h"
 #include "cartan/serial/ik/solver/newton_raphson.h"
-#include "cartan/serial/ik/solver/argmin_projected_gn.h"
-#include "cartan/serial/ik/solver/argmin_projected_gradient_gn.h"
 
 #include "cartan/types.h"
 
@@ -38,13 +32,12 @@ namespace
 using chain_t = cartan::kinematic_chain<double, 6>;
 
 // Aliases to work around Catch2's TEMPLATE_TEST_CASE macro splitting on the
-// comma inside template argument lists. The four solvers that default to
+// comma inside template argument lists. The three solvers that default to
 // no_limits are instantiated with clamp_limits so the unreachable-target
 // stress fixtures keep joint values bounded (raw no_limits drives q to
 // numerically degenerate regions where the SE(3) FK quaternion squared-norm
 // trips the strict-policy assertion).
 using builtin_lm_clamp_t   = cartan::builtin_lm<chain_t, cartan::clamp_limits>;
-using argmin_lm_clamp_t    = cartan::argmin_lm<chain_t, cartan::clamp_limits>;
 using dls_clamp_t          = cartan::dls<chain_t, cartan::clamp_limits>;
 using projected_lm_clamp_t = cartan::projected_lm<chain_t, cartan::clamp_limits>;
 
@@ -172,10 +165,10 @@ cartan::convergence_criteria<double> make_restart_triggering_criteria()
 
 }
 
-// The full set of 11 iterative solver types validated by Blocks A/B/C/C'.
+// The full set of iterative solver types validated by Blocks A/B/C/C'.
 // Use clamp_limits across the board so joint values stay bounded under the
-// unreachable-target stress fixtures (Blocks B, C', D). The four solvers
-// that default to no_limits (builtin_lm, dls, argmin_lm, projected_lm) drive
+// unreachable-target stress fixtures (Blocks B, C', D). The three solvers
+// that default to no_limits (builtin_lm, dls, projected_lm) drive
 // q values to numerically degenerate regions when run against the (10, 10, 10)
 // translation target without bounding -- the quaternion in the SE(3) FK pass
 // hits a near-zero squared norm and trips the strict-policy assertion.
@@ -183,15 +176,9 @@ cartan::convergence_criteria<double> make_restart_triggering_criteria()
 // test here.
 #define CARTAN_UNIT_COUNT_SOLVER_TYPES                                       \
     builtin_lm_clamp_t,                                                      \
-    argmin_lm_clamp_t,                                                       \
     dls_clamp_t,                                                             \
-    cartan::builtin_lbfgsb<chain_t>,                                     \
-    cartan::argmin_lbfgsb<chain_t>,                                      \
-    cartan::argmin_slsqp<chain_t>,                                       \
-    cartan::argmin_bobyqa<chain_t>,                                      \
-    cartan::argmin_projected_gn<chain_t>,                                \
-    cartan::argmin_projected_gradient_gn<chain_t>,                       \
-    cartan::newton_raphson<chain_t>,                                     \
+    cartan::builtin_lbfgsb<chain_t>,                                         \
+    cartan::newton_raphson<chain_t>,                                         \
     projected_lm_clamp_t
 
 // ============================================================================
@@ -233,25 +220,10 @@ TEMPLATE_TEST_CASE("per-step units_consumed is bounded by N",
 // Verifies that with every solver-side termination heuristic defeated and the
 // per-attempt cap set well above N, step(chain, N=10) returns exactly N units.
 // Non-saturation indicates a solver-level defect; no weakening fallback.
-//
-// Solvers wrapping argmin's gradient-based policies (argmin_lm, argmin_lbfgsb,
-// argmin_bobyqa) have internal terminators (ftol_reached, xtol_reached,
-// objective_stalled, roundoff_limited) that fire when the inner solver
-// reaches a local minimum at the workspace boundary on an unreachable target.
-// These are inner-solver convergence criteria the shim cannot defeat from
-// outside without modifying the shim's setup(). Such solvers are documented
-// in TODO comments below as deferred / requires-user-decision.
 
 TEMPLATE_TEST_CASE("solver saturates units_consumed at N on unreachable target",
     "[ik][units][block-b]",
-    builtin_lm_clamp_t,
-    dls_clamp_t,
-    cartan::builtin_lbfgsb<chain_t>,
-    cartan::newton_raphson<chain_t>,
-    projected_lm_clamp_t,
-    cartan::argmin_slsqp<chain_t>,
-    cartan::argmin_projected_gn<chain_t>,
-    cartan::argmin_projected_gradient_gn<chain_t>)
+    CARTAN_UNIT_COUNT_SOLVER_TYPES)
 {
     using S = TestType;
     auto chain = make_ur5_like_chain();
@@ -266,23 +238,6 @@ TEMPLATE_TEST_CASE("solver saturates units_consumed at N on unreachable target",
     auto result = solver.step(chain, 10);
     REQUIRE(result.metrics.units_consumed == 10);
 }
-
-// Block B - argmin gradient-based shims with internal terminators that
-// cannot be defeated through the public options surface.
-// TODO: solver-side diagnostic deferred pending an upstream design decision
-// on whether to expose argmin's inner-solver convergence thresholds via
-// the cartan options surface.
-//
-// argmin_lm, argmin_lbfgsb, argmin_bobyqa report ftol_reached /
-// objective_stalled / roundoff_limited from the inner argmin solver once it
-// reaches the workspace-bounded local minimum on the unreachable target.
-// The shim breaks out and bills fewer than N units. The shim's setup()
-// hardcodes the inner argmin thresholds (1e-14/1e-16) so cartan-side options
-// cannot override them; saturating these shims requires either (a) exposing
-// the inner thresholds through the cartan options struct, or (b) accepting
-// that one algorithmic work unit for these solvers may legitimately mean
-// "one inner iteration up to the inner solver's stationarity certificate."
-// This is a solver-design question deferred to upstream review.
 
 // ============================================================================
 // Block C: per-solver self-consistency
@@ -327,32 +282,9 @@ TEMPLATE_TEST_CASE("per-solver iterations() equals cumulative units_consumed",
 // check exercises the runner's literal cap accumulator: termination occurs
 // within one step's granularity of the budget.
 
-// Block C' excludes argmin_lm and argmin_lbfgsb. These two shims wrap argmin
-// gradient-based policies whose internal terminators (ftol_reached,
-// objective_stalled, roundoff_limited) fire at the workspace-boundary local
-// minimum on the unreachable target. The shim's setup() hardcodes the inner
-// argmin convergence thresholds (1e-14/1e-16) so the cartan-side options
-// cannot defeat them. The shim then maps the terminal inner status to
-// ik_status::stalled, which the runner treats as a terminal exit -- bailing
-// out long before runner.iterations() reaches the cap.
-// TODO: solver-side diagnostic deferred pending an upstream design decision
-// on whether to expose argmin's inner-solver convergence thresholds via
-// the cartan options surface.
-//
-// The same root cause is responsible for argmin_bobyqa being excluded from
-// Block B above; it is not included in Block C' for the same reason. The
-// remaining 9 solver types saturate the runner cap to within one step.
 TEMPLATE_TEST_CASE("runner.iterations() lands in [cap-1, cap] on unreachable target",
     "[ik][units][block-c-prime]",
-    builtin_lm_clamp_t,
-    dls_clamp_t,
-    cartan::builtin_lbfgsb<chain_t>,
-    cartan::argmin_slsqp<chain_t>,
-    cartan::argmin_bobyqa<chain_t>,
-    cartan::argmin_projected_gn<chain_t>,
-    cartan::argmin_projected_gradient_gn<chain_t>,
-    cartan::newton_raphson<chain_t>,
-    projected_lm_clamp_t)
+    CARTAN_UNIT_COUNT_SOLVER_TYPES)
 {
     using S = TestType;
     auto chain = make_ur5_like_chain();
@@ -376,22 +308,17 @@ TEMPLATE_TEST_CASE("runner.iterations() lands in [cap-1, cap] on unreachable tar
 // ============================================================================
 // Block D: self-restart events charge zero additional units
 // ============================================================================
-// For each of the four self-restarting solver families (projected_lm,
-// argmin_slsqp, argmin_projected_gn, argmin_projected_gradient_gn), drive the
-// solver against an unreachable target with a tight per-attempt cap so the
-// inner attempt fires a restart. Sum per-step units_consumed in a step(chain, 1)
-// loop and assert it equals solver.iterations() (pass-through aggregation:
-// cumulative units across attempts equal the sum of per-attempt inner
-// iterations, with restart events themselves billing zero).
+// Drive the self-restarting projected_lm against an unreachable target with a
+// tight per-attempt cap so the inner attempt fires a restart. Sum per-step
+// units_consumed in a step(chain, 1) loop and assert it equals
+// solver.iterations() (pass-through aggregation: cumulative units across
+// attempts equal the sum of per-attempt inner iterations, with restart events
+// themselves billing zero).
 
-TEMPLATE_TEST_CASE("self-restart events charge zero additional units",
-    "[ik][units][block-d][restart]",
-    projected_lm_clamp_t,
-    cartan::argmin_slsqp<chain_t>,
-    cartan::argmin_projected_gn<chain_t>,
-    cartan::argmin_projected_gradient_gn<chain_t>)
+TEST_CASE("self-restart events charge zero additional units",
+    "[ik][units][block-d][restart]")
 {
-    using S = TestType;
+    using S = projected_lm_clamp_t;
     auto chain = make_ur5_like_chain();
     auto target = make_unreachable_target();
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();

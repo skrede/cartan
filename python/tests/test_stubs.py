@@ -117,7 +117,7 @@ def _sample_errors(result: subprocess.CompletedProcess[str], sample: Path) -> li
     """Diagnostics naming the sample itself.
 
     The subject of this gate is the sample, not the generated stubs it reads:
-    a stub emitted from a build without an optional backend is internally
+    a stub emitted from a build without an optional module is internally
     inconsistent with __init__.py, and that is a separate problem.
     """
     return [line.strip() for line in result.stdout.splitlines()

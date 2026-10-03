@@ -93,10 +93,6 @@ if (TARGET cartan::urdf)
     target_compile_definitions(_core PRIVATE CARTAN_PY_HAS_URDF=1)
 endif ()
 
-if (CARTAN_BUILD_ARGMIN)
-    target_link_libraries(_core PRIVATE cartan::argmin)
-endif ()
-
 install(TARGETS _core LIBRARY DESTINATION cartan)
 
 nanobind_add_stub(

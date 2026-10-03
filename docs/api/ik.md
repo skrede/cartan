@@ -24,7 +24,7 @@ See [IK Methods](../background/ik-methods.md) | [IK Composition Guide](../guides
 |------|--------|
 | All IK | `#include <cartan/serial/ik.h>` |
 | `cartan::basic_ik_runner` | `#include <cartan/serial/ik/basic_ik_runner.h>` |
-| `cartan::convergence_criteria`, `cartan::ik_status`, `cartan::ik_termination_reason`, `cartan::ik_failure`, `cartan::ik_objective`, `cartan::feasible_set`, `cartan::step_metrics`, `cartan::step_result`, `cartan::solver_options` | `#include <cartan/serial/ik/ik_status.h>` |
+| `cartan::convergence_criteria`, `cartan::ik_status`, `cartan::ik_failure`, `cartan::ik_objective`, `cartan::step_metrics`, `cartan::step_result`, `cartan::solver_options` | `#include <cartan/serial/ik/ik_status.h>` |
 | `cartan::ik_result`, `cartan::ik_error` | `#include <cartan/serial/ik/ik_result.h>` |
 | `cartan::condition_number`, `manipulability`, `isotropy`, `is_near_singular` | `#include <cartan/serial/fk/singularity_analysis.h>` |
 | `cartan::singular_values` | `#include <cartan/serial/fk/singular_spectrum.h>` |
@@ -35,10 +35,7 @@ See [IK Methods](../background/ik-methods.md) | [IK Composition Guide](../guides
 | `cartan::lm` (alias for `builtin_lm`) | `#include <cartan/serial/ik/solver/lm.h>` |
 | `cartan::lbfgsb` (alias for `builtin_lbfgsb`) | `#include <cartan/serial/ik/solver/lbfgsb.h>` |
 | `cartan::projected_lm`, `cartan::dls`, `cartan::newton_raphson` | `#include <cartan/serial/ik/solver/{projected_lm,dls,newton_raphson}.h>` |
-| argmin-backed: `cartan::argmin_lm`, `argmin_lbfgsb`, `argmin_slsqp`, `argmin_bobyqa`, `argmin_projected_gn`, `argmin_projected_gradient_gn` | `#include <cartan/serial/ik/solver/argmin_*.h>` (requires `CARTAN_HAS_ARGMIN`) |
 | NLopt-backed: `cartan_examples::nlopt_slsqp`, `cartan_examples::nlopt_bobyqa` | carried as a solve-policy example, not library surface: see `examples/nlopt_policy/` |
-| SQP family: `cartan::nw_sqp`, `filter_nw_sqp`, `filter_slsqp` | `#include <cartan/serial/ik/solver/{nw_sqp,filter_nw_sqp,filter_slsqp}.h>` |
-| MMA / aug. Lagrangian: `cartan::mma`, `augmented_lagrangian` | `#include <cartan/serial/ik/solver/{mma,augmented_lagrangian}.h>` |
 | `cartan::restart_wrapper` | `#include <cartan/serial/ik/wrapper/restart_wrapper.h>` |
 | `cartan::exhaustive_ik_runner`, `cartan::exhaustive_options`, `cartan::exhaustive_result`, `cartan::ranking_strategy` | `#include <cartan/serial/ik/solver/exhaustive_ik_runner.h>` |
 | `cartan::verify_solution`, `cartan::filter_valid_solutions` | `#include <cartan/serial/ik/ik_validation.h>` |
@@ -371,8 +368,7 @@ status.
 `dimension_mismatch` or `non_finite_input`, and `basic_ik_runner` reports a
 selection it cannot rank by latching `unsupported_configuration`. Every solve policy validates its
 arguments this way, as do `basic_ik_runner`, `restart_wrapper` and
-`exhaustive_ik_runner`; the policies that require the optional numeric backend
-are no exception, so a solve driven straight through one of them, rather than
+`exhaustive_ik_runner`, so a solve driven straight through a policy, rather than
 through a runner or the wrapper, is checked exactly as the others are. Because
 the chain is a parameter of `step()` and not only of `setup()`, each policy also
 records the setup-time joint count and refuses a `step()` whose chain does not
@@ -380,38 +376,6 @@ match it. `basic_ik_runner` maps a latched status onto the same-named
 `ik_failure` reason.
 
 `message()` returns a static diagnostic string; it allocates nothing.
-
-### ik_termination_reason
-
-<!-- cartan:unbuilt kind=declaration -->
-```cpp
-enum class ik_termination_reason
-{
-    unknown,
-    converged,
-    iteration_limit,
-    stall_detected,
-    divergence_detected,
-    joint_limit_hit,
-    solver_converged_pose_missed,
-    solver_ftol_reached,
-    solver_xtol_reached,
-    solver_objective_stalled,
-    solver_roundoff_limited,
-    solver_stalled,
-    solver_aborted,
-    solver_budget_exhausted,
-    solver_max_iterations,
-    solver_diverged
-};
-```
-
-Fine-grained termination reason for diagnostics. `ik_status` is too coarse
-to distinguish the six underlying argmin terminators that collapse into
-`ik_status::stalled`; policies that wrap a lower-level solver report the
-specific inner terminator via `termination_reason()`. Policies that do not
-opt in report `ik_termination_reason::unknown`, and `basic_ik_runner`
-propagates the reported value into `ik_error::termination_reason`.
 
 ### ik_objective
 
@@ -528,26 +492,6 @@ reproduces the unnormalized arithmetic exactly, so it states the unit scale
 those measures always assumed rather than changing any ranking. A zero,
 negative or non-finite value is refused at `setup()`.
 
-### feasible_set
-
-<!-- cartan:unbuilt kind=declaration -->
-```cpp
-enum class feasible_set
-{
-    declared,
-    substituted
-};
-```
-
-Which joint bounds a policy actually solved over. A backend that cannot accept
-an infinite coordinate -- the active-set QP behind `nw_sqp`, `filter_nw_sqp` and
-`augmented_lagrangian` -- receives a finite interval substituted for a
-non-finite bound, so on a chain carrying an unbounded joint it solves a
-different problem from a policy that box-projects against the declared bounds.
-Racing the two is legitimate; reporting which one produced the answer is what
-keeps the split from being silent. A fully bounded chain reports `declared` for
-every policy.
-
 ### ik_result
 
 <!-- cartan:unbuilt kind=declaration -->
@@ -561,7 +505,6 @@ struct ik_result
     int solver_index{};
     std::optional<Scalar> selection_metric{};
     ik_objective selection_objective{ik_objective::speed};
-    feasible_set solved_feasible_set{feasible_set::declared};
 };
 ```
 
@@ -571,10 +514,7 @@ non-`speed` objective the runner restarts after every convergence, so the policy
 holding the last restart's residual is generally not the one that produced the
 winner. `solver_index` identifies which policy produced the solution in
 multi-policy racing. `selection_metric` is the value that candidate was ranked
-on under `selection_objective`, and is absent where the objective ranks nothing. `solved_feasible_set` reports whether the winning
-policy solved over the chain's declared joint bounds or over a finite interval
-substituted for a non-finite one, which a backend that cannot accept an
-infinite coordinate requires.
+on under `selection_objective`, and is absent where the objective ranks nothing.
 
 ### ik_error
 
@@ -584,7 +524,6 @@ template <typename Scalar = double, int N = dynamic>
 struct ik_error
 {
     ik_failure reason{ik_failure::iteration_limit};
-    ik_termination_reason termination_reason{ik_termination_reason::unknown};
     typename joint_state<Scalar, N>::position_type last_q{detail::poison_joint_position<Scalar, N>()};
     Scalar last_error_norm{std::numeric_limits<Scalar>::quiet_NaN()};
 };
@@ -732,10 +671,9 @@ struct no_limits;
 ```
 
 No-op: applies no enforcement. Use when the policy handles constraints
-internally (e.g., `projected_lm`, argmin policies with box
-constraints). Default for `cartan::lm` and `cartan::projected_lm`
-— the LM trust-region family for which post-step clamping would
-invalidate the trust-region step.
+internally (e.g., `projected_lm`). Default for `cartan::lm` and
+`cartan::projected_lm` — the LM trust-region family for which post-step clamping
+would invalidate the trust-region step.
 **Critical**: post-step `clamp_limits` invalidates LM trust-region
 semantics; `no_limits` is the correct default for the LM family.
 
@@ -748,9 +686,7 @@ struct clamp_limits;
 
 Hard clamping: clamps each `q(i)` to `[position_min, position_max]`.
 Simple and robust, but may cause discontinuities at boundaries. Default
-for the native `lbfgsb`, and for the argmin policies that already
-enforce box constraints internally (`argmin_slsqp`, `argmin_bobyqa`,
-the argmin policies).
+for the native `lbfgsb`.
 
 ### null_space_limits
 
@@ -870,136 +806,6 @@ convergence tolerances.
 
 Reference: Nocedal & Wright, *Numerical Optimization*, Ch. 3 (line
            search), Ch. 10 (nonlinear least squares, Gauss-Newton).
-
-### cartan::argmin_lm
-
-<!-- cartan:unbuilt kind=declaration -->
-```cpp
-template <chain Chain, typename LimitsPolicy = no_limits>
-class argmin_lm;
-```
-
-argmin-backed Levenberg-Marquardt with the least-squares adapter
-exposing the 6-element body-frame error as residuals and the body
-Jacobian. Joint limits are enforced via clamping after each step since
-LM is unconstrained.
-
-### cartan::argmin_lbfgsb
-
-<!-- cartan:unbuilt kind=declaration -->
-```cpp
-template <chain Chain, typename LimitsPolicy = clamp_limits>
-class argmin_lbfgsb;
-```
-
-argmin-backed L-BFGS-B for bound-constrained IK using the analytical
-gradient via the SE(3) log Jacobian.
-
-Reference: Byrd, Lu, Nocedal, Zhu (1995).
-
-### cartan::argmin_slsqp
-
-<!-- cartan:unbuilt kind=declaration -->
-```cpp
-template <chain Chain,
-          typename LimitsPolicy = clamp_limits,
-          typename Convergence = argmin::default_convergence>
-class argmin_slsqp;
-```
-
-argmin-backed SLSQP for constrained IK with box constraints. Uses
-Kraft's Sequential Least Squares Programming algorithm with the
-analytical gradient via the SE(3) log Jacobian. The `Convergence`
-template parameter lets consumers opt out of argmin's default
-four-criterion convergence policy in favor of alternatives like
-`argmin::slsqp_compatible_convergence` (NLopt-style ftol+xtol+stall).
-
-### cartan::argmin_bobyqa
-
-<!-- cartan:unbuilt kind=declaration -->
-```cpp
-template <chain Chain, typename LimitsPolicy = clamp_limits>
-class argmin_bobyqa;
-```
-
-argmin-backed BOBYQA derivative-free solver with box constraints.
-Builds a quadratic interpolation model of the objective and uses
-trust-region steps.
-
-Reference: Powell, M.J.D., "The BOBYQA Algorithm for Bound Constrained
-           Optimization Without Derivatives", 2009.
-
-### cartan::argmin_projected_gn
-
-<!-- cartan:unbuilt kind=declaration -->
-```cpp
-template <chain Chain, typename LimitsPolicy = clamp_limits>
-class argmin_projected_gn;
-```
-
-argmin-backed projected Gauss-Newton with active-set bounds.
-
-### cartan::argmin_projected_gradient_gn
-
-<!-- cartan:unbuilt kind=declaration -->
-```cpp
-template <chain Chain, typename LimitsPolicy = clamp_limits>
-class argmin_projected_gradient_gn;
-```
-
-argmin-backed projected-gradient Gauss-Newton with Armijo backtracking.
-
-### cartan::nw_sqp
-
-<!-- cartan:unbuilt kind=declaration -->
-```cpp
-template <chain Chain, typename LimitsPolicy = clamp_limits>
-class nw_sqp;
-```
-
-argmin-backed Nocedal-Wright SQP with inequality constraints.
-
-Reference: Nocedal & Wright, *Numerical Optimization*, Ch. 18 (SQP).
-
-### cartan::filter_nw_sqp
-
-<!-- cartan:unbuilt kind=declaration -->
-```cpp
-template <chain Chain, typename LimitsPolicy = clamp_limits>
-class filter_nw_sqp;
-```
-
-argmin-backed filter Nocedal-Wright SQP.
-
-### cartan::filter_slsqp
-
-<!-- cartan:unbuilt kind=declaration -->
-```cpp
-template <chain Chain, typename LimitsPolicy = clamp_limits>
-class filter_slsqp;
-```
-
-argmin-backed filter SLSQP with box constraints.
-
-### cartan::mma
-
-<!-- cartan:unbuilt kind=declaration -->
-```cpp
-template <chain Chain, typename LimitsPolicy = clamp_limits>
-class mma;
-```
-
-argmin-backed Method of Moving Asymptotes.
-
-### cartan::augmented_lagrangian
-
-<!-- cartan:unbuilt kind=declaration -->
-```cpp
-template <chain Chain, typename LimitsPolicy = clamp_limits>
-class augmented_lagrangian;
-```
-
-argmin-backed augmented Lagrangian solver for constrained IK.
 
 ## restart_wrapper
 

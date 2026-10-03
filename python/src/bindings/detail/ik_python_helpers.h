@@ -30,10 +30,8 @@ struct IkResult
     double error_norm{0.0};
     std::string failure_reason;
     int solver_index{0};
-    cartan::ik_termination_reason termination_reason{cartan::ik_termination_reason::unknown};
     std::optional<double> selection_metric{};
     cartan::ik_objective selection_objective{cartan::ik_objective::speed};
-    cartan::feasible_set solved_feasible_set{cartan::feasible_set::declared};
 };
 
 struct IkConfig
@@ -75,10 +73,8 @@ inline IkResult to_ik_result(cartan::ik_result<double, N>&& ok)
     out.error_norm         = ok.final_error_norm;
     out.failure_reason     = "";
     out.solver_index       = ok.solver_index;
-    out.termination_reason = cartan::ik_termination_reason::converged;
     out.selection_metric   = ok.selection_metric;
     out.selection_objective = ok.selection_objective;
-    out.solved_feasible_set = ok.solved_feasible_set;
     return out;
 }
 
@@ -92,7 +88,6 @@ inline IkResult to_ik_result_from_error(cartan::ik_error<double, N>&& err, int i
     out.error_norm         = err.last_error_norm;
     out.failure_reason     = ik_failure_to_string(err.reason);
     out.solver_index       = -1;
-    out.termination_reason = err.termination_reason;
     return out;
 }
 
