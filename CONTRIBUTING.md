@@ -1,8 +1,7 @@
 # Contributing to Cartan
 
-Thanks for your interest in contributing. Cartan is an academic / research
-library aimed at robotics teaching and research; contributions of all
-sizes -- documentation fixes, bug reports, code improvements, new
+Thanks for your interest in contributing. Cartan is a C++20 Lie-group and
+serial-chain kinematics library; contributions of all sizes -- documentation fixes, bug reports, code improvements, new
 features -- are welcome.
 
 ## Quick Links
@@ -55,8 +54,8 @@ See [docs/getting-started.md](docs/getting-started.md) for the install
 and build instructions for end users. For contributors:
 
 ```bash
-# Configure the dev preset (Debug + tests + sanitizers enabled by default
-# on at least one CI configuration).
+# Configure the dev preset (Debug + tests); use --preset sanitize for
+# ASan/UBSan.
 cmake --preset dev
 
 # Build everything.
@@ -97,8 +96,10 @@ public contributions.
   polyfill (`cartan::expected`) to keep the baseline at C++20 and the public
   headers usable on the exceptions-off embedded backends. Don't reach for a
   feature purely for novelty; reach for it where it makes the code clearer.
-- **Eigen is the only required dependency.** NLopt, pinocchio, and
-  TRAC-IK are optional and gated behind CMake feature flags.
+- **Eigen is the only library dependency.** The URDF loader adds the
+  robot-description reader; benchmark comparators (KDL, TRAC-IK, pinocchio,
+  ...) are discovered under `CARTAN_BUILD_BENCHMARKS`; NLopt appears only in
+  `examples/nlopt_policy`.
 - **Naming:** lowercase types and functions (`so3`, `kinematic_chain`,
   `forward_kinematics`); member variable prefix `m_` (`m_omega`,
   `m_chain`); template parameters in `CamelCase` (`Scalar`, `Joints`).
@@ -127,9 +128,9 @@ Includes are grouped into three sections separated by a single blank
 line:
 
 1. Internal project includes (`#include "..."`).
-2. Third-party library includes (`#include <eigen/...>`,
+2. Third-party library includes (`#include <Eigen/...>`,
    `#include <catch2/...>`, etc.).
-3. Standard library includes (`#include <vector>`, `#include <expected>`).
+3. Standard library includes (`#include <vector>`, `#include <optional>`).
 
 Within each section, group by folder location with a blank line between
 folder groups. Within each folder group, sort by line length first, then
@@ -169,6 +170,8 @@ Allowed prefixes:
 | `Feature:`     | New user-visible capability or API surface. |
 | `Fix:`         | Bug fix or correctness-affecting change. |
 | `Refactor:`    | Internal reorganization with no user-visible behavior change. |
+| `Build:`       | Build system, packaging, or CI changes. |
+| `Test:`        | Test-only changes. |
 | `Docs:`        | Documentation-only changes (README, docs/, doc-comments). |
 | `Examples:`    | Changes to `examples/` only. |
 | `Optimization:` | Performance change with no API or correctness impact. |

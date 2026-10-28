@@ -4,8 +4,8 @@ Standalone benchmark suite for Cartan Lie group operations, forward kinematics, 
 
 ## What this repository provides, and what you supply
 
-This repository provides the harness, the robot fixtures, the raw records and the
-analysis script. **The comparator libraries are yours to obtain.** cartan does not
+This repository provides the harness, the robot fixtures and the analysis
+scripts. **The comparator libraries are yours to obtain.** cartan does not
 download, copy or patch a library it measures itself against: which revision of a
 comparator produced a published number is not a question this build gets to answer
 on your machine's behalf, and a copy of somebody else's library in this tree is a
@@ -21,7 +21,7 @@ written next to every capture:
 | Mainstream third-party | TRAC-IK, Pinocchio, orocos-kdl, NLopt, LAPACK, opw_kinematics, ik-geo | discovered through package configuration, a project find module, or a path you supply; never copied into this tree |
 | Generated | the IKFast solver source under `third_party/ikfast_kr6r900/` | stays here, with its codegen provenance in its own README |
 
-The two classes exist because the test is the same in both directions: can a
+The first two classes are distinguished by one test, applied in both directions: can a
 reader obtain this themselves. Nothing packages the first class, so a reader has
 no other way to get it. Every member of the second class is a package-manager
 line away for anyone who wants it.
@@ -92,48 +92,27 @@ exactly one full turn, so canonicalization always succeeds and a limits check ca
 bounds. A comparison whose feasibility question has only one possible answer is not measuring
 feasibility.
 
-### Retired cells and why
-
-A cell that vanished from a table with no recorded reason is indistinguishable from a cell that
-was inconvenient, so each retirement is written down here.
-
-- **The cartan-versus-TRAC-IK head-to-head harness (54 cells).** Retired outright. Its cartan
-  rows solved an unconstrained problem while the comparator solved a box-constrained one, and
-  its cartan success column reported the solver's own status rather than an independently
-  recomputed verdict. Both defects are structural, and the study replaces the harness with one
-  feasible set no cell can opt out of and a verdict the harness computes for every participant.
-- **`cartan_restart_lm_clamped`.** Retired with that file: it was benchmarked nowhere else, and
-  the study does not declare it as a participant.
-- **Every `_no_limits` method variant (136 cells).** Retired: 136 of 136 limited-versus-unbounded
-  pairs produced identical success rates, because the default cells clamp while the variant cells
-  run unbounded and every target is drawn from inside the box, so no bound ever binds. The
-  deliberate unbounded measurement now lives in the study as its own table over
-  description-sourced bounds, where a bound can actually bind.
-- **`tools/ik_accuracy_sweep.py`.** Retired: it drove the deleted harness through an environment
-  variable. Driving every participant at one accuracy is now `ik_study_calibrate` plus the
-  capture's `--iso-accuracy` mode, which calibrates against achieved rather than requested error.
-
 ## Building
 
-From the repository root:
+Benchmarks need the robot-description loader (`CARTAN_BUILD_URDF=ON`), a Python 3
+interpreter at configure time, and orocos-kdl and Google Benchmark. From the
+repository root:
 
 ```bash
-cmake --preset=dev \
-    -DCARTAN_BUILD_BENCHMARKS=ON \
-    -DCARTAN_CMAKE_FETCH_DEPS=ON
-
-cmake --build --preset=dev
+cmake --preset=bench
+cmake --build --preset=bench
 ```
 
-Google Benchmark is fetched automatically via CMake FetchContent.
+The `bench` preset builds Release with the loader on and sets
+`CARTAN_FETCH_BENCHMARK_DEPS=ON`, so Google Benchmark is fetched at a pinned
+commit when no installed package is found. Comparator libraries are discovered,
+never fetched; a benchmark whose comparator is absent is omitted with a warning.
 
-To also build SQP benchmarks (requires NLopt):
+To also build the NLopt example-policy benchmarks (BOBYQA and SLSQP from
+`examples/nlopt_policy`; requires an installed NLopt):
 
 ```bash
-cmake --preset=dev \
-    -DCARTAN_BUILD_BENCHMARKS=ON \
-    -DCARTAN_EXAMPLE_NLOPT_POLICY=ON \
-    -DCARTAN_CMAKE_FETCH_DEPS=ON
+cmake --preset=bench -DCARTAN_EXAMPLE_NLOPT_POLICY=ON
 ```
 
 ## Running
@@ -145,13 +124,18 @@ cmake --preset=dev \
 ./benchmarks/lie_group_benchmarks
 ./benchmarks/fk_benchmarks
 ./benchmarks/jacobian_benchmarks
-./benchmarks/ik_dls_benchmarks
-./benchmarks/ik_lm_benchmarks
-./benchmarks/ik_sqp_benchmarks        # requires NLopt
-./benchmarks/ik_racing_benchmarks
-./benchmarks/ik_fallback_benchmarks
-./benchmarks/ik_comparison_pinocchio_benchmarks  # requires orocos-kdl + Pinocchio
+./benchmarks/basic_ik_dls_benchmarks
+./benchmarks/basic_ik_lm_benchmarks
+./benchmarks/exhaustive_ik_full_benchmarks
+./benchmarks/basic_ik_sqp_benchmarks              # requires the NLopt example policy
+./benchmarks/basic_ik_full_benchmarks             # requires TRAC-IK
+./benchmarks/ik_comparison_pinocchio_benchmarks   # requires Pinocchio
+./benchmarks/closed_form_ik_benchmarks            # requires Pinocchio
 ```
+
+The study's executables (`ik_study_benchmarks`, `ik_study_capture`,
+`ik_study_calibrate`, `study_description_gate`) are described in
+[docs/benchmarks/README.md](../docs/benchmarks/README.md).
 
 ### Filtered execution
 
@@ -184,30 +168,33 @@ To obtain p95 and other statistical aggregates beyond the single-run mean:
     --benchmark_report_aggregates_only=true
 ```
 
-This runs the full 10,000-iteration benchmark 10 times and reports mean, median, stddev, and cv across repetitions. Combine with `--benchmark_format=json` for machine-readable output.
+This runs the 2,000-target benchmark 10 times and reports mean, median, stddev, and cv across repetitions. Combine with `--benchmark_format=json` for machine-readable output.
 
 ## Benchmark Structure
 
 | File | What It Measures | Robots |
 |------|------------------|--------|
-| `lie_group_benchmarks.cpp` | SO(2)/SE(2)/SO(3)/SE(3) exp, log, compose, inverse, adjoint, coadjoint | N/A |
+| `lie_group_benchmarks.cpp` | exp, log, compose, inverse for SO(2)/SE(2)/SO(3)/SE(3); adjoint for SE(2)/SO(3)/SE(3); coadjoint for SO(3)/SE(3) | N/A |
 | `fk_benchmarks.cpp` | Forward kinematics for 3/6/7-DOF (fixed-N and dynamic) | 3R, UR3e, LBR Med 14 |
-| `jacobian_benchmarks.cpp` | Space and body Jacobians for 3/6/7-DOF | 3R, UR3e, LBR Med 14 |
-| `ik_dls_benchmarks.cpp` | DLS stepper IK for 3/6/7-DOF | 3R, UR3e, LBR Med 14 |
-| `ik_lm_benchmarks.cpp` | LM stepper IK for 3/6/7-DOF | 3R, UR3e, LBR Med 14 |
-| `ik_sqp_benchmarks.cpp` | SQP stepper IK for 3/6/7-DOF (NLopt) | 3R, UR3e, LBR Med 14 |
-| `ik_racing_benchmarks.cpp` | Racing scheduler IK for 6/7-DOF | UR3e, LBR Med 14 |
-| `ik_fallback_benchmarks.cpp` | Fallback scheduler IK for 6/7-DOF | UR3e, LBR Med 14 |
+| `jacobian_benchmarks.cpp` | Space Jacobian for 3/6/7-DOF (fixed-N and dynamic) | 3R, UR3e, LBR Med 14 |
+| `basic_ik_dls_benchmarks.cpp` | `dls` solve policy for 3/6/7-DOF | 3R, UR3e, LBR Med 14 |
+| `basic_ik_lm_benchmarks.cpp` | `lm` solve policy for 3/6/7-DOF | 3R, UR3e, LBR Med 14 |
+| `basic_ik_sqp_benchmarks.cpp` | NLopt BOBYQA solve policy from `examples/nlopt_policy` (an example, not library surface) | 3R, UR3e, LBR Med 14 |
+| `exhaustive_ik_full_benchmarks.cpp` | `exhaustive_ik_runner` across the robot set | All |
+| `basic_ik_full_benchmarks.cpp` | `basic_ik_runner` compositions across the robot set, beside TRAC-IK | All |
+| `fk_comparison_benchmarks.cpp`, `jacobian_comparison_benchmarks.cpp` | Forward kinematics and Jacobians against orocos-kdl | All |
+| `fk_pinocchio_benchmarks.cpp`, `perf_fk_*.cpp` | Forward kinematics against Pinocchio | UR3e and the fixture set |
+| `closed_form_ik_benchmarks.cpp` | Closed-form analytical solvers against a matched iterative subset | 2R, 3R, ABB IRB 120, KR6 R900 (offset-free model) |
 | `ik_comparison_pinocchio_benchmarks.cpp` | cartan's own solver families side by side, with TRAC-IK and a Pinocchio-primitive LM alongside them, over synthetic bounds | UR3e, KR6, IRB120, Jaco2, LBR Med 14, Panda, Fetch, Baxter, LWR 4+ |
 | `opw_comparison_benchmarks.cpp` | Cartan `opw_6r_solver` vs `opw_kinematics` reference (same OPW formulation -> bit-identical): branch-for-branch parity + solve timing | KR6 R900 |
 | `ikfast_comparison_benchmarks.cpp` | Cartan `opw_6r_solver` vs an OpenRAVE-generated IKFast solver (independent derivation -> ~1e-10 agreement): branch-for-branch parity + solve timing | KR6 R900 |
 | `ikgeo_comparison_benchmarks.cpp` | Cartan `opw_6r_solver` vs the ik-geo crate (Elias & Wen subproblem method, through this project's own foreign-function shim; independent formulation -> ~1e-13 agreement): branch-for-branch parity + solve timing | KR6 R900 |
-| `benchmark_utils.h` | Shared chain factories (~10 robots), target generation | All |
+| `benchmark_utils.h` | KDL twins of the `tests/fixtures/chain_factories.h` robots, target generation | All |
 
 ## Methodology
 
 - **Random seed:** 42 (fixed for reproducibility)
-- **IK iterations:** 10,000 solves per configuration
+- **IK iterations:** 10,000 solves per configuration in the per-policy benchmarks; 2,000 in `ik_comparison_pinocchio_benchmarks`, 1,000 in `basic_ik_full_benchmarks`, 100 in `exhaustive_ik_full_benchmarks`
 - **Targets:** FK-generated from random joint configurations (guaranteed reachable)
 - **Convergence:** position and orientation tolerance default 1e-5, max 100 iterations. A run
   that needs every participant driven at one *achieved* accuracy rather than one requested
@@ -224,7 +211,7 @@ This runs the full 10,000-iteration benchmark 10 times and reports mean, median,
 |---------|-------|--------------------|-------------|
 | Google Benchmark | mainstream | installed package, or fetched at a pinned commit under `CARTAN_FETCH_BENCHMARK_DEPS` | all benchmarks |
 | orocos-kdl | mainstream | installed package | all benchmarks |
-| NLopt | mainstream | installed package | SQP and full-matrix benchmarks |
+| NLopt | mainstream | installed package | the NLopt example-policy cells |
 | Pinocchio | mainstream | installed package | peer comparison benchmarks and the study |
 | TRAC-IK | mainstream | `cmake/FindTracIK.cmake`, or `CARTAN_TRAC_IK_SOURCE_DIR` | comparison benchmarks and the study |
 | LAPACK | mainstream | installed package | IKFast comparison benchmark (polynomial roots) |

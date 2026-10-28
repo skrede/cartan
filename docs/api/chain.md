@@ -1,7 +1,7 @@
 # chain
 
 Headers under `cartan/serial/chain/` (sublib `cartan-serial-chain`). Public
-symbols live in the `cartan::` namespace. Link with `cartan::serial-chain` (or
+symbols live in the `cartan::` namespace. Link with `cartan::serial_chain` (or
 the convenience target `cartan::cartan`).
 
 Kinematic chain representation using Product of Exponentials (PoE) formulation.
@@ -24,7 +24,8 @@ See [PoE Kinematics](../background/poe-kinematics.md)
 | `cartan::joint_state` | `#include <cartan/serial/chain/joint_state.h>` |
 | `cartan::joint_kind`, `cartan::detect_joint_kind` | `#include <cartan/serial/chain/joint_kind.h>` |
 | `cartan::revolute_x/y/z`, `cartan::prismatic_x/y/z` joint tags | `#include <cartan/serial/chain/joint_tags.h>` |
-| `cartan::chain` concept, `cartan::joint_tag` concept | `#include <cartan/serial/chain/chain_concept.h>` |
+| `cartan::chain` concept | `#include <cartan/serial/chain/chain_concept.h>` |
+| `cartan::joint_tag` concept | `#include <cartan/serial/chain/joint_tags.h>` |
 | `cartan::dynamic` | `#include <cartan/types.h>` |
 | `cartan::detail::storage_t` | `#include <cartan/serial/chain/storage_trait.h>` |
 
@@ -418,7 +419,9 @@ kinematic_chain(
 - `limits` — Joint position/velocity limits. Same storage pattern as
   `axes`.
 
-Throws `std::invalid_argument` if `axes.size() != limits.size()`. Caches
+Throws `std::invalid_argument` if `axes.size() != limits.size()`, if any
+screw-axis component or the home pose is non-finite, or if the chain has no
+joints; a build without exceptions takes the fail-stop path instead. Caches
 `joint_kind` per joint so
 FK / Jacobian can dispatch into compile-time specializations.
 
@@ -593,5 +596,5 @@ using storage_t = /* std::array<T, N> when N >= 0, std::vector<T> when N == dyna
 }
 ```
 
-`kinematic_chain` and `joint_state` both use `storage_t` internally so the
+`kinematic_chain` and `fk_result` both use `storage_t` internally so the
 same algorithms work with both fixed and dynamic sizing.

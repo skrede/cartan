@@ -56,15 +56,15 @@ cartan owns kinematics and stays out of everything else.
 
 ## Requirements
 
-- C++20 compiler &mdash; CI builds and tests GCC 14, Clang 18, and MSVC 2022 (VS 17.x); older C++20 toolchains are untested
+- C++20 compiler &mdash; CI builds and tests GCC 14, Clang 18, AppleClang (Xcode 16.2), and MSVC 2022 (VS 17.x); older C++20 toolchains are untested
 - CMake 3.28+
-- Eigen 3.4+ (auto-fetched via FetchContent) &mdash; the only dependency of the
+- Eigen 3.4+ (found, or fetched via FetchContent with `CARTAN_CMAKE_FETCH_DEPS=ON`) &mdash; the only dependency of the
   Lie-group and serial-chain modules
 - For the robot-description loader (`CARTAN_BUILD_URDF`, off by default): a
   robot-description reader that handles URDF and xacro, which brings its own XML
   library with it. Enabling the loader is what makes cartan depend on more than
   Eigen; the rest of the library, including every embedded configuration, does not.
-- For embedded targets: an exceptions-off C++20 GCC backend &mdash; ESP-IDF 5.1+ / 6.x
+- For embedded targets: an exceptions-off C++20 GCC backend &mdash; ESP-IDF 5.1+
   (esp32, esp32c3) or arm-none-eabi (cortex-m7, cortex-m4f).
 
 ## Quick Install
@@ -133,7 +133,7 @@ live under `tests/embedded/esp32-smoke/` (see that directory's README for the
 - [Documentation Index](https://github.com/skrede/cartan/blob/master/docs/README.md) &mdash; API reference, background theory, guides.
 - [Examples](https://github.com/skrede/cartan/tree/master/examples) &mdash; runnable programs for the core feature areas (Lie basics, frame safety, FK/Jacobians, basic and composed IK).
 - [Tutorials](https://github.com/skrede/cartan/tree/master/examples/tutorials) &mdash; step-by-step walkthroughs for FK, Jacobians, IK, and URDF loading.
-- [Python](https://github.com/skrede/cartan/tree/master/python) &mdash; tutorials and setup guide for Cartan's Python API.
+- [Python](https://github.com/skrede/cartan/blob/master/docs/python.md) &mdash; setup guide and C++/Python parity for Cartan's Python API.
 
 ## Contributing
 

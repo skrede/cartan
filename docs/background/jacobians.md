@@ -2,10 +2,10 @@
 
 The **Jacobian** of a serial manipulator maps joint velocities
 $\dot{\theta} \in \mathbb{R}^n$ to the end-effector twist
-$\mathcal{V} \in \mathbb{R}^6$. Unlike the classical geometric Jacobian, the
+$\mathcal{V} \in \mathbb{R}^6$. Unlike the classical geometric Jacobian [3, Sec. 3.2, pp. 120--130], the
 Jacobian defined through the Product of Exponentials relates joint velocities
 to a spatial twist -- a 6-vector combining angular and linear velocity in a
-single reference frame [1, Ch. 5, pp. 169--194].
+single reference frame [1, Ch. 5, pp. 173--216].
 
 This page derives the space and body Jacobians column-by-column, discusses
 singularities and manipulability, and maps the theory to Cartan's implementation.
@@ -74,7 +74,7 @@ preceding joints.
 ### The Adjoint Representation
 
 For $T = \begin{bmatrix} R & p \\ 0 & 1 \end{bmatrix} \in SE(3)$, the
-$6 \times 6$ adjoint matrix is [1, Eq. 3.83, p. 107]:
+$6 \times 6$ adjoint matrix is [1, Def. 3.20, p. 98]:
 
 $$
 \text{Ad}_T = \begin{bmatrix} R & 0 \\ [p]_\times R & R \end{bmatrix}
@@ -89,7 +89,7 @@ $\text{Ad}_T \mathcal{V} = (R\omega, \; [p]_\times R\omega + Rv)$.
 
 The **body Jacobian** $J_b(\theta) \in \mathbb{R}^{6 \times n}$ maps joint
 velocities to the end-effector twist expressed in the body frame $\{b\}$
-[1, Eq. 5.22, p. 185]:
+[1, Eq. 5.17, p. 183]:
 
 $$
 \mathcal{V}_b = J_b(\theta) \, \dot{\theta}
@@ -104,9 +104,9 @@ $$
 J_b(\theta) = \text{Ad}_{T^{-1}(\theta)} \, J_s(\theta)
 $$
 
-where $T(\theta)$ is the end-effector pose from the PoE. This requires only
-one $6 \times 6$ matrix multiply applied to the entire $6 \times n$ space
-Jacobian -- a constant-cost transformation regardless of the number of joints.
+where $T(\theta)$ is the end-effector pose from the PoE. This requires one
+$6 \times 6$ adjoint, formed once and applied to the $6 \times n$ space
+Jacobian; the cost grows linearly in $n$.
 
 **Derivation.** The spatial and body twists are related by
 $\mathcal{V}_b = \text{Ad}_{T^{-1}} \mathcal{V}_s$. Substituting
@@ -128,7 +128,7 @@ $\mathcal{V}_b = \text{Ad}_{T^{-1}} J_s \dot{\theta} = J_b \dot{\theta}$.
 A configuration $\theta$ is **singular** when the Jacobian $J(\theta)$ loses
 rank. At a singularity, certain end-effector velocities become unachievable --
 the manipulator loses one or more degrees of freedom in task space
-[1, Sec. 5.3, pp. 186--190].
+[1, Sec. 5.3, pp. 189--193].
 
 ### Formal Definition
 
@@ -156,7 +156,7 @@ At a singularity:
 ### Manipulability
 
 The **manipulability measure** $\mu(\theta)$ quantifies how far a configuration
-is from singularity [1, Sec. 5.3, p. 186]:
+is from singularity [1, Sec. 5.4, p. 197]:
 
 $$
 \mu(\theta) = \sqrt{\det(J(\theta) \, J(\theta)^\top)}
@@ -227,10 +227,11 @@ See [PoE Kinematics](poe-kinematics.md) for the underlying forward kinematics.
 ## Bibliography
 
 [1] K. M. Lynch and F. C. Park, "Modern Robotics: Mechanics, Planning, and
-Control," Cambridge University Press, 2017.
+Control," Cambridge University Press, 2017; pages refer to the 2019 preprint of
+the updated first edition.
 
 [2] T. Yoshikawa, "Manipulability of Robotic Mechanisms," *International
 Journal of Robotics Research*, vol. 4, no. 2, pp. 3--9, 1985.
 
-[3] B. Siciliano, L. Sciavicco, L. Villani, and G. Oriolo, "Robotics:
-Modelling, Planning and Control," 2nd ed., Springer, 2009.
+[3] B. Siciliano, L. Villani, G. Oriolo, and A. De Luca, "Foundations of
+Robotics," Springer, 2025.

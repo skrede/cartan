@@ -57,13 +57,14 @@ Lie groups | `cartan::so3`, `cartan::se3`, plus SO(2)/SE(2) and frame wrappers |
 Chains | `cartan::screw_axis`, `joint_limits`, `kinematic_chain`, `static_chain` | `cartan.ScrewAxis`, `cartan.JointLimits`, `cartan.KinematicChain` | `python/tutorials/02_fk_and_jacobians.py` | Partial | Python uses runtime dynamic chains. Static-chain templates and joint-tag packs are C++ compile-time facilities.
 FK | `cartan::forward_kinematics` | `cartan.forward_kinematics` | `python/tutorials/01_urdf_walkthrough.py`, `python/tutorials/02_fk_and_jacobians.py` | Bound and tested | Returns `cartan.SE3` directly in Python.
 Jacobians | `cartan::space_jacobian`, `cartan::body_jacobian` | `cartan.space_jacobian`, `cartan.body_jacobian` | `python/tutorials/02_fk_and_jacobians.py` | Bound and tested | Returns NumPy `float64` arrays.
-URDF | `cartan::load_urdf` and `urdf_load_result` | `cartan.load_urdf`, `UrdfLoadResult`, `UrdfMetadata`, `UrdfError` | `python/tutorials/01_urdf_walkthrough.py` | Bound and tested | Available when the extension is built with URDF support.
+Singularity analysis | `cartan::singular_values`, `condition_number`, `manipulability`, `isotropy`, `is_near_singular` | same names | Python tests | Bound and tested | An entirely zero Jacobian returns `None`; a caller error raises `ValueError`.
+URDF | `cartan::load_urdf`, `load_urdf_transform` and `urdf_load_result` | `cartan.load_urdf`, `load_urdf_transform`, `UrdfLoadResult`, `UrdfMetadata`, `UrdfError`, `UrdfFailure`, `UrdfDiagnostic`, `UrdfSourceLocation` | `python/tutorials/01_urdf_walkthrough.py` | Bound and tested | Available when the extension is built with URDF support.
 Iterative IK | `basic_ik_runner`, `restart_wrapper`, native solve policies | `cartan.solve_ik`, `solve_ik_speed`, `solve_ik_robust`, `IkConfig`, `IkResult` | `python/tutorials/01_urdf_walkthrough.py`, `python/tutorials/03_ik_composition.py` | Bound and tested |
 Analytical IK | Pieper 6R, planar 2R, spatial 3R, Paden-Kahan helpers | `cartan.analytical.solve_pieper_6r`, `solve_planar_2r`, `solve_3r`, `paden_kahan_1/2/3`, `solve_all` | `python/tutorials/03_ik_composition.py`, `docs/api/analytical.md` | Bound and tested | Analytical results expose verified solution lists and status values.
-OPW | `cartan::opw_parameters`, `opw_6r_solver`, `opw_branch` | `cartan.OPWParameters`, `cartan.OPWBranch`, `cartan.analytical.solve_opw_6r` | Python analytical tests; parity table here | Partial | The OPW solver covers offset-shoulder spherical-wrist industrial arms through explicit OPW parameters. `OPWBranch` is exposed as an enum, but branch classification (`classify_branch`) is not yet wired or bound; only the enum's presence is tested.
+OPW | `cartan::opw_parameters`, `opw_6r_solver`, `opw_branch` | `cartan.OPWParameters`, `cartan.OPWBranch`, `cartan.analytical.solve_opw_6r` | Python analytical tests; parity table here | Partial | The OPW solver covers offset-shoulder spherical-wrist industrial arms through explicit OPW parameters. `OPWBranch` is exposed as an enum; `classify_branch` exists in C++ but is not bound, and only the enum's presence is tested.
 Unwrap | `cartan::unwrapped_solver`, `unwrapped_result`, `range_status` | `cartan.UnwrappedResult`, `cartan.RangeStatus`, `solve_unwrapped_opw_6r`, `solve_unwrapped_pieper_6r`, `solve_unwrapped_3r`, `solve_unwrapped_planar_2r` | Python analytical tests; parity table here | Bound and tested | Python functions return every branch with per-solution range tags.
 Exhaustive runner | `cartan::exhaustive_ik_runner` | `cartan.ExhaustiveIKRunner`, `IkPolicy`, `RankingStrategy` | Python exhaustive-runner tests | Bound and tested | Returns FK-verified ranked `IkResult` branches.
-Install/export | CMake package config, install/export targets, scikit-build-core wheel build | `pip install cartan-bindings`, editable install command above | This page and package metadata | In progress | Wheel matrix and publishing workflow are handled separately from tutorial parity.
+Install/export | CMake package config, install/export targets, scikit-build-core wheel build | `pip install cartan-bindings`, editable install command above | This page and package metadata | Available | Wheels for Linux x86_64/aarch64, macOS arm64/x86_64 and Windows x64; published as `cartan-bindings` on PyPI.
 
 ## Tutorial Mirrors
 
@@ -144,6 +145,5 @@ def waypoint(chain: cartan.KinematicChain, q):
 
 ### Dynamics
 
-Dynamics are a separate concern. Use a companion dynamics package such as
-`cartan-serial-dynamics` when it is available, with Cartan supplying poses,
-Jacobians, and IK seeds.
+Dynamics are out of scope. Use a dynamics library such as Pinocchio, with
+Cartan supplying poses, Jacobians, and IK seeds.

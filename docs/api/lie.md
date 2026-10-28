@@ -230,9 +230,9 @@ Inverse SE(3) left Jacobian. Block structure: top-left
 `J_so3^{-1}(omega)`, top-right zero, bottom-left `-J^{-1} Q J^{-1}`,
 bottom-right `J_so3^{-1}(omega)`.
 
-Reference: Barfoot, *State Estimation for Robotics*, Eq. 8.91 (left
-           Jacobian), Eq. 8.100b (inverse), adapted to omega-first
-           convention.
+Reference: Barfoot, *State Estimation for Robotics*, Eq. 8.90b, p. 299
+           (left Jacobian), Eq. 8.91a, p. 300 (`Q`), Eq. 8.100b, p. 301
+           (inverse), adapted to omega-first convention.
 
 ## so2
 
@@ -557,7 +557,7 @@ Rotate a 3D vector: `R * v`.
 
 ### Edge Cases
 
-- **Near-zero angle (`||phi|| < epsilon`):** `exp` and `log` switch to Taylor expansions automatically.
+- **Near-zero angle:** `exp` switches to a Taylor expansion when `||phi||² < epsilon`, and `log` when the quaternion's vector-part norm is below `sqrt(epsilon)`.
 - **Near-pi angle:** The quaternion `atan2`-based `log` avoids the eigenvector branch at `theta ~ pi` entirely, producing correct results without special-casing.
 - **Double cover:** `log` canonicalizes to the `w >= 0` quaternion hemisphere for unique output.
 

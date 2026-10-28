@@ -2,7 +2,7 @@
 
 Headers under `cartan/serial/ik/` (sublib `cartan-serial-chain`). Iterative IK
 solvers, runners, status / result types, and convergence criteria all live in
-the `cartan::` namespace. Link with `cartan::serial-chain`
+the `cartan::` namespace. Link with `cartan::serial_chain`
 (or the convenience target `cartan::cartan`). The umbrella header
 `<cartan/serial/ik.h>` includes the runner, every solver, the wrappers, the
 limits / weight policies, and the type aliases / builders.
@@ -55,6 +55,7 @@ complete example in the
 <!-- cartan:unbuilt kind=illustration reason="carries its own include directives above the statements, which a fragment wrapper cannot host inside a function" -->
 ```cpp
 #include <cartan/serial_chain.h>
+#include <iostream>
 #include <numbers>
 
 cartan::vector3<double> z{0, 0, 1};
@@ -308,15 +309,16 @@ step-by-step visibility into solver progress.
 template <typename Scalar = double>
 struct convergence_criteria
 {
-    Scalar position_tol{Scalar(1e-6)};
-    Scalar orientation_tol{Scalar(1e-6)};
+    Scalar position_tol{detail::default_position_tol_v<Scalar>};
+    Scalar orientation_tol{detail::default_orientation_tol_v<Scalar>};
     int max_iterations_per_attempt{100};
     int max_total_work_units{200};
 };
 ```
 
 Separate position (linear) and orientation (angular) tolerances per
-Lynch & Park, Modern Robotics, Ch. 6.2.
+Lynch & Park, Modern Robotics, Section 6.2.2, p. 228. Both tolerances default to `1e-6` for
+`double` and `1e-4` for `float`.
 
 - `position_tol` — pose-error position tolerance.
 - `orientation_tol` — pose-error orientation tolerance.
@@ -329,7 +331,9 @@ Lynch & Park, Modern Robotics, Ch. 6.2.
   the solver's design). The runner accumulates
   `step_result::metrics.units_consumed` against this cap. Internal
   restarts charge zero units beyond the failing inner attempt that
-  triggered them. The cap is literal (no slack).
+  triggered them. A single-policy runner honors the cap exactly; a racing
+  round-robin tick is atomic and can carry the accumulator past it by at most
+  one unit per still-active policy.
 
 ## Status and Result Types
 
@@ -510,7 +514,7 @@ struct ik_result
 
 Successful IK outcome. `final_error_norm` is the residual measured at
 `solution` and not at any other configuration the solve passed through: under a
-non-`speed` objective the runner restarts after every convergence, so the policy
+non-`speed` objective a single-policy runner re-seeds after every convergence, so the policy
 holding the last restart's residual is generally not the one that produced the
 winner. `solver_index` identifies which policy produced the solution in
 multi-policy racing. `selection_metric` is the value that candidate was ranked
@@ -671,8 +675,8 @@ struct no_limits;
 ```
 
 No-op: applies no enforcement. Use when the policy handles constraints
-internally (e.g., `projected_lm`). Default for `cartan::lm` and
-`cartan::projected_lm` — the LM trust-region family for which post-step clamping
+internally (e.g., `projected_lm`). Default for `cartan::lm`,
+`cartan::projected_lm` and `cartan::dls` — the damped family for which post-step clamping
 would invalidate the trust-region step.
 **Critical**: post-step `clamp_limits` invalidates LM trust-region
 semantics; `no_limits` is the correct default for the LM family.
@@ -686,7 +690,7 @@ struct clamp_limits;
 
 Hard clamping: clamps each `q(i)` to `[position_min, position_max]`.
 Simple and robust, but may cause discontinuities at boundaries. Default
-for the native `lbfgsb`.
+for `lbfgsb` and `newton_raphson`.
 
 ### null_space_limits
 
@@ -700,7 +704,8 @@ toward their range midpoints via gradient projection into the Jacobian
 null space, then safety-clamps. Improves distance from joint limits
 without degrading the primary IK task.
 
-Reference: Lynch & Park, Modern Robotics, Ch. 6.3, p. 235-237.
+Reference: Siciliano, Villani, Oriolo and De Luca, Foundations of Robotics,
+           Section 3.6.2, Eqs. 3.63, 3.64 and 3.69, pp. 144-145.
            Liegeois, A., "Automatic Supervisory Control of Configuration
            and Behavior of Multibody Mechanisms," 1977.
 
@@ -746,7 +751,7 @@ Each step: compute FK, body-frame error, Jacobian, Hessian approximation
 `H = J^T J`, gradient `g = J^T V_b`, solve `(H + lambda*I) dq = g`,
 evaluate gain ratio, accept/reject step, update lambda.
 
-Reference: Lynch & Park, Modern Robotics, Ch. 6.2, p. 227-233.
+Reference: Lynch & Park, Modern Robotics, Section 6.2.2, pp. 225-229.
            Nielsen, "Damping Parameter in Marquardt's Method", 1999.
 
 ### cartan::lbfgsb
@@ -776,15 +781,14 @@ class projected_lm;
 Projected Levenberg-Marquardt with active-set box projection and an
 optional dogleg trust-region step. Enforces joint limits within the
 optimization step (not post-hoc clamping). Carries a built-in
-self-restart on stall via Halton re-seed, so wrapping `projected_lm` in
-an outer `restart_wrapper` is no longer the recommended composition —
-the bare `projected_lm` already delivers the multi-start behavior.
+self-restart on stall via Halton re-seed, so an outer `restart_wrapper`
+adds nothing to it.
 
 ### cartan::dls
 
 <!-- cartan:unbuilt kind=declaration -->
 ```cpp
-template <chain Chain, typename LimitsPolicy = clamp_limits>
+template <chain Chain, typename LimitsPolicy = no_limits>
 class dls;
 ```
 
@@ -796,7 +800,8 @@ as the smallest singular value drops below a threshold.
 
 <!-- cartan:unbuilt kind=declaration -->
 ```cpp
-template <chain Chain, typename LimitsPolicy = clamp_limits>
+template <chain Chain, typename LimitsPolicy = clamp_limits,
+          typename ObjectivePolicy = ik_se3_objective<Chain>>
 class newton_raphson;
 ```
 
@@ -830,8 +835,8 @@ in the wrapper, so `step()` returns `dimension_mismatch` or `non_finite_input`
 unchanged without consuming a restart, and `restarts()` stays at zero. A later
 well-formed `setup()` clears the latch, so a wrapper that refused one call is
 still usable. `converged()`, `solution()` and `error_norm()` read through the
-same latch: a refused setup ran no attempt, so they report `false`, a zero
-configuration and `numeric_limits<scalar_type>::max()` rather than the previous
+same latch: a refused setup ran no attempt, so they report `false`, a
+NaN-poisoned configuration and a NaN error norm rather than the previous
 solve's answer. The best damping parameter (lambda)
 from near-miss attempts is preserved across restarts for warm-starting
 (when the inner policy supports `set_lambda()`/`lambda()`). Budgets via
@@ -839,10 +844,11 @@ the work-unit contract: the restart event itself charges zero additional
 units beyond the inner attempt that triggered it; only the underlying
 iterations bill.
 
-Note: `projected_lm` carries a built-in self-restart fold-in, so the
-recommended composition for the speed family is the bare `projected_lm`
-rather than `restart_wrapper<projected_lm>`. Wrapping is still useful
-for non-self-restarting inner policies (e.g. `lbfgsb`).
+Wrap a policy that does not restart itself (`lm`, `dls`, `newton_raphson`,
+`lbfgsb`); `projected_lm` already restarts internally, so wrapping it changes
+nothing. The recommended general-purpose composition is
+`restart_wrapper<Chain, lm<Chain>>`, which solves the most targets in the
+fewest work units of the native compositions on the fixture robots.
 
 Reference: Beeson & Ames, "TRAC-IK", 2015 (multi-start strategy).
 

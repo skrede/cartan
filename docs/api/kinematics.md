@@ -1,7 +1,7 @@
 # kinematics
 
 Headers under `cartan/serial/fk/` (sublib `cartan-serial-chain`). Public
-symbols live in the `cartan::` namespace. Link with `cartan::serial-chain`
+symbols live in the `cartan::` namespace. Link with `cartan::serial_chain`
 (or the convenience target `cartan::cartan`).
 
 Forward kinematics and Jacobian computation using the Product of Exponentials
@@ -64,8 +64,7 @@ mathematical invariant carried by *one* value, such as a quaternion already
 being unit-norm; that claim has somewhere to live, and it lives on a tag
 (`trusted_unit`) or in the operation's name (`compose_trusted`).
 
-They are different claims, so they keep different words, and the existing
-`trusted` surface is not renamed.
+They are different claims, so they keep different words.
 
 The rule is stated here and nowhere else. Documentation that names an
 `_unchecked` entry point on another page should link to this section rather than
@@ -173,7 +172,7 @@ per-element `axis(i)` access and a runtime loop. The `kinematic_chain` and
 `static_chain` overloads are more constrained and win for those specific
 types via partial ordering; this overload handles any future chain types.
 
-Reference: Lynch & Park, Modern Robotics, Eq. 4.10, p. 138.
+Reference: Lynch & Park, Modern Robotics, Eq. 4.14, p. 140.
 
 ## forward_kinematics_matrix
 

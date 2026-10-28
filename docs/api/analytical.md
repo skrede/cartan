@@ -156,7 +156,7 @@ template <typename Scalar>
 class verification_tolerance
 {
 public:
-    constexpr verification_tolerance(Scalar position, Scalar orientation);
+    constexpr explicit verification_tolerance(Scalar position, Scalar orientation);
     constexpr Scalar position() const;
     constexpr Scalar orientation() const;
 };
@@ -269,8 +269,9 @@ A conforming type exposes `chain_type` (the chain type it solves over),
 `max_solutions` (per-solver upper bound). The single `solve(target)` method
 returns `analytical_result` on success or `analytical_error` on failure.
 Solvers must FK-verify their candidates internally; only verified solutions
-are reported to the caller. `planar_2r_solver`, `spatial_3r_solver`, and
-`pieper_6r_solver` are the in-tree conforming implementations.
+are reported to the caller. `planar_2r_solver`, `spatial_3r_solver`,
+`pieper_6r_solver`, and `opw_6r_solver` are the in-tree conforming
+implementations.
 
 ## Paden-Kahan Subproblems
 
@@ -492,7 +493,7 @@ invokes `solve(target)`. A rejected chain travels out on the same diagnostic
 channel a failed solve uses, so the two need no separate handling at the call
 site.
 
-Reference: Lynch & Park, Modern Robotics, Section 6.1.2 (planar two-link
+Reference: Lynch & Park, Modern Robotics, Ch. 6, pp. 217-219 (planar two-link
 inverse kinematics).
 
 ## spatial_3r_solver
@@ -600,7 +601,9 @@ The `Chain` type must satisfy the `chain` concept and model a six-joint
 mechanism. The wrist
 center decomposition assumes joints 4, 5, 6 share a common intersection
 point (Pieper geometry). Industrial 6R arms commonly satisfy this
-constraint (KR6 R900, PUMA 560, ABB IRB120 with appropriate geometry, etc.).
+constraint (PUMA 560, ABB IRB 120, etc.). Arms with a lateral shoulder offset,
+such as the KUKA KR6 R900, fail the shoulder-intersection gate; use
+`opw_6r_solver` for them.
 
 <!-- cartan:unbuilt kind=declaration -->
 ```cpp
@@ -720,8 +723,9 @@ a spherical wrist within `tolerance.position()`) and is the only way in.
 
 `tolerance` is the FK back-check's acceptance bound, `position()` a distance in
 the chain's linear unit and `orientation()` an angle in radians. `position()`
-also bounds the lateral-offset cylinder gate inside `solve`, which judges the
-wrist center's radius in that plane against the offset as two lengths.
+also bounds the spherical-wrist gate in `make`. The lateral-offset cylinder
+guard inside `solve` takes no tolerance: it fires exactly when the wrist
+center's radius in that plane is below `|b|`.
 `singularity_tolerance` is a separate scalar and stays one: it thresholds
 `|sin(theta5)|`, a dimensionless quantity, below which the wrist fold path is
 taken. Its default is pinned empirically rather than copied from the reference
@@ -734,11 +738,12 @@ argument and cannot spell the two-field type. Prefer
 
 ## Edge Cases
 
-- **Pieper-incompatible 6R geometry:** If the last three axes do not
-  intersect within the wrist-finder's tolerance, the wrist decomposition
-  fails and `solve` returns `analytical_failure::degenerate_geometry`. For
-  such mechanisms, fall back to an iterative IK solver from
-  `docs/api/ik.md`.
+- **Pieper-incompatible 6R geometry:** If the shoulder axes do not intersect
+  or the last three axes do not meet within `tolerance.position()`,
+  `pieper_6r_solver::make` (and so `solve_6r`) returns
+  `analytical_failure::degenerate_geometry` and no solver is built. For such
+  mechanisms, use `opw_6r_solver` where its geometry applies, or fall back to
+  an iterative IK solver from `docs/api/ik.md`.
 - **Multiple equivalent solutions:** Analytical solvers enumerate all
   algebraically distinct joint configurations. A downstream selection
   policy (closest-to-seed, distance-to-midpoint, etc.) chooses among

@@ -37,7 +37,8 @@ cmake -S . -B build -DCARTAN_BUILD_EXAMPLES=ON -DCARTAN_EXAMPLE_NLOPT_POLICY=ON
 cmake --build build --target nlopt_policy_example
 ```
 
-NLopt is taken from an installed package when one is present and fetched
-otherwise. The interface target `cartan_examples::nlopt_policy` carries the
+NLopt must be installed; it is found through `find_package(NLopt CONFIG)` and
+never downloaded. Without it the example is omitted with a configure-time
+warning. The interface target `cartan_examples::nlopt_policy` carries the
 include path, the dependency and `CARTAN_EXAMPLE_HAS_NLOPT`; the benchmark,
 profiling and policy-test targets that measure these policies key on it.

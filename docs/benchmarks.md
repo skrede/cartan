@@ -96,8 +96,8 @@ success at one arbitrary cut-off. The wall-clock-budgeted comparator is run at t
 denomination admits, 1.5 ms through 50 ms.
 
 **Two limits provenances.** Every cell is run once against the manufacturer's declared joint
-limits and once against the symmetric ±π box that the previous version of this study used, so the
-effect of that choice is a measured axis rather than an assumption.
+limits and once against a symmetric ±π box, so the effect of that choice is a measured axis
+rather than an assumption.
 
 **Three periodic rules, three tables.** A joint's range may span more than a full turn, which makes
 "the same configuration" ambiguous. Rather than pick one convention, the study runs three:
@@ -144,8 +144,8 @@ the real robot cannot reach.
 ## The iterative study
 
 The three tables agree closely enough that publishing all three in full would be repetition; the
-per-stratum ladders below are table C, and the records for A and B ship beside them and rebuild
-with the same command. Where A or B differs materially it is stated.
+per-stratum ladders below are table C, and tables A and B rebuild from a capture with the same
+command, `--table a|b`. Where A or B differs materially it is stated.
 
 ### Success against compute budget
 
@@ -184,8 +184,8 @@ adding budget past 243 evaluations does not move it, because its failures are wr
 than under-converged. The same solver restarted reaches 100.0% on every stratum by the top rung.
 
 **The kinematics kernels contribute nothing to success.** `cartan_lm` and `pinocchio_lm` are
-identical to the digit at every rung from 243 upward, as are `cartan_restart_lm` and
-`pinocchio_restart_lm`. That is the expected result of holding the algorithm fixed and swapping
+identical to the digit at every rung from 243 upward; `cartan_restart_lm` and
+`pinocchio_restart_lm` differ by at most 0.4 points there and coincide at the top rung. That is the expected result of holding the algorithm fixed and swapping
 only the kernels underneath it, and it is what licenses reading the two restarting rows as one
 finding rather than two.
 
@@ -215,8 +215,8 @@ to settle in the wrong basin. Restarting recovers every robot to 0.92 or better.
 
 Position error at the top rung: the marker is the median across the nine robots, the line
 runs to the p95. The p95 is taken over every target offered, unconverged ones included,
-which is why the single-start arms reach a tenth of a metre while their medians sit at a
-micrometre. A solver's median accuracy says nothing about what its tail does.
+which is why the single-start arms reach a tenth of a meter while their medians sit at a
+micrometer. A solver's median accuracy says nothing about what its tail does.
 
 ### Kernel evaluations
 
@@ -250,9 +250,7 @@ Over 243 000 scored targets per participant, manufacturer limits, all strata and
 | `pinocchio_restart_lm` | 243 000 | 0 | 1 |
 | `trac_ik` | 243 000 | 0 | 0 |
 
-No participant reported a success the harness could not confirm. This is the question the previous
-version of this page could not answer about its own solvers, because it took their success from
-the return value and never gated on a recomputed pose; here every participant's claim and the
+No participant reported a success the harness could not confirm. Every participant's claim and the
 harness's verdict are separate recorded columns, and they disagree on 27 targets out of 1 215 000,
 always in the conservative direction.
 
@@ -288,13 +286,13 @@ Median change in acceptance rate, manufacturer limits minus the symmetric ±π b
 **The direction is not uniform, and it is not uniform by robot.** On the limit-adjacent stratum the
 single-start solver loses 62.2 points on the Franka arm, 45.2 on the ABB arm and 33.0 to 39.4 on
 the three KUKA arms — but 0.2 to 2.0 points on the four UR arms, whose declared ranges are wider
-than the box they replaced. Across the whole record set there are 260 cells in which the
+than the symmetric box. Across the whole record set there are 260 cells in which the
 manufacturer's limits produced the *higher* acceptance rate, the largest being the KR 6 on the
 warm-start stratum at the lowest rung: 94.0% under declared limits against 16.0% under the
 symmetric box.
 
-So "the old numbers were measured on an easier problem" is true for the Franka arm and the ABB
-arm, and false for the UR arms. A success rate that rises after the limits change is a correct
+So the symmetric box is the easier problem for the Franka arm and the ABB arm, and the harder one
+for the UR arms. A success rate that rises after the limits change is a correct
 result on a differently-shaped feasible set, not a defect.
 
 **A multi-start solver is insensitive to the change.** Both restarting participants and the
@@ -350,7 +348,7 @@ claim against the external comparator.
 A comparison the records *do* support is the one against Pinocchio's kernels, since both sides are
 driven by the same algorithm at the same kernel budget — but the participants that produced these
 ladder records carry counting instrumentation, and the peer's inline counters cost it 1.2% to 3.1%.
-A ratio computed from these records would therefore be biased in this repository's favour, so none
+A ratio computed from these records would therefore be biased in this repository's favor, so none
 is published. The uninstrumented kernel comparison is the microbenchmark section below.
 
 ## Closed-form solvers
@@ -428,7 +426,7 @@ against a different implementation of it appears in this section.
 Median of 5 repetitions, nanoseconds, captured under the conditions above with no instrumentation
 on either side. **The microbenchmarks run on a different robot set from the study**: they use this
 repository's own chain fixtures, which include three arms the study excludes for want of a fetched
-description, and exclude the four UR arms the study covers. Against Pinocchio's
+description, and exclude three of the study's four UR arms (UR5e, UR10, UR16e) and the LBR iiwa 14. Against Pinocchio's
 `framesForwardKinematics`, which computes and stores every intermediate placement:
 
 | robot | Pinocchio | `forward_kinematics` (quaternion) | `forward_kinematics_matrix` | matrix, static chain | matrix / Pinocchio |
@@ -443,9 +441,7 @@ description, and exclude the four UR arms the study covers. Against Pinocchio's
 | KUKA LBR Med 14 | 376.9 | 486.3 | 310.7 | 274.9 | 0.82× |
 | 3R planar | 163.9 | 190.9 | 133.5 | 127.2 | 0.81× |
 
-**This page previously reported that cartan's forward kinematics is slightly slower than the
-reference implementations. That described the quaternion path, and the table it appeared in listed
-neither matrix cell.** Both statements below are what this capture measures:
+Both statements below are what this capture measures:
 
 - The quaternion path, `forward_kinematics`, is **1.17× to 1.40× slower** than Pinocchio. It
   returns a quaternion pose, which is what costs it here.
@@ -470,8 +466,9 @@ Against KDL's `JntToCart`, in a separate binary that carries no matrix cell:
 | 3R planar | 184.6 | 164.4 | 0.89× |
 
 No matrix-versus-KDL cell exists, so this page states none. The quaternion cell is common to both
-binaries and agrees between them to 1.1% — 424.0 against 428.5 on UR3e — which is what makes the
-two tables above comparable at all.
+binaries and agrees between them to within 1.4% on every arm — 424.0 against 428.5 on UR3e — which
+is what makes the two tables above comparable at all; the 3R planar cell does not (190.9 against
+164.4).
 
 ## Jacobian
 
@@ -495,9 +492,7 @@ to callers that already hold the pose.
 
 cartan's analytic product-of-exponentials Jacobian is **2.11× to 2.45× faster than KDL** on the
 whole-solve basis, and 2.14× to 2.49× on a compile-time-sized chain. Maximum coefficient of
-variation across these cells is 1.14%. This claim survived the audit that rebuilt the rest of this
-page: it carries none of that audit's defects, and the figures here are a fresh reproduction of it
-rather than the earlier capture's.
+variation across these cells is 1.14%.
 
 ## Lie group operations
 

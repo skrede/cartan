@@ -4,7 +4,7 @@ The special Euclidean group SE(2) is the group of all rigid body
 transformations in the two-dimensional plane. Each element combines a rotation
 (from SO(2)) with a translation, representing the full configuration space of a
 planar rigid body. SE(2) arises naturally in mobile robotics, planar
-manipulators, and 2D SLAM [1, Ch. 3, pp. 86--90].
+manipulators, and 2D SLAM [1, Ch. 3, p. 88].
 
 This page covers the group structure, the Lie algebra with its twist
 representation, the exponential and logarithmic maps, and the adjoint
@@ -14,7 +14,7 @@ representation.
 
 A planar rigid body transformation is a pair $(R, p)$ where $R \in \text{SO}(2)$
 is a rotation and $p \in \mathbb{R}^2$ is a translation. The set of all such
-pairs forms SE(2) [1, Ch. 3, p. 86]:
+pairs forms SE(2) [1, Def. 3.14, p. 88]:
 
 $$
 \text{SE}(2) = \{ (R, p) : R \in \text{SO}(2), \; p \in \mathbb{R}^2 \}
@@ -53,7 +53,7 @@ or in homogeneous coordinates: $T \begin{bmatrix} q \\ 1 \end{bmatrix} = \begin{
 
 The Lie algebra $\mathfrak{se}(2)$ is the tangent space to SE(2) at the
 identity. Its elements are $3 \times 3$ matrices of the form
-[1, Ch. 3, p. 87]:
+[1, Ch. 3, p. 106]:
 
 $$
 [\xi]^\wedge = \begin{bmatrix} [\omega]_\times & v \\ 0 & 0 \end{bmatrix} = \begin{bmatrix} 0 & -\omega & v_x \\ \omega & 0 & v_y \\ 0 & 0 & 0 \end{bmatrix}
@@ -88,7 +88,7 @@ transformation $T \in \text{SE}(2)$.
 ### Derivation
 
 Starting from the matrix exponential $T = \exp([\xi]^\wedge)$, we separate the
-rotation and translation components [1, Eq. 3.77--3.78, p. 88].
+rotation and translation components [1, Eqs. 3.86--3.88, p. 103, adapted for 2D].
 
 **Case 1: $\omega \neq 0$ (rotation present)**
 
@@ -155,7 +155,7 @@ $v = G(\omega)^{-1} p$.
 
 **Case $\omega \neq 0$:** The matrix $G(\omega)$ is invertible. Its inverse
 can be computed in closed form using the half-angle identity
-[1, pp. 89--90]:
+[1, Eq. 3.92, p. 104, adapted for 2D]:
 
 $$
 G(\omega)^{-1} = \begin{bmatrix} \frac{\omega}{2} \cot\frac{\omega}{2} & \frac{\omega}{2} \\ -\frac{\omega}{2} & \frac{\omega}{2} \cot\frac{\omega}{2} \end{bmatrix}
@@ -180,7 +180,7 @@ $$
 The adjoint representation of SE(2) describes how twists transform under
 a change of reference frame. For $T = (R, p) \in \text{SE}(2)$ and a twist
 $\xi = (\omega, v_x, v_y)$, the adjoint action is
-[1, Def. 3.20, adapted for 2D]:
+[1, Def. 3.20, p. 98, adapted for 2D]:
 
 $$
 \text{Ad}_T \xi = T \xi T^{-1}
@@ -234,10 +234,5 @@ case behavior.
 ## Bibliography
 
 [1] K. M. Lynch and F. C. Park, *Modern Robotics: Mechanics, Planning, and
-Control*, Cambridge University Press, 2017.
-
-[2] T. D. Barfoot, *State Estimation for Robotics*, 2nd ed., Cambridge
-University Press, 2024.
-
-[3] B. Siciliano, L. Sciavicco, L. Villani, and G. Oriolo, *Foundations of
-Robotics*, Springer, 2025.
+Control*, Cambridge University Press, 2017; pages refer to the 2019 preprint of
+the updated first edition.

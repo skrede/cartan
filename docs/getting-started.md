@@ -6,7 +6,7 @@
   16.2) and MSVC 2022 (VS 17.x); older C++20 toolchains are untested. Embedded
   targets build with an exceptions-off C++20 GCC backend.
 - CMake 3.28+
-- Eigen 3.4+ (fetched automatically via FetchContent)
+- Eigen 3.4+ (found, or fetched via FetchContent with `CARTAN_CMAKE_FETCH_DEPS=ON`)
 
 ## Installation
 

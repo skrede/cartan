@@ -5,7 +5,7 @@ All notable user-facing changes to this project are documented in this file.
 The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.4.3] - 2026-08-24
+## [0.4.3] - 2026-10-28
 
 ### Added
 - `cartan/serial/fk/singularity_analysis.h`: `singular_values`, `condition_number`,
@@ -338,7 +338,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   Pieper. A rejected chain now reports a typed reason at construction, where
   previously it constructed silently and every solve returned `unreachable`
   carrying a length no reach inequality had compared against.
-- **Breaking.** `analytical_error<Scalar>`'s magnitude is
+- **Breaking.** `analytical_error<Scalar>::workspace_distance` is
   `std::optional<Scalar>`. Every failure whose contract carries no magnitude now
   says so explicitly instead of reporting a zero or a stale value, and that
   absence crosses into Python as `None`. Where a magnitude is reported it is now
@@ -517,7 +517,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 - The Arduino `library.properties` manifest, which advertised a `src/` source
   layout the header-only repository does not provide.
 
-## [0.3.0] — 2026-05-13
+## [0.3.0] - 2026-05-13
 
 ### Added
 - Stream A: per-policy algorithmic-work-unit accounting on `solve_concept`.
@@ -567,7 +567,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   cell-by-cell `±0.20 pp` to net-SR-non-regression with a per-cell `-1.00 pp`
   floor.
 
-## [0.2.1] — 2026-04-13
+## [0.2.1] - 2026-04-13
 
 ### Added
 - `cartan::ik::` namespace with structured directory hierarchy (`solver/`,
@@ -578,7 +578,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 - `exhaustive_ik_runner` with FK validation, joint-space dedup, and three
   ranking strategies.
 
-## [0.2.0] — 2026-04-03
+## [0.2.0] - 2026-04-03
 
 ### Added
 - Module rename: `cartan-kinematics` → `cartan-serial-chain` with a unified
@@ -598,7 +598,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 - `liepp` → `Cartan` rename across all code, CMake, docs, and tests.
 - Performance: fixed-size Eigen on hot paths; Lie algebra inner-loop tuning.
 
-## [0.1.3] — 2026-03-31
+## [0.1.3] - 2026-03-31
 
 ### Added
 - Variadic `basic_ik_solver<Policies...>` with cooperative racing replacing
@@ -618,7 +618,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   sub-functions. ~350 lines of shared detail extracted into
   `cartan/serial/ik/detail/`.
 
-## [0.1.2] — 2026-03-29
+## [0.1.2] - 2026-03-29
 
 ### Added
 - SE(3) left Jacobian with Taylor-stable Q matrix.
@@ -638,7 +638,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   deprecated alias; new `slsqp_stepper` wrapping NLopt LD_SLSQP with
   analytical gradient via SE(3) log Jacobian.
 
-## [0.1.1] — 2026-03-28
+## [0.1.1] - 2026-03-28
 
 ### Added
 - Full project rename: spatialpp → liepp (predecessor of the later
@@ -657,7 +657,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 - `lm_stepper<dynamic, float>` Eigen `MatrixXd`-hardcoding bug caught by the
   DOF sweep tests.
 
-## [0.1.0] — 2026-03-27
+## [0.1.0] - 2026-03-27
 
 ### Added
 - Lie group primitives (SO(2), SE(2), SO(3), SE(3)) with singularity-safe

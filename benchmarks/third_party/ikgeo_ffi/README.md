@@ -3,8 +3,7 @@
 `ikgeo_comparison_benchmarks.cpp` cross-checks cartan's `opw_6r_solver` against
 **ik-geo** (Elias & Wen, RPI) — an independent geometric subproblem-decomposition
 IK solver. ik-geo's *C++* port's spherical solver is broken for roll-pitch-roll
-wrists (it returns least-squares garbage; see
-`.planning/2026-07-07-ikgeo-witness-incompatible.md`), so the benchmark drives a
+wrists (it returns least-squares garbage), so the benchmark drives a
 Rust implementation of the algorithm through this shim.
 
 Everything in this directory is cartan's own code. The implementation it binds is
@@ -15,9 +14,7 @@ module — no source is copied into this tree and no library is patched.
 `Cargo.lock` is committed, so the resolution is fixed rather than re-resolved per
 machine, and `benchmarks/CMakeLists.txt` builds with `--locked`.
 
-This is a different codebase by a different author than the implementation the
-earlier shim bound. Any figure this benchmark produces describes ik-geo 0.1.2 and
-must name it; no number measured against the earlier implementation carries over.
+Any figure this benchmark produces describes ik-geo 0.1.2 and must name it.
 
 `cargo` is invoked automatically by `benchmarks/CMakeLists.txt`; the resulting
 `libikgeo_ffi.a` is linked only into the one benchmark. Pass

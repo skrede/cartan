@@ -25,7 +25,7 @@ combined with $\det(R) = 1$ leave exactly 1 degree of freedom.
 ### Parameterization by Angle
 
 Every element of SO(2) can be written in terms of a single angle
-$\theta \in (-\pi, \pi]$ [1, Eq. 3.10, p. 68]:
+$\theta \in (-\pi, \pi]$ [1, Def. 3.2, p. 68]:
 
 $$
 R(\theta) = \begin{bmatrix} \cos\theta & -\sin\theta \\ \sin\theta & \cos\theta \end{bmatrix}
@@ -47,8 +47,7 @@ SO(2) is a group under matrix multiplication:
 ## The Lie Algebra so(2)
 
 The Lie algebra $\mathfrak{so}(2)$ is the tangent space to SO(2) at the
-identity element. It consists of all $2 \times 2$ skew-symmetric matrices
-[1, Ch. 3, p. 69]:
+identity element. It consists of all $2 \times 2$ skew-symmetric matrices:
 
 $$
 \mathfrak{so}(2) = \{ [\theta]_\times : \theta \in \mathbb{R} \}
@@ -76,7 +75,7 @@ For SO(2), it maps an angular velocity (or angle) to a rotation matrix.
 
 ### Derivation via Matrix Exponential
 
-The matrix exponential is defined by the Taylor series [2, Ch. 7, p. 213]:
+The matrix exponential is defined by the Taylor series [2, Eq. 8.19, p. 283]:
 
 $$
 \exp([\theta]_\times) = \sum_{k=0}^{\infty} \frac{1}{k!} [\theta]_\times^k
@@ -184,10 +183,8 @@ case behavior.
 ## Bibliography
 
 [1] K. M. Lynch and F. C. Park, *Modern Robotics: Mechanics, Planning, and
-Control*, Cambridge University Press, 2017.
+Control*, Cambridge University Press, 2017; pages refer to the 2019 preprint of
+the updated first edition.
 
 [2] T. D. Barfoot, *State Estimation for Robotics*, 2nd ed., Cambridge
-University Press, 2024.
-
-[3] B. Siciliano, L. Sciavicco, L. Villani, and G. Oriolo, *Foundations of
-Robotics*, Springer, 2025.
+University Press, 2024; pages refer to the author's 2nd-edition PDF.

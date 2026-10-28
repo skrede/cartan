@@ -41,24 +41,26 @@ Cartan wraps SO(3) and SE(3) in frame-tagged templates where the `From` and
 
 <!-- cartan:unbuilt kind=declaration -->
 ```cpp
-template <typename From, typename To, typename Scalar = double>
+template <typename From, typename To, typename Scalar = double,
+          lie_group_policy Policy = strict_policy>
 struct transform
 {
-    se3<Scalar> m_value;
+    se3<Scalar, Policy> m_value;
 
     // Only compiles when To == rhs.From
-    template <typename C>
-    auto operator*(const transform<To, C, Scalar>& rhs) const
-        -> transform<From, C, Scalar>;
+    template <typename C, lie_group_policy P2>
+    auto operator*(const transform<To, C, Scalar, P2>& rhs) const
+        -> transform<From, C, Scalar, stricter_policy<Policy, P2>>;
 
     // Inverse flips frames
-    transform<To, From, Scalar> inverse() const;
+    transform<To, From, Scalar, Policy> inverse() const;
 };
 ```
 
 The `operator*` template constraint ensures that composition is only defined
 when the `To` frame of the left operand matches the `From` frame of the right
-operand. Mismatches are compile errors.
+operand, the subscript cancellation rule $T_{ab} T_{bc} = T_{ac}$
+[1, Ch. 3, p. 91]. Mismatches are compile errors.
 
 ### The Fix in Practice
 
@@ -103,16 +105,18 @@ Because they are empty types, frame tags impose **zero runtime cost**:
 
 ### Flexible Tag Design
 
-Frame tags can be any type -- empty structs are the convention, but enum
-classes, integral non-type template parameter wrappers, or any other type
-work equally well:
+Frame tags can be any *type* -- empty structs are the convention, but a type
+wrapping a value works equally well. An enumerator is a value, not a type, so
+it cannot be a tag itself:
 
-<!-- cartan:unbuilt kind=sketch reason="the adapter this form needs is named in the block and deliberately not shown" -->
+<!-- cartan:unbuilt kind=sketch reason="illustrates a tag form; not part of the compiled snippet set" -->
 ```cpp
 enum class Frame { world, base, tool };
 
-// Using enum wrapper (not shown: requires NTTP adapter)
-transform<Frame::world, Frame::base> T_wb;
+template <Frame F>
+using frame_tag = std::integral_constant<Frame, F>;
+
+transform<frame_tag<Frame::world>, frame_tag<Frame::base>> T_wb;
 ```
 
 ## Composition Rules
@@ -176,13 +180,13 @@ auto T_world_tool = T_wb * T_bs * T_se * T_ew * T_wt;
 Cartan extends frame safety to twists and wrenches:
 
 - **`framed_twist<Frame>`**: A spatial or body twist expressed in a specific
-  reference frame. Prevents accidentally adding twists from different frames.
+  reference frame.
 
 - **`framed_wrench<Frame>`**: A wrench expressed in a specific frame.
 
-The frame tag ensures that twist-wrench duality is respected:
-$\mathcal{F}^\top \mathcal{V}$ (power) only makes sense when both are
-expressed in the same frame.
+`adjoint_map(T, twist)` and `coadjoint_map(T, wrench)` accept only a twist or
+wrench whose frame matches the transform's `To` frame, and return it expressed
+in `From`.
 
 ## Design Trade-offs
 
@@ -223,7 +227,8 @@ See [API Reference](../api/frames.md) for the complete `rotation` and
 ## Bibliography
 
 [1] K. M. Lynch and F. C. Park, "Modern Robotics: Mechanics, Planning, and
-Control," Cambridge University Press, 2017.
+Control," Cambridge University Press, 2017; pages refer to the 2019 preprint of
+the updated first edition.
 
 [2] A. Alexandrescu, "Modern C++ Design: Generic Programming and Design
 Patterns Applied," Addison-Wesley, 2001.

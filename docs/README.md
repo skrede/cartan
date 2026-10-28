@@ -11,7 +11,7 @@
 - [frames](api/frames.md) &mdash; Compile-time frame-tagged wrappers (transform, rotation, twist, wrench).
 - [chain](api/chain.md) &mdash; Kinematic chain, screw axis, joint limits, joint state.
 - [kinematics](api/kinematics.md) &mdash; Forward kinematics, space/body Jacobians, velocity kinematics.
-- [ik](api/ik.md) &mdash; IK solvers (DLS, LM, L-BFGS-B, Newton-Raphson) and variadic-policy racing runners (`basic_ik_runner`, `restart_wrapper`).
+- [ik](api/ik.md) &mdash; IK solve policies (DLS, LM, projected LM, Newton-Raphson, L-BFGS-B), the racing runner `basic_ik_runner`, `exhaustive_ik_runner`, and `restart_wrapper`.
 - [analytical](api/analytical.md) &mdash; closed-form solvers (Pieper 6R, planar 2R, 3R, OPW) and Paden-Kahan subproblems.
 - [python](python.md) &mdash; Python install, API parity, tutorial mirrors, and example counterpart status.
 
@@ -25,7 +25,7 @@ Mathematical foundations with full derivations and textbook references.
 - [SE(3)](background/se3.md) &mdash; 3D rigid body transformation group
 - [PoE Kinematics](background/poe-kinematics.md) &mdash; Product of Exponentials and screw theory
 - [Jacobians](background/jacobians.md) &mdash; space and body Jacobians
-- [IK Methods](background/ik-methods.md) &mdash; DLS, Levenberg-Marquardt, SQP algorithms
+- [IK Methods](background/ik-methods.md) &mdash; DLS, Levenberg-Marquardt, Newton-Raphson and box-constrained algorithms
 - [Null-Space Projection](background/null-space.md) &mdash; null-space projection for joint limit avoidance
 - [Frame Tags](background/frame-tags.md) &mdash; compile-time frame safety design rationale
 - [Notation](background/notation.md) &mdash; notation convention table (Lynch & Park / Barfoot / Siciliano)

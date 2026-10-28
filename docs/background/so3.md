@@ -34,7 +34,7 @@ orthogonality conditions (the upper triangle of $R^\top R = I$).
 
 Rotations compose by matrix multiplication. If $R_1$ rotates frame $\{a\}$ to
 $\{b\}$ and $R_2$ rotates frame $\{b\}$ to $\{c\}$, then $R_2 R_1$ rotates
-frame $\{a\}$ to $\{c\}$ [1, Ch. 3, p. 70].
+frame $\{a\}$ to $\{c\}$ [1, Sec. 3.2.1, pp. 69--73].
 
 The inverse of a rotation is its transpose:
 
@@ -59,10 +59,12 @@ This is a **minimal (3-parameter) representation**. Its norm encodes the angle
 ($\theta = \|\phi\|$) and its direction encodes the axis
 ($\hat{\omega} = \phi / \|\phi\|$).
 
-**Singularity at identity:** When $\theta = 0$, the axis direction
-$\hat{\omega}$ is undefined (any axis gives the same identity rotation). This
-singularity is unavoidable for any 3-parameter rotation representation -- a
-topological consequence of SO(3) not being contractible. Cartan handles the
+**Axis undefined at identity:** When $\theta = 0$, the axis direction
+$\hat{\omega}$ is undefined (any axis gives the same identity rotation), though
+$\phi = 0$ itself is a regular point of the exponential map. The rotation
+vector's genuine singularity is at $\theta = \pi$, where $\phi$ and $-\phi$
+name the same rotation; every 3-parameter representation has a singularity
+somewhere, since SO(3) is not homeomorphic to $\mathbb{R}^3$. Cartan handles the
 $\theta \approx 0$ case via Taylor series in both the exponential and
 logarithmic maps.
 
@@ -70,7 +72,7 @@ logarithmic maps.
 
 The Lie algebra of SO(3), denoted $\mathfrak{so}(3)$, is the tangent space at
 the identity. It consists of all $3 \times 3$ skew-symmetric matrices
-[1, Ch. 3, p. 75; 2, Sec. 7.2.1, pp. 223--225]:
+[1, Ch. 3, p. 75; 2, Sec. 8.1.2, pp. 281--282]:
 
 $$
 \mathfrak{so}(3) = \{ [\phi]_\times : \phi \in \mathbb{R}^3 \}
@@ -101,7 +103,7 @@ $$
 If $R(t)$ is a time-varying rotation, then $\dot{R} R^{-1} = [\omega^s]_\times$
 where $\omega^s$ is the angular velocity in the space (fixed) frame, and
 $R^{-1} \dot{R} = [\omega^b]_\times$ where $\omega^b$ is the angular velocity
-in the body frame [1, Ch. 3, p. 75].
+in the body frame [1, Eqs. 3.34 and 3.36, p. 76].
 
 ## Exponential Map (Rodrigues' Formula)
 
@@ -120,7 +122,7 @@ $$
 $$
 
 **Key identity for skew-symmetric matrices.** For a unit-axis skew-symmetric
-matrix $\Omega = [\hat{\omega}]_\times$, we have [1, p. 82]:
+matrix $\Omega = [\hat{\omega}]_\times$, we have [1, p. 81]:
 
 $$
 \Omega^3 = -\Omega
@@ -162,21 +164,20 @@ decomposition.
 ### General Form (Non-Unit Axis)
 
 For an arbitrary rotation vector $\phi$ (not necessarily unit length) with
-$\theta = \|\phi\|$, the formula becomes [2, Eq. 7.18, p. 229]:
+$\theta = \|\phi\|$, the formula becomes [2, Eq. 8.23, p. 285, with $\phi = \theta a$]:
 
 $$
 \exp([\phi]_\times) = I + \frac{\sin\theta}{\theta} [\phi]_\times + \frac{1 - \cos\theta}{\theta^2} [\phi]_\times^2
 $$
 
-This is the form implemented in Cartan. The sinc-type coefficients
-$\frac{\sin\theta}{\theta}$ and $\frac{1 - \cos\theta}{\theta^2}$ avoid the
-need to extract the unit axis explicitly.
+The sinc-type coefficients $\frac{\sin\theta}{\theta}$ and
+$\frac{1 - \cos\theta}{\theta^2}$ avoid the need to extract the unit axis
+explicitly. Cartan's `so3::exp` evaluates the equivalent quaternion form below.
 
 ### Numerical Stability Near $\theta = 0$
 
 When $\theta \approx 0$, the coefficients suffer from $0/0$ indeterminacy.
-Taylor expansions provide numerically stable alternatives
-[2, p. 229]:
+Taylor expansions provide numerically stable alternatives:
 
 $$
 \frac{\sin\theta}{\theta} \approx 1 - \frac{\theta^2}{6} + \frac{\theta^4}{120}
@@ -186,13 +187,14 @@ $$
 \frac{1 - \cos\theta}{\theta^2} \approx \frac{1}{2} - \frac{\theta^2}{24} + \frac{\theta^4}{720}
 $$
 
-Cartan switches to these Taylor branches when $\theta^2$ is below a
-scalar-dependent threshold (`detail::epsilon_v<Scalar>`).
+Cartan's quaternion form below has the same problem in
+$\frac{\sin(\theta/2)}{\theta}$ and switches to its Taylor expansion when
+$\theta^2$ is below a scalar-dependent threshold (`detail::epsilon_v<Scalar>`).
 
 ### Quaternion Form
 
 Cartan's SO(3) implementation uses unit quaternions internally. The exponential
-map in quaternion form is [2, Eq. 7.20, p. 230]:
+map in quaternion form follows from the Euler parameters [2, Eq. 7.14, p. 244]:
 
 $$
 \exp(\phi) = \begin{bmatrix} \cos(\theta/2) \\ \frac{\sin(\theta/2)}{\theta} \phi \end{bmatrix}
@@ -203,7 +205,7 @@ with Taylor expansion $\frac{\sin(\theta/2)}{\theta} \approx \frac{1}{2} - \frac
 ## Logarithmic Map
 
 The logarithmic map is the inverse of the exponential map, taking a rotation
-back to the Lie algebra [1, p. 82; 2, Eq. 7.22, p. 231].
+back to the Lie algebra [1, Sec. 3.2.3.3, pp. 83--85; 2, Eqs. 8.26--8.28, pp. 285--286].
 
 ### Rotation Matrix Form
 
@@ -232,7 +234,7 @@ $$
 ### Quaternion Form (Cartan Implementation)
 
 Cartan avoids the $\theta = \pi$ branch entirely by using the quaternion
-logarithm [2, Eq. 7.22, p. 231]:
+logarithm, the inverse of the Euler-parameter map [2, Eq. 7.14, p. 244]:
 
 $$
 \log(q) = \frac{2 \, \text{atan2}(\|q_{xyz}\|, q_w)}{\|q_{xyz}\|} \, q_{xyz}
@@ -246,9 +248,9 @@ $$
 
 The quaternion is first canonicalized to the $q_w \geq 0$ hemisphere (since
 $q$ and $-q$ represent the same rotation), and then the atan2-based formula
-handles all angles $\theta \in [0, \pi]$ without branching. This is the
-approach described in [2, Sec. 7.1.3, p. 284] and implemented in Cartan's
-`detail::so3_log_impl`.
+handles all angles $\theta \in [0, \pi]$ without branching. It is implemented
+in Cartan's `detail::so3_log_impl`; Barfoot derives the logarithm from the
+rotation matrix instead [2, Eqs. 8.27--8.28, p. 286].
 
 ## Adjoint Representation
 
@@ -292,7 +294,7 @@ This is used in:
 
 The left Jacobian of SO(3) relates perturbations in the Lie algebra to
 perturbations on the group. It appears in the first-order approximation
-[2, Sec. 7.4, pp. 240--245]:
+[2, Sec. 8.1.5, pp. 296--302]:
 
 $$
 \exp(\phi + \delta\phi) \approx \exp(J_l(\phi) \, \delta\phi) \, \exp(\phi)
@@ -305,7 +307,7 @@ J_l(\phi) = \frac{\sin\theta}{\theta} I + \left(1 - \frac{\sin\theta}{\theta}\ri
 $$
 
 where $\theta = \|\phi\|$ and $\hat{\omega} = \phi/\theta$
-[2, Eq. 7.82b, p. 298].
+[2, Eq. 8.82b, p. 298].
 
 ### Right Jacobian
 
@@ -318,7 +320,7 @@ $$
 
 ### Inverse Jacobians
 
-The inverse left Jacobian is [2, Eq. 7.84, p. 299]:
+The inverse left Jacobian is [2, Eq. 8.81b, p. 298]:
 
 $$
 J_l^{-1}(\phi) = \frac{\theta}{2} \cot\frac{\theta}{2} \, I + \left(1 - \frac{\theta}{2}\cot\frac{\theta}{2}\right) \hat{\omega}\hat{\omega}^\top - \frac{\theta}{2} [\hat{\omega}]_\times
@@ -334,13 +336,14 @@ These Jacobians appear in:
 
 Cartan uses unit quaternions as the internal representation of SO(3) elements.
 A unit quaternion $q = (q_w, q_x, q_y, q_z)$ with $\|q\| = 1$ provides a
-compact, singularity-free representation. Quaternions form a **double cover**
-of SO(3): both $q$ and $-q$ represent the same rotation
-[2, Sec. 7.1.3, pp. 218--222].
+compact, singularity-free representation [2, Sec. 7.2.3, pp. 242--248].
+Quaternions form a **double cover** of SO(3): both $q$ and $-q$ represent the
+same rotation.
 
 ### Quaternion to Rotation Matrix
 
-The equivalent rotation matrix is [2, Eq. 7.14, p. 220]:
+The equivalent rotation matrix is the transpose of Barfoot's passive form
+[2, Eq. 7.15, p. 245]:
 
 $$
 R(q) = (q_w^2 - \|q_{xyz}\|^2) I + 2 q_{xyz} q_{xyz}^\top + 2 q_w [q_{xyz}]_\times
@@ -382,10 +385,8 @@ case behavior.
 ## Bibliography
 
 [1] K. M. Lynch and F. C. Park, *Modern Robotics: Mechanics, Planning, and
-Control*, Cambridge University Press, 2017.
+Control*, Cambridge University Press, 2017; pages refer to the 2019 preprint of
+the updated first edition.
 
 [2] T. D. Barfoot, *State Estimation for Robotics*, 2nd ed., Cambridge
-University Press, 2024.
-
-[3] B. Siciliano, L. Sciavicco, L. Villani, and G. Oriolo, *Foundations of
-Robotics*, Springer, 2025.
+University Press, 2024; pages refer to the author's 2nd-edition PDF.
