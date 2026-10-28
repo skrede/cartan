@@ -46,12 +46,12 @@ Scalar unwrap_to_range_nearest(
         return nearest_equivalent_angle(theta, reference);
     }
     constexpr Scalar full_turn = Scalar(2) * std::numbers::pi_v<Scalar>;
-    const Scalar inf = std::numeric_limits<Scalar>::infinity();
+    const Scalar unbounded = std::numeric_limits<Scalar>::infinity();
     const Scalar base = canonical_angle_in_limits(theta, lo, hi, tol);
     const Scalar k_lo =
-        std::isfinite(lo) ? std::ceil((lo - base - tol) / full_turn) : -inf;
+        std::isfinite(lo) ? std::ceil((lo - base - tol) / full_turn) : -unbounded;
     const Scalar k_hi =
-        std::isfinite(hi) ? std::floor((hi - base + tol) / full_turn) : inf;
+        std::isfinite(hi) ? std::floor((hi - base + tol) / full_turn) : unbounded;
     if (k_lo > k_hi)
     {
         return base;
