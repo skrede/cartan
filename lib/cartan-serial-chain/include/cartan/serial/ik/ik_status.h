@@ -4,7 +4,7 @@
 /// Status, objective, failure enums, convergence criteria, and solver
 ///        options for inverse kinematics.
 ///
-/// Reference: Lynch & Park, Modern Robotics, Ch. 6.2, p. 227-233.
+/// Reference: Lynch & Park, Modern Robotics, Sec. 6.2, pp. 224-230.
 
 #include <type_traits>
 
@@ -179,7 +179,7 @@ inline constexpr Scalar default_orientation_tol_v =
 }
 
 /// Runtime convergence criteria for IK solvers.
-/// Separate position and orientation tolerances per Lynch & Park Ch. 6.2.
+/// Separate position and orientation tolerances per Lynch & Park, Sec. 6.2.2, p. 228.
 ///
 /// `max_iterations_per_attempt` bounds a single solver attempt (the per-attempt
 /// cap consulted by every solver's internal iteration counter, and by

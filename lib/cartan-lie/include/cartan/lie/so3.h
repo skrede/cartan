@@ -21,7 +21,8 @@ namespace detail
 
 /// SO(3) logarithmic map implementation via quaternion atan2 approach.
 /// Avoids theta~pi eigenvector branch entirely; only theta~0 needs Taylor.
-/// Ref: Barfoot, State Estimation for Robotics, Eq. 8.22/8.28, p. 284-286.
+/// Ref: Barfoot, State Estimation for Robotics, Eq. 8.22, p. 284 (definition);
+/// Barfoot evaluates it from the rotation matrix, Eqs. 8.27-8.28, p. 286.
 template <typename Scalar>
 vector3<Scalar> so3_log_impl(quaternion<Scalar> q)
 {
@@ -75,7 +76,7 @@ matrix3<Scalar> so3_left_jacobian_impl(const vector3<Scalar>& phi)
 }
 
 /// SO(3) inverse left Jacobian implementation.
-/// Ref: Barfoot, State Estimation for Robotics, Eq. 8.84, p. 299.
+/// Ref: Barfoot, State Estimation for Robotics, Eq. 8.81b, p. 298.
 template <typename Scalar>
 matrix3<Scalar> so3_left_jacobian_inv_impl(const vector3<Scalar>& phi)
 {
@@ -107,8 +108,8 @@ matrix3<Scalar> so3_left_jacobian_inv_impl(const vector3<Scalar>& phi)
 
 /// 3D rotation group SO(3), parameterized by scalar type and policy.
 /// Internal representation: unit quaternion (Eigen::Quaternion<Scalar>).
-/// Reference: Lynch & Park, Modern Robotics, Ch. 3.2, p. 68-82.
-///            Barfoot, State Estimation for Robotics, Ch. 8, p. 280-300.
+/// Reference: Lynch & Park, Modern Robotics, Sec. 3.2, pp. 66-86.
+///            Barfoot, State Estimation for Robotics, 2nd ed., Sec. 8.1, pp. 279-302.
 template <typename Scalar, typename Policy = strict_policy>
 class so3
 {
@@ -177,7 +178,8 @@ public:
 
     /// Logarithmic map: SO(3) -> so(3) via quaternion atan2 approach.
     /// Avoids theta~pi eigenvector branch; only theta~0 needs Taylor.
-    /// Ref: Barfoot, State Estimation for Robotics, Eq. 8.22/8.28, p. 284-286.
+    /// Ref: Barfoot, State Estimation for Robotics, Eq. 8.22, p. 284 (definition);
+    /// Barfoot evaluates it from the rotation matrix, Eqs. 8.27-8.28, p. 286.
     vector3<Scalar> log() const
     {
         return detail::so3_log_impl(m_quaternion);
@@ -185,7 +187,7 @@ public:
 
     /// Group composition via Hamilton quaternion product.
     /// Result uses stricter of two policies.
-    /// Ref: Lynch & Park, Modern Robotics, rotation composition, p. 70.
+    /// Ref: Lynch & Park, Modern Robotics, Props. 3.4-3.5, p. 69.
     template <typename P2>
     auto operator*(const so3<Scalar, P2>& rhs) const
         -> so3<Scalar, stricter_policy<Policy, P2>>
@@ -195,14 +197,14 @@ public:
     }
 
     /// Group inverse via quaternion conjugate: q^{-1} = q*.
-    /// Ref: Lynch & Park, Modern Robotics, p. 70.
+    /// Ref: Lynch & Park, Modern Robotics, Prop. 3.3, p. 68.
     so3 inverse() const
     {
         return so3(m_quaternion.conjugate());
     }
 
     /// Adjoint representation: Ad_R = R (the rotation matrix itself for SO(3)).
-    /// Ref: Lynch & Park, Modern Robotics, p. 75.
+    /// Ref: Lynch & Park, Modern Robotics, Prop. 3.8/Eq. 3.31, p. 75.
     matrix3<Scalar> adjoint() const
     {
         return m_quaternion.toRotationMatrix();
@@ -230,21 +232,21 @@ public:
     }
 
     /// Inverse left Jacobian.
-    /// Ref: Barfoot, State Estimation for Robotics, Eq. 8.84, p. 299.
+    /// Ref: Barfoot, State Estimation for Robotics, Eq. 8.81b, p. 298.
     static matrix3<Scalar> left_jacobian_inv(const vector3<Scalar>& phi)
     {
         return detail::so3_left_jacobian_inv_impl(phi);
     }
 
     /// Inverse right Jacobian: J_r^{-1}(phi) = J_l^{-1}(-phi).
-    /// Ref: Barfoot, State Estimation for Robotics, Eq. 8.84.
+    /// Ref: Barfoot, State Estimation for Robotics, Eq. 8.81a, p. 298.
     static matrix3<Scalar> right_jacobian_inv(const vector3<Scalar>& phi)
     {
         return detail::so3_left_jacobian_inv_impl(vector3<Scalar>(-phi));
     }
 
     /// Convert to 3x3 rotation matrix.
-    /// Ref: Lynch & Park, Modern Robotics, Eq. 3.10 (rotation matrix from quaternion).
+    /// Ref: Barfoot, State Estimation for Robotics, Eq. 7.15, p. 245 (transposed: Barfoot's form is passive).
     matrix3<Scalar> matrix() const
     {
         return m_quaternion.toRotationMatrix();
@@ -277,7 +279,7 @@ public:
 
     /// Construct from 3x3 rotation matrix with validation.
     /// Checks R^T*R ~= I and det(R) ~= 1.
-    /// Ref: Rotation matrix properties, Lynch & Park, Modern Robotics, p. 23-24.
+    /// Ref: Lynch & Park, Modern Robotics, Def. 3.1, p. 68.
     static cartan::expected<so3, lie_failure>
     from_matrix(const matrix3<Scalar>& R)
     {

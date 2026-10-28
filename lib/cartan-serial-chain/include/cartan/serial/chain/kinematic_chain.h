@@ -10,7 +10,7 @@
 /// Lynch & Park, Modern Robotics, Eq. 4.10, p. 138:
 ///   T(q) = exp([S1]q1) ... exp([Sn]qn) * M
 ///
-/// Reference: Lynch & Park, Modern Robotics, Ch. 4, p. 119-158.
+/// Reference: Lynch & Park, Modern Robotics, Ch. 4, pp. 135-158.
 
 #include "cartan/detail/compat.h"
 

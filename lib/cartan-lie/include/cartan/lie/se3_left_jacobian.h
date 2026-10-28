@@ -122,7 +122,7 @@ matrix3<Scalar> se3_Q_matrix(const vector3<Scalar>& omega, const vector3<Scalar>
 
 /// SE(3) left Jacobian.
 /// Uses cartan's omega-first convention: top-left = J_so3, bottom-left = Q.
-/// Ref: Barfoot, State Estimation for Robotics, Eq. 8.91, adapted to omega-first.
+/// Ref: Barfoot, State Estimation for Robotics, Eq. 8.90b, p. 299, adapted to omega-first.
 template <typename Scalar>
 matrix6<Scalar> se3_left_jacobian(const vector6<Scalar>& xi)
 {
@@ -142,7 +142,7 @@ matrix6<Scalar> se3_left_jacobian(const vector6<Scalar>& xi)
 
 /// SE(3) inverse left Jacobian.
 /// Uses cartan's omega-first convention.
-/// Ref: Barfoot, State Estimation for Robotics, Eq. 8.100b, adapted to omega-first.
+/// Ref: Barfoot, State Estimation for Robotics, Eq. 8.100b, p. 301, adapted to omega-first.
 template <typename Scalar>
 matrix6<Scalar> se3_left_jacobian_inv(const vector6<Scalar>& xi)
 {

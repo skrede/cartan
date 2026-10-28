@@ -34,7 +34,7 @@ vector3<Scalar> vee(const matrix3<Scalar>& S)
 /// Constructs a 4x4 se(3) twist matrix from a 6-vector.
 /// Twist V = (omega, v) uses omega-first convention per Lynch & Park.
 /// Layout: top-left 3x3 = hat(omega), top-right 3x1 = v, bottom row = zeros.
-/// Reference: Lynch & Park, Modern Robotics, Eq. 3.85, p. 103.
+/// Reference: Lynch & Park, Modern Robotics, Eq. 3.85, p. 102.
 template <typename Scalar>
 matrix4<Scalar> hat(const vector6<Scalar>& V)
 {
@@ -49,7 +49,7 @@ matrix4<Scalar> hat(const vector6<Scalar>& V)
 /// Extracts a 6-vector from a 4x4 se(3) twist matrix.
 /// Returns V = (omega, v) in omega-first convention.
 /// Inverse of hat for se(3): vee(hat(V)) == V.
-/// Reference: Lynch & Park, Modern Robotics, inverse of Eq. 3.85, p. 103.
+/// Reference: Lynch & Park, Modern Robotics, inverse of Eq. 3.85, p. 102.
 template <typename Scalar>
 vector6<Scalar> vee(const matrix4<Scalar>& M)
 {

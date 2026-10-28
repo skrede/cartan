@@ -8,7 +8,7 @@
 /// Both reuse cached intermediate products from fk_result to avoid
 /// redundant exp() calls.
 ///
-/// Reference: Lynch & Park, Modern Robotics, Ch. 5, p. 174-190.
+/// Reference: Lynch & Park, Modern Robotics, Sec. 5.1, pp. 176-188.
 
 #include "cartan/types.h"
 

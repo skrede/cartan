@@ -7,8 +7,8 @@
 /// linear velocity. This module provides the twist struct, SE(3) conversions,
 /// and screw motion parameter decomposition.
 ///
-/// Reference: Lynch & Park, Modern Robotics, Section 3.3, p. 86-106.
-///            Barfoot, State Estimation for Robotics, Ch. 8, p. 280-300.
+/// Reference: Lynch & Park, Modern Robotics, Sec. 3.3, pp. 87-106.
+///            Barfoot, State Estimation for Robotics, 2nd ed., Sec. 8.1, pp. 279-302.
 
 #include "cartan/types.h"
 #include "cartan/detail/epsilon.h"
@@ -23,7 +23,7 @@ namespace cartan
 
 /// Twist (spatial velocity) representation: V = (omega, v).
 /// omega is the angular velocity (3-vector), v is the linear velocity (3-vector).
-/// Uses omega-first convention per Lynch & Park, Modern Robotics, p. 86-106.
+/// Uses omega-first convention per Lynch & Park, Modern Robotics, Eq. 3.83, p. 99.
 template <typename Scalar>
 struct twist
 {
@@ -31,7 +31,7 @@ struct twist
     vector3<Scalar> v;      ///< Linear velocity
 
     /// Construct from 6-vector (omega-first).
-    /// Reference: Lynch & Park, Modern Robotics, Eq. 3.82, p. 103.
+    /// Reference: Lynch & Park, Modern Robotics, Eq. 3.83, p. 99.
     static twist from_vector(const vector6<Scalar>& vec)
     {
         twist tw;
@@ -41,7 +41,7 @@ struct twist
     }
 
     /// Convert to 6-vector (omega-first).
-    /// Reference: Lynch & Park, Modern Robotics, Eq. 3.82, p. 103.
+    /// Reference: Lynch & Park, Modern Robotics, Eq. 3.83, p. 99.
     vector6<Scalar> to_vector() const
     {
         vector6<Scalar> vec;
@@ -53,7 +53,7 @@ struct twist
 
 /// Compute the rigid body motion from a unit twist applied for angle/distance theta.
 /// Returns se3::exp(theta * twist_vector).
-/// Reference: Lynch & Park, Modern Robotics, Prop. 3.22, p. 99.
+/// Reference: Lynch & Park, Modern Robotics, Prop. 3.25/Eq. 3.88, p. 103.
 template <typename Scalar>
 se3<Scalar> twist_to_se3(const twist<Scalar>& tw, Scalar theta)
 {
@@ -64,7 +64,7 @@ se3<Scalar> twist_to_se3(const twist<Scalar>& tw, Scalar theta)
 /// Returns twist::from_vector(T.log()). The twist encodes the axis-angle and
 /// linear components of the rigid body displacement.
 /// Reference: Lynch & Park, Modern Robotics, Eq. 3.91-3.92, p. 104.
-///            Barfoot, State Estimation for Robotics, Eq. 8.35, p. 290.
+///            Barfoot, State Estimation for Robotics, Eq. 8.35, p. 288.
 template <typename Scalar, typename Policy>
 twist<Scalar> se3_to_twist(const se3<Scalar, Policy>& T)
 {

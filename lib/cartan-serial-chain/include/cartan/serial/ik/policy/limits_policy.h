@@ -7,7 +7,7 @@
 /// on the hot path: no enforcement, hard clamping, or null-space projection
 /// toward joint midpoints for redundant chains.
 ///
-/// Reference: Lynch & Park, Modern Robotics, Ch. 6.3 (null-space).
+/// Reference: Siciliano et al., Foundations of Robotics, Sec. 3.6.2, pp. 142-146 (null space).
 
 #include "cartan/serial/chain/joint_state.h"
 #include "cartan/serial/fk/jacobian.h"
@@ -83,7 +83,7 @@ struct clamp_limits
 /// the null space to bias joints toward their range midpoints, improving
 /// distance from joint limits without degrading the primary IK task.
 ///
-/// Reference: Lynch & Park, Modern Robotics, Ch. 6.3, p. 235-237.
+/// Reference: Siciliano et al., Foundations of Robotics, Eqs. 3.63 and 3.69, pp. 144-145.
 ///            Liegeois, A., "Automatic Supervisory Control of Configuration
 ///            and Behavior of Multibody Mechanisms," 1977.
 struct null_space_limits

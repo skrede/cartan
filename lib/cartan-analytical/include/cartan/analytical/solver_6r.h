@@ -39,7 +39,7 @@ namespace cartan
 ///
 /// All solutions are FK-verified with both position and orientation checks.
 ///
-/// Reference: Lynch & Park, Modern Robotics, Section 6.1.1.
+/// Reference: Lynch & Park, Modern Robotics, Sec. 6.1.1, pp. 219-223.
 ///            Murray, Li and Sastry (1994), Section 3.3.
 template <chain Chain>
 class pieper_6r_solver

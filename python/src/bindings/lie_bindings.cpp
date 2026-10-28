@@ -58,7 +58,7 @@ void register_lie(nb::module_& m)
                 return self.matrix();
             },
             "SO(3) adjoint -- equal to the rotation matrix itself "
-            "(Lynch & Park Eq. 3.84).");
+            "(Lynch & Park Prop. 3.8).");
 
     nb::class_<SE3d>(m, "SE3", "Rigid-body transformation group element")
         .def_static("identity", &SE3d::identity)

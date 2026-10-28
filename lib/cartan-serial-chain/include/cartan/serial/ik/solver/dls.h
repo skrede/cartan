@@ -8,7 +8,7 @@
 /// increases as the smallest singular value of the body Jacobian drops
 /// below a threshold, preventing wild joint velocities near singularities.
 ///
-/// Reference: Lynch & Park, Modern Robotics, Ch. 6.2, p. 227-233.
+/// Reference: Lynch & Park, Modern Robotics, Sec. 6.2, pp. 224-230.
 ///            Nakamura, Y., Advanced Robotics: Redundancy and Optimization, 1991.
 
 #include "cartan/types.h"
@@ -44,7 +44,7 @@ namespace cartan
 /// Each step() call: compute FK, body-frame error, check convergence,
 /// compute body Jacobian, SVD, adaptive damping, pseudoinverse step.
 ///
-/// Reference: Lynch & Park, Modern Robotics, Ch. 6.2, Eq. 6.8-6.10.
+/// Reference: Siciliano et al., Foundations of Robotics, Eq. 3.55, p. 141.
 ///            Nakamura, Advanced Robotics, Ch. 11 (adaptive DLS).
 template <chain Chain, typename LimitsPolicy = no_limits>
 class dls

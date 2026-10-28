@@ -3,7 +3,7 @@
 
 /// IK result and error types for inverse kinematics solve outcomes.
 ///
-/// Reference: Lynch & Park, Modern Robotics, Ch. 6.2, p. 227-233.
+/// Reference: Lynch & Park, Modern Robotics, Sec. 6.2, pp. 224-230.
 
 #include "cartan/serial/ik/ik_status.h"
 

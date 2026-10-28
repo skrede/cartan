@@ -17,7 +17,7 @@
 /// loop therefore lives inside the solver rather than in a separate
 /// wrapper layer.
 ///
-/// Reference: Lynch & Park, Modern Robotics, Ch. 6.2, p. 227-233.
+/// Reference: Lynch & Park, Modern Robotics, Sec. 6.2, pp. 224-230.
 ///            Nielsen, H.B., Damping Parameter in Marquardt's Method, 1999.
 ///            Nocedal & Wright, Numerical Optimization, Ch. 4 (dogleg).
 ///            Beeson & Ames, "TRAC-IK", 2015 (multi-start strategy).

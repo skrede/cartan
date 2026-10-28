@@ -28,7 +28,7 @@ namespace cartan
 /// solutions ("elbow up" / "elbow down") using the planar law-of-cosines.
 /// All candidates are FK-verified; only verified solutions are returned.
 ///
-/// Reference: Lynch & Park, Modern Robotics, Section 6.1.2 (planar
+/// Reference: Lynch & Park, Modern Robotics, Ch. 6, pp. 217-219 (planar
 ///            two-link inverse kinematics).
 template <chain Chain>
 class planar_2r_solver

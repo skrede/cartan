@@ -11,7 +11,7 @@
 /// Lynch & Park, Modern Robotics, Eq. 4.10, p. 138:
 ///   T(q) = exp([S1]q1) * exp([S2]q2) * ... * exp([Sn]qn) * M
 ///
-/// Reference: Lynch & Park, Modern Robotics, Ch. 4, p. 119-158.
+/// Reference: Lynch & Park, Modern Robotics, Ch. 4, pp. 135-158.
 
 #include "cartan/serial/fk/fk_result.h"
 #include "cartan/serial/fk/detail/shape_validation.h"

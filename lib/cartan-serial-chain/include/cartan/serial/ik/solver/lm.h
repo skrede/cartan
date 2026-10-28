@@ -8,7 +8,7 @@
 /// lambda adapts: good steps reduce lambda (more Gauss-Newton),
 /// poor steps increase lambda (more gradient descent).
 ///
-/// Reference: Lynch & Park, Modern Robotics, Ch. 6.2, p. 227-233.
+/// Reference: Lynch & Park, Modern Robotics, Sec. 6.2, pp. 224-230.
 ///            Nielsen, H.B., Damping Parameter in Marquardt's Method, 1999.
 
 #include "cartan/types.h"
@@ -48,7 +48,7 @@ namespace cartan
 /// one forward kinematics and one Jacobian. Anything that moves the iterate
 /// owes that pair a refresh.
 ///
-/// Reference: Lynch & Park, Modern Robotics, Ch. 6.2.
+/// Reference: Lynch & Park, Modern Robotics, Sec. 6.2, pp. 224-230.
 ///            Nielsen, Damping Parameter in Marquardt's Method, 1999.
 template <chain Chain, typename LimitsPolicy = no_limits>
 class builtin_lm
