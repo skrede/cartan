@@ -46,7 +46,7 @@ namespace cartan
 
 /// 2D rigid body transformation group SE(2), parameterized by scalar type and policy.
 /// Internal representation: SO(2) rotation + R^2 translation.
-/// Reference: Lynch & Park, Modern Robotics, Ch. 3.3.1, p. 86-90.
+/// Reference: Lynch & Park, Modern Robotics, Sec. 3.3.1, pp. 87-95.
 template <typename Scalar, typename Policy = strict_policy>
 class se2
 {
@@ -74,7 +74,7 @@ public:
     /// The translation coupling uses the cancellation-free
     /// b = 2 sin^2(omega/2) / omega instead of (1 - cos(omega)) / omega; the
     /// only branch is the literal-0/0 guard at omega == 0.
-    /// Reference: Lynch & Park, Modern Robotics, Def. 3.14, p. 88.
+    /// Reference: Lynch & Park, Modern Robotics, Prop. 3.25/Eq. 3.88, p. 103, restricted to the plane.
     static se2 exp(const vector3<Scalar>& v)
     {
         Scalar omega = v(0);
@@ -116,7 +116,7 @@ public:
     /// V-inverse off-diagonal (omega/2) term is always applied. The half-angle
     /// term (omega/2) cot(omega/2) is well-conditioned, so the only branch is
     /// the literal-0/0 guard at omega == 0.
-    /// Reference: Lynch & Park, Modern Robotics, p. 89-90.
+    /// Reference: Lynch & Park, Modern Robotics, Eqs. 3.91-3.92, p. 104, restricted to the plane.
     vector3<Scalar> log() const
     {
         Scalar omega = m_rotation.log();
@@ -128,7 +128,7 @@ public:
         // always applied -- it is not dropped for small omega.
         // Derivation: V = [[sin/omega, -(1-cos)/omega], [(1-cos)/omega, sin/omega]];
         // det V = 2*(1-cos)/omega^2, and omega*sin/(2*(1-cos)) = (omega/2) cot(omega/2).
-        // Reference: Lynch & Park, p. 89-90 (adapted for 2D).
+        // Reference: Lynch & Park, Modern Robotics, Eq. 3.92, p. 104, restricted to the plane.
         Scalar half_omega = omega / Scalar(2);
         Scalar half_cot;
         if (std::abs(omega) < detail::se2_sinc_guard_v<Scalar>)
@@ -148,7 +148,7 @@ public:
     }
 
     /// Group inverse: T^{-1} = (R^{-1}, -R^{-1} * t).
-    /// Reference: Lynch & Park, Modern Robotics, Eq. 3.64, adapted for 2D.
+    /// Reference: Lynch & Park, Modern Robotics, Eq. 3.64, p. 88, restricted to the plane.
     se2 inverse() const
     {
         auto rot_inv = m_rotation.inverse();
@@ -157,7 +157,7 @@ public:
 
     /// Group composition: T1 * T2.
     /// Result uses the stricter of the two policies.
-    /// Reference: Lynch & Park, Modern Robotics, homogeneous transform composition.
+    /// Reference: Lynch & Park, Modern Robotics, Prop. 3.16, p. 88, restricted to the plane.
     template <typename P2>
     auto operator*(const se2<Scalar, P2>& rhs) const
         -> se2<Scalar, stricter_policy<Policy, P2>>
@@ -172,7 +172,7 @@ public:
     }
 
     /// Convert to 3x3 homogeneous transformation matrix.
-    /// Reference: Lynch & Park, Modern Robotics, Eq. 3.60-3.61.
+    /// Reference: Lynch & Park, Modern Robotics, Def. 3.14/Eq. 3.63, p. 88.
     Eigen::Matrix<Scalar, 3, 3> matrix() const
     {
         Eigen::Matrix<Scalar, 3, 3> T;
@@ -186,7 +186,7 @@ public:
     /// Adjoint representation: 3x3 matrix acting on se(2) twists (omega, vx, vy).
     /// For SE(2): Ad_T = [[1, 0, 0], [ty, cos, -sin], [-tx, sin, cos]]
     /// where the twist is (omega, vx, vy) omega-first.
-    /// Reference: Derived from Lynch & Park, Modern Robotics, Def. 3.20, adapted for 2D.
+    /// Reference: Lynch & Park, Modern Robotics, Def. 3.20, p. 98, restricted to the plane.
     Eigen::Matrix<Scalar, 3, 3> adjoint() const
     {
         Eigen::Matrix<Scalar, 3, 3> Ad;
@@ -225,10 +225,15 @@ public:
 
     /// Construct from 3x3 homogeneous matrix with validation.
     /// Validates rotation block is SO(2) and bottom row is [0, 0, 1].
-    /// Reference: SE(2) matrix structure, Lynch & Park, p. 86.
+    /// Reference: Lynch & Park, Modern Robotics, Def. 3.14/Eq. 3.63, p. 88.
     static cartan::expected<se2, lie_failure>
     from_matrix(const Eigen::Matrix<Scalar, 3, 3>& T)
     {
+        if (!T.allFinite())
+        {
+            return cartan::unexpected(lie_failure::non_finite_input);
+        }
+
         Scalar tol = detail::sqrt_epsilon_v<Scalar>;
 
         // Check bottom row is [0, 0, 1]

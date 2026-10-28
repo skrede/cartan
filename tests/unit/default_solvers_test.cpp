@@ -1,3 +1,6 @@
+#include "../support/kinematics_helpers.h"
+#include "../support/joint_limits_helpers.h"
+
 #include <cartan/serial/ik/ik_status.h>
 #include <cartan/serial/ik/policy/limits_policy.h>
 #include <cartan/serial/ik/basic_ik_runner.h>
@@ -45,7 +48,7 @@ static spp::kinematic_chain<double, 6> make_ur5_like_chain()
     home_trans << 0.817, 0.191, -0.006;
     auto home = spp::se3<double>(spp::so3<double>::identity(), home_trans);
 
-    spp::joint_limits<double> lim{-2 * std::numbers::pi, 2 * std::numbers::pi};
+    auto lim = spp::testing::limits(-2 * std::numbers::pi, 2 * std::numbers::pi);
     return spp::kinematic_chain<double, 6>(home, {s1, s2, s3, s4, s5, s6},
                                   {lim, lim, lim, lim, lim, lim});
 }
@@ -58,7 +61,7 @@ static spp::se3<double> reachable_target(
     const spp::kinematic_chain<double, 6>& chain,
     const Eigen::Vector<double, 6>& q)
 {
-    return spp::forward_kinematics(chain, q).end_effector;
+    return spp::testing::fk_at(chain, q).end_effector;
 }
 
 // ============================================================================
@@ -85,7 +88,7 @@ TEST_CASE("speed_solver compiles and converges", "[ik][default_solvers]")
 
     REQUIRE(result.has_value());
 
-    auto fk_sol = spp::forward_kinematics(chain, result->solution.position);
+    auto fk_sol = spp::testing::fk_at(chain, result->solution.position);
     auto err = (fk_sol.end_effector.inverse() * target).log();
     REQUIRE(err.norm() < 1e-4);
 }
@@ -114,7 +117,7 @@ TEST_CASE("convergence_solver compiles and converges", "[ik][default_solvers]")
 
     REQUIRE(result.has_value());
 
-    auto fk_sol = spp::forward_kinematics(chain, result->solution.position);
+    auto fk_sol = spp::testing::fk_at(chain, result->solution.position);
     auto err = (fk_sol.end_effector.inverse() * target).log();
     REQUIRE(err.norm() < 1e-4);
 }
@@ -142,7 +145,7 @@ TEST_CASE("default_solver compiles and converges", "[ik][default_solvers]")
 
     REQUIRE(result.has_value());
 
-    auto fk_sol = spp::forward_kinematics(chain, result->solution.position);
+    auto fk_sol = spp::testing::fk_at(chain, result->solution.position);
     auto err = (fk_sol.end_effector.inverse() * target).log();
     REQUIRE(err.norm() < 1e-4);
 }
@@ -179,15 +182,12 @@ TEST_CASE("default_solver converges on harder target", "[ik][default_solvers]")
     criteria.max_iterations_per_attempt = 300;
     criteria.max_total_work_units = 600;
 
-    spp::solver_options<double> opts;
-    opts.max_total_iterations = 600;
-
-    solver.setup(chain, target, q0, criteria, opts);
+    solver.setup(chain, target, q0, criteria);
     auto result = solver.solve();
 
     REQUIRE(result.has_value());
 
-    auto fk_sol = spp::forward_kinematics(chain, result->solution.position);
+    auto fk_sol = spp::testing::fk_at(chain, result->solution.position);
     auto err = (fk_sol.end_effector.inverse() * target).log();
     REQUIRE(err.norm() < 1e-3);
 }

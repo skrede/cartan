@@ -1,13 +1,16 @@
 #include <cartan/lie/so3.h>
-
 #include <cartan/lie/hat_vee.h>
+
+#include <cartan/detail/epsilon.h>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_template_test_macros.hpp>
 
 #include <cmath>
+#include <limits>
 #include <numbers>
+#include <string_view>
 
 using Catch::Approx;
 
@@ -283,7 +286,7 @@ TEST_CASE("so3: from_matrix with valid SO(3)", "[so3]")
     auto r = cartan::so3<double>::exp(phi);
     auto result = cartan::so3<double>::from_matrix(r.matrix());
     REQUIRE(result.has_value());
-    REQUIRE((result.value().matrix() - r.matrix()).norm() < 1e-12);
+    REQUIRE(((*result).matrix() - r.matrix()).norm() < 1e-12);
 }
 
 TEST_CASE("so3: from_matrix rejects non-orthogonal matrix", "[so3]")
@@ -304,7 +307,7 @@ TEST_CASE("so3: from_quaternion with valid quaternion", "[so3]")
     auto result = cartan::so3<double>::from_quaternion(q);
     REQUIRE(result.has_value());
     auto I = cartan::matrix3<double>::Identity();
-    REQUIRE((result.value().matrix() - I).norm() < 1e-14);
+    REQUIRE(((*result).matrix() - I).norm() < 1e-14);
 }
 
 TEST_CASE("so3: from_quaternion rejects non-unit quaternion", "[so3]")
@@ -391,7 +394,7 @@ TEST_CASE("so3: matrix roundtrip with from_matrix", "[so3]")
     auto R = r.matrix();
     auto result = cartan::so3<double>::from_matrix(R);
     REQUIRE(result.has_value());
-    REQUIRE((result.value().matrix() - R).norm() < 1e-12);
+    REQUIRE(((*result).matrix() - R).norm() < 1e-12);
 }
 
 // ============================================================================
@@ -437,4 +440,176 @@ TEST_CASE("so3: isApprox is quaternion double-cover safe", "[so3]")
     cartan::so3<double> r_neg(neg);
     // q and -q are the same rotation: manifold-aware isApprox must treat them as equal
     REQUIRE(r.isApprox(r_neg, 1e-12));
+}
+
+// ============================================================================
+// Nonfinite rejection
+// ============================================================================
+
+/// The orthogonality and determinant tests as they read without a finiteness
+/// guard in front of them. The comparisons are negated exactly as the factory
+/// spells them: `!(deviation > tol)` is true for a NaN where `deviation <= tol`
+/// is false, so the two are not interchangeable here.
+template <typename S>
+static bool unguarded_matrix_gate_admits(const cartan::matrix3<S>& R)
+{
+    const S tol = cartan::detail::sqrt_epsilon_v<S>;
+    const cartan::matrix3<S> RtR = R.transpose() * R;
+    return !((RtR - cartan::matrix3<S>::Identity()).norm() > tol)
+        && !(std::abs(R.determinant() - S(1)) > tol);
+}
+
+template <typename S>
+static bool unguarded_quaternion_gate_admits(const cartan::quaternion<S>& q)
+{
+    return !(std::abs(q.squaredNorm() - S(1)) > cartan::detail::sqrt_epsilon_v<S>);
+}
+
+/// The chain above admits every entry and every value class but one -- an
+/// infinity at (0,0) -- which is why a finiteness test applied to the result
+/// cannot stand in for one applied to the input. Everywhere else a 0 * inf
+/// product, inside R^T * R or inside the cofactor expansion of det(R), turns the
+/// infinity into a NaN before it is compared, and `deviation > tol` is false for
+/// a NaN. At (0,0) the infinity multiplies a finite minor and reaches the
+/// determinant intact, so that entry alone is refused -- as an improper rotation.
+template <typename S>
+static bool unguarded_admits_entry(int i, int j, S poison)
+{
+    return std::isnan(poison) || i != 0 || j != 0;
+}
+
+template <typename S>
+static void expect_entry_rejected(int i, int j, S poison)
+{
+    cartan::matrix3<S> R = cartan::matrix3<S>::Identity();
+    R(i, j) = poison;
+
+    auto result = cartan::so3<S>::from_matrix(R);
+    REQUIRE_FALSE(result.has_value());
+    REQUIRE(result.error() == cartan::lie_failure::non_finite_input);
+    REQUIRE(unguarded_matrix_gate_admits<S>(R) == unguarded_admits_entry<S>(i, j, poison));
+}
+
+template <typename S>
+static void expect_diagonal_rejected(S poison)
+{
+    for (int i = 0; i < 3; ++i)
+    {
+        expect_entry_rejected<S>(i, i, poison);
+    }
+}
+
+template <typename S>
+static void expect_offdiagonal_rejected(S poison)
+{
+    for (int i = 0; i < 3; ++i)
+    {
+        for (int j = 0; j < 3; ++j)
+        {
+            if (i != j)
+            {
+                expect_entry_rejected<S>(i, j, poison);
+            }
+        }
+    }
+}
+
+template <typename S>
+static void expect_coefficients_rejected(S poison, bool unguarded_admits)
+{
+    for (int c = 0; c < 4; ++c)
+    {
+        cartan::quaternion<S> q(S(1), S(0), S(0), S(0));
+        q.coeffs()(c) = poison;
+
+        auto result = cartan::so3<S>::from_quaternion(q);
+        REQUIRE_FALSE(result.has_value());
+        REQUIRE(result.error() == cartan::lie_failure::non_finite_input);
+        REQUIRE(unguarded_quaternion_gate_admits<S>(q) == unguarded_admits);
+    }
+}
+
+TEMPLATE_TEST_CASE("so3: from_matrix rejects nonfinite entries on the diagonal",
+    "[so3][nonfinite]", double, float)
+{
+    using S = TestType;
+    using lim = std::numeric_limits<S>;
+
+    expect_diagonal_rejected<S>(lim::quiet_NaN());
+    expect_diagonal_rejected<S>(-lim::quiet_NaN());
+    expect_diagonal_rejected<S>(lim::infinity());
+    expect_diagonal_rejected<S>(-lim::infinity());
+}
+
+TEMPLATE_TEST_CASE("so3: from_matrix rejects nonfinite entries off the diagonal",
+    "[so3][nonfinite]", double, float)
+{
+    using S = TestType;
+    using lim = std::numeric_limits<S>;
+
+    expect_offdiagonal_rejected<S>(lim::quiet_NaN());
+    expect_offdiagonal_rejected<S>(-lim::quiet_NaN());
+    expect_offdiagonal_rejected<S>(lim::infinity());
+    expect_offdiagonal_rejected<S>(-lim::infinity());
+}
+
+TEMPLATE_TEST_CASE("so3: from_quaternion rejects nonfinite coefficients",
+    "[so3][nonfinite]", double, float)
+{
+    using S = TestType;
+    using lim = std::numeric_limits<S>;
+
+    expect_coefficients_rejected<S>(lim::quiet_NaN(), true);
+    expect_coefficients_rejected<S>(-lim::quiet_NaN(), true);
+    expect_coefficients_rejected<S>(lim::infinity(), false);
+    expect_coefficients_rejected<S>(-lim::infinity(), false);
+}
+
+/// Ties the two predicates above to the factories they stand in for. On finite
+/// input each pair must agree exactly, so widening a tolerance or replacing a
+/// comparison in so3::from_matrix or so3::from_quaternion breaks these cases --
+/// which the nonfinite corpus above cannot do, since both of its sides are
+/// written here. The reflection is the only shape that reaches the determinant
+/// test: scaling a rotation trips orthogonality first, so that branch cannot be
+/// straddled marginally while orthogonality still passes.
+TEMPLATE_TEST_CASE("so3: the unguarded chains agree with the factories on finite input",
+    "[so3][nonfinite]", double, float)
+{
+    using S = TestType;
+    const S tol = cartan::detail::sqrt_epsilon_v<S>;
+
+    cartan::vector3<S> phi;
+    phi << S(0.3), S(-0.5), S(0.7);
+    const cartan::matrix3<S> exact = cartan::so3<S>::exp(phi).matrix();
+
+    cartan::matrix3<S> marginal = exact;
+    marginal(0, 0) += S(2) * tol;
+
+    cartan::matrix3<S> reflection = cartan::matrix3<S>::Identity();
+    reflection(2, 2) = S(-1);
+
+    const cartan::matrix3<S> gross = cartan::matrix3<S>::Identity() * S(2);
+
+    for (const cartan::matrix3<S>& R : {exact, marginal, reflection, gross})
+    {
+        REQUIRE(unguarded_matrix_gate_admits<S>(R)
+            == cartan::so3<S>::from_matrix(R).has_value());
+    }
+
+    const cartan::quaternion<S> unit = cartan::so3<S>::exp(phi).quaternion_ref();
+    const cartan::quaternion<S> marginal_q(
+        unit.w() * (S(1) + tol), unit.x(), unit.y(), unit.z());
+    const cartan::quaternion<S> gross_q(S(2), S(3), S(4), S(5));
+
+    for (const cartan::quaternion<S>& q : {unit, marginal_q, gross_q})
+    {
+        REQUIRE(unguarded_quaternion_gate_admits<S>(q)
+            == cartan::so3<S>::from_quaternion(q).has_value());
+    }
+}
+
+TEST_CASE("so3: lie_failure carries a diagnostic for nonfinite input", "[so3][nonfinite]")
+{
+    REQUIRE_FALSE(std::string_view(
+        cartan::message(cartan::lie_failure::non_finite_input)).empty());
 }

@@ -23,6 +23,10 @@ constexpr std::size_t kInputs = 1024;
 
 }
 
+// The timed loop calls the unchecked entry point. The checked one validates
+// joint-vector length and finiteness on every call, which inside a timed region
+// measures the guard rather than the kinematics and would shift a published
+// number under an unchanged benchmark name.
 static void bm_fk_3r_planar(benchmark::State& state)
 {
     auto chain = cartan::fixtures::make_3r_planar_chain<double>();
@@ -35,7 +39,7 @@ static void bm_fk_3r_planar(benchmark::State& state)
     {
         auto& q = qs[i++ & (kInputs - 1)];
         benchmark::DoNotOptimize(q);
-        auto result = cartan::forward_kinematics(chain, q);
+        auto result = cartan::forward_kinematics_unchecked(chain, q);
         benchmark::DoNotOptimize(result);
     }
 }
@@ -53,7 +57,7 @@ static void bm_fk_ur3e_fixed(benchmark::State& state)
     {
         auto& q = qs[i++ & (kInputs - 1)];
         benchmark::DoNotOptimize(q);
-        auto result = cartan::forward_kinematics(chain, q);
+        auto result = cartan::forward_kinematics_unchecked(chain, q);
         benchmark::DoNotOptimize(result);
     }
 }
@@ -71,7 +75,7 @@ static void bm_fk_ur3e_dynamic(benchmark::State& state)
     {
         auto& q = qs[i++ & (kInputs - 1)];
         benchmark::DoNotOptimize(q);
-        auto result = cartan::forward_kinematics(chain, q);
+        auto result = cartan::forward_kinematics_unchecked(chain, q);
         benchmark::DoNotOptimize(result);
     }
 }
@@ -89,7 +93,7 @@ static void bm_fk_lbr_med14_fixed(benchmark::State& state)
     {
         auto& q = qs[i++ & (kInputs - 1)];
         benchmark::DoNotOptimize(q);
-        auto result = cartan::forward_kinematics(chain, q);
+        auto result = cartan::forward_kinematics_unchecked(chain, q);
         benchmark::DoNotOptimize(result);
     }
 }
@@ -107,7 +111,7 @@ static void bm_fk_lbr_med14_dynamic(benchmark::State& state)
     {
         auto& q = qs[i++ & (kInputs - 1)];
         benchmark::DoNotOptimize(q);
-        auto result = cartan::forward_kinematics(chain, q);
+        auto result = cartan::forward_kinematics_unchecked(chain, q);
         benchmark::DoNotOptimize(result);
     }
 }

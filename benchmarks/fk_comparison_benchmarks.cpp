@@ -20,6 +20,11 @@ namespace
 // optimizer cannot hoist a loop-invariant FK out of the timed loop. KDL cells
 // keep their own loop-invariant q (equal end-effector work is the point).
 // Power-of-two size wraps the index with a mask.
+//
+// The timed loop calls the unchecked entry point. The checked one validates
+// joint-vector length and finiteness on every call, which inside a timed region
+// measures the guard rather than the kinematics and would shift a published
+// comparison number under an unchanged benchmark name.
 constexpr std::size_t kInputs = 1024;
 
 // ============================================================================
@@ -27,91 +32,102 @@ constexpr std::size_t kInputs = 1024;
 // ============================================================================
 
 template <typename Scalar>
-auto make_3r_planar_static()
+cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_z, cartan::revolute_z>
+make_3r_planar_static()
 {
+    using chain_type =
+        cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_z, cartan::revolute_z>;
     auto kc = cartan::fixtures::make_3r_planar_chain<Scalar>();
-    return cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_z, cartan::revolute_z>(
-        kc.home(), kc.axes(), kc.limits());
+    return cartan::testing::unwrap(
+        chain_type::make(kc.home(), kc.axes(), kc.limits()), "make_3r_planar_static");
 }
 
 template <typename Scalar>
-auto make_ur3e_static()
+cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y, cartan::revolute_y, cartan::revolute_y, cartan::revolute_z, cartan::revolute_y>
+make_ur3e_static()
 {
+    using chain_type =
+        cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y, cartan::revolute_y, cartan::revolute_y, cartan::revolute_z, cartan::revolute_y>;
     auto kc = cartan::fixtures::make_ur3e_chain<Scalar>();
-    return cartan::static_chain<Scalar,
-        cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
-        cartan::revolute_y, cartan::revolute_z, cartan::revolute_y>(
-        kc.home(), kc.axes(), kc.limits());
+    return cartan::testing::unwrap(
+        chain_type::make(kc.home(), kc.axes(), kc.limits()), "make_ur3e_static");
 }
 
 template <typename Scalar>
-auto make_lbr_med14_static()
+cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y, cartan::revolute_z, cartan::revolute_y, cartan::revolute_z, cartan::revolute_y, cartan::revolute_z>
+make_lbr_med14_static()
 {
+    using chain_type =
+        cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y, cartan::revolute_z, cartan::revolute_y, cartan::revolute_z, cartan::revolute_y, cartan::revolute_z>;
     auto kc = cartan::fixtures::make_lbr_med14_chain<Scalar>();
-    return cartan::static_chain<Scalar,
-        cartan::revolute_z, cartan::revolute_y, cartan::revolute_z, cartan::revolute_y,
-        cartan::revolute_z, cartan::revolute_y, cartan::revolute_z>(
-        kc.home(), kc.axes(), kc.limits());
+    return cartan::testing::unwrap(
+        chain_type::make(kc.home(), kc.axes(), kc.limits()), "make_lbr_med14_static");
 }
 
 template <typename Scalar>
-auto make_kr6_sixx_static()
+cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y, cartan::revolute_y, cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>
+make_kr6_sixx_static()
 {
+    using chain_type =
+        cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y, cartan::revolute_y, cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>;
     auto kc = cartan::fixtures::make_kr6_sixx_chain<Scalar>();
-    return cartan::static_chain<Scalar,
-        cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
-        cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>(
-        kc.home(), kc.axes(), kc.limits());
+    return cartan::testing::unwrap(
+        chain_type::make(kc.home(), kc.axes(), kc.limits()), "make_kr6_sixx_static");
 }
 
 template <typename Scalar>
-auto make_panda_static()
+cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y, cartan::revolute_z, cartan::revolute_y, cartan::revolute_z, cartan::revolute_y, cartan::revolute_z>
+make_panda_static()
 {
+    using chain_type =
+        cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y, cartan::revolute_z, cartan::revolute_y, cartan::revolute_z, cartan::revolute_y, cartan::revolute_z>;
     auto kc = cartan::fixtures::make_panda_chain<Scalar>();
-    return cartan::static_chain<Scalar,
-        cartan::revolute_z, cartan::revolute_y, cartan::revolute_z, cartan::revolute_y,
-        cartan::revolute_z, cartan::revolute_y, cartan::revolute_z>(
-        kc.home(), kc.axes(), kc.limits());
+    return cartan::testing::unwrap(
+        chain_type::make(kc.home(), kc.axes(), kc.limits()), "make_panda_static");
 }
 
 template <typename Scalar>
-auto make_abb_irb120_static()
+cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y, cartan::revolute_y, cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>
+make_abb_irb120_static()
 {
+    using chain_type =
+        cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y, cartan::revolute_y, cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>;
     auto kc = cartan::fixtures::make_abb_irb120_chain<Scalar>();
-    return cartan::static_chain<Scalar,
-        cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
-        cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>(
-        kc.home(), kc.axes(), kc.limits());
+    return cartan::testing::unwrap(
+        chain_type::make(kc.home(), kc.axes(), kc.limits()), "make_abb_irb120_static");
 }
 
 template <typename Scalar>
-auto make_jaco2_static()
+cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y, cartan::revolute_y, cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>
+make_jaco2_static()
 {
+    using chain_type =
+        cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y, cartan::revolute_y, cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>;
     auto kc = cartan::fixtures::make_jaco2_chain<Scalar>();
-    return cartan::static_chain<Scalar,
-        cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
-        cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>(
-        kc.home(), kc.axes(), kc.limits());
+    return cartan::testing::unwrap(
+        chain_type::make(kc.home(), kc.axes(), kc.limits()), "make_jaco2_static");
 }
 
 template <typename Scalar>
-auto make_fetch_static()
+cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y, cartan::revolute_x, cartan::revolute_y, cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>
+make_fetch_static()
 {
+    using chain_type =
+        cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y, cartan::revolute_x, cartan::revolute_y, cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>;
     auto kc = cartan::fixtures::make_fetch_chain<Scalar>();
-    return cartan::static_chain<Scalar,
-        cartan::revolute_z, cartan::revolute_y, cartan::revolute_x, cartan::revolute_y,
-        cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>(
-        kc.home(), kc.axes(), kc.limits());
+    return cartan::testing::unwrap(
+        chain_type::make(kc.home(), kc.axes(), kc.limits()), "make_fetch_static");
 }
 
 template <typename Scalar>
-auto make_baxter_static()
+cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y, cartan::revolute_x, cartan::revolute_y, cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>
+make_baxter_static()
 {
+    using chain_type =
+        cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y, cartan::revolute_x, cartan::revolute_y, cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>;
     auto kc = cartan::fixtures::make_baxter_chain<Scalar>();
-    return cartan::static_chain<Scalar,
-        cartan::revolute_z, cartan::revolute_y, cartan::revolute_x, cartan::revolute_y,
-        cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>(
-        kc.home(), kc.axes(), kc.limits());
+    return cartan::testing::unwrap(
+        chain_type::make(kc.home(), kc.axes(), kc.limits()), "make_baxter_static");
 }
 
 // ============================================================================
@@ -119,7 +135,8 @@ auto make_baxter_static()
 // ============================================================================
 
 template <typename ChainType>
-auto random_config_static(const ChainType& chain, std::mt19937& rng)
+typename cartan::joint_state<typename ChainType::scalar_type, ChainType::joints>::position_type
+random_config_static(const ChainType& chain, std::mt19937& rng)
 {
     using Scalar = typename ChainType::scalar_type;
     constexpr int N = ChainType::joints;
@@ -131,7 +148,7 @@ auto random_config_static(const ChainType& chain, std::mt19937& rng)
     {
         auto idx = static_cast<std::size_t>(i);
         std::uniform_real_distribution<Scalar> dist(
-            limits[idx].position_min, limits[idx].position_max);
+            limits[idx].position_min(), limits[idx].position_max());
         q(i) = dist(rng);
     }
     return q;
@@ -165,7 +182,7 @@ static void bm_fk_##ROBOT##_kinematic_chain(benchmark::State& state)     \
     {                                                                    \
         auto& q = qs[i++ & (kInputs - 1)];                              \
         benchmark::DoNotOptimize(q);                                    \
-        auto result = cartan::forward_kinematics(chain, q);               \
+        auto result = cartan::forward_kinematics_unchecked(chain, q);               \
         benchmark::DoNotOptimize(result);                                \
     }                                                                    \
 }                                                                        \
@@ -184,7 +201,7 @@ static void bm_fk_##ROBOT##_static_generic(benchmark::State& state)      \
     {                                                                    \
         auto& q = qs[i++ & (kInputs - 1)];                              \
         benchmark::DoNotOptimize(q);                                    \
-        auto result = cartan::forward_kinematics(wrapped, q);             \
+        auto result = cartan::forward_kinematics_unchecked(wrapped, q);             \
         benchmark::DoNotOptimize(result);                                \
     }                                                                    \
 }                                                                        \
@@ -202,7 +219,7 @@ static void bm_fk_##ROBOT##_static_specialized(benchmark::State& state)  \
     {                                                                    \
         auto& q = qs[i++ & (kInputs - 1)];                              \
         benchmark::DoNotOptimize(q);                                    \
-        auto result = cartan::forward_kinematics(sc, q);                  \
+        auto result = cartan::forward_kinematics_unchecked(sc, q);                  \
         benchmark::DoNotOptimize(result);                                \
     }                                                                    \
 }                                                                        \

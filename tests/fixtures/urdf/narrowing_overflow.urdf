@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<!-- Position bounds that are finite as double and overflow to +/-infinity when
+     narrowed to float. Loads at double precision and is rejected at single
+     precision, which is the only place the two cases are still separable. -->
+<robot name="narrowing_overflow">
+
+  <link name="base_link"/>
+  <link name="tip"/>
+
+  <joint name="overflow_joint" type="revolute">
+    <parent link="base_link"/>
+    <child link="tip"/>
+    <origin xyz="0 0 0.1" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-1e300" upper="1e300" velocity="2.0" effort="50.0"/>
+  </joint>
+
+</robot>

@@ -1,0 +1,22 @@
+function(matrix_consume cell label prefix)
+    set(build "${MATRIX_WORK_DIR}/${cell}-consume-${label}")
+    matrix_configure("${cell}" "${CARTAN_SOURCE_DIR}/tests/integration/consumers/installed" "${build}"
+        "-DCMAKE_PREFIX_PATH=${prefix}" ${ARGN})
+    matrix_build("${cell}" "${build}")
+    matrix_run_tests("${cell}" "${build}")
+endfunction()
+
+function(matrix_cell_minimal)
+    set(cell minimal)
+    set(build "${MATRIX_WORK_DIR}/${cell}-build")
+    set(staged "${MATRIX_WORK_DIR}/${cell}-stage")
+    set(moved "${MATRIX_WORK_DIR}/${cell}-moved")
+    matrix_configure("${cell}" "${CARTAN_SOURCE_DIR}" "${build}"
+        "-DCMAKE_INSTALL_PREFIX=${staged}" -DFETCHCONTENT_FULLY_DISCONNECTED=ON)
+    matrix_require_cache("${cell}" "${build}" "^CARTAN_ENABLE_INSTALL:BOOL=ON$")
+    matrix_build("${cell}" "${build}")
+    matrix_install("${cell}" "${build}")
+    matrix_require_export("${cell}" "${staged}")
+    matrix_relocate("${cell}" "${staged}" "${moved}")
+    matrix_consume("${cell}" relocated "${moved}")
+endfunction()

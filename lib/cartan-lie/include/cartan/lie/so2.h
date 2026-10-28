@@ -16,7 +16,7 @@ namespace cartan
 
 /// 2D rotation group SO(2), parameterized by scalar type and policy.
 /// Internal representation: (cos(theta), sin(theta)) pair.
-/// Reference: Lynch & Park, Modern Robotics, Ch. 3.2.1, p. 68-69.
+/// Reference: Lynch & Park, Modern Robotics, Sec. 3.2.1, pp. 66-74.
 template <typename Scalar, typename Policy = strict_policy>
 class so2
 {
@@ -54,7 +54,7 @@ public:
     }
 
     /// Logarithmic map: SO(2) rotation -> angle in (-pi, pi].
-    /// Reference: Lynch & Park, Modern Robotics, p. 69.
+    /// Reference: Lynch & Park, Modern Robotics, Def. 3.2, p. 68.
     Scalar log() const
     {
         return std::atan2(m_sin, m_cos);
@@ -69,7 +69,7 @@ public:
 
     /// Group composition: R1 * R2 via angle-addition formulas.
     /// Result uses the stricter of the two policies.
-    /// Reference: Lynch & Park, Modern Robotics, rotation composition, p. 68.
+    /// Reference: Lynch & Park, Modern Robotics, Props. 3.4-3.5, p. 69.
     template <typename P2>
     auto operator*(const so2<Scalar, P2>& rhs) const
         -> so2<Scalar, stricter_policy<Policy, P2>>
@@ -80,7 +80,7 @@ public:
     }
 
     /// Convert to 2x2 rotation matrix: [[c, -s], [s, c]].
-    /// Reference: Lynch & Park, Modern Robotics, Eq. 3.10, p. 68.
+    /// Reference: Lynch & Park, Modern Robotics, Def. 3.2, p. 68.
     matrix2<Scalar> matrix() const
     {
         matrix2<Scalar> R;
@@ -115,10 +115,15 @@ public:
     /// Construct from 2x2 rotation matrix with validation.
     /// Checks orthogonality (R^T * R ~= I) and det(R) ~= 1.
     /// Returns cartan::unexpected with a lie_failure code on failure.
-    /// Reference: Rotation matrix properties, Lynch & Park, p. 23-24.
+    /// Reference: Lynch & Park, Modern Robotics, Def. 3.2, p. 68.
     static cartan::expected<so2, lie_failure>
     from_matrix(const matrix2<Scalar>& R)
     {
+        if (!R.allFinite())
+        {
+            return cartan::unexpected(lie_failure::non_finite_input);
+        }
+
         Scalar tol = detail::sqrt_epsilon_v<Scalar>;
 
         // Check orthogonality: R^T * R ~= I

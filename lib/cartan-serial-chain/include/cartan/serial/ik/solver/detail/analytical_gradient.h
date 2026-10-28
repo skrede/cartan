@@ -50,7 +50,7 @@ struct ik_se3_objective
         const position_type& q,
         const error_weight<Scalar>& weight = {})
     {
-        auto fk = forward_kinematics(chain, q);
+        auto fk = forward_kinematics_unchecked(chain, q);
         auto V_b = (target.inverse() * fk.end_effector).log();
 
         auto W_V = weight.apply(V_b);
@@ -66,12 +66,12 @@ struct ik_se3_objective
         const position_type& q,
         const error_weight<Scalar>& weight = {})
     {
-        auto fk = forward_kinematics(chain, q);
+        auto fk = forward_kinematics_unchecked(chain, q);
         auto V_b = (target.inverse() * fk.end_effector).log();
 
         // Right-trivialized differential of log: J_r^{-1}(V_b) = J_l^{-1}(-V_b)
         auto J_log_inv = se3_left_jacobian_inv(vector6<Scalar>(-V_b));
-        auto J_b = body_jacobian(chain, fk);
+        auto J_b = body_jacobian_unchecked(chain, fk);
 
         auto W_V = weight.apply(V_b);
         Scalar obj = Scalar(0.5) * W_V.squaredNorm();

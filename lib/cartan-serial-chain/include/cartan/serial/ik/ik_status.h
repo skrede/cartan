@@ -4,7 +4,7 @@
 /// Status, objective, failure enums, convergence criteria, and solver
 ///        options for inverse kinematics.
 ///
-/// Reference: Lynch & Park, Modern Robotics, Ch. 6.2, p. 227-233.
+/// Reference: Lynch & Park, Modern Robotics, Sec. 6.2, pp. 224-230.
 
 #include <type_traits>
 
@@ -13,6 +13,12 @@ namespace cartan
 
 /// Status returned by each IK stepper step() call.
 /// Stepper is running until it converges, hits a limit, or fails.
+///
+/// The values from `not_initialized` onward are terminal before any iteration
+/// runs. A solver starts in `not_initialized` so a caller that never calls
+/// setup() cannot enter the work loop with a default-constructed joint vector,
+/// and setup() latches one of the others when its precondition fails, because
+/// every setup() returns void and has no other way to report.
 enum class ik_status
 {
     running,
@@ -20,61 +26,106 @@ enum class ik_status
     diverged,
     stalled,
     joint_limit_hit,
-    iteration_limit
+    iteration_limit,
+    aborted,
+    not_initialized,
+    dimension_mismatch,
+    non_finite_input,
+    unsupported_configuration
 };
 
+/// Human-readable diagnostic for an ik_status, for logging and binding
+/// exception messages. Returns a static string literal; no allocation.
+constexpr const char* message(ik_status status)
+{
+    switch (status)
+    {
+    case ik_status::running:
+        return "Solver is running";
+    case ik_status::converged:
+        return "Solver converged within the requested tolerances";
+    case ik_status::diverged:
+        return "Solver diverged";
+    case ik_status::stalled:
+        return "Solver stopped making progress";
+    case ik_status::joint_limit_hit:
+        return "Solution lies outside the joint limits";
+    case ik_status::iteration_limit:
+        return "Iteration budget exhausted before convergence";
+    case ik_status::aborted:
+        return "Solve was aborted by the caller";
+    case ik_status::not_initialized:
+        return "Solver was stepped before setup";
+    case ik_status::dimension_mismatch:
+        return "Seed joint vector length does not match the chain's joint count";
+    case ik_status::non_finite_input:
+        return "Seed joint vector or target pose contains a NaN or infinite component";
+    case ik_status::unsupported_configuration:
+        return "Selection objective is not defined for this chain or characteristic length";
+    }
+    return "Unknown ik_status";
+}
+
 /// Objective for the IK solve -- controls secondary optimization.
+///
+/// `min_error_norm` ranks on the pose residual and `min_joint_distance` on the
+/// displacement from the seed configuration; the two Jacobian measures rank on
+/// the singular values of the body Jacobian normalized by the characteristic
+/// length. Each definition lives once, in detail/selection_metrics.h.
 enum class ik_objective
 {
     speed,
-    min_distance,
+    min_error_norm,
+    min_joint_distance,
     max_manipulability,
     max_isotropy
 };
 
 /// Failure reason reported in ik_error when solve does not converge.
+///
+/// The three setup-precondition reasons share their names with the terminal
+/// `ik_status` values the solver latches, and the runner maps one onto the other
+/// where it builds the error.
 enum class ik_failure
 {
-    unreachable,
     diverged,
     stalled,
     iteration_limit,
     joint_limit_violation,
     aborted,
-    not_initialized
+    not_initialized,
+    dimension_mismatch,
+    non_finite_input,
+    unsupported_configuration
 };
 
-/// Fine-grained termination reason reported by individual solve policies.
-///
-/// `ik_status` distinguishes only five terminal cases (converged, diverged,
-/// stalled, iteration_limit, joint_limit_hit), which is too coarse for
-/// diagnosing failure clusters in SQP/BFGS-backed solvers: six underlying
-/// argmin terminators collapse into `ik_status::stalled` without this.
-///
-/// Policies that wrap a lower-level solver (e.g. `argmin_slsqp` wrapping
-/// argmin's `kraft_slsqp_policy`) report the specific inner terminator via
-/// `termination_reason()`. Policies that do not opt in report
-/// `ik_termination_reason::unknown`, and `basic_ik_runner` propagates the
-/// reported value into `ik_error::termination_reason`.
-enum class ik_termination_reason
+/// Human-readable diagnostic for an ik_failure, for logging and binding
+/// exception messages. Returns a static string literal; no allocation.
+constexpr const char* message(ik_failure failure)
 {
-    unknown,                         ///< policy did not report a finer reason
-    converged,                       ///< pose tolerance met
-    iteration_limit,                 ///< cartan-side max_iterations exhausted
-    stall_detected,                  ///< cartan-side stall detection fired
-    divergence_detected,             ///< cartan-side divergence detection fired
-    joint_limit_hit,                 ///< cartan-side limits policy rejected
-    solver_converged_pose_missed,    ///< inner solver converged, pose tol not met
-    solver_ftol_reached,             ///< inner solver: objective tol reached, pose tol not met
-    solver_xtol_reached,             ///< inner solver: step tol reached
-    solver_objective_stalled,        ///< inner solver: objective stalled
-    solver_roundoff_limited,         ///< inner solver: roundoff-limited
-    solver_stalled,                  ///< inner solver: stall terminator
-    solver_aborted,                  ///< inner solver: aborted by callback
-    solver_budget_exhausted,         ///< inner solver: per-step budget exhausted
-    solver_max_iterations,           ///< inner solver: max_iterations exhausted
-    solver_diverged                  ///< inner solver: divergence detected
-};
+    switch (failure)
+    {
+    case ik_failure::diverged:
+        return "Solver diverged";
+    case ik_failure::stalled:
+        return "Solver stopped making progress";
+    case ik_failure::iteration_limit:
+        return "Iteration budget exhausted before convergence";
+    case ik_failure::joint_limit_violation:
+        return "Solution lies outside the joint limits";
+    case ik_failure::aborted:
+        return "Solve was aborted by the caller";
+    case ik_failure::not_initialized:
+        return "Solve was requested before setup";
+    case ik_failure::dimension_mismatch:
+        return "Seed joint vector length does not match the chain's joint count";
+    case ik_failure::non_finite_input:
+        return "Seed joint vector or target pose contains a NaN or infinite component";
+    case ik_failure::unsupported_configuration:
+        return "Selection objective is not defined for this chain or characteristic length";
+    }
+    return "Unknown ik_failure";
+}
 
 namespace detail
 {
@@ -128,7 +179,7 @@ inline constexpr Scalar default_orientation_tol_v =
 }
 
 /// Runtime convergence criteria for IK solvers.
-/// Separate position and orientation tolerances per Lynch & Park Ch. 6.2.
+/// Separate position and orientation tolerances per Lynch & Park, Sec. 6.2.2, p. 228.
 ///
 /// `max_iterations_per_attempt` bounds a single solver attempt (the per-attempt
 /// cap consulted by every solver's internal iteration counter, and by
@@ -136,7 +187,9 @@ inline constexpr Scalar default_orientation_tol_v =
 /// restart). `max_total_work_units` bounds the runner-level total budget,
 /// measured in algorithmic work units (1 unit = one major iteration of the
 /// solver's design); the runner accumulates `step_result::metrics.units_consumed`
-/// against this cap.
+/// against this cap on every entry point, single-policy and racing alike. A
+/// racing round-robin tick is atomic, so it can carry the accumulator past the
+/// cap by at most one unit per still-active policy.
 template <typename Scalar = double>
 struct convergence_criteria
 {
@@ -173,9 +226,17 @@ struct step_result
 
 /// Options controlling multi-policy solver racing behavior.
 ///
-/// Separate from convergence_criteria, which controls per-policy behavior.
-/// solver_options governs the outer racing loop: how many total iterations,
-/// which objective selects the winner, and the Halton seed for reproducibility.
+/// Separate from convergence_criteria, which controls per-policy behavior and
+/// carries the runner's total work budget. solver_options governs the outer
+/// racing loop: which objective selects the winner, and the Halton seed for
+/// reproducibility.
+///
+/// `characteristic_length` is in the chain's linear unit and divides the body
+/// Jacobian's linear rows before the decomposition the two Jacobian objectives
+/// rank on, so those rows are commensurable with the angular ones. It applies
+/// to those objectives alone and is not a library-wide scale. The default of
+/// one reproduces the unnormalized arithmetic exactly, which states the unit
+/// scale the measures always assumed rather than changing any ranking.
 template <typename Scalar = double>
 struct solver_options
 {
@@ -183,8 +244,8 @@ struct solver_options
         "solver_options requires a floating-point Scalar type");
 
     ik_objective objective{ik_objective::speed};
-    int max_total_iterations{500};
     unsigned int halton_seed{42};
+    Scalar characteristic_length{1};
 };
 
 }

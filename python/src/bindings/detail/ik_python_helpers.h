@@ -8,10 +8,7 @@
 /// convergence_criteria + solver_options pair before driving a runner.
 ///
 /// The to_ik_result / to_ik_result_from_error helpers unwrap a
-/// cartan::expected<ik_result, ik_error> into IkResult. The success branch
-/// leaves condition_number = 0.0 because the runner does not compute the
-/// Jacobian SVD on convergence (a Jacobian condition number is only
-/// populated on the failure path).
+/// cartan::expected<ik_result, ik_error> into IkResult.
 
 #include "cartan/serial/ik/ik_status.h"
 #include "cartan/serial/ik/ik_result.h"
@@ -20,6 +17,7 @@
 
 #include <string>
 #include <utility>
+#include <optional>
 
 namespace cartan::python
 {
@@ -32,9 +30,8 @@ struct IkResult
     double error_norm{0.0};
     std::string failure_reason;
     int solver_index{0};
-    cartan::ik_termination_reason termination_reason{cartan::ik_termination_reason::unknown};
-    bool near_singular{false};
-    double condition_number{0.0};
+    std::optional<double> selection_metric{};
+    cartan::ik_objective selection_objective{cartan::ik_objective::speed};
 };
 
 struct IkConfig
@@ -43,21 +40,25 @@ struct IkConfig
     int max_total_work_units{200};
     double position_tol{1e-6};
     double orientation_tol{1e-6};
-    int max_total_iterations{500};
     cartan::ik_objective objective{cartan::ik_objective::speed};
     unsigned int halton_seed{42};
+    double characteristic_length{1.0};
 };
 
 inline std::string ik_failure_to_string(cartan::ik_failure r)
 {
     switch (r)
     {
-        case cartan::ik_failure::unreachable:           return "unreachable";
         case cartan::ik_failure::diverged:              return "diverged";
         case cartan::ik_failure::stalled:               return "stalled";
         case cartan::ik_failure::iteration_limit:       return "iteration_limit";
         case cartan::ik_failure::joint_limit_violation: return "joint_limit_violation";
         case cartan::ik_failure::aborted:               return "aborted";
+        case cartan::ik_failure::not_initialized:       return "not_initialized";
+        case cartan::ik_failure::dimension_mismatch:    return "dimension_mismatch";
+        case cartan::ik_failure::non_finite_input:      return "non_finite_input";
+        case cartan::ik_failure::unsupported_configuration:
+            return "unsupported_configuration";
     }
     return "unknown";
 }
@@ -72,9 +73,8 @@ inline IkResult to_ik_result(cartan::ik_result<double, N>&& ok)
     out.error_norm         = ok.final_error_norm;
     out.failure_reason     = "";
     out.solver_index       = ok.solver_index;
-    out.termination_reason = cartan::ik_termination_reason::converged;
-    out.near_singular      = false;
-    out.condition_number   = 0.0;
+    out.selection_metric   = ok.selection_metric;
+    out.selection_objective = ok.selection_objective;
     return out;
 }
 
@@ -88,9 +88,6 @@ inline IkResult to_ik_result_from_error(cartan::ik_error<double, N>&& err, int i
     out.error_norm         = err.last_error_norm;
     out.failure_reason     = ik_failure_to_string(err.reason);
     out.solver_index       = -1;
-    out.termination_reason = err.termination_reason;
-    out.near_singular      = err.near_singular;
-    out.condition_number   = err.condition_number;
     return out;
 }
 

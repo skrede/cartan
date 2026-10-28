@@ -1,3 +1,6 @@
+#include "../support/kinematics_helpers.h"
+#include "../support/joint_limits_helpers.h"
+
 #include "cartan/analytical.h"
 #include "cartan/serial_chain.h"
 
@@ -17,7 +20,11 @@ using namespace cartan;
 // is explicitly insufficient, so the round-trip below spans over a thousand
 // full-joint-range configurations and re-verifies every returned solution by an
 // independent forward map at 1e-9 (never trusting the solver's own report).
-static constexpr double tolerance = 1e-9;
+static constexpr double check_tolerance = 1e-9;
+static constexpr verification_tolerance<double> acceptance(check_tolerance, check_tolerance);
+
+using non_parallel_6r_chain = static_chain<double, revolute_z, revolute_y, revolute_x,
+    revolute_x, revolute_y, revolute_x>;
 
 // Worst of position and orientation reconstruction error of q against target.
 template <typename Chain>
@@ -25,7 +32,7 @@ static double fk_error(const Chain& chain,
                        const Eigen::Vector<double, 6>& q,
                        const se3<double>& target)
 {
-    auto fk = forward_kinematics(chain, q);
+    auto fk = testing::fk_at(chain, q);
     const double pe =
         (fk.end_effector.translation() - target.translation()).norm();
     const double oe = (fk.end_effector.rotation().inverse()
@@ -37,7 +44,7 @@ static double fk_error(const Chain& chain,
 // (Z here would be parallel, so axis 2 is Z and axis 3 is X) -- the parallel
 // gate of make() must reject it. Built inline so the rejection premise is
 // self-evident from the joint tags rather than borrowed from a fixture.
-static auto make_non_ortho_parallel_chain()
+static non_parallel_6r_chain make_non_ortho_parallel_chain()
 {
     auto s0 = screw_axis<double>::revolute({0, 0, 1}, {0, 0, 0});
     auto s1 = screw_axis<double>::revolute({0, 1, 0}, {0, 0, 0.4});
@@ -47,14 +54,14 @@ static auto make_non_ortho_parallel_chain()
     auto s4 = screw_axis<double>::revolute({0, 1, 0}, {0.8, 0, 0.4});
     auto s5 = screw_axis<double>::revolute({1, 0, 0}, {0.8, 0, 0.4});
 
-    joint_limits<double> lim{-std::numbers::pi, std::numbers::pi};
+    auto lim = testing::limits(-std::numbers::pi, std::numbers::pi);
     std::array<joint_limits<double>, 6> limits{lim, lim, lim, lim, lim, lim};
 
-    return static_chain<double, revolute_z, revolute_y, revolute_x,
-                        revolute_x, revolute_y, revolute_x>(
-        se3<double>(so3<double>::identity(),
-                    Eigen::Vector3d(0.88, 0, 0.4)),
-        {s0, s1, s2, s3, s4, s5}, limits);
+    return testing::unwrap(
+        non_parallel_6r_chain::make(
+            se3<double>(so3<double>::identity(), Eigen::Vector3d(0.88, 0, 0.4)),
+            {s0, s1, s2, s3, s4, s5}, limits),
+        "make_non_parallel_chain");
 }
 
 TEST_CASE("OPW: FK round-trip reconstructs KR6 R900 targets at 1e-9 over a "
@@ -63,11 +70,11 @@ TEST_CASE("OPW: FK round-trip reconstructs KR6 R900 targets at 1e-9 over a "
     auto chain = fixtures::make_kr6_r900_opw_chain<double>();
     auto params = fixtures::kr6_r900_opw_parameters<double>();
 
-    // Solve AT the correctness bar: the acceptance tolerance binds both the
-    // position and orientation FK back-check, so every emitted solution already
-    // reconstructs the target to 1e-9. The independent re-check below then holds
-    // for every returned solution, not merely the best one.
-    auto solver = opw_6r_solver<decltype(chain)>::make(chain, params, tolerance);
+    // Solve AT the correctness bar: both fields of the acceptance tolerance are
+    // set to it, so every emitted solution already reconstructs the target to
+    // 1e-9 in position and in orientation. The independent re-check below then
+    // holds for every returned solution, not merely the best one.
+    auto solver = opw_6r_solver<decltype(chain)>::make(chain, params, acceptance);
     REQUIRE(solver.has_value());
 
     std::mt19937_64 rng(0xC0FFEE1234ull);
@@ -75,27 +82,35 @@ TEST_CASE("OPW: FK round-trip reconstructs KR6 R900 targets at 1e-9 over a "
         -std::numbers::pi, std::numbers::pi);
 
     constexpr int samples = 1200;
+    int branches = 0;
     for (int t = 0; t < samples; ++t)
     {
         Eigen::Vector<double, 6> q_known;
         for (int k = 0; k < 6; ++k)
             q_known(k) = angle(rng);
 
-        auto target = forward_kinematics(chain, q_known).end_effector;
+        auto target = testing::fk_at(chain, q_known).end_effector;
         auto result = solver->solve(target);
 
         INFO("sample " << t << " q_known = " << q_known.transpose());
         REQUIRE(result.has_value());
         REQUIRE(result->count >= 1);
+        branches += result->count;
 
         for (int i = 0; i < result->count; ++i)
         {
             const auto& sol = result->solutions[static_cast<std::size_t>(i)];
             for (int k = 0; k < 6; ++k)
                 CHECK_FALSE(std::isnan(sol(k)));
-            CHECK(fk_error(chain, sol, target) < tolerance);
+            CHECK(fk_error(chain, sol, target) < check_tolerance);
         }
     }
+
+    // Skipping a shoulder family whose arc-cosine denominator vanishes is the
+    // one change on the success path, so the branches this sweep returns are
+    // counted against what it returned before that skip existed. Every target
+    // solving is already required above; this bounds how many ways it solves.
+    CHECK(branches >= 9172);
 }
 
 TEST_CASE("OPW: make() accepts the offset-shoulder KR6 R900 chain")
@@ -111,7 +126,7 @@ TEST_CASE("OPW: make() accepts the offset-shoulder KR6 R900 chain")
 
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.4, 0.5, 0.2, -0.3, 0.1;
-    auto target = forward_kinematics(chain, q_known).end_effector;
+    auto target = testing::fk_at(chain, q_known).end_effector;
     auto result = solver->solve(target);
 
     REQUIRE(result.has_value());
@@ -138,7 +153,7 @@ TEST_CASE("OPW: wrist singularity returns FK-verified folded solutions")
     // FK-verifies at 1e-9" holds: at the exact locus the fold is exact, and any
     // alternate branch that only reaches 1e-8 near a secondary singularity is
     // filtered rather than reported.
-    auto solver = opw_6r_solver<decltype(chain)>::make(chain, params, tolerance);
+    auto solver = opw_6r_solver<decltype(chain)>::make(chain, params, acceptance);
     REQUIRE(solver.has_value());
 
     // Targets ON the wrist-singular locus: internal theta5 = q(4) = 0 exactly,
@@ -150,7 +165,7 @@ TEST_CASE("OPW: wrist singularity returns FK-verified folded solutions")
         {
             Eigen::Vector<double, 6> q;
             q << 0.3, -0.4, 0.5, q4, 0.0, q6;
-            auto target = forward_kinematics(chain, q).end_effector;
+            auto target = testing::fk_at(chain, q).end_effector;
 
             auto result = solver->solve(target);
 
@@ -166,7 +181,7 @@ TEST_CASE("OPW: wrist singularity returns FK-verified folded solutions")
                 const auto& sol = result->solutions[static_cast<std::size_t>(i)];
                 for (int k = 0; k < 6; ++k)
                     CHECK_FALSE(std::isnan(sol(k)));
-                CHECK(fk_error(chain, sol, target) < tolerance);
+                CHECK(fk_error(chain, sol, target) < check_tolerance);
             }
         }
     }
@@ -187,7 +202,8 @@ TEST_CASE("OPW: the error channel is reserved for genuine failures")
     REQUIRE_FALSE(result.has_value());
     CHECK(result.error().reason == analytical_failure::unreachable);
     // The diagnostic carries a positive workspace overshoot, never a joint value.
-    CHECK(result.error().workspace_distance > 0.0);
+    REQUIRE(result.error().workspace_distance.has_value());
+    CHECK(*result.error().workspace_distance > 0.0);
 }
 
 TEST_CASE("OPW: the sin(theta5) fold threshold sits in the empirical "
@@ -205,7 +221,7 @@ TEST_CASE("OPW: the sin(theta5) fold threshold sits in the empirical "
     // Permissive acceptance so BOTH the fold and the naive reconstruction are
     // emitted (not filtered), letting the independent re-check expose each
     // path's true worst-case FK error.
-    const double permissive = 1e-2;
+    const verification_tolerance<double> permissive(1e-2, 1e-2);
 
     // A spread of shoulder/elbow configurations; joint 5 is swept onto the
     // locus so the worst case is taken over the whole family, not one pose.
@@ -236,7 +252,7 @@ TEST_CASE("OPW: the sin(theta5) fold threshold sits in the empirical "
         for (auto q : bases)
         {
             q(4) = delta;
-            auto target = forward_kinematics(chain, q).end_effector;
+            auto target = testing::fk_at(chain, q).end_effector;
 
             auto worst = [&](const auto& r) -> double
             {
@@ -284,4 +300,73 @@ TEST_CASE("OPW: the sin(theta5) fold threshold sits in the empirical "
     // default must too.
     CHECK(opw_6r_solver<decltype(chain)>::default_singularity_tolerance > below);
     CHECK(opw_6r_solver<decltype(chain)>::default_singularity_tolerance < above);
+}
+
+TEST_CASE("OPW: the solver forwards both fields of its own tolerance to the "
+          "back-check")
+{
+    // The pre-change code passed the position tolerance to both comparisons and
+    // said so in a comment. That spelling is indistinguishable from the correct
+    // one under any symmetric tolerance, so the two fields are driven to zero
+    // one at a time: no norm is below zero, and a solver reusing one field for
+    // both would return every branch from the first probe.
+    auto chain = fixtures::make_kr6_r900_opw_chain<double>();
+    auto params = fixtures::kr6_r900_opw_parameters<double>();
+    Eigen::Vector<double, 6> q_known;
+    q_known << 0.3, -0.4, 0.5, 0.2, -0.3, 0.1;
+    auto target = testing::fk_at(chain, q_known).end_effector;
+
+    auto baseline = opw_6r_solver<decltype(chain)>::make(chain, params);
+    REQUIRE(baseline.has_value());
+    auto all = baseline->solve(target);
+    REQUIRE(all.has_value());
+    REQUIRE(all->count >= 1);
+
+    auto zero_orientation = opw_6r_solver<decltype(chain)>::make(
+        chain, params, verification_tolerance<double>(1e-6, 0.0));
+    REQUIRE(zero_orientation.has_value());
+    CHECK_FALSE(zero_orientation->solve(target).has_value());
+
+    // The mirror. The KR6 wrist axes meet exactly, so the factory's sphericity
+    // gate still admits at a zero position field and the probe reaches solve().
+    auto zero_position = opw_6r_solver<decltype(chain)>::make(
+        chain, params, verification_tolerance<double>(0.0, 1e-6));
+    REQUIRE(zero_position.has_value());
+    CHECK_FALSE(zero_position->solve(target).has_value());
+
+    // Neither zero probe separates the two fields from a swap of them, because
+    // on an exactly-posed target both residuals are round-off. Just off the
+    // wrist-singular locus the fold path splits them by the tool offset: pinning
+    // theta4 injects an orientation error of ~2*delta and, through the 80 mm
+    // offset, a position error of a twelfth of that. Thresholds placed between
+    // the two are met one way round and not the other.
+    Eigen::Vector<double, 6> q_fold;
+    q_fold << 0.3, -0.4, 0.5, 0.2, 1e-4, 0.1;
+    auto fold_target = testing::fk_at(chain, q_fold).end_effector;
+    auto folded = opw_6r_solver<decltype(chain)>::make(
+        chain, params, verification_tolerance<double>(1e-5, 1e-4), 3e-4);
+    REQUIRE(folded.has_value());
+    auto fold_result = folded->solve(fold_target);
+    REQUIRE(fold_result.has_value());
+
+    // Two exact branches plus the two fold branches, whose residuals
+    // (1.60e-06 in position, 2.00e-05 in orientation) clear their own field and
+    // not the other's.
+    CHECK(fold_result->count == 4);
+    int past_position_field = 0;
+    for (int i = 0; i < fold_result->count; ++i)
+    {
+        const auto& sol = fold_result->solutions[static_cast<std::size_t>(i)];
+        auto fk = testing::fk_at(chain, sol);
+        double oe = (fk.end_effector.rotation().inverse()
+            * fold_target.rotation()).log().norm();
+        double pe = (fk.end_effector.translation()
+            - fold_target.translation()).norm();
+        if (oe > 1e-5)
+        {
+            ++past_position_field;
+            CHECK(pe < 1e-5);
+        }
+    }
+    CHECK(past_position_field == 2);
 }

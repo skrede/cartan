@@ -23,10 +23,13 @@ int main()
     auto R3 = R * R2;                        // group composition
     auto R_inv = R.inverse();                // group inverse
     std::cout << "R * R_inv ~ I error: " << (R * R_inv).log().norm() << "\n";
+    std::cout << "R * R2 rotation vector: " << R3.log().transpose() << "\n";
 
     auto Ad_R = R.adjoint();                 // 3x3 adjoint (rotation matrix)
     vec3 v{1.0, 0.0, 0.0};
     std::cout << "Rotated vector: " << R.act(v).transpose() << "\n";
+    std::cout << "Adjoint acts as the rotation does, error: "
+              << (Ad_R * v - R.act(v)).norm() << "\n";
 
     // --- SE(3): 3D rigid body transformations ---
     vec6 twist;

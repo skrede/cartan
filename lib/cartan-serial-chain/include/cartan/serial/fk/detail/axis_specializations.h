@@ -141,6 +141,11 @@ se3<Scalar> exp_joint(Scalar q, const screw_axis<Scalar>& axis)
         vector3<Scalar> t = axis.v() * q;
         return se3<Scalar>(so3<Scalar>::identity(), t);
     }
+    else
+    {
+        static_assert(detail::joint_tag_exhausted_v<JointTag>,
+            "exp_joint has no specialization for this joint tag");
+    }
 }
 
 /// Jacobian column at identity transform (i.e., for joint index 0).
@@ -223,6 +228,11 @@ void jacobian_column(
         matrix3<Scalar> R = T_prev.rotation().matrix();
         col.template head<3>().setZero();
         col.template tail<3>() = R * axis.v();
+    }
+    else
+    {
+        static_assert(detail::joint_tag_exhausted_v<JointTag>,
+            "jacobian_column has no specialization for this joint tag");
     }
 }
 
@@ -360,33 +370,10 @@ inline void exp_joint_matrix(
         R.setIdentity();
         t = axis.v() * q;
     }
-}
-
-/// Runtime dispatch for matrix-form per-joint SE(3) exponential.
-template <typename Scalar>
-inline void exp_joint_matrix_runtime(
-    joint_kind kind,
-    Scalar q,
-    const screw_axis<Scalar>& axis,
-    matrix3<Scalar>& R,
-    vector3<Scalar>& t)
-{
-    switch (kind)
+    else
     {
-        case joint_kind::revolute_x:  exp_joint_matrix<revolute_x>(q, axis, R, t); return;
-        case joint_kind::revolute_y:  exp_joint_matrix<revolute_y>(q, axis, R, t); return;
-        case joint_kind::revolute_z:  exp_joint_matrix<revolute_z>(q, axis, R, t); return;
-        case joint_kind::prismatic_x: exp_joint_matrix<prismatic_x>(q, axis, R, t); return;
-        case joint_kind::prismatic_y: exp_joint_matrix<prismatic_y>(q, axis, R, t); return;
-        case joint_kind::prismatic_z: exp_joint_matrix<prismatic_z>(q, axis, R, t); return;
-        case joint_kind::general:
-        default:
-        {
-            auto se = exp_joint_runtime(kind, q, axis);
-            R = se.rotation().matrix();
-            t = se.translation();
-            return;
-        }
+        static_assert(detail::joint_tag_exhausted_v<JointTag>,
+            "exp_joint_matrix has no specialization for this joint tag");
     }
 }
 

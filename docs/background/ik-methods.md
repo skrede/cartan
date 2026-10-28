@@ -5,16 +5,17 @@ $\theta \in \mathbb{R}^n$ such that the forward kinematics maps to a desired
 end-effector pose $T_d \in SE(3)$. Formally, given the PoE forward kinematics
 $T(\theta) = e^{[\mathcal{S}_1]\theta_1} \cdots e^{[\mathcal{S}_n]\theta_n} M$,
 find $\theta$ satisfying $T(\theta) = T_d$
-[1, Ch. 6, pp. 227--240].
+[1, Ch. 6, p. 217].
 
 Unlike forward kinematics (which has a unique closed-form solution), inverse
 kinematics may have zero, one, or infinitely many solutions, and generally
 requires iterative numerical methods.
 
-Cartan provides three IK steppers: Damped Least Squares (DLS),
-Levenberg-Marquardt (LM), and Sequential Quadratic Programming (SQP). All
-operate on the body-frame error twist and expose a cooperative `step()`
-interface.
+Cartan provides five iterative IK solve policies: Damped Least Squares
+(`dls`), Levenberg-Marquardt (`lm`), projected Levenberg-Marquardt
+(`projected_lm`), Newton-Raphson with an Armijo line search (`newton_raphson`),
+and L-BFGS-B (`lbfgsb`). All operate on the body-frame error twist and expose a
+cooperative `step()` interface.
 
 ## The IK Problem
 
@@ -22,7 +23,7 @@ interface.
 
 Rather than solving $T(\theta) = T_d$ directly, IK is formulated as
 minimizing an error twist. The **body-frame error twist** is
-[1, Eq. 6.6, p. 228]:
+[1, Sec. 6.2.2, p. 228]:
 
 $$
 \xi_b = \log\!\left(T(\theta)^{-1} \, T_d\right) \in \mathbb{R}^6
@@ -44,7 +45,7 @@ $\lVert \xi_v \rVert$ measures position error.
 ### Linearization
 
 For small joint updates $\Delta\theta$, the first-order Taylor expansion of
-the error twist gives [1, Eq. 6.8, p. 230]:
+the error twist gives [1, Eq. 6.4, p. 226]:
 
 $$
 \xi_b \approx J_b(\theta) \, \Delta\theta
@@ -56,7 +57,7 @@ for all Newton-type IK methods.
 ## Newton-Raphson IK
 
 The simplest iterative approach solves the linearized system directly
-[1, Sec. 6.2, p. 228]:
+[1, Eq. 6.6, p. 228]:
 
 $$
 \Delta\theta = J_b^\dagger \, \xi_b
@@ -69,7 +70,7 @@ $\theta \leftarrow \theta + \Delta\theta$.
 **Properties:**
 - **Quadratic convergence** near the solution (when the Jacobian is well-conditioned)
 - **No damping:** Diverges or produces huge joint velocities near singularities
-- **Not used directly in Cartan:** Both DLS and LM add damping to handle singularities
+- **In Cartan:** the `newton_raphson` policy takes this undamped Gauss-Newton step, globalized by a backtracking Armijo line search; `dls` and `lm` add damping instead
 
 ## Damped Least Squares (DLS)
 
@@ -77,13 +78,13 @@ $\theta \leftarrow \theta + \Delta\theta$.
 
 The DLS method replaces the pseudoinverse with a regularized solution.
 Instead of minimizing $\lVert J_b \Delta\theta - \xi_b \rVert^2$, DLS
-minimizes [1, Eq. 6.10, p. 231]:
+minimizes [7, Eq. 3.56, p. 141]:
 
 $$
 \min_{\Delta\theta} \; \lVert J_b \Delta\theta - \xi_b \rVert^2 + \lambda^2 \lVert \Delta\theta \rVert^2
 $$
 
-The closed-form solution is:
+The closed-form solution is [7, Eq. 3.55, p. 141]:
 
 $$
 \Delta\theta = J_b^\top (J_b J_b^\top + \lambda^2 I)^{-1} \xi_b
@@ -192,46 +193,30 @@ builtin_lm<Chain, LimitsPolicy>   // also available as the alias lm<Chain, Limit
 - **Step:** `step(chain, n)` -- advances up to `n` LM iterations with gain ratio evaluation and lambda update, returning a `step_result`
 - **Diagnostic:** `lambda()` -- current damping parameter
 
-## Sequential Quadratic Programming (SQP)
+## Box-Constrained Solvers
 
-### Formulation
-
-SQP formulates IK as a constrained optimization problem:
+When joint limits must hold throughout the iteration rather than be enforced
+after it, IK becomes a bound-constrained problem:
 
 $$
 \min_\theta \; \frac{1}{2} \lVert \xi_b(\theta) \rVert^2 \qquad \text{subject to} \qquad \theta_{\min} \leq \theta \leq \theta_{\max}
 $$
 
-where $\theta_{\min}, \theta_{\max}$ are the joint position limits. At each
-iteration, SQP approximates the original problem as a quadratic program (QP):
+where $\theta_{\min}, \theta_{\max}$ are the joint position limits. Two native
+policies solve it directly:
 
-$$
-\min_{\Delta\theta} \; \frac{1}{2} \Delta\theta^\top H \, \Delta\theta + g^\top \Delta\theta \qquad \text{s.t.} \qquad \theta_{\min} - \theta \leq \Delta\theta \leq \theta_{\max} - \theta
-$$
+- `projected_lm` keeps the iterate inside the joint box by active-set
+  projection within the step, with an optional dogleg trust-region step.
+- `lbfgsb` identifies the active set through the generalized Cauchy point and
+  then minimizes over the free variables [6].
 
-where $H \approx J_b^\top J_b$ (Gauss-Newton Hessian approximation) and
-$g = -J_b^\top \xi_b$ (negative gradient).
-
-### Cartan Implementation
-
-```
-nlopt_slsqp<Chain, LimitsPolicy>   // requires CARTAN_HAS_NLOPT
-```
-
-Cartan wraps NLopt's SLSQP algorithm. Joint limits from the `kinematic_chain`
-are passed as box constraints. The policy runs a configurable budget of NLopt
-evaluations per `step(chain, n)` call, enabling cooperative scheduling with
-other policies in a `basic_ik_runner`. For a dependency-free option that also
-respects joint limits, the native `projected_lm<Chain, LimitsPolicy>` policy
-solves the same box-constrained problem without NLopt.
-
-- **When to use:** When joint limits are critical (surgical robots, constrained workspaces)
-- **Trade-off:** More expensive per iteration than DLS/LM, but respects hard constraints throughout
+`examples/nlopt_policy/` shows how to wrap an external optimizer (NLopt SLSQP
+and BOBYQA) as a solve policy; it is an example, not part of the library.
 
 ## Convergence Criteria
 
 IK convergence is checked via separate angular and linear tolerances on the
-body-frame error twist [1, Sec. 6.2, p. 228]:
+body-frame error twist [1, Sec. 6.2.2, p. 228]:
 
 $$
 \lVert \xi_\omega \rVert < \epsilon_\omega \qquad \text{and} \qquad \lVert \xi_v \rVert < \epsilon_v
@@ -251,9 +236,8 @@ different physical units (radians vs meters) and different magnitudes in
 practice. A combined norm $\lVert \xi_b \rVert < \epsilon$ conflates the two,
 making it difficult to set appropriate tolerances.
 
-Cartan's `default_position_tol_v<Scalar>` constant provides scalar-appropriate
-default tolerances: `double` uses $10^{-6}$, `float` uses $10^{-4}$, reflecting
-the difference in machine precision.
+The tolerance defaults depend on the scalar type: `double` uses $10^{-6}$,
+`float` uses $10^{-4}$, reflecting the difference in machine precision.
 
 ### Termination Conditions
 
@@ -265,7 +249,10 @@ Every solve policy reports status via `ik_status`:
 | `iteration_limit` | Maximum iterations reached |
 | `stalled` | Error not improving (within stall window) |
 | `diverged` | Error exceeds divergence factor times initial error |
-| `joint_limit_hit` | Limits policy rejected the step |
+| `joint_limit_hit` | Converged pose is reachable only outside the joint limits |
+| `aborted` | The caller aborted the solve |
+| `not_initialized`, `dimension_mismatch`, `non_finite_input` | `setup()` was not called, or refused its arguments |
+| `unsupported_configuration` | The selection objective cannot be ranked on this chain |
 
 ## Cartan's Tick-Based Architecture
 
@@ -278,6 +265,7 @@ units are allocated.
 
 Every solver satisfies the `solve_policy` concept:
 
+<!-- cartan:unbuilt kind=sketch reason="the requires-clause parameters are elided, so the concept reads as its shape rather than as its declaration" -->
 ```cpp
 concept solve_policy = requires(S& s, ...) {
     { s.setup(chain, target, q0, criteria) };
@@ -318,7 +306,8 @@ See [Jacobians](jacobians.md) for the body Jacobian used in all IK methods.
 ## Bibliography
 
 [1] K. M. Lynch and F. C. Park, "Modern Robotics: Mechanics, Planning, and
-Control," Cambridge University Press, 2017.
+Control," Cambridge University Press, 2017; pages refer to the 2019 preprint of
+the updated first edition.
 
 [2] Y. Nakamura, "Advanced Robotics: Redundancy and Optimization,"
 Addison-Wesley, 1991.
@@ -333,3 +322,10 @@ pp. 164--168, 1944.
 [5] D. W. Marquardt, "An Algorithm for Least-Squares Estimation of Nonlinear
 Parameters," *Journal of the Society for Industrial and Applied Mathematics*,
 vol. 11, no. 2, pp. 431--441, 1963.
+
+[6] R. H. Byrd, P. Lu, J. Nocedal and C. Zhu, "A Limited Memory Algorithm for
+Bound Constrained Optimization," *SIAM Journal on Scientific Computing*,
+vol. 16, no. 5, pp. 1190--1208, 1995.
+
+[7] B. Siciliano, L. Villani, G. Oriolo, and A. De Luca, "Foundations of
+Robotics," Springer, 2025.

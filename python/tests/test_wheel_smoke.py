@@ -59,7 +59,7 @@ def _ur5e_like_chain() -> cartan.KinematicChain:
 
 
 def test_installed_wheel_exports_core_surface() -> None:
-    assert cartan.__version__.startswith("0.4.2")
+    assert cartan.__version__.startswith("0.4.3")
     for name in (
         "SE3",
         "KinematicChain",
@@ -88,9 +88,12 @@ def test_ur5e_iterative_ik_smoke() -> None:
     q_truth = np.array([0.0, -1.2, 1.4, -0.7, 0.8, 0.2], dtype=np.float64)
     target = cartan.forward_kinematics(chain, q_truth)
     q_seed = q_truth + np.array([0.005, -0.005, 0.003, -0.003, 0.004, -0.004])
+    # A racing tick bills one work unit per still-active policy, so this
+    # two-policy race needs about twice as many units as it needs ticks: it
+    # reaches this tolerance after 499 units.
     config = cartan.IkConfig(
         max_iterations_per_attempt=200,
-        max_total_work_units=400,
+        max_total_work_units=1000,
         position_tol=1e-10,
         orientation_tol=1e-10,
     )

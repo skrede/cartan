@@ -9,12 +9,17 @@
 /// Fixed joints between mobile joints are composed into the world-to-parent
 /// accumulator and naturally fold into the next downstream screw_axis origin;
 /// fixed joints trailing the last mobile joint fold into the home pose M.
-/// Branched trees (more than one outgoing non-fixed joint from any link, or
-/// more than one root) produce urdf_failure::branched_kinematic_tree.
+/// Branched trees (more than one outgoing non-fixed joint from any link, more
+/// than one root, or more than one leaf after the merge) produce
+/// urdf_failure::branched_kinematic_tree. A description whose joints all fold
+/// away produces urdf_failure::no_movable_joint; build_transform is the entry
+/// point that answers it.
 
 #include "cartan/urdf/error.h"
 #include "cartan/urdf/schema.h"
 #include "cartan/urdf/metadata.h"
+
+#include "cartan/urdf/detail/topology.h"
 
 #include "cartan/serial/chain/screw_axis.h"
 #include "cartan/serial/chain/joint_limits.h"
@@ -24,13 +29,13 @@
 
 #include "cartan/types.h"
 
+#include <cmath>
 #include <string>
 #include <vector>
 #include <limits>
 #include <utility>
 #include "cartan/expected.h"
 #include <algorithm>
-#include <unordered_map>
 
 namespace cartan
 {
@@ -38,55 +43,20 @@ namespace cartan
 namespace detail
 {
 
-/// Build the parent-link -> outgoing-joint-indices adjacency over parsed_model.
-/// A link with multiple non-fixed outgoing joints is a branch point; the chain
-/// extractor surfaces that via urdf_failure::branched_kinematic_tree.
+/// What the root-to-leaf walk produces: the base-to-tool transform at zero
+/// joint configuration, one axis and one limit per mobile joint, and the names
+/// the chain itself does not carry. link_inertials stays empty here; it is
+/// read off the model rather than off the walk.
 template <typename Scalar>
-inline std::unordered_map<std::string, std::vector<std::size_t>>
-build_outgoing(const parsed_model<Scalar>& model)
+struct chain_walk
 {
-    std::unordered_map<std::string, std::vector<std::size_t>> out;
-    for (std::size_t i = 0; i < model.joints.size(); ++i)
-    {
-        out[model.joints[i].parent_link].push_back(i);
-    }
-    return out;
-}
+    se3<Scalar> transform;
+    std::vector<screw_axis<Scalar>> axes;
+    std::vector<joint_limits<Scalar>> limits;
+    urdf_metadata<Scalar> meta;
+};
 
-/// Build the child-link -> parent-joint-index reverse map. Used to identify
-/// root links (those with no incoming joint).
-template <typename Scalar>
-inline std::unordered_map<std::string, std::size_t>
-build_incoming(const parsed_model<Scalar>& model)
-{
-    std::unordered_map<std::string, std::size_t> in;
-    for (std::size_t i = 0; i < model.joints.size(); ++i)
-    {
-        in.emplace(model.joints[i].child_link, i);
-    }
-    return in;
-}
-
-/// Identify the root links (no incoming joint) in source order.
-template <typename Scalar>
-inline std::vector<std::string>
-collect_roots(const parsed_model<Scalar>& model,
-              const std::unordered_map<std::string, std::size_t>& incoming)
-{
-    std::vector<std::string> roots;
-    for (const auto& link : model.links)
-    {
-        if (!incoming.contains(link.name))
-        {
-            roots.push_back(link.name);
-        }
-    }
-    return roots;
-}
-
-}
-
-/// Build a strictly-serial kinematic_chain from a parsed_model.
+/// Walk a parsed_model from root to leaf.
 ///
 /// Auto-detect path (opts.base_link and opts.tool_link both empty): the
 /// extractor walks from the unique root link along the unique chain of
@@ -100,9 +70,9 @@ collect_roots(const parsed_model<Scalar>& model,
 /// urdf_failure::link_not_found. When base_link is set, the walk starts at
 /// that link instead of the auto-detected root; when tool_link is set, the
 /// walk stops once it reaches that link.
-template <typename Scalar = double>
-cartan::expected<urdf_load_result<Scalar>, urdf_error>
-build_chain(const parsed_model<Scalar>& model, const load_options& opts = {})
+template <typename Scalar>
+cartan::expected<chain_walk<Scalar>, urdf_error>
+walk_model(const parsed_model<Scalar>& model, const load_options& opts)
 {
     // Validate overrides against the link set up front so the caller gets the
     // most specific error rather than a downstream branched_kinematic_tree.
@@ -125,9 +95,9 @@ build_chain(const parsed_model<Scalar>& model, const load_options& opts = {})
             .location = std::nullopt});
     }
 
-    const auto outgoing = detail::build_outgoing(model);
-    const auto incoming = detail::build_incoming(model);
-    const auto roots = detail::collect_roots(model, incoming);
+    const auto outgoing = build_outgoing(model);
+    const auto incoming = build_incoming(model);
+    const auto roots = collect_roots(model, incoming);
 
     std::string current;
     if (!opts.base_link.empty())
@@ -140,17 +110,7 @@ build_chain(const parsed_model<Scalar>& model, const load_options& opts = {})
     }
     else
     {
-        std::string detail_msg = "branched tree; roots: [";
-        for (std::size_t i = 0; i < roots.size(); ++i)
-        {
-            if (i > 0) { detail_msg += ", "; }
-            detail_msg += roots[i];
-        }
-        detail_msg += "]";
-        return cartan::unexpected(urdf_error{
-            .kind = urdf_failure::branched_kinematic_tree,
-            .detail = std::move(detail_msg),
-            .location = std::nullopt});
+        return cartan::unexpected(branched_failure("roots", roots));
     }
 
     // Walk root -> leaf accumulating screw axes and the world-to-current-link
@@ -248,10 +208,10 @@ build_chain(const parsed_model<Scalar>& model, const load_options& opts = {})
             // self-collision wrappers and "other" leaves and fold an unique
             // "other" leaf as the trailing tool offset (the Franka Panda
             // attaches up to seven `_sc` wrappers alongside the actual
-            // `panda_joint8` tool offset at link7). A genuine ambiguity (zero
-            // or several non-wrapper leaves) terminates the walk at the
-            // current link without folding any of them, leaving the caller's
-            // explicit `tool_link` override as the disambiguation path.
+            // `panda_joint8` tool offset at link7). Several non-wrapper leaves
+            // are more than one leaf after the merge, which is the branched
+            // case; only wrappers means the walk has reached the end of the
+            // chain and there is nothing left to fold.
             if (outs.size() == 1)
             {
                 const auto& fixed_joint = model.joints[outs[0]];
@@ -259,20 +219,25 @@ build_chain(const parsed_model<Scalar>& model, const load_options& opts = {})
                 current = fixed_joint.child_link;
                 continue;
             }
-            std::size_t other_leaf_count = 0;
+            std::vector<std::string> leaves;
             std::size_t other_leaf_idx = outs.size();
             for (std::size_t idx : outs)
             {
                 if (is_self_collision_wrapper_leaf(idx, current)) { continue; }
-                ++other_leaf_count;
+                leaves.push_back(model.joints[idx].child_link);
                 other_leaf_idx = idx;
             }
-            if (other_leaf_count == 1)
+            if (leaves.size() == 1)
             {
                 const auto& fixed_joint = model.joints[other_leaf_idx];
                 T_acc = T_acc * fixed_joint.origin;
                 current = fixed_joint.child_link;
                 continue;
+            }
+            if (leaves.size() > 1)
+            {
+                return cartan::unexpected(branched_failure(
+                    "multiple fixed leaves at link '" + current + "'", leaves));
             }
             break;
         }
@@ -280,21 +245,14 @@ build_chain(const parsed_model<Scalar>& model, const load_options& opts = {})
         {
             // Genuine branching: more than one outgoing joint leads to a
             // sub-tree that needs further traversal.
-            std::string detail_msg = "branched tree; multiple chain-continuing"
-                " branches at link '" + current + "': [";
-            bool first = true;
+            std::vector<std::string> branches;
             for (std::size_t idx : outs)
             {
                 if (is_leaf_outgoing(idx)) { continue; }
-                if (!first) { detail_msg += ", "; }
-                detail_msg += model.joints[idx].child_link;
-                first = false;
+                branches.push_back(model.joints[idx].child_link);
             }
-            detail_msg += "]";
-            return cartan::unexpected(urdf_error{
-                .kind = urdf_failure::branched_kinematic_tree,
-                .detail = std::move(detail_msg),
-                .location = std::nullopt});
+            return cartan::unexpected(branched_failure(
+                "multiple chain-continuing branches at link '" + current + "'", branches));
         }
 
         if (model.joints[chosen].kind == parsed_joint_kind::fixed)
@@ -313,13 +271,30 @@ build_chain(const parsed_model<Scalar>& model, const load_options& opts = {})
         // R(T_acc * j.origin).act(axis). The point on the axis (origin of the
         // joint frame in world coords) is (T_acc * j.origin).translation().
         se3<Scalar> T_acc_after_joint = T_acc * j.origin;
-        // A zero-magnitude axis normalizes to NaN and would silently poison the
-        // kinematics; reject it before normalization.
-        if (!(j.axis.norm() > Scalar(0)))
+        // Eigen's normalized() is `squaredNorm() > 0 ? v / sqrt(squaredNorm())
+        // : v`, so it has two ways of returning something that is not a unit
+        // axis, and both leave a joint contributing identity to the kinematics
+        // forever. A zero axis takes the else branch and comes back unchanged.
+        // A magnitude whose *square* overflows the scalar type takes the
+        // division branch against an infinite norm and comes back as the zero
+        // vector -- and the squaring is what overflows, so a magnitude well
+        // inside the type's range (1e30 in float, 1e200 in double) is enough.
+        // Neither is caught downstream: the result is finite either way. Both
+        // are refused here, before normalization.
+        const Scalar axis_sq = j.axis.squaredNorm();
+        if (!(axis_sq > Scalar(0)))
         {
             return cartan::unexpected(urdf_error{
                 .kind = urdf_failure::zero_axis,
                 .detail = "joint '" + j.name + "' has a zero-magnitude <axis>",
+                .location = std::nullopt});
+        }
+        if (!std::isfinite(axis_sq))
+        {
+            return cartan::unexpected(urdf_error{
+                .kind = urdf_failure::non_finite_value,
+                .detail = "joint '" + j.name
+                    + "' has an <axis> whose squared magnitude overflows the chain's scalar type",
                 .location = std::nullopt});
         }
         const vector3<Scalar> axis_world =
@@ -335,13 +310,9 @@ build_chain(const parsed_model<Scalar>& model, const load_options& opts = {})
             axes.push_back(screw_axis<Scalar>::revolute(axis_world, point_world));
         }
 
-        joint_limits<Scalar> jl{};
-        if (j.kind == parsed_joint_kind::continuous)
-        {
-            jl.position_min = -std::numeric_limits<Scalar>::infinity();
-            jl.position_max = +std::numeric_limits<Scalar>::infinity();
-        }
-        else
+        Scalar lower = -std::numeric_limits<Scalar>::infinity();
+        Scalar upper = +std::numeric_limits<Scalar>::infinity();
+        if (j.kind != parsed_joint_kind::continuous)
         {
             // Revolute and prismatic joints are bounded; a missing <limit
             // lower upper> is malformed (freezing it to [0,0] would silently
@@ -357,12 +328,19 @@ build_chain(const parsed_model<Scalar>& model, const load_options& opts = {})
                         + " but omits the required <limit lower upper>",
                     .location = std::nullopt});
             }
-            jl.position_min = *j.position_min;
-            jl.position_max = *j.position_max;
+            lower = *j.position_min;
+            upper = *j.position_max;
         }
-        jl.velocity_max = j.velocity_max;
-        jl.effort_max = j.effort_max;
-        limits.push_back(jl);
+        auto jl = joint_limits<Scalar>::make(lower, upper, j.velocity_max, j.effort_max);
+        if (!jl.has_value())
+        {
+            return cartan::unexpected(urdf_error{
+                .kind = urdf_failure::invalid_joint_limit,
+                .detail = "joint '" + j.name + "' has an unusable <limit>: "
+                    + message(jl.error()),
+                .location = std::nullopt});
+        }
+        limits.push_back(*jl);
 
         joint_names.push_back(j.name);
         velocity_max.push_back(j.velocity_max);
@@ -384,21 +362,43 @@ build_chain(const parsed_model<Scalar>& model, const load_options& opts = {})
             .location = std::nullopt});
     }
 
-    // Populate metadata. base_link_name and tool_link_name reflect the walk's
-    // endpoints (which echo the override values when supplied).
-    urdf_metadata<Scalar> meta{};
-    if (!opts.base_link.empty())
+    // base_link_name and tool_link_name reflect the walk's endpoints, which
+    // echo the override values when those were supplied.
+    chain_walk<Scalar> walked{std::move(T_acc), std::move(axes), std::move(limits),
+                              urdf_metadata<Scalar>{}};
+    walked.meta.base_link_name = opts.base_link.empty() ? roots[0] : opts.base_link;
+    walked.meta.tool_link_name = std::move(current);
+    walked.meta.joint_names = std::move(joint_names);
+    walked.meta.velocity_max = std::move(velocity_max);
+    walked.meta.effort_max = std::move(effort_max);
+    return walked;
+}
+
+}
+
+/// Build a strictly-serial kinematic_chain from a parsed_model.
+///
+/// Every refusal the walk makes is a refusal here. On top of them, a
+/// description the walk folds away entirely is refused rather than handed back
+/// as a chain with no joints, and build_transform is the route that answers it.
+template <typename Scalar = double>
+cartan::expected<urdf_load_result<Scalar>, urdf_error>
+build_chain(const parsed_model<Scalar>& model, const load_options& opts = {})
+{
+    auto walked = detail::walk_model<Scalar>(model, opts);
+    if (!walked)
     {
-        meta.base_link_name = opts.base_link;
+        return cartan::unexpected(walked.error());
     }
-    else
+    if (walked->axes.empty())
     {
-        meta.base_link_name = roots[0];
+        return cartan::unexpected(urdf_error{
+            .kind = urdf_failure::no_movable_joint,
+            .detail = "description '" + model.robot_name + "' has no joint that moves, so it "
+                "poses no inverse-kinematics problem; load_urdf_transform answers its "
+                "base-to-tool transform",
+            .location = std::nullopt});
     }
-    meta.tool_link_name = current;
-    meta.joint_names = std::move(joint_names);
-    meta.velocity_max = std::move(velocity_max);
-    meta.effort_max = std::move(effort_max);
 
     for (const auto& link : model.links)
     {
@@ -408,13 +408,31 @@ build_chain(const parsed_model<Scalar>& model, const load_options& opts = {})
         li.mass = link.inertial->mass;
         li.com = link.inertial->com;
         li.inertia = link.inertial->inertia;
-        meta.link_inertials.push_back(std::move(li));
+        walked->meta.link_inertials.push_back(std::move(li));
     }
 
     urdf_load_result<Scalar> result{
-        kinematic_chain<Scalar, dynamic>(T_acc, std::move(axes), std::move(limits)),
-        std::move(meta)};
+        kinematic_chain<Scalar, dynamic>(std::move(walked->transform), std::move(walked->axes),
+                                         std::move(walked->limits)),
+        std::move(walked->meta)};
     return result;
+}
+
+/// Fold a parsed_model down to the rigid transform from its base link to its
+/// tool link, the same transform the walk hands the chain constructor as the
+/// home pose. It is defined for the shape build_chain walks -- one root, one
+/// leaf after the fixed-joint merge -- and a description that branches is
+/// refused rather than answered. No intermediate link's pose is reported.
+template <typename Scalar = double>
+cartan::expected<se3<Scalar>, urdf_error>
+build_transform(const parsed_model<Scalar>& model, const load_options& opts = {})
+{
+    auto walked = detail::walk_model<Scalar>(model, opts);
+    if (!walked)
+    {
+        return cartan::unexpected(walked.error());
+    }
+    return walked->transform;
 }
 
 }

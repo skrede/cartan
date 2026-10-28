@@ -1,0 +1,13 @@
+table,robot,limits_provenance,stratum,solver,budget_index,budget_requested,budget_axis,budget_value,target_id,seed_id,self_reported,accepted,pose_ok,limits_ok,pos_err_m,ori_err_rad,worst_limit_violation_rad,fk_evals,jac_evals,iterations,solver_tolerance,wall_ns,accuracy_target,accuracy_target_met
+c,irb120,description,reachable,cartan_lm,5,2187,kernel_evaluations,24,0,0,1,1,1,1,1.0326852654e-06,1.32e-07,0,16,8,7,1e-05,16000,,
+c,irb120,description,reachable,pinocchio_lm,5,2187,kernel_evaluations,13,0,0,1,1,1,1,1.0326852654e-06,1.32e-07,0,13,13,6,1e-05,17000,,
+c,irb120,description,reachable,cartan_lm,5,2187,kernel_evaluations,24,1,1,1,1,1,1,1.0326852654e-06,1.32e-07,0,16,8,7,1e-05,16000,,
+c,irb120,description,reachable,pinocchio_lm,5,2187,kernel_evaluations,13,1,1,1,1,1,1,1.0326852654e-06,1.32e-07,0,13,13,6,1e-05,17000,,
+c,irb120,description,reachable,cartan_lm,5,2187,kernel_evaluations,24,2,2,1,1,1,1,1.0326852654e-06,1.32e-07,0,16,8,7,1e-05,16000,,
+c,irb120,description,reachable,pinocchio_lm,5,2187,kernel_evaluations,13,2,2,1,1,1,1,1.0326852654e-06,1.32e-07,0,13,13,6,1e-05,17000,,
+c,irb120,description,reachable,cartan_lm,5,2187,kernel_evaluations,24,3,3,0,0,0,1,1.0326852654e-06,1.32e-07,0,16,8,7,1e-05,16000,,
+c,irb120,description,reachable,pinocchio_lm,5,2187,kernel_evaluations,13,3,3,0,0,0,1,1.0326852654e-06,1.32e-07,0,13,13,6,1e-05,17000,,
+c,irb120,description,reachable,cartan_lm,5,2187,kernel_evaluations,24,9,9,1,0,0,0,1.0326852654e-06,1.32e-07,0.31,16,8,7,1e-05,16000,,
+c,irb120,description,reachable,pinocchio_lm,5,2187,kernel_evaluations,13,9,9,1,0,0,0,1.0326852654e-06,1.32e-07,0.31,13,13,6,1e-05,17000,,
+c,irb120,description,reachable,cartan_lm,5,2187,kernel_evaluations,24,10,10,0,1,1,1,1.0326852654e-06,1.32e-07,0,16,8,7,1e-05,16000,,
+c,irb120,description,reachable,pinocchio_lm,5,2187,kernel_evaluations,13,10,10,0,1,1,1,1.0326852654e-06,1.32e-07,0,13,13,6,1e-05,17000,,

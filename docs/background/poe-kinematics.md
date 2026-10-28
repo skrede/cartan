@@ -5,13 +5,13 @@ approach to forward kinematics based on screw theory. Unlike the
 Denavit-Hartenberg (D-H) convention, the PoE formula requires no link reference
 frames -- only a fixed space frame $\{s\}$, an end-effector body frame $\{b\}$,
 and the screw axes of each joint expressed in the space frame
-[1, Ch. 4, pp. 135--168].
+[1, Ch. 4, pp. 135--172].
 
 Cartan uses the PoE formulation exclusively. The advantages over D-H parameters
 include: no frame-attachment ambiguity (different D-H conventions lead to
 different parameters for the same robot), uniform treatment of revolute and
 prismatic joints, and global coordinates that compose naturally with Lie group
-operations [1, Sec. 4.5, pp. 158].
+operations [1, Sec. 4.5, p. 158].
 
 ## Screw Motions
 
@@ -55,7 +55,7 @@ translation direction.
 ### The Screw Axis as an se(3) Element
 
 The $4 \times 4$ matrix representation of a screw axis is
-[1, Eq. 3.63, p. 101]:
+[1, Eq. 3.85, p. 102]:
 
 $$
 [\mathcal{S}] = \begin{bmatrix} [\omega]_\times & v \\ 0 & 0 \end{bmatrix} \in se(3)
@@ -211,9 +211,9 @@ The PoE concepts map directly to Cartan's API:
 |---------|-----------|
 | Screw axis $\mathcal{S}$ (revolute) | `screw_axis::revolute(omega, point)` |
 | Screw axis $\mathcal{S}$ (prismatic) | `screw_axis::prismatic(direction)` |
-| Screw axis from 6-vector | `screw_axis::from_vector(vec)` |
+| Screw axis from 6-vector | `screw_axis::from_vector(vec)` — returns `expected`; refuses non-finite or non-unit input |
 | Kinematic chain $(M, \mathcal{S}_1 \ldots \mathcal{S}_n)$ | `kinematic_chain(home, axes, limits)` |
-| Forward kinematics $T(\theta)$ | `forward_kinematics(chain, q)` |
+| Forward kinematics $T(\theta)$ | `forward_kinematics(chain, q)` — returns `expected` |
 | Intermediate products $T_i$ | `fk_result::intermediates` |
 | End-effector pose | `fk_result::end_effector` |
 
@@ -229,7 +229,8 @@ See [SE(3) Theory](se3.md) for the underlying Lie group operations.
 ## Bibliography
 
 [1] K. M. Lynch and F. C. Park, "Modern Robotics: Mechanics, Planning, and
-Control," Cambridge University Press, 2017.
+Control," Cambridge University Press, 2017; pages refer to the 2019 preprint of
+the updated first edition.
 
 [2] R. M. Murray, Z. Li, and S. S. Sastry, "A Mathematical Introduction to
 Robotic Manipulation," CRC Press, 1994.

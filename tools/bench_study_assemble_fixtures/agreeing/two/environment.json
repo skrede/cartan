@@ -1,0 +1,17 @@
+{
+  "compiler": "GNU 16.1.1",
+  "standard_library": "libstdc++ 16",
+  "eigen": "3.4.0",
+  "kernel": "6.18.41",
+  "cpu_model": "AMD Ryzen 7 5800X3D",
+  "governor": "performance",
+  "frequency_boost": "0",
+  "simultaneous_multithreading": "off",
+  "configure_command": "cmake --preset bench",
+  "dependencies": [],
+  "descriptions": [],
+  "declared_participants": [],
+  "absent_participants": [],
+  "unread_machine_values": {},
+  "run_command": "ik_study_capture --robot franka_panda"
+}

@@ -9,7 +9,6 @@
 /// the same compile-time specializations used by static_chain.
 
 #include "cartan/types.h"
-#include "cartan/detail/epsilon.h"
 
 #include "cartan/serial/chain/screw_axis.h"
 
@@ -34,20 +33,79 @@ enum class joint_kind : std::uint8_t
     prismatic_z,
 };
 
+namespace detail
+{
+
+/// Per-component deviation an axis may carry and still be snapped onto a
+/// principal axis.
+///
+/// Absolute, dimensionless and independent of Scalar by intent. A threshold
+/// derived from machine precision makes the same code safe in double and
+/// unsafe in float, where sqrt(epsilon) is 3.45e-4 -- a misalignment of about
+/// a hundredth of a degree, silently discarded. The compared quantity is an
+/// unsquared per-component deviation in the axis components' own units, which
+/// for a near-principal unit axis is the misalignment angle in radians to
+/// first order, so the value below is read directly as an angle.
+///
+/// It sits 2.44x above the largest deviation the fixture set requires to be
+/// snapped -- 4.102071e-10, which classifies the same way in both scalars,
+/// though the stored values differ in their low bits -- and 3.0e5 times below
+/// the smallest deviation that must not be. The error a snap induces was
+/// measured over 400 random configurations on three description-derived chains
+/// (6R/0.50 m, 7R/0.85 m, 7R/1.30 m):
+///
+///     |dp| <= 1.4 * n * L * delta      |dtheta| <= 1.7 * n * delta
+///
+/// with n the joint count, L the maximum moment arm and delta this tolerance;
+/// the analytic worst case is sqrt(2)*pi, about 4.44. On the largest of those
+/// chains the value below licenses about 13 nm of end-effector error, an angle
+/// no robot axis can be specified to.
+///
+/// One surprising property, because it will bite whoever relaxes the unit
+/// assumption: below about 6e-8 the unit test is exact in single precision. The
+/// binding gap is the one below one, where the neighbouring float is 5.96e-8
+/// away (above one it is 1.19e-7), so no representable value can satisfy the
+/// test except one exactly. That is harmless only while every axis reaching
+/// here is normalized, which makes the on-axis component exactly one; the
+/// off-axis test keeps real tolerance either way.
+///
+/// Both margins are properties of the fixture set and of the description
+/// parser's arithmetic, so re-measure them if either changes and lock the
+/// result here; the two-sided target in
+/// tests/boundary/axis_classification_test.cpp pins the margins but does not
+/// re-derive the induced-error law.
+template <typename Scalar>
+inline constexpr Scalar k_axis_snap_tolerance_v = Scalar(1e-9);
+
+}
+
 /// Detect the joint_kind of a screw axis.
 ///
-/// Recognizes axes whose omega (revolute) or v (prismatic) is exactly ±e_x,
-/// ±e_y, or ±e_z within sqrt-epsilon. A ±e_k axis and its negation map to the
-/// same joint_kind; the downstream specializations recover the sign from the
-/// axis itself -- the signed component for revolute joints, and the signed
-/// screw_axis::v() direction for prismatic joints.
-/// All other axes return joint_kind::general.
+/// Recognizes axes whose omega (revolute) or v (prismatic) is +/-e_x, +/-e_y
+/// or +/-e_z to within the axis-snap tolerance. A +/-e_k axis and its negation
+/// map to the same joint_kind; the downstream specializations recover the sign
+/// from the axis itself -- the signed component for revolute joints, and the
+/// signed screw_axis::v() direction for prismatic joints. All other axes return
+/// joint_kind::general.
+///
+/// This is not a finiteness gate and must not be used as one. Only the
+/// component the branch tests is examined: a nonfinite omega classifies as
+/// general because no comparison against a NaN holds, but a revolute axis with
+/// an exactly principal omega and a nonfinite v is reported as that principal
+/// kind. static_chain::make and the kinematic_chain constructor test the whole
+/// six-vector; this function answers a different question.
 template <typename Scalar>
 inline joint_kind detect_joint_kind(const screw_axis<Scalar>& axis)
 {
-    const Scalar tol = detail::sqrt_epsilon_v<Scalar>;
-    auto is_unit = [tol](Scalar x) { return std::abs(std::abs(x) - Scalar(1)) < tol; };
-    auto is_zero = [tol](Scalar x) { return std::abs(x) < tol; };
+    auto is_unit = [](Scalar x)
+    {
+        return std::abs(std::abs(x) - Scalar(1))
+               < detail::k_axis_snap_tolerance_v<Scalar>;
+    };
+    auto is_zero = [](Scalar x)
+    {
+        return std::abs(x) < detail::k_axis_snap_tolerance_v<Scalar>;
+    };
 
     const auto& w = axis.omega();
 

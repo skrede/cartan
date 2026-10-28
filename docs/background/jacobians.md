@@ -2,10 +2,10 @@
 
 The **Jacobian** of a serial manipulator maps joint velocities
 $\dot{\theta} \in \mathbb{R}^n$ to the end-effector twist
-$\mathcal{V} \in \mathbb{R}^6$. Unlike the classical geometric Jacobian, the
+$\mathcal{V} \in \mathbb{R}^6$. Unlike the classical geometric Jacobian [3, Sec. 3.2, pp. 120--130], the
 Jacobian defined through the Product of Exponentials relates joint velocities
 to a spatial twist -- a 6-vector combining angular and linear velocity in a
-single reference frame [1, Ch. 5, pp. 169--194].
+single reference frame [1, Ch. 5, pp. 173--216].
 
 This page derives the space and body Jacobians column-by-column, discusses
 singularities and manipulability, and maps the theory to Cartan's implementation.
@@ -74,7 +74,7 @@ preceding joints.
 ### The Adjoint Representation
 
 For $T = \begin{bmatrix} R & p \\ 0 & 1 \end{bmatrix} \in SE(3)$, the
-$6 \times 6$ adjoint matrix is [1, Eq. 3.83, p. 107]:
+$6 \times 6$ adjoint matrix is [1, Def. 3.20, p. 98]:
 
 $$
 \text{Ad}_T = \begin{bmatrix} R & 0 \\ [p]_\times R & R \end{bmatrix}
@@ -89,7 +89,7 @@ $\text{Ad}_T \mathcal{V} = (R\omega, \; [p]_\times R\omega + Rv)$.
 
 The **body Jacobian** $J_b(\theta) \in \mathbb{R}^{6 \times n}$ maps joint
 velocities to the end-effector twist expressed in the body frame $\{b\}$
-[1, Eq. 5.22, p. 185]:
+[1, Eq. 5.17, p. 183]:
 
 $$
 \mathcal{V}_b = J_b(\theta) \, \dot{\theta}
@@ -104,9 +104,9 @@ $$
 J_b(\theta) = \text{Ad}_{T^{-1}(\theta)} \, J_s(\theta)
 $$
 
-where $T(\theta)$ is the end-effector pose from the PoE. This requires only
-one $6 \times 6$ matrix multiply applied to the entire $6 \times n$ space
-Jacobian -- a constant-cost transformation regardless of the number of joints.
+where $T(\theta)$ is the end-effector pose from the PoE. This requires one
+$6 \times 6$ adjoint, formed once and applied to the $6 \times n$ space
+Jacobian; the cost grows linearly in $n$.
 
 **Derivation.** The spatial and body twists are related by
 $\mathcal{V}_b = \text{Ad}_{T^{-1}} \mathcal{V}_s$. Substituting
@@ -128,7 +128,7 @@ $\mathcal{V}_b = \text{Ad}_{T^{-1}} J_s \dot{\theta} = J_b \dot{\theta}$.
 A configuration $\theta$ is **singular** when the Jacobian $J(\theta)$ loses
 rank. At a singularity, certain end-effector velocities become unachievable --
 the manipulator loses one or more degrees of freedom in task space
-[1, Sec. 5.3, pp. 186--190].
+[1, Sec. 5.3, pp. 189--193].
 
 ### Formal Definition
 
@@ -156,7 +156,7 @@ At a singularity:
 ### Manipulability
 
 The **manipulability measure** $\mu(\theta)$ quantifies how far a configuration
-is from singularity [1, Sec. 5.3, p. 186]:
+is from singularity [1, Sec. 5.4, p. 197]:
 
 $$
 \mu(\theta) = \sqrt{\det(J(\theta) \, J(\theta)^\top)}
@@ -172,11 +172,12 @@ Cartan computes the space Jacobian column-by-column using the cached
 intermediate products from `fk_result`. This avoids redundant matrix
 exponential computations:
 
-1. The forward kinematics `forward_kinematics(chain, q)` stores all
+1. The forward kinematics `forward_kinematics(chain, q)` returns an `expected`
+   whose value stores all
    intermediate products $T_i = e^{[\mathcal{S}_1]\theta_1} \cdots e^{[\mathcal{S}_i]\theta_i}$
    in `fk_result::intermediates`.
 
-2. `space_jacobian(chain, fk)` computes each column as:
+2. `space_jacobian(chain, fk)`, taking that value, computes each column as:
    - Column 0: $\mathcal{S}_1$ (no adjoint needed)
    - Column $i > 0$: $\text{Ad}_{T_{i-1}} \mathcal{S}_i$ using the cached
      `fk.intermediates[i-1]`
@@ -193,14 +194,32 @@ used. Both paths produce identical results.
 
 | Concept | Cartan API |
 |---------|-----------|
-| Space Jacobian $J_s(\theta)$ | `space_jacobian(chain, fk)` |
-| Body Jacobian $J_b(\theta)$ | `body_jacobian(chain, fk)` |
-| Spatial twist $\mathcal{V}_s = J_s \dot{\theta}$ | `end_effector_velocity(chain, q, dq)` |
+| Space Jacobian $J_s(\theta)$ | `space_jacobian(chain, fk)` — returns `expected` |
+| Body Jacobian $J_b(\theta)$ | `body_jacobian(chain, fk)` — returns `expected` |
+| Spatial twist $\mathcal{V}_s = J_s \dot{\theta}$ | `end_effector_velocity(chain, q, dq)` — returns `expected` |
 | Jacobian matrix type | `jacobian_matrix<Scalar, N>` |
 | Cached intermediates for Jacobian | `fk_result::intermediates` |
 
+Both Jacobian entry points reject an `fk_result` whose joint count does not
+match the chain's, and `space_jacobian_unchecked` / `body_jacobian_unchecked`
+are the same computations without that check. The rejection only ever fires for
+a chain whose joint count is *not* in its type: an `fk_result` for a fixed-size
+chain carries that count in its own type, so a mismatched one is ill-formed
+rather than rejected, and the predicate folds away at those overloads. Note also
+that matching joint counts are not provenance — a result of the right length
+computed from a different chain is accepted.
+
 The `end_effector_velocity` function is a convenience that computes FK and the
-space Jacobian internally, returning the 6-vector spatial twist directly.
+space Jacobian internally, returning the 6-vector spatial twist wrapped in
+`cartan::expected` — it rejects a joint vector of the wrong length or holding a
+nonfinite component. `end_effector_velocity_unchecked` is the same computation
+without the checks, for a caller that has already established both.
+
+The `_unchecked` suffix is the library's mark for a structural precondition
+between arguments, and it is deliberately a different word from the `trusted`
+vocabulary used for a single value's mathematical invariant. See
+[Why two words](../api/kinematics.md#why-two-words-unchecked-and-trusted) for
+the rule.
 
 See [API Reference](../api/kinematics.md) for full function signatures.
 See [PoE Kinematics](poe-kinematics.md) for the underlying forward kinematics.
@@ -208,10 +227,11 @@ See [PoE Kinematics](poe-kinematics.md) for the underlying forward kinematics.
 ## Bibliography
 
 [1] K. M. Lynch and F. C. Park, "Modern Robotics: Mechanics, Planning, and
-Control," Cambridge University Press, 2017.
+Control," Cambridge University Press, 2017; pages refer to the 2019 preprint of
+the updated first edition.
 
 [2] T. Yoshikawa, "Manipulability of Robotic Mechanisms," *International
 Journal of Robotics Research*, vol. 4, no. 2, pp. 3--9, 1985.
 
-[3] B. Siciliano, L. Sciavicco, L. Villani, and G. Oriolo, "Robotics:
-Modelling, Planning and Control," 2nd ed., Springer, 2009.
+[3] B. Siciliano, L. Villani, G. Oriolo, and A. De Luca, "Foundations of
+Robotics," Springer, 2025.

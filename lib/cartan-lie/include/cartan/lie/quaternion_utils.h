@@ -7,7 +7,7 @@
 /// to_wxyz provide explicit serialization order (w-first external API).
 ///
 /// Reference: Eigen quaternion documentation; Barfoot, State Estimation
-///            for Robotics, Section 8.1, p. 280-282.
+///            for Robotics, Sec. 7.2.3, pp. 242-248.
 
 #include "cartan/types.h"
 
@@ -40,7 +40,7 @@ quaternion<Scalar> quat_normalize(const quaternion<Scalar>& q)
 
 /// Convert unit quaternion to 3x3 rotation matrix.
 /// Delegates to Eigen's toRotationMatrix().
-/// Reference: Barfoot, State Estimation for Robotics, Eq. 8.3, p. 281.
+/// Reference: Barfoot, State Estimation for Robotics, Eq. 7.15, p. 245 (transposed: Barfoot's form is passive).
 template <typename Scalar>
 matrix3<Scalar> quat_to_matrix(const quaternion<Scalar>& q)
 {
@@ -49,7 +49,7 @@ matrix3<Scalar> quat_to_matrix(const quaternion<Scalar>& q)
 
 /// Convert 3x3 rotation matrix to quaternion.
 /// Delegates to Eigen's quaternion constructor from rotation matrix.
-/// Reference: Barfoot, State Estimation for Robotics, Eq. 8.3 (inverse).
+/// Reference: inverse of Barfoot, State Estimation for Robotics, Eq. 7.15, p. 245.
 template <typename Scalar>
 quaternion<Scalar> matrix_to_quat(const matrix3<Scalar>& R)
 {
@@ -57,9 +57,8 @@ quaternion<Scalar> matrix_to_quat(const matrix3<Scalar>& R)
 }
 
 /// Named quaternion constructor: w-first order (w, x, y, z).
-/// This matches the ctrlpp external API convention.
 /// Eigen's quaternion constructor is also w-first: Quaternion(w, x, y, z).
-/// Reference: Hamilton convention; Barfoot, Section 8.1.
+/// Reference: Hamilton convention.
 template <typename Scalar>
 quaternion<Scalar> from_wxyz(Scalar w, Scalar x, Scalar y, Scalar z)
 {
@@ -76,7 +75,7 @@ quaternion<Scalar> from_xyzw(Scalar x, Scalar y, Scalar z, Scalar w)
     return quaternion<Scalar>(w, x, y, z);
 }
 
-/// Serialize quaternion to [w, x, y, z] 4-vector per ctrlpp convention.
+/// Serialize quaternion to [w, x, y, z] 4-vector.
 /// Reference: Hamilton convention output format.
 template <typename Scalar>
 vector<Scalar, 4> to_wxyz(const quaternion<Scalar>& q)
@@ -88,7 +87,7 @@ vector<Scalar, 4> to_wxyz(const quaternion<Scalar>& q)
 
 /// Hamilton quaternion product: q1 * q2.
 /// Delegates to Eigen's operator* which uses Hamilton convention.
-/// Reference: Hamilton, "On quaternions" (1843); Barfoot, Eq. 8.6, p. 282.
+/// Reference: Hamilton, "On quaternions" (1843); Barfoot, State Estimation for Robotics, Eq. 7.17, p. 245.
 template <typename Scalar>
 quaternion<Scalar> quat_hamilton_product(
     const quaternion<Scalar>& q1,

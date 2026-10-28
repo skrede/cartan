@@ -30,6 +30,8 @@
 #include <random>
 #include <vector>
 #include <limits>
+#include <cstdio>
+#include <cstdlib>
 #include "cartan/expected.h"
 #include <algorithm>
 
@@ -72,14 +74,31 @@ auto compute_bounding_box(
         std::numeric_limits<Scalar>::infinity());
     bb.tmax = -bb.tmin;
 
+    int refused = 0;
     std::mt19937 rng(seed);
     for (int i = 0; i < sample_count; ++i)
     {
         auto q = random_joint_config(chain, rng);
         auto fk = cartan::forward_kinematics(chain, q);
-        auto t = fk.end_effector.translation();
+        if (!fk)
+        {
+            ++refused;
+            continue;
+        }
+        auto t = fk->end_effector.translation();
         bb.tmin = bb.tmin.cwiseMin(t);
         bb.tmax = bb.tmax.cwiseMax(t);
+    }
+
+    // The extremes start at +/-infinity, so a box no sample ever widened is
+    // still infinite and reversed. Handing that to uniform_real_distribution
+    // is undefined, so the emptiness is reported here rather than downstream.
+    if (!(bb.tmax - bb.tmin).allFinite())
+    {
+        std::fprintf(stderr,
+            "cartan::fixtures::compute_bounding_box: no usable sample in %d draws "
+            "(%d refused); the workspace box is empty\n", sample_count, refused);
+        std::abort();
     }
     return bb;
 }
@@ -141,7 +160,13 @@ void bm_closed_form_solver(
 {
     using Scalar = typename Chain::scalar_type;
 
-    Solver solver(static_chain_for_solver);
+    auto built = Solver::make(static_chain_for_solver);
+    if (!built.has_value())
+    {
+        state.SkipWithError(message(built.error().reason));
+        return;
+    }
+    const Solver& solver = *built;
     const auto target_count = ts.targets.size();
 
     // Accuracy pass (untimed): FK-gated success and error means over the
@@ -151,6 +176,8 @@ void bm_closed_form_solver(
     int successes = 0;
     Scalar total_pos = Scalar(0);
     Scalar total_ori = Scalar(0);
+    Scalar worst_pos = Scalar(0);
+    Scalar worst_ori = Scalar(0);
     for (std::size_t i = 0; i < target_count; ++i)
     {
         auto result = solver.solve(ts.targets[i]);
@@ -166,6 +193,8 @@ void bm_closed_form_solver(
             ++successes;
             total_pos += pos_err;
             total_ori += ori_err;
+            worst_pos = std::max(worst_pos, pos_err);
+            worst_ori = std::max(worst_ori, ori_err);
         }
     }
 
@@ -185,6 +214,9 @@ void bm_closed_form_solver(
         static_cast<double>(total_pos) / std::max(successes, 1));
     state.counters["ori_err"] = benchmark::Counter(
         static_cast<double>(total_ori) / std::max(successes, 1));
+    state.counters["pos_err_max"] = benchmark::Counter(static_cast<double>(worst_pos));
+    state.counters["ori_err_max"] = benchmark::Counter(static_cast<double>(worst_ori));
+    state.counters["n_poses"] = benchmark::Counter(static_cast<double>(denom));
 }
 
 /// Closed-form solver driver — workspace coverage cell.
@@ -203,7 +235,13 @@ void bm_closed_form_coverage(
     const Chain& static_chain_for_solver,
     const BboxTargetSet& bbox_ts)
 {
-    Solver solver(static_chain_for_solver);
+    auto built = Solver::make(static_chain_for_solver);
+    if (!built.has_value())
+    {
+        state.SkipWithError(message(built.error().reason));
+        return;
+    }
+    const Solver& solver = *built;
 
     std::size_t idx = 0;
     int hits = 0;

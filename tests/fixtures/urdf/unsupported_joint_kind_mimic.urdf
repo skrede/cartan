@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<!-- A joint that trips two refusals at once: an unsupported kind and a mimic
+     relation. Which one is reported pins the order the refusals are applied. -->
+<robot name="unsupported_joint_kind_mimic">
+
+  <link name="base_link"/>
+  <link name="link_1"/>
+  <link name="tip"/>
+
+  <joint name="joint_primary" type="revolute">
+    <parent link="base_link"/>
+    <child link="link_1"/>
+    <origin xyz="0 0 0.1" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-1.0" upper="1.0" velocity="2.0" effort="50.0"/>
+  </joint>
+
+  <joint name="floating_follower" type="floating">
+    <parent link="link_1"/>
+    <child link="tip"/>
+    <origin xyz="0 0 0.2" rpy="0 0 0"/>
+    <mimic joint="joint_primary" multiplier="1.0" offset="0.0"/>
+  </joint>
+
+</robot>

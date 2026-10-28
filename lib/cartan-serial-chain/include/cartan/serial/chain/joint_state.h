@@ -9,6 +9,7 @@
 
 #include <Eigen/Dense>
 
+#include <limits>
 #include <optional>
 #include <type_traits>
 
@@ -49,6 +50,41 @@ struct joint_state
         return static_cast<int>(position.size());
     }
 };
+
+namespace detail
+{
+
+/// Poison default for a joint vector that no solver has populated yet: NaN-filled
+/// for a fixed-size chain, empty for a dynamic one. A NaN sentinel makes an
+/// accidental read fail loudly -- it propagates through arithmetic and, unlike a
+/// large finite value, survives angle wrapping -- instead of masquerading as the
+/// plausible all-zero home configuration. An Eigen fixed-size vector's default
+/// constructor leaves its coefficients indeterminate, so a member holding one
+/// needs this default explicitly.
+template <typename Scalar, int N>
+typename joint_state<Scalar, N>::position_type poison_joint_position()
+{
+    using position_type = typename joint_state<Scalar, N>::position_type;
+    if constexpr (N == dynamic)
+    {
+        return position_type{};
+    }
+    else
+    {
+        return position_type::Constant(std::numeric_limits<Scalar>::quiet_NaN());
+    }
+}
+
+/// The same poison over a known joint count, for a dynamic vector whose size a
+/// caller reads even where its coefficients were never measured.
+template <typename Scalar, int N>
+typename joint_state<Scalar, N>::position_type poison_joint_position(int joints)
+{
+    return joint_state<Scalar, N>::position_type::Constant(
+        joints, std::numeric_limits<Scalar>::quiet_NaN());
+}
+
+}
 
 }
 

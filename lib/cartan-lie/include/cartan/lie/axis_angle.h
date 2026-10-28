@@ -7,7 +7,7 @@
 ///
 /// Reference: Lynch & Park, Modern Robotics, Section 3.2.3, p. 77-86 (axis-angle).
 ///            Lynch & Park, Modern Robotics, Def. 3.24, p. 102 (screw axis).
-///            Barfoot, State Estimation for Robotics, Ch. 8, p. 280-300.
+///            Barfoot, State Estimation for Robotics, 2nd ed., Sec. 8.1, pp. 279-302.
 
 #include "cartan/types.h"
 #include "cartan/detail/epsilon.h"

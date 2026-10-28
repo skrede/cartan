@@ -39,6 +39,9 @@ it sits on screen:
 | Function | 5–15 lines | 25 lines     |
 | File     | ~100 lines | 200 lines    |
 
+The file ceiling is enforced for new and for growing files; the files already over it are
+registered in `EXCEPTIONS.md`.
+
 Readability is the goal, not SOLID or DRY orthodoxy. Group code that is read together. Split
 where it genuinely separates responsibilities — never to chase a number.
 
@@ -57,22 +60,37 @@ Keep public headers lean by moving internal helpers into a `detail/` directory a
 `detail::` namespace. Make `detail/` files and `detail::` types as needed — but a `detail/`
 file is still a real file and obeys these same rules.
 
-Enforcement: `.clang-tidy` runs size and cognitive-complexity checks and **fails the build**
-over the ceiling. A change is not done until it is within budget or its overage is a
-registered exception.
+Enforcement, file size: `tools/check_file_size.py` measures every tracked C++ file and checks it
+against `EXCEPTIONS.md`. It fails on an overage that is not registered, on a registered row whose
+file has dropped back under the ceiling, and on a registered file that has grown past the allowance
+its row records. Run it from the repository root; it needs no build and no configure.
+
+Enforcement, function size: `.clang-tidy` carries `readability-function-size` at this ceiling, so a
+linter run with that check enabled reports every function over it — but **nothing fails over it
+today**. The measured finding count and what would change that are recorded in `EXCEPTIONS.md`. The
+function ceiling is a rule to follow, not one a machine currently catches you breaking.
+
+A change is not done until it is within budget or its overage is a registered exception.
 
 ### Exceptions
 
-A file or function may exceed its ceiling only when it is a single cohesive whole that
-splitting would *harm* — scattering shared state across files, or forcing an artificial-purity
-layer. An exception is a considered decision, not a fallback; prefer decomposition, and reach
-for an exception only when decomposition would make the code worse.
+A **file** may exceed its ceiling only when it is a single cohesive whole that splitting would
+*harm* — scattering shared state across files, or forcing an artificial-purity layer. An exception
+is a considered decision, not a fallback; prefer decomposition, and reach for an exception only
+when decomposition would make the code worse.
 
-Every exception is registered in **`EXCEPTIONS.md`** — the single, complete list of every
-sanctioned over-limit unit, each with its justification. There is **no in-code marker**: the
-justification is bookkeeping, and bookkeeping never belongs in the code. The size gate sanctions
-exactly the files `EXCEPTIONS.md` lists and fails on any unlisted overage, or on a stale row whose
-file has since dropped under the ceiling. There are no silent exceptions.
+Every such file is registered in **`EXCEPTIONS.md`** — the complete list of every sanctioned
+over-limit *file*, each with its justification. There is **no in-code marker**: the justification
+is bookkeeping, and bookkeeping never belongs in the code. The size gate sanctions exactly the
+files that register lists and fails on any unlisted overage, or on a stale row whose file has
+since dropped under the ceiling. There are no silent file exceptions.
+
+The register does not cover functions, and no row sanctions one. A function over the twenty-five
+line ceiling is settled in review against the same cohesion test — and, as the enforcement note
+above says, nothing fails over one. Seventy-four functions in the library headers alone are
+currently over it, all of them unregistered because there is nothing to register them in. Read the
+register as the complete list of sanctioned *files*, never as an inventory of every over-limit
+unit.
 
 ## Comments
 
@@ -212,13 +230,32 @@ initialization-order constraint in **Construction**.
 
 ## Formatting and tooling
 
-- `.clang-format` is the formatter, and it is authoritative on its own for the mechanical rules:
-  185-column lines, comments never reflowed to fit the column, short functions never auto-collapsed
-  onto one line (the author decides), and includes left unsorted so the hand-ordering below holds.
-  Run it.
-- `.clang-tidy` is the linter and the size/complexity gate. It fails the build.
-- Apply both across the whole tree. A change is not done until both are clean — or its overage is a
-  registered exception.
+- `.clang-format` records the token-level shape — brace placement, spacing, pointer and reference
+  placement, case labels on their own lines — and it is **advisory**. Nothing runs it, and it cannot
+  reproduce this codebase's shape: where a declaration or an expression breaks across lines is a
+  judgment call about what reads well (the downward waterfall below), and a formatter decides it
+  from the column limit alone. Measured over the tracked sources, a format run rewraps the large
+  majority of files, and lowering the column limit does not change that. Use it as a starting point
+  on a new file, then wrap by hand. Pointing it at an existing file rewrites the file rather than
+  confirming it.
+- `.clang-tidy` is a gate over a stated **subset** of its checks, and the subset lives in the
+  configuration rather than in the job: a check written with a leading `-` is off and carries the
+  reason it is off, and every check left on is promoted to an error. There is no category the linter
+  reports and the build tolerates. Two files hold the set — the root one, and `tests/.clang-tidy`,
+  which turns off two checks whose findings here are the test doing its job. That second file is
+  written as a directory-scoped exclusion but is not one today: clang-tidy resolves its configuration
+  from each translation unit's own source file, and since the library is header-only every unit is a
+  test, so those two checks are off project-wide. Widening or narrowing the gate means reading both.
+- The per-function size and cognitive-complexity checks are not in that subset. They are measured
+  and fail nothing, as the function-size note above says; `EXCEPTIONS.md` carries the count and what
+  would move them in.
+- So what a machine checks is: file size against `EXCEPTIONS.md`, and the linter's gated subset over
+  the headers some test actually includes. A header no test, example or benchmark reaches is not
+  linted at all — around two dozen are in that position, the public umbrella headers among them — so
+  a green lane is not a statement about every file. The rest of this document — the include order,
+  the comment policy, the class layout, the shapes below, the ownership rules, the spelling — is
+  guidance a reviewer applies. A convention no tool enforces still binds the change; it is a person
+  rather than a build that catches it.
 
 ### Shape (readability guidelines, not rigid rules)
 

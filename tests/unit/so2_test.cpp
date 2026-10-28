@@ -1,10 +1,13 @@
 #include <cartan/lie/so2.h>
 
+#include <cartan/detail/epsilon.h>
+
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_template_test_macros.hpp>
 
 #include <cmath>
+#include <limits>
 #include <numbers>
 
 using Catch::Approx;
@@ -147,7 +150,7 @@ TEST_CASE("so2: from_matrix with valid rotation", "[so2]")
 
     auto result = cartan::so2<double>::from_matrix(R);
     REQUIRE(result.has_value());
-    REQUIRE(result.value().log() == Approx(theta).margin(1e-14));
+    REQUIRE((*result).log() == Approx(theta).margin(1e-14));
 }
 
 TEST_CASE("so2: from_matrix rejects non-orthogonal matrix", "[so2]")
@@ -279,4 +282,83 @@ TEST_CASE("so2: isApprox is angle-wrap safe", "[so2]")
     // Naive angle() difference is ~2*pi; manifold-aware isApprox sees ~2e-10
     REQUIRE(std::abs(a.angle() - b.angle()) > 1.0);
     REQUIRE(a.isApprox(b, 1e-8));
+}
+
+// ============================================================================
+// Nonfinite rejection
+// ============================================================================
+
+/// The orthogonality and determinant tests as they read without a finiteness
+/// guard in front of them, written with the comparisons negated exactly as the
+/// factory spells them: `!(deviation > tol)` is true for a NaN, while
+/// `deviation <= tol` is false, so the two are not interchangeable here. The
+/// cases below assert what this gate admits, because a pre-guard admission is
+/// invisible in the constructed value for half the positions: from_matrix reads
+/// only R(0,0) and R(1,0), so a NaN at (0,1) produced a finite identity.
+template <typename S>
+static bool unguarded_gate_admits(const cartan::matrix2<S>& R)
+{
+    const S tol = cartan::detail::sqrt_epsilon_v<S>;
+    const cartan::matrix2<S> RtR = R.transpose() * R;
+    return !((RtR - cartan::matrix2<S>::Identity()).norm() > tol)
+        && !(std::abs(R.determinant() - S(1)) > tol);
+}
+
+template <typename S>
+static void expect_entries_rejected(S poison, bool unguarded_admits)
+{
+    for (int i = 0; i < 2; ++i)
+    {
+        for (int j = 0; j < 2; ++j)
+        {
+            cartan::matrix2<S> R = cartan::matrix2<S>::Identity();
+            R(i, j) = poison;
+
+            auto result = cartan::so2<S>::from_matrix(R);
+            REQUIRE_FALSE(result.has_value());
+            REQUIRE(result.error() == cartan::lie_failure::non_finite_input);
+            REQUIRE(unguarded_gate_admits<S>(R) == unguarded_admits);
+        }
+    }
+}
+
+TEMPLATE_TEST_CASE("so2: from_matrix rejects nonfinite entries",
+    "[so2][nonfinite]", double, float)
+{
+    using S = TestType;
+    using lim = std::numeric_limits<S>;
+
+    expect_entries_rejected<S>(lim::quiet_NaN(), true);
+    expect_entries_rejected<S>(-lim::quiet_NaN(), true);
+    expect_entries_rejected<S>(lim::infinity(), false);
+    expect_entries_rejected<S>(-lim::infinity(), false);
+}
+
+/// Ties the predicate above to the factory it stands in for. On finite input the
+/// two must agree exactly, so widening either tolerance, or replacing either
+/// comparison, breaks this case -- which the nonfinite corpus above cannot do,
+/// since both of its sides are written here. The marginal matrix straddles the
+/// orthogonality tolerance; the reflection is the only shape that reaches the
+/// determinant test, because scaling a rotation trips orthogonality first.
+TEMPLATE_TEST_CASE("so2: the unguarded chain agrees with from_matrix on finite input",
+    "[so2][nonfinite]", double, float)
+{
+    using S = TestType;
+    const S tol = cartan::detail::sqrt_epsilon_v<S>;
+
+    const cartan::matrix2<S> exact = cartan::so2<S>::exp(S(0.6)).matrix();
+
+    cartan::matrix2<S> marginal = exact;
+    marginal(0, 0) += S(2) * tol;
+
+    cartan::matrix2<S> reflection = cartan::matrix2<S>::Identity();
+    reflection(1, 1) = S(-1);
+
+    const cartan::matrix2<S> gross = cartan::matrix2<S>::Identity() * S(2);
+
+    for (const cartan::matrix2<S>& R : {exact, marginal, reflection, gross})
+    {
+        REQUIRE(unguarded_gate_admits<S>(R)
+            == cartan::so2<S>::from_matrix(R).has_value());
+    }
 }

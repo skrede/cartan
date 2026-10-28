@@ -1,3 +1,6 @@
+#include "../support/kinematics_helpers.h"
+#include "../support/joint_limits_helpers.h"
+
 #include <cartan/serial/ik/solver/lbfgsb.h>
 
 #include <cartan/types.h>
@@ -38,7 +41,7 @@ static spp::kinematic_chain<double, 6> make_ur5_like_chain()
     home_trans << 0.817, 0.191, -0.006;
     auto home = spp::se3<double>(spp::so3<double>::identity(), home_trans);
 
-    spp::joint_limits<double> lim{-2 * std::numbers::pi, 2 * std::numbers::pi};
+    auto lim = cartan::testing::limits(-2 * std::numbers::pi, 2 * std::numbers::pi);
     return spp::kinematic_chain<double, 6>(home, {s1, s2, s3, s4, s5, s6},
                                   {lim, lim, lim, lim, lim, lim});
 }
@@ -81,7 +84,7 @@ TEST_CASE("lbfgsb FK roundtrip", "[ik][lbfgsb]")
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
 
-    auto fk_target = spp::forward_kinematics(chain, q_known);
+    auto fk_target = spp::testing::fk_at(chain, q_known);
     auto target = fk_target.end_effector;
 
     spp::builtin_lbfgsb<spp::kinematic_chain<double, 6>> stepper;
@@ -96,7 +99,7 @@ TEST_CASE("lbfgsb FK roundtrip", "[ik][lbfgsb]")
     REQUIRE(status == spp::ik_status::converged);
 
     // Verify FK roundtrip
-    auto fk_sol = spp::forward_kinematics(chain, stepper.solution());
+    auto fk_sol = spp::testing::fk_at(chain, stepper.solution());
     auto err = (fk_sol.end_effector.inverse() * target).log();
     REQUIRE(err.head<3>().norm() < 1e-6);
     REQUIRE(err.tail<3>().norm() < 1e-6);
@@ -120,8 +123,8 @@ TEST_CASE("lbfgsb with tight limits", "[ik][lbfgsb]")
     home_trans << 0.817, 0.191, -0.006;
     auto home = spp::se3<double>(spp::so3<double>::identity(), home_trans);
 
-    spp::joint_limits<double> wide{-2 * std::numbers::pi, 2 * std::numbers::pi};
-    spp::joint_limits<double> tight{-0.5, 0.5};
+    auto wide = cartan::testing::limits(-2 * std::numbers::pi, 2 * std::numbers::pi);
+    auto tight = cartan::testing::limits(-0.5, 0.5);
     auto chain = spp::kinematic_chain<double, 6>(home, {s1, s2, s3, s4, s5, s6},
                                          {wide, wide, tight, wide, wide, wide});
 
@@ -129,7 +132,7 @@ TEST_CASE("lbfgsb with tight limits", "[ik][lbfgsb]")
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.5, 0.4, 0.1, -0.4, 0.7;
 
-    auto fk_target = spp::forward_kinematics(chain, q_known);
+    auto fk_target = spp::testing::fk_at(chain, q_known);
     auto target = fk_target.end_effector;
 
     spp::builtin_lbfgsb<spp::kinematic_chain<double, 6>> stepper;
@@ -159,7 +162,7 @@ TEST_CASE("lbfgsb iterations count", "[ik][lbfgsb]")
 
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
-    auto fk_target = spp::forward_kinematics(chain, q_known);
+    auto fk_target = spp::testing::fk_at(chain, q_known);
 
     spp::builtin_lbfgsb<spp::kinematic_chain<double, 6>> stepper;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
@@ -200,7 +203,7 @@ TEST_CASE("lbfgsb with error weight", "[ik][lbfgsb]")
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
 
-    auto fk_target = spp::forward_kinematics(chain, q_known);
+    auto fk_target = spp::testing::fk_at(chain, q_known);
     auto target = fk_target.end_effector;
 
     spp::error_weight<double> weight;
@@ -236,7 +239,7 @@ TEST_CASE("lbfgsb stall detection", "[ik][lbfgsb]")
     home_trans << 0.817, 0.191, -0.006;
     auto home = spp::se3<double>(spp::so3<double>::identity(), home_trans);
 
-    spp::joint_limits<double> tight{-0.01, 0.01};
+    auto tight = cartan::testing::limits(-0.01, 0.01);
     auto chain = spp::kinematic_chain<double, 6>(home, {s1, s2, s3, s4, s5, s6},
                                          {tight, tight, tight, tight, tight, tight});
 
@@ -244,7 +247,7 @@ TEST_CASE("lbfgsb stall detection", "[ik][lbfgsb]")
     Eigen::Vector<double, 6> q_far;
     q_far << 1.0, -1.0, 1.0, 0.5, -0.5, 0.5;
     auto fk_target_chain = make_ur5_like_chain();
-    auto fk_target = spp::forward_kinematics(fk_target_chain, q_far);
+    auto fk_target = spp::testing::fk_at(fk_target_chain, q_far);
     auto target = fk_target.end_effector;
 
     spp::builtin_lbfgsb<spp::kinematic_chain<double, 6>> stepper;

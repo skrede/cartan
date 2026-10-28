@@ -18,8 +18,8 @@ namespace cartan
 /// 3D rigid body transformation group SE(3), parameterized by scalar type and policy.
 /// Internal representation: SO(3) rotation + R^3 translation.
 /// 7 Scalars total (4 quaternion + 3 translation).
-/// Reference: Lynch & Park, Modern Robotics, Ch. 3.3, p. 86-106.
-///            Barfoot, State Estimation for Robotics, Ch. 8, p. 280-300.
+/// Reference: Lynch & Park, Modern Robotics, Sec. 3.3, pp. 87-106.
+///            Barfoot, State Estimation for Robotics, 2nd ed., Sec. 8.1, pp. 279-302.
 template <typename Scalar, typename Policy = strict_policy>
 class se3
 {
@@ -68,7 +68,7 @@ public:
     /// Exponential map: se(3) twist -> SE(3) transform.
     /// Twist V = (omega, rho) uses omega-first convention.
     /// Ref: Lynch & Park, Modern Robotics, Prop. 3.25/Eq. 3.88, p. 103.
-    ///      Barfoot, State Estimation for Robotics, Eq. 8.33, p. 289.
+    ///      Barfoot, State Estimation for Robotics, Eqs. 8.33-8.34, p. 288.
     static se3 exp(const vector6<Scalar>& v)
     {
         vector3<Scalar> omega = v.template head<3>();
@@ -83,7 +83,7 @@ public:
     /// Logarithmic map: SE(3) transform -> se(3) twist.
     /// Returns V = (omega, rho) in omega-first convention.
     /// Ref: Lynch & Park, Modern Robotics, Eq. 3.91-3.92, p. 104.
-    ///      Barfoot, State Estimation for Robotics, Eq. 8.35, p. 290.
+    ///      Barfoot, State Estimation for Robotics, Eq. 8.35, p. 288.
     vector6<Scalar> log() const
     {
         vector3<Scalar> omega = m_rotation.log();
@@ -98,7 +98,7 @@ public:
 
     /// Group composition: T1 * T2.
     /// Result uses the stricter of the two policies.
-    /// Ref: Lynch & Park, Modern Robotics, homogeneous transform composition.
+    /// Ref: Lynch & Park, Modern Robotics, Prop. 3.16, p. 88.
     template <typename P2>
     auto operator*(const se3<Scalar, P2>& rhs) const
         -> se3<Scalar, stricter_policy<Policy, P2>>
@@ -112,7 +112,7 @@ public:
     }
 
     /// Group inverse: T^{-1} = (R^{-1}, -R^{-1} * t).
-    /// Ref: Lynch & Park, Modern Robotics, Eq. 3.64, p. 94.
+    /// Ref: Lynch & Park, Modern Robotics, Prop. 3.15/Eq. 3.64, p. 88.
     se3 inverse() const
     {
         auto rot_inv = m_rotation.inverse();
@@ -144,7 +144,7 @@ public:
     }
 
     /// Convert to 4x4 homogeneous transformation matrix.
-    /// Ref: Lynch & Park, Modern Robotics, Eq. 3.60-3.61.
+    /// Ref: Lynch & Park, Modern Robotics, Def. 3.13/Eq. 3.62, p. 87.
     matrix4<Scalar> matrix() const
     {
         matrix4<Scalar> T;
@@ -181,10 +181,15 @@ public:
 
     /// Construct from 4x4 homogeneous matrix with validation.
     /// Validates rotation block is SO(3) and bottom row is (0,0,0,1).
-    /// Ref: SE(3) matrix structure, Lynch & Park, Modern Robotics, p. 86.
+    /// Ref: Lynch & Park, Modern Robotics, Def. 3.13/Eq. 3.62, p. 87.
     static cartan::expected<se3, lie_failure>
     from_matrix(const matrix4<Scalar>& T)
     {
+        if (!T.allFinite())
+        {
+            return cartan::unexpected(lie_failure::non_finite_input);
+        }
+
         Scalar tol = detail::sqrt_epsilon_v<Scalar>;
 
         // Check bottom row is [0, 0, 0, 1]

@@ -1,0 +1,15 @@
+{
+  "declared_participants": [
+    {
+      "name": "cartan_lm",
+      "supplier": "",
+      "kernel_countable": true
+    },
+    {
+      "name": "pinocchio_lm",
+      "supplier": "pinocchio",
+      "kernel_countable": true
+    }
+  ],
+  "absent_participants": []
+}

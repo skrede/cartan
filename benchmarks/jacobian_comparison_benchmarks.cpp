@@ -1,3 +1,4 @@
+#include "checked_cache.h"
 #include "benchmark_utils.h"
 
 #include <cartan/serial/chain/static_chain.h>
@@ -31,91 +32,102 @@ constexpr std::size_t kInputs = 1024;
 // ============================================================================
 
 template <typename Scalar>
-auto make_3r_planar_static()
+cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_z, cartan::revolute_z>
+make_3r_planar_static()
 {
+    using chain_type =
+        cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_z, cartan::revolute_z>;
     auto kc = cartan::fixtures::make_3r_planar_chain<Scalar>();
-    return cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_z, cartan::revolute_z>(
-        kc.home(), kc.axes(), kc.limits());
+    return cartan::testing::unwrap(
+        chain_type::make(kc.home(), kc.axes(), kc.limits()), "make_3r_planar_static");
 }
 
 template <typename Scalar>
-auto make_ur3e_static()
+cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y, cartan::revolute_y, cartan::revolute_y, cartan::revolute_z, cartan::revolute_y>
+make_ur3e_static()
 {
+    using chain_type =
+        cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y, cartan::revolute_y, cartan::revolute_y, cartan::revolute_z, cartan::revolute_y>;
     auto kc = cartan::fixtures::make_ur3e_chain<Scalar>();
-    return cartan::static_chain<Scalar,
-        cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
-        cartan::revolute_y, cartan::revolute_z, cartan::revolute_y>(
-        kc.home(), kc.axes(), kc.limits());
+    return cartan::testing::unwrap(
+        chain_type::make(kc.home(), kc.axes(), kc.limits()), "make_ur3e_static");
 }
 
 template <typename Scalar>
-auto make_lbr_med14_static()
+cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y, cartan::revolute_z, cartan::revolute_y, cartan::revolute_z, cartan::revolute_y, cartan::revolute_z>
+make_lbr_med14_static()
 {
+    using chain_type =
+        cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y, cartan::revolute_z, cartan::revolute_y, cartan::revolute_z, cartan::revolute_y, cartan::revolute_z>;
     auto kc = cartan::fixtures::make_lbr_med14_chain<Scalar>();
-    return cartan::static_chain<Scalar,
-        cartan::revolute_z, cartan::revolute_y, cartan::revolute_z, cartan::revolute_y,
-        cartan::revolute_z, cartan::revolute_y, cartan::revolute_z>(
-        kc.home(), kc.axes(), kc.limits());
+    return cartan::testing::unwrap(
+        chain_type::make(kc.home(), kc.axes(), kc.limits()), "make_lbr_med14_static");
 }
 
 template <typename Scalar>
-auto make_kr6_sixx_static()
+cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y, cartan::revolute_y, cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>
+make_kr6_sixx_static()
 {
+    using chain_type =
+        cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y, cartan::revolute_y, cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>;
     auto kc = cartan::fixtures::make_kr6_sixx_chain<Scalar>();
-    return cartan::static_chain<Scalar,
-        cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
-        cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>(
-        kc.home(), kc.axes(), kc.limits());
+    return cartan::testing::unwrap(
+        chain_type::make(kc.home(), kc.axes(), kc.limits()), "make_kr6_sixx_static");
 }
 
 template <typename Scalar>
-auto make_panda_static()
+cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y, cartan::revolute_z, cartan::revolute_y, cartan::revolute_z, cartan::revolute_y, cartan::revolute_z>
+make_panda_static()
 {
+    using chain_type =
+        cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y, cartan::revolute_z, cartan::revolute_y, cartan::revolute_z, cartan::revolute_y, cartan::revolute_z>;
     auto kc = cartan::fixtures::make_panda_chain<Scalar>();
-    return cartan::static_chain<Scalar,
-        cartan::revolute_z, cartan::revolute_y, cartan::revolute_z, cartan::revolute_y,
-        cartan::revolute_z, cartan::revolute_y, cartan::revolute_z>(
-        kc.home(), kc.axes(), kc.limits());
+    return cartan::testing::unwrap(
+        chain_type::make(kc.home(), kc.axes(), kc.limits()), "make_panda_static");
 }
 
 template <typename Scalar>
-auto make_abb_irb120_static()
+cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y, cartan::revolute_y, cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>
+make_abb_irb120_static()
 {
+    using chain_type =
+        cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y, cartan::revolute_y, cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>;
     auto kc = cartan::fixtures::make_abb_irb120_chain<Scalar>();
-    return cartan::static_chain<Scalar,
-        cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
-        cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>(
-        kc.home(), kc.axes(), kc.limits());
+    return cartan::testing::unwrap(
+        chain_type::make(kc.home(), kc.axes(), kc.limits()), "make_abb_irb120_static");
 }
 
 template <typename Scalar>
-auto make_jaco2_static()
+cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y, cartan::revolute_y, cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>
+make_jaco2_static()
 {
+    using chain_type =
+        cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y, cartan::revolute_y, cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>;
     auto kc = cartan::fixtures::make_jaco2_chain<Scalar>();
-    return cartan::static_chain<Scalar,
-        cartan::revolute_z, cartan::revolute_y, cartan::revolute_y,
-        cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>(
-        kc.home(), kc.axes(), kc.limits());
+    return cartan::testing::unwrap(
+        chain_type::make(kc.home(), kc.axes(), kc.limits()), "make_jaco2_static");
 }
 
 template <typename Scalar>
-auto make_fetch_static()
+cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y, cartan::revolute_x, cartan::revolute_y, cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>
+make_fetch_static()
 {
+    using chain_type =
+        cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y, cartan::revolute_x, cartan::revolute_y, cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>;
     auto kc = cartan::fixtures::make_fetch_chain<Scalar>();
-    return cartan::static_chain<Scalar,
-        cartan::revolute_z, cartan::revolute_y, cartan::revolute_x, cartan::revolute_y,
-        cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>(
-        kc.home(), kc.axes(), kc.limits());
+    return cartan::testing::unwrap(
+        chain_type::make(kc.home(), kc.axes(), kc.limits()), "make_fetch_static");
 }
 
 template <typename Scalar>
-auto make_baxter_static()
+cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y, cartan::revolute_x, cartan::revolute_y, cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>
+make_baxter_static()
 {
+    using chain_type =
+        cartan::static_chain<Scalar, cartan::revolute_z, cartan::revolute_y, cartan::revolute_x, cartan::revolute_y, cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>;
     auto kc = cartan::fixtures::make_baxter_chain<Scalar>();
-    return cartan::static_chain<Scalar,
-        cartan::revolute_z, cartan::revolute_y, cartan::revolute_x, cartan::revolute_y,
-        cartan::revolute_x, cartan::revolute_y, cartan::revolute_x>(
-        kc.home(), kc.axes(), kc.limits());
+    return cartan::testing::unwrap(
+        chain_type::make(kc.home(), kc.axes(), kc.limits()), "make_baxter_static");
 }
 
 // ============================================================================
@@ -123,7 +135,8 @@ auto make_baxter_static()
 // ============================================================================
 
 template <typename ChainType>
-auto random_config_static(const ChainType& chain, std::mt19937& rng)
+typename cartan::joint_state<typename ChainType::scalar_type, ChainType::joints>::position_type
+random_config_static(const ChainType& chain, std::mt19937& rng)
 {
     using Scalar = typename ChainType::scalar_type;
     constexpr int N = ChainType::joints;
@@ -135,7 +148,7 @@ auto random_config_static(const ChainType& chain, std::mt19937& rng)
     {
         auto idx = static_cast<std::size_t>(i);
         std::uniform_real_distribution<Scalar> dist(
-            limits[idx].position_min, limits[idx].position_max);
+            limits[idx].position_min(), limits[idx].position_max());
         q(i) = dist(rng);
     }
     return q;
@@ -169,8 +182,8 @@ static void bm_jac_##ROBOT##_kinematic_chain(benchmark::State& state)    \
     {                                                                    \
         auto& q = qs[i++ & (kInputs - 1)];                              \
         benchmark::DoNotOptimize(q);                                    \
-        auto fk = cartan::forward_kinematics(chain, q);                   \
-        auto J = cartan::space_jacobian(chain, fk);                       \
+        auto fk = cartan::forward_kinematics_unchecked(chain, q);        \
+        auto J = cartan::space_jacobian_unchecked(chain, fk);            \
         benchmark::DoNotOptimize(J.data());                              \
     }                                                                    \
 }                                                                        \
@@ -179,14 +192,14 @@ static void bm_jac_##ROBOT##_kinematic_chain_jacobian_given_fk(benchmark::State&
 {                                                                        \
     auto chain = cartan::fixtures::FACTORY<double>();                    \
     std::mt19937 rng(42);                                                \
-    std::array<decltype(cartan::forward_kinematics(chain, cartan::fixtures::random_joint_config(chain, rng))), kInputs> fks; \
-    for (auto& f : fks) f = cartan::forward_kinematics(chain, cartan::fixtures::random_joint_config(chain, rng)); \
+    std::array<decltype(cartan::forward_kinematics_unchecked(chain, cartan::fixtures::random_joint_config(chain, rng))), kInputs> fks; \
+    if (!cartan::bench::fill_fk_cache(fks, chain, rng, state)) return;   \
     std::size_t i = 0;                                                   \
     for (auto _ : state)                                                 \
     {                                                                    \
         auto& fk = fks[i++ & (kInputs - 1)];                            \
         benchmark::DoNotOptimize(fk);                                    \
-        auto J = cartan::space_jacobian(chain, fk);                       \
+        auto J = cartan::space_jacobian_unchecked(chain, fk);            \
         benchmark::DoNotOptimize(J.data());                              \
     }                                                                    \
 }                                                                        \
@@ -205,8 +218,8 @@ static void bm_jac_##ROBOT##_static_generic(benchmark::State& state)     \
     {                                                                    \
         auto& q = qs[i++ & (kInputs - 1)];                              \
         benchmark::DoNotOptimize(q);                                    \
-        auto fk = cartan::forward_kinematics(wrapped, q);                 \
-        auto J = cartan::space_jacobian(wrapped, fk);                     \
+        auto fk = cartan::forward_kinematics_unchecked(wrapped, q);      \
+        auto J = cartan::space_jacobian_unchecked(wrapped, fk);          \
         benchmark::DoNotOptimize(J.data());                              \
     }                                                                    \
 }                                                                        \
@@ -216,14 +229,16 @@ static void bm_jac_##ROBOT##_static_generic_jacobian_given_fk(benchmark::State& 
     auto sc = STATIC_FACTORY<double>();                                   \
     cartan::detail::generic_chain_wrapper wrapped{sc};                     \
     std::mt19937 rng(42);                                                \
-    std::array<decltype(cartan::forward_kinematics(wrapped, random_config_static(sc, rng))), kInputs> fks; \
-    for (auto& f : fks) f = cartan::forward_kinematics(wrapped, random_config_static(sc, rng)); \
+    std::array<decltype(cartan::forward_kinematics_unchecked(wrapped, random_config_static(sc, rng))), kInputs> fks; \
+    if (!cartan::bench::fill_cache(fks, state,                           \
+            [&] { return cartan::forward_kinematics(wrapped, random_config_static(sc, rng)); })) \
+        return;                                                          \
     std::size_t i = 0;                                                   \
     for (auto _ : state)                                                 \
     {                                                                    \
         auto& fk = fks[i++ & (kInputs - 1)];                            \
         benchmark::DoNotOptimize(fk);                                    \
-        auto J = cartan::space_jacobian(wrapped, fk);                     \
+        auto J = cartan::space_jacobian_unchecked(wrapped, fk);          \
         benchmark::DoNotOptimize(J.data());                              \
     }                                                                    \
 }                                                                        \
@@ -241,8 +256,8 @@ static void bm_jac_##ROBOT##_static_specialized(benchmark::State& state) \
     {                                                                    \
         auto& q = qs[i++ & (kInputs - 1)];                              \
         benchmark::DoNotOptimize(q);                                    \
-        auto fk = cartan::forward_kinematics(sc, q);                      \
-        auto J = cartan::space_jacobian(sc, fk);                          \
+        auto fk = cartan::forward_kinematics_unchecked(sc, q);           \
+        auto J = cartan::space_jacobian_unchecked(sc, fk);               \
         benchmark::DoNotOptimize(J.data());                              \
     }                                                                    \
 }                                                                        \
@@ -251,14 +266,16 @@ static void bm_jac_##ROBOT##_static_specialized_jacobian_given_fk(benchmark::Sta
 {                                                                        \
     auto sc = STATIC_FACTORY<double>();                                   \
     std::mt19937 rng(42);                                                \
-    std::array<decltype(cartan::forward_kinematics(sc, random_config_static(sc, rng))), kInputs> fks; \
-    for (auto& f : fks) f = cartan::forward_kinematics(sc, random_config_static(sc, rng)); \
+    std::array<decltype(cartan::forward_kinematics_unchecked(sc, random_config_static(sc, rng))), kInputs> fks; \
+    if (!cartan::bench::fill_cache(fks, state,                           \
+            [&] { return cartan::forward_kinematics(sc, random_config_static(sc, rng)); })) \
+        return;                                                          \
     std::size_t i = 0;                                                   \
     for (auto _ : state)                                                 \
     {                                                                    \
         auto& fk = fks[i++ & (kInputs - 1)];                            \
         benchmark::DoNotOptimize(fk);                                    \
-        auto J = cartan::space_jacobian(sc, fk);                          \
+        auto J = cartan::space_jacobian_unchecked(sc, fk);               \
         benchmark::DoNotOptimize(J.data());                              \
     }                                                                    \
 }                                                                        \

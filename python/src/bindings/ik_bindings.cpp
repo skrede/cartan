@@ -1,3 +1,8 @@
+#include "registrations.h"
+
+#include "detail/format_double.h"
+#include "detail/ik_python_helpers.h"
+
 #include "cartan/lie/se3.h"
 #include "cartan/serial/ik/solvers.h"
 #include "cartan/serial/ik/ik_result.h"
@@ -6,17 +11,6 @@
 #include "cartan/serial/ik/policy/limits_policy.h"
 #include "cartan/serial/ik/wrapper/restart_wrapper.h"
 #include "cartan/serial/chain/kinematic_chain.h"
-
-#ifdef CARTAN_BUILD_ARGMIN
-#include "cartan/serial/ik/solver/argmin_slsqp.h"
-#include "cartan/serial/ik/solver/argmin_lm.h"
-#include "cartan/serial/ik/solver/argmin_lbfgsb.h"
-#endif
-
-#include "registrations.h"
-#include "detail/ik_python_helpers.h"
-#include "detail/expected_caster.h"
-#include "detail/format_double.h"
 
 #include <nanobind/eigen/dense.h>
 #include <nanobind/stl/optional.h>
@@ -43,34 +37,6 @@ using py_speed_runner  = cartan::basic_ik_runner<cartan::speed_ik_runner<KC>>;
 using py_robust_runner = cartan::basic_ik_runner<cartan::robust_ik_runner<KC>>;
 using py_dual_runner   = cartan::dual_ik_runner<KC>;
 
-#ifdef CARTAN_BUILD_ARGMIN
-// argmin-backed iterative IK runners. The LimitsPolicy per inner solver
-// follows the C++ default for each solver class -- LM cannot tolerate
-// post-step clamping because the trust-region step would no longer be the
-// step computed (post-clamp truncation breaks the Cauchy-point / dogleg
-// guarantees); SLSQP and L-BFGS-B both natively handle box constraints
-// inside the inner QP / projected line search, so clamp_limits matches
-// the inner policy's own bound-projection cadence. Each inner solver is
-// wrapped in restart_wrapper for parity with the speed/robust runners
-// above (Halton multi-start on stall / divergence / iteration_limit).
-using py_argmin_slsqp_inner =
-    cartan::restart_wrapper<KC,
-        cartan::argmin_slsqp<KC, cartan::clamp_limits>,
-        cartan::clamp_limits>;
-using py_argmin_lm_inner =
-    cartan::restart_wrapper<KC,
-        cartan::argmin_lm<KC, cartan::no_limits>,
-        cartan::no_limits>;
-using py_argmin_lbfgsb_inner =
-    cartan::restart_wrapper<KC,
-        cartan::argmin_lbfgsb<KC, cartan::clamp_limits>,
-        cartan::clamp_limits>;
-
-using py_argmin_slsqp_runner  = cartan::basic_ik_runner<py_argmin_slsqp_inner>;
-using py_argmin_lm_runner     = cartan::basic_ik_runner<py_argmin_lm_inner>;
-using py_argmin_lbfgsb_runner = cartan::basic_ik_runner<py_argmin_lbfgsb_inner>;
-#endif
-
 using cartan::python::format_double;
 
 /// Validate target finiteness + q_seed.size() == chain.num_joints().
@@ -94,6 +60,10 @@ inline void validate_ik_inputs(const char* fn_name,
         throw nb::value_error((std::string(fn_name) + ": q_seed.size() (" + std::to_string(q_seed.size())
                                + ") does not match chain.num_joints() (" + std::to_string(chain.num_joints()) + ")").c_str());
     }
+    if (!q_seed.allFinite())
+    {
+        throw nb::value_error((std::string(fn_name) + ": q_seed contains a NaN or non-finite component").c_str());
+    }
 }
 
 template <typename Runner>
@@ -110,8 +80,8 @@ inline cartan::python::IkResult run_ik(const KC& chain,
     };
     cartan::solver_options<double> opts{
         cfg.objective,
-        cfg.max_total_iterations,
-        cfg.halton_seed
+        cfg.halton_seed,
+        cfg.characteristic_length
     };
 
     Runner runner;
@@ -140,41 +110,25 @@ void register_ik(nb::module_& m)
     nb::enum_<cartan::ik_objective>(m, "IkObjective",
         "Secondary optimization objective for multi-policy IK racing.")
         .value("speed",              cartan::ik_objective::speed)
-        .value("min_distance",       cartan::ik_objective::min_distance)
+        .value("min_error_norm",     cartan::ik_objective::min_error_norm)
+        .value("min_joint_distance", cartan::ik_objective::min_joint_distance)
         .value("max_manipulability", cartan::ik_objective::max_manipulability)
         .value("max_isotropy",       cartan::ik_objective::max_isotropy);
-
-    nb::enum_<cartan::ik_termination_reason>(m, "IkTerminationReason",
-        "Fine-grained terminator reported by individual IK policies. "
-        "Distinguishes the inner solver's terminator (solver_*) from the "
-        "runner-level terminator (iteration_limit, stall_detected, ...).")
-        .value("unknown",                      cartan::ik_termination_reason::unknown)
-        .value("converged",                    cartan::ik_termination_reason::converged)
-        .value("iteration_limit",              cartan::ik_termination_reason::iteration_limit)
-        .value("stall_detected",               cartan::ik_termination_reason::stall_detected)
-        .value("divergence_detected",          cartan::ik_termination_reason::divergence_detected)
-        .value("joint_limit_hit",              cartan::ik_termination_reason::joint_limit_hit)
-        .value("solver_converged_pose_missed", cartan::ik_termination_reason::solver_converged_pose_missed)
-        .value("solver_ftol_reached",          cartan::ik_termination_reason::solver_ftol_reached)
-        .value("solver_xtol_reached",          cartan::ik_termination_reason::solver_xtol_reached)
-        .value("solver_objective_stalled",     cartan::ik_termination_reason::solver_objective_stalled)
-        .value("solver_roundoff_limited",      cartan::ik_termination_reason::solver_roundoff_limited)
-        .value("solver_stalled",               cartan::ik_termination_reason::solver_stalled)
-        .value("solver_aborted",               cartan::ik_termination_reason::solver_aborted)
-        .value("solver_budget_exhausted",      cartan::ik_termination_reason::solver_budget_exhausted)
-        .value("solver_max_iterations",        cartan::ik_termination_reason::solver_max_iterations)
-        .value("solver_diverged",              cartan::ik_termination_reason::solver_diverged);
 
     nb::enum_<cartan::ik_failure>(m, "IkFailure",
         "Coarse-grained failure category reported by an IK solve when it does "
         "not converge. Mirrors C++ ik_failure for typed dispatch on the "
         "Python side.")
-        .value("unreachable",           cartan::ik_failure::unreachable)
         .value("diverged",              cartan::ik_failure::diverged)
         .value("stalled",               cartan::ik_failure::stalled)
         .value("iteration_limit",       cartan::ik_failure::iteration_limit)
         .value("joint_limit_violation", cartan::ik_failure::joint_limit_violation)
-        .value("aborted",               cartan::ik_failure::aborted);
+        .value("aborted",               cartan::ik_failure::aborted)
+        .value("not_initialized",       cartan::ik_failure::not_initialized)
+        .value("dimension_mismatch",    cartan::ik_failure::dimension_mismatch)
+        .value("non_finite_input",      cartan::ik_failure::non_finite_input)
+        .value("unsupported_configuration",
+            cartan::ik_failure::unsupported_configuration);
 
     // ------------------------------------------------------------------
     // IkConfig (kw-only ctor; def_rw on each field)
@@ -189,18 +143,18 @@ void register_ik(nb::module_& m)
                int max_total_work_units,
                double position_tol,
                double orientation_tol,
-               int max_total_iterations,
                cartan::ik_objective objective,
-               unsigned int halton_seed)
+               unsigned int halton_seed,
+               double characteristic_length)
             {
                 new (self) IkConfig{
                     max_iterations_per_attempt,
                     max_total_work_units,
                     position_tol,
                     orientation_tol,
-                    max_total_iterations,
                     objective,
-                    halton_seed
+                    halton_seed,
+                    characteristic_length
                 };
             },
             nb::kw_only(),
@@ -208,23 +162,22 @@ void register_ik(nb::module_& m)
             nb::arg("max_total_work_units")       = 200,
             nb::arg("position_tol")               = 1e-6,
             nb::arg("orientation_tol")            = 1e-6,
-            nb::arg("max_total_iterations")       = 500,
             nb::arg("objective")                  = cartan::ik_objective::speed,
-            nb::arg("halton_seed")                = 42u)
+            nb::arg("halton_seed")                = 42u,
+            nb::arg("characteristic_length")      = 1.0)
         .def_rw("max_iterations_per_attempt", &IkConfig::max_iterations_per_attempt)
         .def_rw("max_total_work_units",       &IkConfig::max_total_work_units)
         .def_rw("position_tol",               &IkConfig::position_tol)
         .def_rw("orientation_tol",            &IkConfig::orientation_tol)
-        .def_rw("max_total_iterations",       &IkConfig::max_total_iterations)
         .def_rw("objective",                  &IkConfig::objective)
         .def_rw("halton_seed",                &IkConfig::halton_seed)
+        .def_rw("characteristic_length",      &IkConfig::characteristic_length)
         .def("__repr__",
             [](const IkConfig& c) {
                 return "IkConfig(max_iterations_per_attempt=" + std::to_string(c.max_iterations_per_attempt)
                      + ", max_total_work_units=" + std::to_string(c.max_total_work_units)
                      + ", position_tol=" + format_double(c.position_tol)
                      + ", orientation_tol=" + format_double(c.orientation_tol)
-                     + ", max_total_iterations=" + std::to_string(c.max_total_iterations)
                      + ", halton_seed=" + std::to_string(c.halton_seed) + ")";
             });
 
@@ -236,32 +189,29 @@ void register_ik(nb::module_& m)
         "Iterative IK solve outcome with always-populated diagnostic fields. "
         "The .converged flag is the success signal; on .converged == True the "
         "q field holds the converged joint vector, error_norm the final task "
-        "error magnitude, iterations the total work units charged, and "
-        "termination_reason carries the policy's fine-grained terminator. "
-        "On .converged == False the q field holds the best-seen position, "
-        "failure_reason names the coarse category (mirror of cartan::ik_failure), "
-        "and condition_number / near_singular reflect the failure-state "
-        "Jacobian. condition_number is 0.0 on the success path; cartan does "
-        "not currently compute it on convergence to keep the hot path "
-        "Jacobian-SVD free.")
+        "error magnitude, and iterations the total work units charged. "
+        "On .converged == False the q field holds the best-seen position and "
+        "failure_reason names the coarse category (mirror of cartan::ik_failure). "
+        "selection_metric is the value the winning candidate was ranked on under "
+        "selection_objective, and is None where the objective ranks nothing. "
+        "For the conditioning of the Jacobian at any "
+        "configuration, including a failed solve's .q, use singular_values, "
+        "condition_number, manipulability, isotropy or is_near_singular.")
         .def_ro("q",                  &IkResult::q)
         .def_ro("converged",          &IkResult::converged)
         .def_ro("iterations",         &IkResult::iterations)
         .def_ro("error_norm",         &IkResult::error_norm)
         .def_ro("failure_reason",     &IkResult::failure_reason)
         .def_ro("solver_index",       &IkResult::solver_index)
-        .def_ro("termination_reason", &IkResult::termination_reason)
-        .def_ro("near_singular",      &IkResult::near_singular)
-        .def_ro("condition_number",   &IkResult::condition_number)
+        .def_ro("selection_metric",   &IkResult::selection_metric)
+        .def_ro("selection_objective", &IkResult::selection_objective)
         .def("__repr__",
             [](const IkResult& r) {
                 return std::string("IkResult(converged=") + (r.converged ? "True" : "False")
                      + ", iterations=" + std::to_string(r.iterations)
                      + ", error_norm=" + format_double(r.error_norm)
                      + ", solver_index=" + std::to_string(r.solver_index)
-                     + ", failure_reason='" + r.failure_reason + "'"
-                     + ", near_singular=" + (r.near_singular ? "True" : "False")
-                     + ", condition_number=" + format_double(r.condition_number) + ")";
+                     + ", failure_reason='" + r.failure_reason + "')";
             });
 
     // ------------------------------------------------------------------
@@ -328,82 +278,6 @@ void register_ik(nb::module_& m)
         nb::arg("q_seed").noconvert(),
         nb::arg("config") = nb::none(),
         nb::call_guard<nb::gil_scoped_release>());
-
-#ifdef CARTAN_BUILD_ARGMIN
-    // ------------------------------------------------------------------
-    // argmin-backed iterative IK free functions. Only compiled when the
-    // wheel is built with CARTAN_BUILD_ARGMIN=ON; cartan.has_argmin
-    // exposes the build configuration as a module-level bool. Each
-    // solver shares the IkResult / IkConfig contract above; per-solver
-    // LimitsPolicy matches the C++ default for the inner solver class.
-    // ------------------------------------------------------------------
-
-    m.def("solve_ik_argmin_slsqp",
-        [](const KC& chain,
-           const SE3d& target,
-           const nb::DRef<const VectorXd>& q_seed,
-           std::optional<IkConfig> config) -> IkResult
-        {
-            validate_ik_inputs("solve_ik_argmin_slsqp", chain, target, q_seed);
-            const IkConfig cfg = config.value_or(IkConfig{});
-            return run_ik<py_argmin_slsqp_runner>(chain, target, q_seed, cfg);
-        },
-        "argmin-backed SLSQP iterative IK: restart-wrapped argmin_slsqp "
-        "policy with clamp_limits (native box-constraint handling in the "
-        "inner SQP QP). Same input/output contract as solve_ik. Only "
-        "available when the wheel is built with CARTAN_BUILD_ARGMIN=ON; "
-        "check cartan.has_argmin before calling.",
-        nb::arg("chain"),
-        nb::arg("target").noconvert(),
-        nb::arg("q_seed").noconvert(),
-        nb::arg("config") = nb::none(),
-        nb::call_guard<nb::gil_scoped_release>());
-
-    m.def("solve_ik_argmin_lm",
-        [](const KC& chain,
-           const SE3d& target,
-           const nb::DRef<const VectorXd>& q_seed,
-           std::optional<IkConfig> config) -> IkResult
-        {
-            validate_ik_inputs("solve_ik_argmin_lm", chain, target, q_seed);
-            const IkConfig cfg = config.value_or(IkConfig{});
-            return run_ik<py_argmin_lm_runner>(chain, target, q_seed, cfg);
-        },
-        "argmin-backed Levenberg-Marquardt iterative IK: restart-wrapped "
-        "argmin_lm policy with no_limits (LM trust-region semantics break "
-        "when joint values are clamped after a step, so the limits policy "
-        "is left as no_limits to match the C++ default). Same "
-        "input/output contract as solve_ik. Only available when the wheel "
-        "is built with CARTAN_BUILD_ARGMIN=ON; check cartan.has_argmin "
-        "before calling.",
-        nb::arg("chain"),
-        nb::arg("target").noconvert(),
-        nb::arg("q_seed").noconvert(),
-        nb::arg("config") = nb::none(),
-        nb::call_guard<nb::gil_scoped_release>());
-
-    m.def("solve_ik_argmin_lbfgsb",
-        [](const KC& chain,
-           const SE3d& target,
-           const nb::DRef<const VectorXd>& q_seed,
-           std::optional<IkConfig> config) -> IkResult
-        {
-            validate_ik_inputs("solve_ik_argmin_lbfgsb", chain, target, q_seed);
-            const IkConfig cfg = config.value_or(IkConfig{});
-            return run_ik<py_argmin_lbfgsb_runner>(chain, target, q_seed, cfg);
-        },
-        "argmin-backed L-BFGS-B iterative IK: restart-wrapped "
-        "argmin_lbfgsb policy with clamp_limits (native box-constraint "
-        "handling in the inner projected line search). Same input/output "
-        "contract as solve_ik. Only available when the wheel is built "
-        "with CARTAN_BUILD_ARGMIN=ON; check cartan.has_argmin before "
-        "calling.",
-        nb::arg("chain"),
-        nb::arg("target").noconvert(),
-        nb::arg("q_seed").noconvert(),
-        nb::arg("config") = nb::none(),
-        nb::call_guard<nb::gil_scoped_release>());
-#endif
 }
 
 }

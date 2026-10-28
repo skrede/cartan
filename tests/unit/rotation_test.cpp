@@ -5,6 +5,7 @@
 #include <catch2/catch_template_test_macros.hpp>
 
 #include <cmath>
+#include <limits>
 #include <numbers>
 #include <type_traits>
 
@@ -150,7 +151,7 @@ TEST_CASE("rotation: from_matrix roundtrip", "[rotation]")
     auto r = cartan::rotation<world, base>{cartan::so3<double>::exp(phi)};
     auto result = cartan::rotation<world, base>::from_matrix(r.matrix());
     REQUIRE(result.has_value());
-    REQUIRE((result.value().matrix() - r.matrix()).norm() < 1e-12);
+    REQUIRE(((*result).matrix() - r.matrix()).norm() < 1e-12);
 }
 
 TEST_CASE("rotation: from_quaternion", "[rotation]")
@@ -159,7 +160,7 @@ TEST_CASE("rotation: from_quaternion", "[rotation]")
     auto result = cartan::rotation<world, base>::from_quaternion(q);
     REQUIRE(result.has_value());
     auto I = cartan::matrix3<double>::Identity();
-    REQUIRE((result.value().matrix() - I).norm() < 1e-14);
+    REQUIRE(((*result).matrix() - I).norm() < 1e-14);
 }
 
 // ============================================================================
@@ -186,4 +187,30 @@ TEST_CASE("rotation: m_value is accessible as so3", "[rotation]")
     auto R = r.m_value.matrix();
     auto I = cartan::matrix3<double>::Identity();
     REQUIRE((R - I).norm() < 1e-14);
+}
+
+// ============================================================================
+// Nonfinite rejection through delegation
+// ============================================================================
+
+/// Both factories forward to so3 and add no test of their own, so the guard
+/// there is what rejects here. The off-diagonal infinity is the position that
+/// was admitted before that guard existed.
+TEMPLATE_TEST_CASE("rotation: from_matrix and from_quaternion reject nonfinite input",
+    "[rotation][nonfinite]", double, float)
+{
+    using S = TestType;
+    using lim = std::numeric_limits<S>;
+
+    cartan::matrix3<S> R = cartan::matrix3<S>::Identity();
+    R(0, 1) = lim::infinity();
+    auto from_matrix = cartan::rotation<world, base, S>::from_matrix(R);
+    REQUIRE_FALSE(from_matrix.has_value());
+    REQUIRE(from_matrix.error() == cartan::lie_failure::non_finite_input);
+
+    cartan::quaternion<S> q(S(1), S(0), S(0), S(0));
+    q.coeffs()(1) = lim::quiet_NaN();
+    auto from_quaternion = cartan::rotation<world, base, S>::from_quaternion(q);
+    REQUIRE_FALSE(from_quaternion.has_value());
+    REQUIRE(from_quaternion.error() == cartan::lie_failure::non_finite_input);
 }

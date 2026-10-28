@@ -25,10 +25,10 @@ using `FetchContent` (see below). Python bindings are available on PyPI: `pip in
 ## Features
 
 - **Lie groups:** SO(2), SE(2), SO(3), SE(3) with exp/log, adjoint, coadjoint, left/right Jacobians.
-- **Header-only:** depends on no compiled library artifacts, Eigen as the sole required dependency. Use the system-install or have CMake fetch it automatically.
+- **Header-only:** the Lie-group and serial-chain modules depend on no compiled library artifacts, with Eigen as their only required dependency. Use the system-install or have CMake fetch it automatically. The optional robot-description loader is the one exception &mdash; see Requirements.
 - **Compile-time frame safety:** Transforms and rotations are templated on frames, `transform<From_frame, To_frame>` and `rotation<From_frame, To_frame>`.
 - **Product of Exponentials kinematics:** Screw-theory-based FK through Product of Exponentials (PoE), either runtime-specified or compile-time (templated) for 1-7 DOF chains.
-- **Policy-based IK solvers:** Damped Least Squares (DLS), Levenberg-Marquardt (LM), and Sequential Quadratic Programming (SQP) &mdash; or roll your own.
+- **Policy-based IK solvers:** Damped Least Squares (DLS), Levenberg-Marquardt (LM), projected LM, L-BFGS-B and Newton-Raphson &mdash; or roll your own.
 - **Policy-based solver runners:** Run one or multiple Cartan IK solvers until a solution is found; tunable convergence criteria.
 - **Analytic IK solvers:** Solve kinematics analytically for 2R, 3R or 6R Pieper manipulators, or robots with Ortho-Parallel Wrists (OPW).
 - **Real-time friendly:** User controls the execution: solver runners can step until converged, follow a budget (perform N steps), or step once.
@@ -44,7 +44,7 @@ purpose-built tool cartan composes with:
 - **Collision detection** &mdash; use [hpp-fcl / Coal](https://github.com/coal-library/coal).
 - **Motion / trajectory planning** &mdash; use a planner (OMPL) or a time-parameterizer
   ([TOPP-RA](https://github.com/hungpham2511/toppra)).
-- **State estimation / filtering** &mdash; see [ctrlpp](https://github.com/skrede/ctrlpp).
+- **State estimation / filtering** &mdash; use a dedicated estimation library.
 - **Visualization** &mdash; use [threepp](https://github.com/markaren/threepp) or your own renderer.
 - **Middleware bindings** (ROS / KDL / orocos) &mdash; zero coupling by design.
 - **Custom linear algebra** &mdash; Eigen only; cartan reinvents no matrix math.
@@ -56,36 +56,52 @@ cartan owns kinematics and stays out of everything else.
 
 ## Requirements
 
-- C++20 compiler &mdash; CI builds and tests GCC 14, Clang 18, and MSVC 2022 (VS 17.x); older C++20 toolchains are untested
+- C++20 compiler &mdash; CI builds and tests GCC 14, Clang 18, AppleClang (Xcode 16.2), and MSVC 2022 (VS 17.x); older C++20 toolchains are untested
 - CMake 3.28+
-- Eigen 3.4+ (auto-fetched via FetchContent)
-- For embedded targets: an exceptions-off C++20 GCC backend &mdash; ESP-IDF 5.1+ / 6.x
+- Eigen 3.4+ (found, or fetched via FetchContent with `CARTAN_CMAKE_FETCH_DEPS=ON`) &mdash; the only dependency of the
+  Lie-group and serial-chain modules
+- For the robot-description loader (`CARTAN_BUILD_URDF`, off by default): a
+  robot-description reader that handles URDF and xacro, which brings its own XML
+  library with it. Enabling the loader is what makes cartan depend on more than
+  Eigen; the rest of the library, including every embedded configuration, does not.
+- For embedded targets: an exceptions-off C++20 GCC backend &mdash; ESP-IDF 5.1+
   (esp32, esp32c3) or arm-none-eabi (cortex-m7, cortex-m4f).
 
 ## Quick Install
 
 ### CMake FetchContent (recommended)
 
+<!-- cartan:recipe kind=cmake name=fetchcontent -->
 ```cmake
 include(FetchContent)
+set(CARTAN_CMAKE_FETCH_DEPS ON)
 FetchContent_Declare(
     cartan
     GIT_REPOSITORY https://github.com/skrede/cartan.git
-    GIT_TAG        v0.4.2
+    GIT_TAG        v0.4.3
 )
 FetchContent_MakeAvailable(cartan)
 
 target_link_libraries(my_app PRIVATE cartan::cartan)
 ```
 
-This pulls Cartan and its Eigen dependency automatically. No manual installation required.
+`CARTAN_CMAKE_FETCH_DEPS` is what pulls Eigen too; without it Cartan expects to
+find an installed Eigen. This configuration builds but does not install: a
+dependency fetched into your build tree belongs to no export set, so Cartan
+generates no install rules under it.
 
 ### find_package
 
+<!-- cartan:recipe kind=cmake name=find-package -->
 ```cmake
 find_package(cartan CONFIG REQUIRED)
 target_link_libraries(my_app PRIVATE cartan::cartan)
 ```
+
+Installing Cartan is the other way round: build it with Eigen, and the URDF
+module's description reader if you enabled it, available as findable packages
+rather than fetched, or the configure step refuses to generate an install surface
+it cannot make resolvable.
 
 ### ESP-IDF Component Manager
 
@@ -93,6 +109,7 @@ Cartan ships an `idf_component.yml` at the repo root. Add it to your firmware
 project's `main/idf_component.yml` once it is published to the ESP Component
 Registry, or pin a Git revision directly:
 
+<!-- cartan:unbuilt kind=sketch reason="a stanza for a consumer's component manifest, published for a registry this repository does not build against" -->
 ```yaml
 dependencies:
   skrede/cartan:
@@ -116,7 +133,7 @@ live under `tests/embedded/esp32-smoke/` (see that directory's README for the
 - [Documentation Index](https://github.com/skrede/cartan/blob/master/docs/README.md) &mdash; API reference, background theory, guides.
 - [Examples](https://github.com/skrede/cartan/tree/master/examples) &mdash; runnable programs for the core feature areas (Lie basics, frame safety, FK/Jacobians, basic and composed IK).
 - [Tutorials](https://github.com/skrede/cartan/tree/master/examples/tutorials) &mdash; step-by-step walkthroughs for FK, Jacobians, IK, and URDF loading.
-- [Python](https://github.com/skrede/cartan/tree/master/python) &mdash; tutorials and setup guide for Cartan's Python API.
+- [Python](https://github.com/skrede/cartan/blob/master/docs/python.md) &mdash; setup guide and C++/Python parity for Cartan's Python API.
 
 ## Contributing
 

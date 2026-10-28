@@ -1,0 +1,157 @@
+name: Quality
+
+# The static checks that need no compiler live here so they do not queue behind a
+# build. Unlike the build workflows this one carries no path filter: the register
+# the size gate reads is a markdown file, so ignoring '**.md' would skip exactly
+# the edit that can turn the gate red.
+on:
+  push:
+    branches: [master, develop, 'milestone/**']
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  static-checks:
+    runs-on: ubuntu-24.04
+    name: build-free static checks
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      # A gate only ever run against a tree that passes cannot tell you it still
+      # fails. These fixtures are repositories built to hit one verdict each, so a
+      # widened exclusion or a dropped extension shows up as a green tree and a red
+      # fixture rather than as nothing at all.
+      - name: Size-gate fixtures
+        run: python3 tools/check_file_size_test.py
+
+      - name: File sizes against the exception register
+        run: python3 tools/check_file_size.py
+
+      # Same ordering, same reason: the fixtures prove the gate still goes red on
+      # each construct, and only then is a green tree worth anything. The build
+      # configuration is scanned alongside the sources because the switch that
+      # would make an untrusted description executable is reached by editing
+      # CMake, not C++.
+      - name: Forbidden-call fixtures
+        run: python3 tools/check_forbidden_calls_test.py
+
+      - name: Forbidden calls and build settings
+        run: python3 tools/check_forbidden_calls.py
+
+      # The study's analysis script is what its reproducibility claim rests on: a
+      # reader is offered the records, that script and nothing else. Its refusals
+      # are what stop a rebuilt table from quietly losing a participant, mixing two
+      # experiments or publishing a survivor-conditioned mean with no denominator,
+      # so each fixture is a record set built to hit one refusal and each has been
+      # seen to go red without it.
+      - name: Study report fixtures
+        run: python3 tools/bench_study_report_test.py
+
+  # The linter needs a compile database and therefore a compiler, so it is its own
+  # job: the checks above stay build-free and finish while this one is still
+  # configuring.
+  linter:
+    runs-on: ubuntu-24.04
+    name: clang-tidy over the compile database
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # A linter's verdict is a property of its version: a check's diagnostics move
+      # between major releases, so an unpinned tool is an unpinned verdict. The
+      # compiler that writes the compile database is pinned to the same release, so
+      # the flags in it are flags this clang-tidy understands.
+      - name: Install the pinned toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang-18 clang-tidy-18 clang-tools-18 ninja-build
+          clang-tidy-18 --version
+
+      # Ninja scans C++20 sources for module dependencies by default and writes an
+      # @<target>.modmap into every compile command. Those files are produced by the
+      # build, so clang-tidy run against an unbuilt tree fails to open them and every
+      # translation unit reports clang-diagnostic-error instead of being linted.
+      - name: Configure
+        env:
+          CC: clang-18
+          CXX: clang++-18
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DCMAKE_CXX_SCAN_FOR_MODULES=OFF \
+            -DCARTAN_BUILD_TESTS=ON \
+            -DCARTAN_BUILD_URDF=ON \
+            -DCARTAN_CMAKE_FETCH_DEPS=ON
+
+      # Fetching the dependencies puts their sources in the database -- a hundred and
+      # seven entries against this project's eighty-odd -- and they are not ours to
+      # lint: they carry findings from checks this gate enables, and one of them ships
+      # a check list of its own that replaces this repository's for every one of its
+      # units. So the linter reads a database holding only first-party units. An empty
+      # or module-map-carrying database is the other direction of the same fault: it
+      # lints nothing and exits zero.
+      - name: Build the first-party compile database
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+          db = json.load(open('build/compile_commands.json'))
+          def cmd(e):
+              return e.get('command', ' '.join(e.get('arguments', [])))
+          ours = [e for e in db if '/_deps/' not in e['file']]
+          print(f'database entries: {len(db)}, first-party: {len(ours)}')
+          if len(ours) < 60:
+              sys.exit(f'only {len(ours)} first-party entries; expected the full test set')
+          bad = [e['file'] for e in ours if 'modmap' in cmd(e)]
+          if bad:
+              sys.exit(f'{len(bad)} entries reference a module map that only a build produces')
+          os.makedirs('build/tidy', exist_ok=True)
+          json.dump(ours, open('build/tidy/compile_commands.json', 'w'))
+          open('build/tidy/first-unit.txt', 'w').write(ours[0]['file'])
+          PY
+
+      # clang-tidy resolves its configuration from each unit's own source file, not
+      # from the working directory, so a check set listed without naming a file is not
+      # the set the lint will use. Every unit here lives under tests/, which carries a
+      # configuration of its own; asking about the root one would certify a file that
+      # governs nothing being linted. The count is asserted because the sentinels
+      # survive a configuration that has thrown almost everything away, and because
+      # surrendering a check should be a visible two-line diff rather than a silent
+      # one-line one.
+      - name: Assert the repository configuration governs the units being linted
+        run: |
+          UNIT=$(cat build/tidy/first-unit.txt)
+          clang-tidy-18 --list-checks -p build/tidy "$UNIT" > build/enabled.txt
+          COUNT=$(grep -c '^    ' build/enabled.txt)
+          echo "effective checks for $UNIT: $COUNT"
+          if ! grep -qx '    modernize-use-transparent-functors' build/enabled.txt; then
+            echo 'the effective check set is not this repository configuration'
+            exit 1
+          fi
+          if grep -qx '    readability-function-size' build/enabled.txt; then
+            echo 'a check the configuration disables is enabled, so it was not read'
+            exit 1
+          fi
+          if [ "$COUNT" -lt 128 ]; then
+            echo "only $COUNT checks are in force; the gated set has been narrowed"
+            exit 1
+          fi
+
+      # The gated set is the check list in .clang-tidy and the one under tests/, and
+      # nothing else; no check names appear here. Promoting every remaining finding to
+      # an error is what makes this a gate rather than a report.
+      - name: Lint
+        run: |
+          run-clang-tidy-18 \
+            -clang-tidy-binary clang-tidy-18 \
+            -p build/tidy \
+            -header-filter='.*/lib/cartan-.*' \
+            -warnings-as-errors='*' \
+            -j"$(nproc)"

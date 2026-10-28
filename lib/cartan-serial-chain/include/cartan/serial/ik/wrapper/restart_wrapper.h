@@ -15,6 +15,7 @@
 #include "cartan/serial/ik/ik_status.h"
 #include "cartan/serial/ik/policy/error_weight.h"
 #include "cartan/serial/ik/concepts/solve_concept.h"
+#include "cartan/serial/ik/detail/setup_validation.h"
 #include "cartan/serial/ik/detail/limit_enforcement.h"
 #include "cartan/serial/ik/solver/detail/halton_seed_generator.h"
 #include "cartan/serial/ik/solver/projected_lm.h"
@@ -49,6 +50,21 @@ concept has_lambda = requires(const S& s)
     { s.lambda() } -> std::convertible_to<typename S::scalar_type>;
 };
 
+/// Detect whether a policy accepts a task weight through a five-argument
+/// setup. Only some policies apply a weight, so the wrapper constrains its own
+/// weighted setup on this rather than accepting a weight it cannot pass on.
+template <typename S, typename C>
+concept weighted_setup_policy = requires(
+    S& s,
+    const C& chain,
+    const se3<typename C::scalar_type>& target,
+    const typename joint_state<typename C::scalar_type, C::joints>::position_type& q0,
+    const convergence_criteria<typename C::scalar_type>& criteria,
+    const error_weight<typename C::scalar_type>& weight)
+{
+    { s.setup(chain, target, q0, criteria, weight) };
+};
+
 }
 
 /// Restart wrapper solve policy with warm-start lambda preservation.
@@ -80,21 +96,31 @@ public:
         int max_restarts{20};
     };
 
-    restart_wrapper() = default;
+    restart_wrapper()
+        : m_best_q(detail::poison_joint_position<scalar_type, joints>())
+        , m_seed_reference(detail::poison_joint_position<scalar_type, joints>())
+    {
+    }
 
     explicit restart_wrapper(InnerPolicy inner)
         : m_inner(std::move(inner))
+        , m_best_q(detail::poison_joint_position<scalar_type, joints>())
+        , m_seed_reference(detail::poison_joint_position<scalar_type, joints>())
     {
     }
 
     explicit restart_wrapper(const options& opts)
         : m_options(opts)
+        , m_best_q(detail::poison_joint_position<scalar_type, joints>())
+        , m_seed_reference(detail::poison_joint_position<scalar_type, joints>())
     {
     }
 
     restart_wrapper(const options& opts, InnerPolicy inner)
         : m_inner(std::move(inner))
         , m_options(opts)
+        , m_best_q(detail::poison_joint_position<scalar_type, joints>())
+        , m_seed_reference(detail::poison_joint_position<scalar_type, joints>())
     {
     }
 
@@ -107,8 +133,8 @@ public:
         m_chain = std::cref(chain);
         m_target = target;
         m_criteria = criteria;
-        m_weight.reset();
-        m_seed_gen.emplace(chain);
+        m_weight = error_weight<scalar_type>{};
+        m_seed_reference = q0;
         m_restart_count = 0;
         m_total_iterations = 0;
         m_best_lambda = scalar_type(0);
@@ -117,6 +143,18 @@ public:
         m_best_feasible = false;
         m_best_valid = false;
         m_aborted = false;
+        m_best_q = detail::poison_joint_position<scalar_type, joints>(chain.num_joints());
+        m_setup_joints = chain.num_joints();
+
+        // Assigned on both outcomes, not only on failure: a wrapper is reusable,
+        // and a latch written only when the check fails would report the stale
+        // rejection for every later solve.
+        auto held = cartan::detail::validate_solve_inputs(chain, target, q0);
+        m_precondition = held ? ik_status::running : held.error();
+        if (!held)
+        {
+            return;
+        }
 
         m_inner.setup(chain, target, q0, criteria);
     }
@@ -127,12 +165,13 @@ public:
         const position_type& q0,
         const convergence_criteria<scalar_type>& criteria,
         const error_weight<scalar_type>& weight)
+        requires detail::weighted_setup_policy<InnerPolicy, Chain>
     {
         m_chain = std::cref(chain);
         m_target = target;
         m_criteria = criteria;
         m_weight = weight;
-        m_seed_gen.emplace(chain);
+        m_seed_reference = q0;
         m_restart_count = 0;
         m_total_iterations = 0;
         m_best_lambda = scalar_type(0);
@@ -141,15 +180,17 @@ public:
         m_best_feasible = false;
         m_best_valid = false;
         m_aborted = false;
+        m_best_q = detail::poison_joint_position<scalar_type, joints>(chain.num_joints());
+        m_setup_joints = chain.num_joints();
 
-        if constexpr (requires { m_inner.setup(chain, target, q0, criteria, weight); })
+        auto held = cartan::detail::validate_solve_inputs(chain, target, q0);
+        m_precondition = held ? ik_status::running : held.error();
+        if (!held)
         {
-            m_inner.setup(chain, target, q0, criteria, weight);
+            return;
         }
-        else
-        {
-            m_inner.setup(chain, target, q0, criteria);
-        }
+
+        m_inner.setup(chain, target, q0, criteria, weight);
     }
 
     /// Deleted rvalue overloads: the wrapper borrows the chain for its whole
@@ -169,13 +210,27 @@ public:
         const se3<scalar_type>&,
         const position_type&,
         const convergence_criteria<scalar_type>&,
-        const error_weight<scalar_type>&) = delete;
+        const error_weight<scalar_type>&)
+        requires detail::weighted_setup_policy<InnerPolicy, Chain> = delete;
 
     step_result<scalar_type> step(const Chain& chain, int N)
     {
+        // The restart path re-seeds from a generator built on the setup-time
+        // chain and hands the result to the step-time one, so the two must be
+        // the same chain before either is touched.
+        m_precondition = cartan::detail::chain_bound_status(
+            m_precondition, m_setup_joints, chain);
+
+        // A wrapper-level rejection never reached the inner solver, so there is
+        // nothing to step and nothing to restart from.
+        if (cartan::detail::is_setup_failure(m_precondition))
+        {
+            return {m_precondition, {0, error_norm()}};
+        }
+
         if (m_aborted)
         {
-            return {ik_status::stalled, {0, m_inner.error_norm()}};
+            return {ik_status::aborted, {0, m_inner.error_norm()}};
         }
 
         auto inner_result = m_inner.step(chain, N);
@@ -183,6 +238,14 @@ public:
 
         if (inner_result.status == ik_status::converged
             || inner_result.status == ik_status::running)
+        {
+            return inner_result;
+        }
+
+        // A bad argument is not a failed attempt: it is returned before the
+        // best-candidate tracking so it neither counts against the restart
+        // budget nor pollutes the best-so-far, and no fresh seed can repair it.
+        if (cartan::detail::is_setup_failure(inner_result.status))
         {
             return inner_result;
         }
@@ -197,44 +260,50 @@ public:
             return inner_result;
         }
 
-        auto q_new = (*m_seed_gen)(m_restart_count);
-
-        if (m_weight.has_value())
-        {
-            if constexpr (requires { m_inner.setup(chain, m_target, q_new, m_criteria, *m_weight); })
-            {
-                m_inner.setup(chain, m_target, q_new, m_criteria, *m_weight);
-            }
-            else
-            {
-                m_inner.setup(chain, m_target, q_new, m_criteria);
-            }
-        }
-        else
-        {
-            m_inner.setup(chain, m_target, q_new, m_criteria);
-        }
-
+        reseed_inner(chain,
+            halton_seed_generator<Chain>{m_chain->get(), m_seed_reference}(m_restart_count));
         apply_warm_start_lambda();
 
         ++m_restart_count;
         return {ik_status::running, {inner_result.metrics.units_consumed, m_inner.error_norm()}};
     }
 
-    bool converged() const { return m_inner.converged(); }
+    // All three read through the same gate: a refused setup ran no attempt, so
+    // the inner solver still holds the previous solve's answer and reporting it
+    // would present that solve as this one's. They are part of the solve_policy
+    // concept, so a caller reading them instead of step()'s status must not see
+    // a converged solve with an error norm of zero.
+    bool converged() const
+    {
+        return !cartan::detail::is_setup_failure(m_precondition) && m_inner.converged();
+    }
+
     // On a converged solve the live inner iterate is the answer; on a terminal
     // solve report the feasibility-first best-so-far captured across restarts
-    // rather than the last (discarded) attempt.
+    // rather than the last (discarded) attempt. A refused setup ran no attempt,
+    // so both report the poison: a zero configuration reads as the home pose and
+    // the largest representable residual as a measured distance. The sentinel
+    // the retention below minimizes against keeps that largest value, which is
+    // what it is for -- it is never reported.
     position_type solution() const
     {
+        if (cartan::detail::is_setup_failure(m_precondition))
+        {
+            return m_best_q;
+        }
         if (m_inner.converged() || !m_best_valid)
         {
             return m_inner.solution();
         }
         return m_best_q;
     }
+
     scalar_type error_norm() const
     {
+        if (cartan::detail::is_setup_failure(m_precondition))
+        {
+            return std::numeric_limits<scalar_type>::quiet_NaN();
+        }
         if (m_inner.converged() || !m_best_valid)
         {
             return m_inner.error_norm();
@@ -242,6 +311,7 @@ public:
         return m_best_q_error;
     }
     int iterations() const { return m_total_iterations; }
+    int restarts() const { return m_restart_count; }
 
     void abort()
     {
@@ -292,6 +362,18 @@ private:
         }
     }
 
+    void reseed_inner(const Chain& chain, const position_type& q0)
+    {
+        if constexpr (detail::weighted_setup_policy<InnerPolicy, Chain>)
+        {
+            m_inner.setup(chain, m_target, q0, m_criteria, m_weight);
+        }
+        else
+        {
+            m_inner.setup(chain, m_target, q0, m_criteria);
+        }
+    }
+
     void apply_warm_start_lambda()
     {
         if constexpr (detail::has_set_lambda<InnerPolicy>)
@@ -308,13 +390,15 @@ private:
     std::optional<std::reference_wrapper<const Chain>> m_chain{};
     se3<scalar_type> m_target{se3<scalar_type>::identity()};
     convergence_criteria<scalar_type> m_criteria{};
-    std::optional<error_weight<scalar_type>> m_weight{};
-    std::optional<halton_seed_generator<Chain>> m_seed_gen{};
+    error_weight<scalar_type> m_weight{};
+    ik_status m_precondition{ik_status::not_initialized};
     int m_restart_count{};
+    int m_setup_joints{-1};
     int m_total_iterations{};
     scalar_type m_best_lambda{};
     scalar_type m_best_error{std::numeric_limits<scalar_type>::max()};
-    position_type m_best_q{};
+    position_type m_best_q;
+    position_type m_seed_reference;
     scalar_type m_best_q_error{std::numeric_limits<scalar_type>::max()};
     bool m_best_feasible{false};
     bool m_best_valid{false};

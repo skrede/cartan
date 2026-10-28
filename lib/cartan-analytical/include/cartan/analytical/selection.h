@@ -11,6 +11,7 @@
 
 #include <limits>
 #include <cstddef>
+#include <optional>
 #include <algorithm>
 
 namespace cartan
@@ -34,7 +35,7 @@ closest_to_seed(const analytical_result<Scalar, N, MaxSolutions>& r,
     if (it == r.end())
     {
         return cartan::unexpected(analytical_error<Scalar>{
-            analytical_failure::unreachable, Scalar(0)});
+            analytical_failure::unreachable, std::nullopt});
     }
 
     return *it;
@@ -81,7 +82,7 @@ closest_to_seed(const unwrapped_result<Scalar, N, MaxSolutions>& r,
     if (pick < 0)
     {
         return cartan::unexpected(analytical_error<Scalar>{
-            analytical_failure::unreachable, Scalar(0)});
+            analytical_failure::unreachable, std::nullopt});
     }
 
     return selected_solution<Scalar, N>{

@@ -1,12 +1,14 @@
 #include <cartan/lie/se3.h>
-
 #include <cartan/lie/hat_vee.h>
+
+#include <cartan/detail/epsilon.h>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_template_test_macros.hpp>
 
 #include <cmath>
+#include <limits>
 #include <numbers>
 
 using Catch::Approx;
@@ -215,7 +217,7 @@ TEST_CASE("se3: from_matrix with valid SE(3)", "[se3]")
     auto T = cartan::se3<double>::exp(v);
     auto result = cartan::se3<double>::from_matrix(T.matrix());
     REQUIRE(result.has_value());
-    REQUIRE((result.value().matrix() - T.matrix()).norm() < 1e-10);
+    REQUIRE(((*result).matrix() - T.matrix()).norm() < 1e-10);
 }
 
 TEST_CASE("se3: from_matrix rejects invalid bottom row", "[se3]")
@@ -392,4 +394,120 @@ TEST_CASE("se3: isApprox is quaternion double-cover safe", "[se3]")
     cartan::se3<double> b(cartan::so3<double>(neg), trans);
     // Same rotation built from q and -q, same translation -> identical transform
     REQUIRE(a.isApprox(b, 1e-12));
+}
+
+// ============================================================================
+// Nonfinite rejection
+// ============================================================================
+
+/// The affine-row and rotation-block tests as they read without a finiteness
+/// guard in front of them, with every comparison negated exactly as the factory
+/// spells it: `!(deviation > tol)` is true for a NaN where `deviation <= tol` is
+/// false. Nothing in this chain reads the translation block, which is why the
+/// translation cases below assert that it admits every value class.
+template <typename S>
+static bool unguarded_gate_admits(const cartan::matrix4<S>& T)
+{
+    const S tol = cartan::detail::sqrt_epsilon_v<S>;
+    const bool affine_row_ok = !(std::abs(T(3, 0)) > tol) && !(std::abs(T(3, 1)) > tol)
+        && !(std::abs(T(3, 2)) > tol) && !(std::abs(T(3, 3) - S(1)) > tol);
+
+    const cartan::matrix3<S> R = T.template block<3, 3>(0, 0);
+    const cartan::matrix3<S> RtR = R.transpose() * R;
+    return affine_row_ok
+        && !((RtR - cartan::matrix3<S>::Identity()).norm() > tol)
+        && !(std::abs(R.determinant() - S(1)) > tol);
+}
+
+template <typename S>
+static void expect_affine_row_rejected(S poison, bool unguarded_admits)
+{
+    for (int j = 0; j < 4; ++j)
+    {
+        cartan::matrix4<S> T = cartan::matrix4<S>::Identity();
+        T(3, j) = poison;
+
+        auto result = cartan::se3<S>::from_matrix(T);
+        REQUIRE_FALSE(result.has_value());
+        REQUIRE(result.error() == cartan::lie_failure::non_finite_input);
+        REQUIRE(unguarded_gate_admits<S>(T) == unguarded_admits);
+    }
+}
+
+template <typename S>
+static void expect_translation_rejected(S poison, bool unguarded_admits)
+{
+    for (int i = 0; i < 3; ++i)
+    {
+        cartan::matrix4<S> T = cartan::matrix4<S>::Identity();
+        T(i, 3) = poison;
+
+        auto result = cartan::se3<S>::from_matrix(T);
+        REQUIRE_FALSE(result.has_value());
+        REQUIRE(result.error() == cartan::lie_failure::non_finite_input);
+        REQUIRE(unguarded_gate_admits<S>(T) == unguarded_admits);
+    }
+}
+
+TEMPLATE_TEST_CASE("se3: from_matrix rejects a nonfinite affine row",
+    "[se3][nonfinite]", double, float)
+{
+    using S = TestType;
+    using lim = std::numeric_limits<S>;
+
+    expect_affine_row_rejected<S>(lim::quiet_NaN(), true);
+    expect_affine_row_rejected<S>(-lim::quiet_NaN(), true);
+    expect_affine_row_rejected<S>(lim::infinity(), false);
+    expect_affine_row_rejected<S>(-lim::infinity(), false);
+}
+
+TEMPLATE_TEST_CASE("se3: from_matrix rejects a nonfinite translation block",
+    "[se3][nonfinite]", double, float)
+{
+    using S = TestType;
+    using lim = std::numeric_limits<S>;
+
+    expect_translation_rejected<S>(lim::quiet_NaN(), true);
+    expect_translation_rejected<S>(-lim::quiet_NaN(), true);
+    expect_translation_rejected<S>(lim::infinity(), true);
+    expect_translation_rejected<S>(-lim::infinity(), true);
+}
+
+/// Ties the predicate above to the factory it stands in for. On finite input the
+/// two must agree exactly, so widening either tolerance, or replacing either
+/// comparison, breaks this case -- which the nonfinite corpus above cannot do,
+/// since both of its sides are written here. Each shape straddles a different
+/// branch: the affine row, the rotation block's orthogonality, its determinant.
+TEMPLATE_TEST_CASE("se3: the unguarded chain agrees with from_matrix on finite input",
+    "[se3][nonfinite]", double, float)
+{
+    using S = TestType;
+    const S tol = cartan::detail::sqrt_epsilon_v<S>;
+
+    cartan::vector3<S> phi;
+    phi << S(0.3), S(-0.5), S(0.7);
+
+    cartan::matrix4<S> exact = cartan::matrix4<S>::Identity();
+    exact.template block<3, 3>(0, 0) = cartan::so3<S>::exp(phi).matrix();
+    exact.template block<3, 1>(0, 3) << S(0.5), S(-0.3), S(0.7);
+
+    cartan::matrix4<S> marginal_row = exact;
+    marginal_row(3, 1) = S(2) * tol;
+
+    cartan::matrix4<S> marginal_rotation = exact;
+    marginal_rotation(0, 0) += S(2) * tol;
+
+    cartan::matrix4<S> reflection = exact;
+    reflection.template block<3, 3>(0, 0) = cartan::matrix3<S>::Identity();
+    reflection(2, 2) = S(-1);
+
+    cartan::matrix4<S> gross = exact;
+    gross.template block<3, 3>(0, 0) *= S(2);
+
+    for (const cartan::matrix4<S>& T :
+        {exact, marginal_row, marginal_rotation, reflection, gross})
+    {
+        REQUIRE(unguarded_gate_admits<S>(T)
+            == cartan::se3<S>::from_matrix(T).has_value());
+    }
 }

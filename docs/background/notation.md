@@ -59,16 +59,16 @@ textbooks and to their Cartan C++ implementations.
 | Screw axis | $\mathcal{S} = (\omega, v)$, $\|\omega\|=1$ | -- | -- | `screw_axis<Scalar>` |
 | Screw angle/distance | $\theta$ (revolute) / $d$ (prismatic) | -- | -- | Joint variable `q` |
 | Angular velocity | $\omega$ | $\omega$ | $\boldsymbol{\omega}$ | Top 3 of twist vector |
-| Linear velocity | $v$ | $\dot{p}$ | $\boldsymbol{\nu}$ | Bottom 3 of twist vector |
+| Linear velocity | $v$ | $\dot{p}_e$ (end-effector origin, not $v_s$) | $\boldsymbol{\nu}$ | Bottom 3 of twist vector |
 
 ### Kinematics
 
 | Concept | Lynch & Park [1] | Siciliano et al. [3] | Barfoot [2] | Cartan C++ |
 |---------|-----------------|---------------------|-------------|-----------|
 | Forward kinematics | $T(\theta) = e^{[\mathcal{S}_1]\theta_1} \cdots e^{[\mathcal{S}_n]\theta_n} M$ | $T(q)$ | $\mathbf{T}(q)$ | `forward_kinematics(chain, q)` |
-| Home configuration | $M$ | -- | -- | `chain<...>::home()` |
-| Space Jacobian | $J_s(\theta)$ | $J$ (geometric) | $\mathbf{J}$ | `space_jacobian(chain, q)` |
-| Body Jacobian | $J_b(\theta)$ | -- | -- | `body_jacobian(chain, q)` |
+| Home configuration | $M$ | -- | -- | `kinematic_chain<Scalar, N>::home()` |
+| Space Jacobian | $J_s(\theta)$ | -- ($J$ is geometric, linear-first; not $J_s$) | $\mathbf{J}$ | `space_jacobian(chain, fk)` |
+| Body Jacobian | $J_b(\theta)$ | -- | -- | `body_jacobian(chain, fk)` |
 | Adjoint (SE3) | $[\text{Ad}_T]$ (6x6) | -- | $\mathcal{T}$ or $\text{Ad}(\mathbf{T})$ | `se3<Scalar>::adjoint()` |
 | Adjoint (SO3) | $R$ (3x3, acts on $\omega$) | -- | $\mathbf{C}$ | `so3<Scalar>::adjoint()` |
 | Left Jacobian (SO3) | -- | -- | $\mathbf{J}$ | `so3<Scalar>::left_jacobian(phi)` |
@@ -136,10 +136,12 @@ where:
 - $M$ is the home (zero-angle) configuration of the end effector
 - Exponentials multiply from left to right in joint order
 
-**Siciliano et al.** [3] use the geometric Jacobian $J$ which relates joint
-velocities to the end-effector twist. Their Jacobian corresponds to Cartan's
-**space Jacobian** $J_s$ when both are expressed in the same frame, but the
-frame attachment conventions may differ. Siciliano defines the Jacobian columns
+**Siciliano et al.** [3] use the geometric Jacobian $J$, ordered linear-first,
+which maps joint velocities to the end-effector origin's velocity $\dot{p}_e$
+and the angular velocity $\omega$, both in the base frame. It is not Cartan's
+**space Jacobian** $J_s$: the spatial linear velocity is
+$v_s = \dot{p}_e - \omega \times p_e$, so the two differ by a shift through
+$[p_e]_\times$ and a reordering of the rows. Siciliano defines the Jacobian columns
 from DH parameters rather than PoE screw axes, so numerical values may need
 conversion.
 
@@ -152,7 +154,7 @@ vectors and the Jacobian columns must be reordered.
 The exponential map for SO(3) appears in slightly different forms across
 textbooks. All are mathematically equivalent:
 
-**Lynch and Park** [1, Eq. 3.51]:
+**Lynch and Park** [1, Eq. 3.51, p. 82]:
 
 $$
 e^{[\hat{\omega}]\theta} = I + \sin\theta \, [\hat{\omega}]_\times + (1 - \cos\theta) \, [\hat{\omega}]_\times^2
@@ -160,23 +162,25 @@ $$
 
 where $\hat{\omega}$ is the **unit** axis.
 
-**Barfoot** [2, Eq. 7.18]:
+**Barfoot** [2, Eq. 8.23, p. 285], written with $\boldsymbol{\phi} = \theta \mathbf{a}$:
 
 $$
 \exp(\boldsymbol{\phi}^\wedge) = I + \frac{\sin\theta}{\theta} \boldsymbol{\phi}^\wedge + \frac{1 - \cos\theta}{\theta^2} (\boldsymbol{\phi}^\wedge)^2
 $$
 
 where $\theta = \|\boldsymbol{\phi}\|$ and $\boldsymbol{\phi}$ is **not**
-necessarily unit length. This form uses sinc-type coefficients and is the form
-implemented in Cartan (it handles arbitrary-magnitude rotation vectors directly).
+necessarily unit length. This form uses sinc-type coefficients and handles
+arbitrary-magnitude rotation vectors directly; Cartan evaluates the equivalent
+half-angle quaternion form (see [SO(3)](so3.md)).
 
 ## Bibliography
 
 [1] K. M. Lynch and F. C. Park, *Modern Robotics: Mechanics, Planning, and
-Control*, Cambridge University Press, 2017.
+Control*, Cambridge University Press, 2017; pages refer to the 2019 preprint of
+the updated first edition.
 
 [2] T. D. Barfoot, *State Estimation for Robotics*, 2nd ed., Cambridge
-University Press, 2024.
+University Press, 2024; pages refer to the author's 2nd-edition PDF.
 
-[3] B. Siciliano, L. Sciavicco, L. Villani, and G. Oriolo, *Foundations of
+[3] B. Siciliano, L. Villani, G. Oriolo, and A. De Luca, *Foundations of
 Robotics*, Springer, 2025.

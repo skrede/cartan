@@ -1,0 +1,14 @@
+# Two checks whose findings here are the test doing its job: a generator seeded with a
+# constant, which is what makes a sweep reproducible, and an assignment operator written
+# to mishandle self-assignment so a test can observe it.
+#
+# clang-tidy resolves its configuration from the translation unit's main source file, and
+# every translation unit in this project is a test -- the library modules are interface
+# targets with no sources of their own. So this file governs the library headers a test
+# includes as well, and these two checks are off everywhere, not only under this directory.
+# It stops being true the moment a translation unit outside this tree enters the compile
+# database; until then, read it as project-wide.
+---
+InheritParentConfig: true
+Checks: '-cert-msc51-cpp,
+-bugprone-unhandled-self-assignment'

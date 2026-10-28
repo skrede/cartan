@@ -1,11 +1,11 @@
+#include "../support/kinematics_helpers.h"
+#include "../support/joint_limits_helpers.h"
+
 #include <cartan/serial/ik/ik_validation.h>
 #include <cartan/serial/ik/solver/exhaustive_ik_runner.h>
 
 #include <cartan/serial/ik/ik_status.h>
 #include <cartan/serial/ik/solver/projected_lm.h>
-#ifdef CARTAN_BUILD_ARGMIN
-#include <cartan/serial/ik/solver/argmin_slsqp.h>
-#endif
 
 #include <cartan/lie/se3.h>
 #include <cartan/lie/so3.h>
@@ -38,7 +38,7 @@ static ur5_chain make_ur5_like_chain()
     home_trans << 0.817, 0.191, -0.006;
     auto home = spp::se3<double>(spp::so3<double>::identity(), home_trans);
 
-    spp::joint_limits<double> lim{-2 * std::numbers::pi, 2 * std::numbers::pi};
+    auto lim = spp::testing::limits(-2 * std::numbers::pi, 2 * std::numbers::pi);
     return ur5_chain(home, {s1, s2, s3, s4, s5, s6},
                      {lim, lim, lim, lim, lim, lim});
 }
@@ -49,7 +49,7 @@ TEST_CASE("verify_solution validates FK-consistent configurations", "[ik][valida
     Eigen::Vector<double, 6> q;
     q << 0.5, -0.3, 0.8, -0.2, 0.4, 0.1;
 
-    auto fk = spp::forward_kinematics(chain, q);
+    auto fk = spp::testing::fk_at(chain, q);
     auto target = fk.end_effector;
 
     spp::convergence_criteria<double> criteria;
@@ -74,7 +74,7 @@ TEST_CASE("filter_valid_solutions removes invalid entries", "[ik][validation]")
     Eigen::Vector<double, 6> q_good;
     q_good << 0.5, -0.3, 0.8, -0.2, 0.4, 0.1;
 
-    auto fk = spp::forward_kinematics(chain, q_good);
+    auto fk = spp::testing::fk_at(chain, q_good);
     auto target = fk.end_effector;
 
     spp::convergence_criteria<double> criteria;
@@ -118,7 +118,7 @@ TEST_CASE("exhaustive_ik_runner finds multiple solutions", "[ik][exhaustive]")
     Eigen::Vector<double, 6> q_known;
     q_known << 0.5, -0.3, 0.8, -0.2, 0.4, 0.1;
 
-    auto fk = spp::forward_kinematics(chain, q_known);
+    auto fk = spp::testing::fk_at(chain, q_known);
     auto target = fk.end_effector;
 
     spp::convergence_criteria<double> criteria;
@@ -185,7 +185,7 @@ TEST_CASE("exhaustive_ik_runner dedup removes near-identical solutions", "[ik][e
     Eigen::Vector<double, 6> q_known;
     q_known << 0.5, -0.3, 0.8, -0.2, 0.4, 0.1;
 
-    auto fk = spp::forward_kinematics(chain, q_known);
+    auto fk = spp::testing::fk_at(chain, q_known);
     auto target = fk.end_effector;
 
     spp::convergence_criteria<double> criteria;
@@ -217,7 +217,7 @@ TEST_CASE("exhaustive_ik_runner ranking strategies", "[ik][exhaustive]")
     Eigen::Vector<double, 6> q_known;
     q_known << 0.5, -0.3, 0.8, -0.2, 0.4, 0.1;
 
-    auto fk = spp::forward_kinematics(chain, q_known);
+    auto fk = spp::testing::fk_at(chain, q_known);
     auto target = fk.end_effector;
 
     spp::convergence_criteria<double> criteria;
@@ -271,7 +271,7 @@ TEST_CASE("exhaustive_ik_runner ranking strategies", "[ik][exhaustive]")
             for (int j = 0; j < 6; ++j)
             {
                 auto lim = chain.limits()[static_cast<std::size_t>(j)];
-                mid[j] = (lim.position_min + lim.position_max) / 2.0;
+                mid[j] = (lim.position_min() + lim.position_max()) / 2.0;
             }
             double d0 = (result.solutions[0].solution.position - mid).norm();
             double d1 = (result.solutions[1].solution.position - mid).norm();
@@ -279,41 +279,3 @@ TEST_CASE("exhaustive_ik_runner ranking strategies", "[ik][exhaustive]")
         }
     }
 }
-
-#ifdef CARTAN_BUILD_ARGMIN
-
-using ur5_argmin_slsqp = spp::argmin_slsqp<ur5_chain>;
-
-TEST_CASE("exhaustive_ik_runner<argmin_slsqp> concept satisfaction and solve", "[ik][exhaustive][argmin]")
-{
-    auto chain = make_ur5_like_chain();
-    Eigen::Vector<double, 6> q_known;
-    q_known << 0.5, -0.3, 0.8, -0.2, 0.4, 0.1;
-
-    auto fk = spp::forward_kinematics(chain, q_known);
-    auto target = fk.end_effector;
-
-    spp::convergence_criteria<double> criteria;
-    criteria.position_tol = 1e-4;
-    criteria.orientation_tol = 1e-4;
-    criteria.max_iterations_per_attempt = 200;
-    criteria.max_total_work_units = 400;
-
-    spp::exhaustive_options<double> options;
-    options.max_restarts = 20;
-
-    Eigen::Vector<double, 6> seed = Eigen::Vector<double, 6>::Zero();
-
-    spp::exhaustive_ik_runner<ur5_chain, ur5_argmin_slsqp> runner;
-    auto result = runner.solve(chain, target, seed, criteria, options);
-
-    REQUIRE(result.restarts_attempted == 20);
-    REQUIRE(result.solutions.size() >= 1);
-
-    for (const auto& sol : result.solutions)
-    {
-        REQUIRE(spp::verify_solution(chain, target, sol.solution.position, criteria));
-    }
-}
-
-#endif

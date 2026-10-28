@@ -4,7 +4,7 @@ For **redundant manipulators** -- robots with more joints than task-space
 degrees of freedom ($n > 6$) -- the Jacobian has a non-trivial null space.
 Motions in this null space produce zero end-effector displacement, allowing
 secondary objectives (such as joint limit avoidance) to be optimized without
-affecting the primary IK task [1, Ch. 6, pp. 235--237].
+affecting the primary IK task [1, Sec. 6.3, pp. 231--232; 4, Sec. 3.6.2, pp. 142--146].
 
 This page derives the null-space projector, the combined update step for
 joint limit avoidance, and maps to Cartan's limits policies.
@@ -15,7 +15,7 @@ joint limit avoidance, and maps to Cartan's limits policies.
 
 The **null space** of the body Jacobian $J_b \in \mathbb{R}^{6 \times n}$ is
 the set of joint velocities that produce zero end-effector twist
-[1, Sec. 6.3, p. 235]:
+[4, Sec. 3.4, pp. 134--135]:
 
 $$
 \mathcal{N}(J_b) = \{\Delta\theta \in \mathbb{R}^n : J_b \, \Delta\theta = 0\}
@@ -44,7 +44,7 @@ swivel" is the classic example of a null-space self-motion.
 ### Construction from the Pseudoinverse
 
 The **null-space projector** $P \in \mathbb{R}^{n \times n}$ maps any joint
-velocity vector into the null space of $J_b$ [1, Eq. 6.13, p. 236]:
+velocity vector into the null space of $J_b$ [4, Eq. 3.63, p. 144]:
 
 $$
 P = I_n - J_b^\dagger J_b
@@ -78,7 +78,7 @@ especially when the Jacobian is near-singular.
 
 The general form of a null-space-augmented IK step combines a primary task
 (minimizing the error twist) with a secondary objective (pushing joints away
-from their limits) [1, Eq. 6.14, p. 236]:
+from their limits) [4, Eqs. 3.63--3.64, p. 144]:
 
 $$
 \Delta\theta = J_b^\dagger \, \xi_b + \alpha \, P \, \nabla h(\theta)
@@ -97,7 +97,7 @@ interfere with the primary task.
 ### Joint-Centering Gradient
 
 A common choice for $h(\theta)$ penalizes deviation from the joint range
-midpoints (Liegeois, 1977):
+midpoints (Liegeois, 1977) [4, Eq. 3.69, p. 145]:
 
 $$
 h(\theta) = -\frac{1}{2n} \sum_{i=1}^{n} \left(\frac{\theta_i - \bar{\theta}_i}{\theta_{i,\max} - \theta_{i,\min}}\right)^2
@@ -130,7 +130,8 @@ policies are provided, selectable at compile time:
 ### `no_limits`
 
 No enforcement. Use when the solve policy itself handles constraints (e.g.,
-an SQP policy with its own box bounds).
+`projected_lm`, whose active-set projection keeps the iterate inside the joint
+box). It is the default for `lm`, `projected_lm` and `dls`.
 
 ### `clamp_limits`
 
@@ -160,6 +161,7 @@ The limits policies are stateless structs consumed by the solve policies that
 `basic_ik_runner` drives. All of them satisfy a common interface, templated on
 the chain type:
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain>
 static void enforce(
@@ -170,13 +172,14 @@ static void enforce(
 The `null_space_limits` policy additionally provides an extended overload,
 detected at compile time via the `has_extended_enforce` concept:
 
+<!-- cartan:unbuilt kind=declaration -->
 ```cpp
 template <chain Chain>
 static void enforce_extended(
     typename joint_state<typename Chain::scalar_type, Chain::joints>::position_type& q,
     const auto& limits,
     const jacobian_matrix<typename Chain::scalar_type, Chain::joints>& J_b,
-    const Eigen::JacobiSVD<jacobian_matrix<typename Chain::scalar_type, Chain::joints>>& svd,
+    const enforcement_svd<typename Chain::scalar_type, Chain::joints>& svd,
     typename Chain::scalar_type gain = typename Chain::scalar_type(0.5));
 ```
 
@@ -186,7 +189,8 @@ See [IK Methods](ik-methods.md) for the IK algorithms that use these policies.
 ## Bibliography
 
 [1] K. M. Lynch and F. C. Park, "Modern Robotics: Mechanics, Planning, and
-Control," Cambridge University Press, 2017.
+Control," Cambridge University Press, 2017; pages refer to the 2019 preprint of
+the updated first edition.
 
 [2] A. Liegeois, "Automatic Supervisory Control of the Configuration and
 Behavior of Multibody Mechanisms," *IEEE Transactions on Systems, Man, and
@@ -195,5 +199,5 @@ Cybernetics*, vol. 7, no. 12, pp. 868--871, 1977.
 [3] Y. Nakamura, "Advanced Robotics: Redundancy and Optimization,"
 Addison-Wesley, 1991.
 
-[4] B. Siciliano, L. Sciavicco, L. Villani, and G. Oriolo, "Robotics:
-Modelling, Planning and Control," 2nd ed., Springer, 2009.
+[4] B. Siciliano, L. Villani, G. Oriolo, and A. De Luca, "Foundations of
+Robotics," Springer, 2025.

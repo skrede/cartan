@@ -1,9 +1,8 @@
+#include "registrations.h"
+
 #include "cartan/lie/so3.h"
 #include "cartan/lie/se3.h"
 #include "cartan/lie/lie_failure.h"
-
-#include "registrations.h"
-#include "detail/expected_caster.h"
 
 #include <nanobind/eigen/dense.h>
 #include <nanobind/nanobind.h>
@@ -51,14 +50,15 @@ void register_lie(nb::module_& m)
                 return *std::move(r);
             },
             "Construct an SO(3) from a 3x3 rotation matrix. "
-            "Raises ValueError if R is not orthogonal or has det != 1.",
+            "Raises ValueError if R holds a NaN or an infinity, is not "
+            "orthogonal, or has det != 1.",
             nb::arg("R").noconvert())
         .def("adjoint",
             [](const SO3d& self) -> cartan::matrix3<double> {
                 return self.matrix();
             },
             "SO(3) adjoint -- equal to the rotation matrix itself "
-            "(Lynch & Park Eq. 3.84).");
+            "(Lynch & Park Prop. 3.8).");
 
     nb::class_<SE3d>(m, "SE3", "Rigid-body transformation group element")
         .def_static("identity", &SE3d::identity)
@@ -89,7 +89,8 @@ void register_lie(nb::module_& m)
                 return *std::move(r);
             },
             "Construct an SE(3) from a 4x4 homogeneous transformation matrix. "
-            "Raises ValueError if T is not a valid rigid-body transform.",
+            "Raises ValueError if T holds a NaN or an infinity, or is not a "
+            "valid rigid-body transform.",
             nb::arg("T").noconvert())
         .def_prop_ro("translation",
             [](const SE3d& self) { return cartan::vector3<double>(self.translation()); },

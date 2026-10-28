@@ -10,8 +10,20 @@
                 "CMAKE_BUILD_TYPE": "Debug",
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
                 "CARTAN_BUILD_TESTS": "ON",
-                "CARTAN_BUILD_ARGMIN": "ON",
                 "CARTAN_CMAKE_FETCH_DEPS": "ON"
+            }
+        },
+        {
+            "name": "golden",
+            "displayName": "Bitwise golden gate (development tree with the bit comparison compiled in)",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/golden",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "CARTAN_BUILD_TESTS": "ON",
+                "CARTAN_CMAKE_FETCH_DEPS": "ON",
+                "CARTAN_RUN_BITWISE_GOLDEN": "ON"
             }
         },
         {
@@ -39,7 +51,7 @@
                 "CARTAN_BUILD_EXAMPLES": "ON",
                 "CARTAN_BUILD_FUZZ_TESTS": "ON",
                 "CARTAN_BUILD_PROPERTY_TESTS": "ON",
-                "CARTAN_BUILD_ARGMIN": "ON",
+                "CARTAN_BUILD_URDF": "ON",
                 "CARTAN_CMAKE_FETCH_DEPS": "ON"
             }
         },
@@ -50,7 +62,6 @@
             "binaryDir": "${sourceDir}/build/release",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
-                "CARTAN_BUILD_ARGMIN": "ON",
                 "CARTAN_CMAKE_FETCH_DEPS": "ON"
             }
         },
@@ -63,7 +74,6 @@
                 "CMAKE_BUILD_TYPE": "Debug",
                 "CMAKE_CXX_FLAGS": "--coverage -fprofile-arcs -ftest-coverage",
                 "CARTAN_BUILD_TESTS": "ON",
-                "CARTAN_BUILD_ARGMIN": "ON",
                 "CARTAN_CMAKE_FETCH_DEPS": "ON"
             }
         },
@@ -77,7 +87,19 @@
                 "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer",
                 "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined",
                 "CARTAN_BUILD_TESTS": "ON",
-                "CARTAN_BUILD_ARGMIN": "ON",
+                "CARTAN_CMAKE_FETCH_DEPS": "ON"
+            }
+        },
+        {
+            "name": "release-sanitize",
+            "displayName": "Sanitizers, optimized (ASan + UBSan, halting on a violation)",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/release-sanitize",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=undefined -g",
+                "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined",
+                "CARTAN_BUILD_TESTS": "ON",
                 "CARTAN_CMAKE_FETCH_DEPS": "ON"
             }
         },
@@ -88,9 +110,9 @@
             "binaryDir": "${sourceDir}/build/bench",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
+                "CARTAN_BUILD_URDF": "ON",
                 "CARTAN_BUILD_BENCHMARKS": "ON",
                 "CARTAN_FETCH_BENCHMARK_DEPS": "ON",
-                "CARTAN_BUILD_ARGMIN": "ON",
                 "CARTAN_CMAKE_FETCH_DEPS": "ON"
             }
         },
@@ -103,11 +125,10 @@
                 "CMAKE_BUILD_TYPE": "Release",
                 "CMAKE_CXX_FLAGS": "-g -fno-omit-frame-pointer",
                 "CMAKE_C_FLAGS": "-g -fno-omit-frame-pointer",
+                "CARTAN_BUILD_URDF": "ON",
                 "CARTAN_BUILD_BENCHMARKS": "ON",
                 "CARTAN_FETCH_BENCHMARK_DEPS": "ON",
-                "CARTAN_BUILD_NLOPT": "ON",
                 "CARTAN_BUILD_PROFILING": "ON",
-                "CARTAN_BUILD_ARGMIN": "ON",
                 "CARTAN_CMAKE_FETCH_DEPS": "ON"
             }
         },
@@ -118,8 +139,9 @@
             "binaryDir": "${sourceDir}/build/fuzz",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_CXX_COMPILER": "clang++",
                 "CARTAN_BUILD_FUZZ_TESTS": "ON",
-                "CARTAN_BUILD_ARGMIN": "ON",
+                "CARTAN_BUILD_URDF": "ON",
                 "CARTAN_CMAKE_FETCH_DEPS": "ON"
             }
         }
@@ -128,6 +150,10 @@
         {
             "name": "dev",
             "configurePreset": "dev"
+        },
+        {
+            "name": "golden",
+            "configurePreset": "golden"
         },
         {
             "name": "python-dev",
@@ -148,6 +174,10 @@
         {
             "name": "sanitize",
             "configurePreset": "sanitize"
+        },
+        {
+            "name": "release-sanitize",
+            "configurePreset": "release-sanitize"
         },
         {
             "name": "bench",
@@ -171,6 +201,13 @@
             }
         },
         {
+            "name": "golden",
+            "configurePreset": "golden",
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
             "name": "dev-full",
             "configurePreset": "dev-full",
             "output": {
@@ -187,6 +224,13 @@
         {
             "name": "sanitize",
             "configurePreset": "sanitize",
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
+            "name": "release-sanitize",
+            "configurePreset": "release-sanitize",
             "output": {
                 "outputOnFailure": true
             }

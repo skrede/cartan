@@ -8,6 +8,7 @@ This guide shows how to use Cartan's compile-time frame safety system. Frame tag
 
 Frame tags are empty structs -- they exist only as type-level markers with zero runtime cost:
 
+<!-- cartan:unbuilt kind=illustration reason="defines the reader's own frame tags and touches nothing cartan declares" -->
 ```cpp
 struct World {};
 struct Camera {};
@@ -21,6 +22,7 @@ These tags carry no data. They serve purely as compile-time identifiers for coor
 
 A `transform<From, To>` wraps an `se3` value with frame annotations:
 
+<!-- cartan:unbuilt kind=illustration reason="carries its own include directives above the statements, which a fragment wrapper cannot host inside a function" -->
 ```cpp
 #include <cartan/frames/transform.h>
 
@@ -49,6 +51,7 @@ The template parameters read as "transforms **from** the first frame **to** the 
 
 Transforms compose with `operator*`, but **only when frames match**:
 
+<!-- cartan:unbuilt kind=sketch reason="elides the transform values with a placeholder, so the block shows a rule and not a computation" -->
 ```cpp
 cartan::transform<World, Camera> T_wc{ /* ... */ };
 cartan::transform<Camera, Tool>  T_ct{ /* ... */ };
@@ -64,6 +67,7 @@ The compiler enforces that the `To` frame of the left operand matches the `From`
 
 Multi-step composition works naturally:
 
+<!-- cartan:unbuilt kind=sketch reason="elides the transform values with a placeholder, so the block shows a rule and not a computation" -->
 ```cpp
 cartan::transform<World, Base>   T_wb{ /* ... */ };
 cartan::transform<Base, Camera>  T_bc{ /* ... */ };
@@ -77,6 +81,7 @@ auto T_wt = T_wb * T_bc * T_ct;  // transform<World, Tool>
 
 Inverting a transform flips the frame tags:
 
+<!-- cartan:unbuilt kind=sketch reason="elides the transform values with a placeholder, so the block shows a rule and not a computation" -->
 ```cpp
 cartan::transform<World, Camera> T_wc{ /* ... */ };
 
@@ -93,6 +98,7 @@ This is mathematically correct: if T maps Camera -> World, then T^{-1} maps Worl
 
 When you need the raw `se3` value for math operations or interop with untagged code, use `.m_value`:
 
+<!-- cartan:unbuilt kind=sketch reason="elides the transform values with a placeholder, so the block shows a rule and not a computation" -->
 ```cpp
 cartan::transform<World, Camera> T_wc{ /* ... */ };
 
@@ -116,6 +122,7 @@ The `m_value` member is public (aggregate struct), so bridging between framed an
 
 The same pattern applies to pure rotations with `rotation<From, To>`:
 
+<!-- cartan:unbuilt kind=illustration reason="carries its own include directives above the statements, which a fragment wrapper cannot host inside a function" -->
 ```cpp
 #include <cartan/frames/rotation.h>
 
@@ -140,6 +147,7 @@ auto R_mat = R_ib.matrix();
 
 Velocity twists and force wrenches are tagged with a **single** frame (the frame in which they are expressed):
 
+<!-- cartan:unbuilt kind=sketch reason="elides the transforms it adjoints with a placeholder, so the block shows the map and not a computation" -->
 ```cpp
 #include <cartan/frames/framed_twist.h>
 #include <cartan/frames/framed_wrench.h>
@@ -185,6 +193,7 @@ auto W_world = cartan::coadjoint_map(T_wt, W_tool);
 
 **Bridge between framed and unframed code** using `.m_value`:
 
+<!-- cartan:unbuilt kind=sketch reason="hands the value to a function the page leaves to the reader" -->
 ```cpp
 // Application layer: framed
 cartan::transform<World, Tool> T_wt = /* ... */;

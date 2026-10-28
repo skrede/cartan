@@ -1,9 +1,14 @@
+# This service receives the merged Cobertura document — coverage-merged.xml, the
+# one the Linux workflow's upload step sends — and reports what it says.
+# It enforces nothing, and no target is recorded here for it to enforce: the gate
+# that can fail a build is tools/check_coverage_report.py, run in-tree by the
+# coverage step, needing no token and no network. A target written here would be a
+# second claim of the same shape as that gate's but unable to fail anything,
+# leaving a reader no way to tell which one is the project's position.
 coverage:
   status:
     project:
       default:
-        target: 90%
-        threshold: 5%
         informational: true
     patch:
       default:

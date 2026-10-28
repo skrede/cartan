@@ -1,3 +1,6 @@
+#include "../support/kinematics_helpers.h"
+#include "../support/joint_limits_helpers.h"
+
 #include <cartan/serial/ik/ik_status.h>
 #include <cartan/serial/ik/basic_ik_runner.h>
 
@@ -42,7 +45,7 @@ static spp::kinematic_chain<double, 6> make_ur5_like_chain()
     home_trans << 0.817, 0.191, -0.006;
     auto home = spp::se3<double>(spp::so3<double>::identity(), home_trans);
 
-    spp::joint_limits<double> lim{-2 * std::numbers::pi, 2 * std::numbers::pi};
+    auto lim = spp::testing::limits(-2 * std::numbers::pi, 2 * std::numbers::pi);
     return spp::kinematic_chain<double, 6>(home, {s1, s2, s3, s4, s5, s6},
                                   {lim, lim, lim, lim, lim, lim});
 }
@@ -64,7 +67,7 @@ static spp::kinematic_chain<double, 6> make_tight_limits_chain()
     home_trans << 0.817, 0.191, -0.006;
     auto home = spp::se3<double>(spp::so3<double>::identity(), home_trans);
 
-    spp::joint_limits<double> lim{-0.5, 0.5};
+    auto lim = spp::testing::limits(-0.5, 0.5);
     return spp::kinematic_chain<double, 6>(home, {s1, s2, s3, s4, s5, s6},
                                   {lim, lim, lim, lim, lim, lim});
 }
@@ -87,7 +90,7 @@ static spp::kinematic_chain<double, 7> make_7r_redundant_chain()
     home_trans << 0.817, 0.191, -0.006;
     auto home = spp::se3<double>(spp::so3<double>::identity(), home_trans);
 
-    spp::joint_limits<double> lim{-std::numbers::pi, std::numbers::pi};
+    auto lim = spp::testing::limits(-std::numbers::pi, std::numbers::pi);
     return spp::kinematic_chain<double, 7>(home, {s1, s2, s3, s4, s5, s6, s7},
                                   {lim, lim, lim, lim, lim, lim, lim});
 }
@@ -103,7 +106,7 @@ TEST_CASE("IkSolver with DLS converges via solve()", "[ik][solver]")
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
 
-    auto fk_target = spp::forward_kinematics(chain, q_known);
+    auto fk_target = spp::testing::fk_at(chain, q_known);
     auto target = fk_target.end_effector;
 
     spp::basic_ik_runner<spp::dls<spp::kinematic_chain<double, 6>>> solver;
@@ -118,7 +121,7 @@ TEST_CASE("IkSolver with DLS converges via solve()", "[ik][solver]")
     REQUIRE(result.has_value());
 
     // Verify FK roundtrip
-    auto fk_sol = spp::forward_kinematics(chain, result->solution.position);
+    auto fk_sol = spp::testing::fk_at(chain, result->solution.position);
     auto err = (fk_sol.end_effector.inverse() * target).log();
     REQUIRE(err.head<3>().norm() < 1e-5);
     REQUIRE(err.tail<3>().norm() < 1e-5);
@@ -135,7 +138,7 @@ TEST_CASE("IkSolver with LM converges via solve()", "[ik][solver]")
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
 
-    auto fk_target = spp::forward_kinematics(chain, q_known);
+    auto fk_target = spp::testing::fk_at(chain, q_known);
     auto target = fk_target.end_effector;
 
     spp::basic_ik_runner<spp::lm<spp::kinematic_chain<double, 6>>> solver;
@@ -149,7 +152,7 @@ TEST_CASE("IkSolver with LM converges via solve()", "[ik][solver]")
 
     REQUIRE(result.has_value());
 
-    auto fk_sol = spp::forward_kinematics(chain, result->solution.position);
+    auto fk_sol = spp::testing::fk_at(chain, result->solution.position);
     auto err = (fk_sol.end_effector.inverse() * target).log();
     REQUIRE(err.head<3>().norm() < 1e-5);
     REQUIRE(err.tail<3>().norm() < 1e-5);
@@ -165,7 +168,7 @@ TEST_CASE("IkSolver step-by-step matches solve()", "[ik][solver]")
 
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
-    auto fk_target = spp::forward_kinematics(chain, q_known);
+    auto fk_target = spp::testing::fk_at(chain, q_known);
     auto target = fk_target.end_effector;
 
     spp::basic_ik_runner<spp::dls<spp::kinematic_chain<double, 6>>> solver;
@@ -197,7 +200,7 @@ TEST_CASE("IkSolver with clamp_limits enforces bounds", "[ik][solver][limits]")
     // Target within tight-limit workspace (small angles)
     Eigen::Vector<double, 6> q_known;
     q_known << 0.1, -0.1, 0.1, 0.05, -0.05, 0.1;
-    auto fk_target = spp::forward_kinematics(chain, q_known);
+    auto fk_target = spp::testing::fk_at(chain, q_known);
     auto target = fk_target.end_effector;
 
     spp::basic_ik_runner<spp::dls<spp::kinematic_chain<double, 6>>> solver;
@@ -264,16 +267,16 @@ TEST_CASE("IkSolver returns ik_error on unreachable target", "[ik][solver]")
 }
 
 // ============================================================================
-// IkSolver min_distance objective continues past first convergence
+// IkSolver min_error_norm objective continues past first convergence
 // ============================================================================
 
-TEST_CASE("IkSolver min_distance objective continues past first convergence", "[ik][solver]")
+TEST_CASE("IkSolver min_error_norm objective continues past first convergence", "[ik][solver]")
 {
     auto chain = make_ur5_like_chain();
 
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
-    auto fk_target = spp::forward_kinematics(chain, q_known);
+    auto fk_target = spp::testing::fk_at(chain, q_known);
     auto target = fk_target.end_effector;
 
     spp::basic_ik_runner<spp::dls<spp::kinematic_chain<double, 6>>> solver;
@@ -282,7 +285,7 @@ TEST_CASE("IkSolver min_distance objective continues past first convergence", "[
     criteria.max_iterations_per_attempt = 200;
     criteria.max_total_work_units = 400;
 
-    spp::solver_options<double> opts{.objective = spp::ik_objective::min_distance};
+    spp::solver_options<double> opts{.objective = spp::ik_objective::min_error_norm};
     solver.setup(chain, target, q0, criteria, opts);
     auto result = solver.solve();
 
@@ -300,7 +303,7 @@ TEST_CASE("IkSolver ik_result contains correct fields", "[ik][solver]")
 
     Eigen::Vector<double, 6> q_known;
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7;
-    auto fk_target = spp::forward_kinematics(chain, q_known);
+    auto fk_target = spp::testing::fk_at(chain, q_known);
 
     spp::basic_ik_runner<spp::dls<spp::kinematic_chain<double, 6>>> solver;
     Eigen::Vector<double, 6> q0 = Eigen::Vector<double, 6>::Zero();
@@ -327,7 +330,7 @@ TEST_CASE("IkSolver with LM and null_space_limits on 7-DOF chain", "[ik][solver]
 
     Eigen::Vector<double, 7> q_known;
     q_known << 0.3, -0.5, 0.8, 0.1, -0.4, 0.7, 0.2;
-    auto fk_target = spp::forward_kinematics(chain, q_known);
+    auto fk_target = spp::testing::fk_at(chain, q_known);
     auto target = fk_target.end_effector;
 
     // Solve with null_space_limits
@@ -345,7 +348,7 @@ TEST_CASE("IkSolver with LM and null_space_limits on 7-DOF chain", "[ik][solver]
     REQUIRE(result.has_value());
 
     // Verify FK roundtrip
-    auto fk_sol = spp::forward_kinematics(chain, result->solution.position);
+    auto fk_sol = spp::testing::fk_at(chain, result->solution.position);
     auto err = (fk_sol.end_effector.inverse() * target).log();
     REQUIRE(err.head<3>().norm() < 1e-3);
     REQUIRE(err.tail<3>().norm() < 1e-3);

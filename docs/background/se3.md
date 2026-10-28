@@ -5,7 +5,7 @@ transformations in three-dimensional space. Each element combines a rotation
 (from SO(3)) with a translation, representing the full 6-DOF configuration of
 a rigid body. SE(3) is the core mathematical object in robotics: every
 end-effector pose, every joint transformation, and every sensor frame is an
-element of SE(3) [1, Ch. 3, pp. 86--106].
+element of SE(3) [1, Sec. 3.3, pp. 87--106].
 
 This page covers homogeneous transformation matrices, twists and screw
 motions, the exponential and logarithmic maps with full derivations, and the
@@ -15,7 +15,7 @@ adjoint representation.
 
 A rigid body transformation is a pair $(R, p)$ where $R \in \text{SO}(3)$ is a
 rotation and $p \in \mathbb{R}^3$ is a translation. The set of all such pairs
-forms SE(3) [1, Ch. 3, p. 86]:
+forms SE(3) [1, Def. 3.13, p. 87]:
 
 $$
 \text{SE}(3) = \{ (R, p) : R \in \text{SO}(3), \; p \in \mathbb{R}^3 \}
@@ -36,7 +36,7 @@ where $R \in \text{SO}(3)$ and $p \in \mathbb{R}^3$.
 
 ### Composition
 
-Transformations compose by matrix multiplication [1, Ch. 3, p. 92]:
+Transformations compose by matrix multiplication [1, Prop. 3.16, p. 88]:
 
 $$
 T_1 T_2 = \begin{bmatrix} R_1 & p_1 \\ 0 & 1 \end{bmatrix} \begin{bmatrix} R_2 & p_2 \\ 0 & 1 \end{bmatrix} = \begin{bmatrix} R_1 R_2 & R_1 p_2 + p_1 \\ 0 & 1 \end{bmatrix}
@@ -47,7 +47,7 @@ is first rotated by $R_1$ before adding $p_1$.
 
 ### Inverse
 
-The inverse has a convenient closed form [1, Eq. 3.64, p. 94]:
+The inverse has a convenient closed form [1, Prop. 3.15, Eq. 3.64, p. 88]:
 
 $$
 T^{-1} = \begin{bmatrix} R^\top & -R^\top p \\ 0 & 1 \end{bmatrix}
@@ -71,7 +71,7 @@ $T \begin{bmatrix} q \\ 1 \end{bmatrix} = \begin{bmatrix} Rq + p \\ 1 \end{bmatr
 
 The Lie algebra $\mathfrak{se}(3)$ is the tangent space to SE(3) at the
 identity. Its elements are $4 \times 4$ matrices of the form
-[1, Ch. 3, p. 103]:
+[1, Eq. 3.71, p. 96]:
 
 $$
 [\mathcal{V}]^\wedge = \begin{bmatrix} [\omega]_\times & v \\ 0_{1 \times 3} & 0 \end{bmatrix} \in \mathbb{R}^{4 \times 4}
@@ -145,7 +145,7 @@ Every rigid body displacement can be represented as a rotation about some axis
 combined with a translation along that axis. This is the screw motion
 interpretation, and it means every element of SE(3) can be written as a single
 matrix exponential $e^{[\mathcal{S}]\theta}$ for some screw axis
-$\mathcal{S}$ and angle/distance $\theta$ [1, Theorem 3.1, p. 100].
+$\mathcal{S}$ and angle/distance $\theta$ [1, Eq. 3.90, p. 104].
 
 ## Exponential Map
 
@@ -195,7 +195,7 @@ $$
 For an arbitrary twist $\mathcal{V} = (\omega, v)$ where $\phi = \omega$ is a
 general rotation vector with $\theta = \|\phi\|$, the formula generalizes.
 Cartan's implementation uses the **left Jacobian** $J_l(\phi)$ of SO(3) as the
-coupling matrix [2, Eq. 8.33, p. 289]:
+coupling matrix [2, Eqs. 8.33--8.34, p. 288]:
 
 $$
 T = \exp([\mathcal{V}]^\wedge) = \begin{bmatrix} \exp([\omega]_\times) & J_l(\omega) \, v \\ 0 & 1 \end{bmatrix}
@@ -389,10 +389,8 @@ case behavior.
 ## Bibliography
 
 [1] K. M. Lynch and F. C. Park, *Modern Robotics: Mechanics, Planning, and
-Control*, Cambridge University Press, 2017.
+Control*, Cambridge University Press, 2017; pages refer to the 2019 preprint of
+the updated first edition.
 
 [2] T. D. Barfoot, *State Estimation for Robotics*, 2nd ed., Cambridge
-University Press, 2024.
-
-[3] B. Siciliano, L. Sciavicco, L. Villani, and G. Oriolo, *Foundations of
-Robotics*, Springer, 2025.
+University Press, 2024; pages refer to the author's 2nd-edition PDF.

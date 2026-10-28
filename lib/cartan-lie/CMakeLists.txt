@@ -1,34 +1,45 @@
-if (CARTAN_CMAKE_FETCH_DEPS)
-    FetchContent_Declare(
-        Eigen3
-        GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
-        GIT_TAG 3.4.0
-        GIT_SHALLOW TRUE
-        EXCLUDE_FROM_ALL
-        SOURCE_SUBDIR this-directory-does-not-exist
-    )
-    FetchContent_MakeAvailable(Eigen3)
-    add_library(eigen_headers INTERFACE)
-    add_library(Eigen3::Eigen ALIAS eigen_headers)
-    target_include_directories(eigen_headers SYSTEM INTERFACE
-        "${eigen3_SOURCE_DIR}"
-    )
-else ()
-    find_package(Eigen3 CONFIG REQUIRED)
-    if (Eigen3_VERSION VERSION_LESS "3.4")
-        message(FATAL_ERROR "cartan requires Eigen >= 3.4, found ${Eigen3_VERSION}")
-    endif ()
-
-    get_target_property(_eigen_aliased Eigen3::Eigen ALIASED_TARGET)
-    if (_eigen_aliased)
-        set(_eigen_target ${_eigen_aliased})
+# A parent project may already provide Eigen (e.g. via its own FetchContent),
+# which defines the target but installs no config package; honor it and skip
+# our own acquisition so dependency sourcing stays the integrator's decision.
+if (NOT TARGET Eigen3::Eigen)
+    if (CARTAN_CMAKE_FETCH_DEPS)
+        FetchContent_Declare(
+            Eigen3
+            GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
+            # 3.4.0, written as the commit that tag names: a tag can be moved,
+            # and a build that resolves a different linear-algebra library under
+            # the same name changes results without changing anything visible.
+            GIT_TAG 3147391d946bb4b6c68edd901f2add6ac1f31f8c
+            EXCLUDE_FROM_ALL
+            SOURCE_SUBDIR this-directory-does-not-exist
+        )
+        FetchContent_MakeAvailable(Eigen3)
+        add_library(cartan_eigen_headers INTERFACE)
+        add_library(Eigen3::Eigen ALIAS cartan_eigen_headers)
+        target_include_directories(cartan_eigen_headers SYSTEM INTERFACE
+            "${eigen3_SOURCE_DIR}"
+        )
     else ()
-        set(_eigen_target Eigen3::Eigen)
+        # GLOBAL: an imported target is otherwise scoped to this directory, and
+        # the install-surface gate runs at the root, where it would see no
+        # target at all rather than the imported one it is there to inspect.
+        find_package(Eigen3 CONFIG REQUIRED GLOBAL)
+
+        get_target_property(_eigen_aliased Eigen3::Eigen ALIASED_TARGET)
+        if (_eigen_aliased)
+            set(_eigen_target ${_eigen_aliased})
+        else ()
+            set(_eigen_target Eigen3::Eigen)
+        endif ()
+        get_target_property(_eigen_inc ${_eigen_target} INTERFACE_INCLUDE_DIRECTORIES)
+        set_target_properties(${_eigen_target} PROPERTIES
+            INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_eigen_inc}"
+        )
     endif ()
-    get_target_property(_eigen_inc ${_eigen_target} INTERFACE_INCLUDE_DIRECTORIES)
-    set_target_properties(${_eigen_target} PROPERTIES
-        INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_eigen_inc}"
-    )
+endif ()
+
+if (DEFINED Eigen3_VERSION AND Eigen3_VERSION VERSION_LESS "3.4")
+    message(FATAL_ERROR "cartan requires Eigen >= 3.4, found ${Eigen3_VERSION}")
 endif ()
 
 configure_file(

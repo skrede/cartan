@@ -93,6 +93,20 @@ concept joint_tag = requires
     { T::is_revolute } -> std::convertible_to<bool>;
 };
 
+namespace detail
+{
+
+/// False, but only after substitution, so a static_assert in the unreachable
+/// arm of an `if constexpr` chain over the six tags fires on the tag that is
+/// missing an arm rather than at definition. Every such chain must terminate in
+/// one: the concept requires only `is_revolute`, so a seventh tag satisfies it,
+/// and a chain without a final arm falls off the end of a value-returning
+/// function -- undefined behavior in place of a diagnostic.
+template <typename>
+inline constexpr bool joint_tag_exhausted_v = false;
+
+}
+
 }
 
 #endif

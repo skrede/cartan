@@ -5,7 +5,7 @@
 /// avg_position_error, avg_orientation_error.
 
 #include <cartan/serial/ik/basic_ik_runner.h>
-#include <cartan/serial/ik/solver/nlopt_bobyqa.h>
+#include <cartan_examples/nlopt/nlopt_bobyqa.h>
 #include <cartan/serial/ik/ik_status.h>
 
 #include "benchmark_utils.h"
@@ -35,7 +35,7 @@ static void bm_ik_nlopt_bobyqa_3r_planar(benchmark::State& state)
         const auto& target = pool.targets[i];
         const auto& q_seed = pool.seeds[i];
 
-        cartan::basic_ik_runner<cartan::nlopt_bobyqa<cartan::kinematic_chain<double, 3>>> solver;
+        cartan::basic_ik_runner<cartan_examples::nlopt_bobyqa<cartan::kinematic_chain<double, 3>>> solver;
         solver.setup(chain, target, q_seed, criteria);
         auto result = solver.solve();
 
@@ -87,7 +87,7 @@ static void bm_ik_nlopt_bobyqa_ur3e(benchmark::State& state)
         const auto& target = pool.targets[i];
         const auto& q_seed = pool.seeds[i];
 
-        cartan::basic_ik_runner<cartan::nlopt_bobyqa<cartan::kinematic_chain<double, 6>>> solver;
+        cartan::basic_ik_runner<cartan_examples::nlopt_bobyqa<cartan::kinematic_chain<double, 6>>> solver;
         solver.setup(chain, target, q_seed, criteria);
         auto result = solver.solve();
 
@@ -139,7 +139,7 @@ static void bm_ik_nlopt_bobyqa_lbr_med14(benchmark::State& state)
         const auto& target = pool.targets[i];
         const auto& q_seed = pool.seeds[i];
 
-        cartan::basic_ik_runner<cartan::nlopt_bobyqa<cartan::kinematic_chain<double, 7>>> solver;
+        cartan::basic_ik_runner<cartan_examples::nlopt_bobyqa<cartan::kinematic_chain<double, 7>>> solver;
         solver.setup(chain, target, q_seed, criteria);
         auto result = solver.solve();
 

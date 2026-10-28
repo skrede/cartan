@@ -74,14 +74,14 @@ TEST_CASE("extractor: continuous joint yields kinematic_chain with infinity limi
     REQUIRE(chain.num_joints() == 3);
 
     const auto& wrist_limits = chain.limits()[2];
-    CHECK(wrist_limits.position_min == -std::numeric_limits<double>::infinity());
-    CHECK(wrist_limits.position_max == +std::numeric_limits<double>::infinity());
+    CHECK(wrist_limits.position_min() == -std::numeric_limits<double>::infinity());
+    CHECK(wrist_limits.position_max() == +std::numeric_limits<double>::infinity());
 
     // Bounded joints remain finite.
-    CHECK(std::isfinite(chain.limits()[0].position_min));
-    CHECK(std::isfinite(chain.limits()[0].position_max));
-    CHECK(std::isfinite(chain.limits()[1].position_min));
-    CHECK(std::isfinite(chain.limits()[1].position_max));
+    CHECK(std::isfinite(chain.limits()[0].position_min()));
+    CHECK(std::isfinite(chain.limits()[0].position_max()));
+    CHECK(std::isfinite(chain.limits()[1].position_min()));
+    CHECK(std::isfinite(chain.limits()[1].position_max()));
 }
 
 TEST_CASE("extractor: fixed-joint merge composes offsets into the downstream screw_axis origin",
@@ -255,8 +255,8 @@ TEST_CASE("extractor: continuous joint without <limit> stays valid (unlimited)",
     REQUIRE(chain.num_joints() == 1);
 
     const auto& lim = chain.limits()[0];
-    CHECK(lim.position_min == -std::numeric_limits<double>::infinity());
-    CHECK(lim.position_max == +std::numeric_limits<double>::infinity());
+    CHECK(lim.position_min() == -std::numeric_limits<double>::infinity());
+    CHECK(lim.position_max() == +std::numeric_limits<double>::infinity());
 }
 
 // --- Kinematic-cycle DoS (build-time walk) ---

@@ -13,8 +13,11 @@
 /// The sweep runs in double precision: the metre-scale float residual floor and
 /// its gating are covered exhaustively by the dedicated float-tolerance sweep,
 /// whereas here a fixed 1e-6 gate must hold deterministically for every robot
-/// and seed. Coverage extends to a pure-prismatic chain, a mixed
-/// revolute/prismatic chain, and a zero-DOF chain.
+/// and seed. Coverage extends to a pure-prismatic chain and a mixed
+/// revolute/prismatic chain.
+
+#include "../support/kinematics_helpers.h"
+#include "../support/joint_limits_helpers.h"
 
 #include "../fixtures/chain_factories.h"
 #include "../fixtures/prismatic_chains.h"
@@ -99,7 +102,7 @@ sweep_stats ik_sweep_robot(MakeChain make_chain, const char* name)
             q0(j) = q_known(j) + perturb(rng);
         }
 
-        auto target = cartan::forward_kinematics(chain, q_known).end_effector;
+        auto target = cartan::testing::fk_at(chain, q_known).end_effector;
 
         cartan::basic_ik_runner<cartan::lm<Chain>> solver;
         solver.setup(chain, target, q0, criteria);
@@ -111,7 +114,7 @@ sweep_stats ik_sweep_robot(MakeChain make_chain, const char* name)
             // No lying: a reported convergence must survive independent FK
             // re-verification, never the solver's self-report alone.
             REQUIRE(cartan::verify_solution(
-                chain, target, result.value().solution.position, criteria));
+                chain, target, result->solution.position, criteria));
         }
     }
     return stats;
@@ -132,23 +135,10 @@ auto make_ppp_chain() -> cartan::kinematic_chain<Scalar, 3>
 
     auto home = cartan::se3<Scalar>(
         cartan::so3<Scalar>::identity(), vec3(Scalar(0), Scalar(0), Scalar(0)));
-    cartan::joint_limits<Scalar> lim{Scalar(-1), Scalar(1)};
+    auto lim = cartan::testing::limits(Scalar(-1), Scalar(1));
 
     return cartan::kinematic_chain<Scalar, 3>(
         home, {s1, s2, s3}, {lim, lim, lim});
-}
-
-/// Zero-DOF dynamic chain: empty axis/limit storage, non-trivial home pose.
-template <typename Scalar>
-auto make_zero_dof_chain() -> cartan::kinematic_chain<Scalar, cartan::dynamic>
-{
-    auto home = cartan::se3<Scalar>(
-        cartan::so3<Scalar>::identity(),
-        cartan::vector3<Scalar>(Scalar(0.1), Scalar(0.2), Scalar(0.3)));
-    return cartan::kinematic_chain<Scalar, cartan::dynamic>(
-        home,
-        std::vector<cartan::screw_axis<Scalar>>{},
-        std::vector<cartan::joint_limits<Scalar>>{});
 }
 
 }
@@ -180,7 +170,7 @@ TEST_CASE("IK sweep: nine robots x fifty seeded configs", "[ik][sweep]")
     REQUIRE(total.converged >= (total.attempts * 9) / 10);
 }
 
-TEST_CASE("IK sweep: prismatic, mixed, and zero-DOF coverage",
+TEST_CASE("IK sweep: prismatic and mixed coverage",
     "[ik][sweep][prismatic]")
 {
     SECTION("pure prismatic chain")
@@ -195,18 +185,5 @@ TEST_CASE("IK sweep: prismatic, mixed, and zero-DOF coverage",
         auto s = ik_sweep_robot(
             cartan::fixtures::make_rppr_signed_chain<double>, "RPPR mixed");
         REQUIRE(s.converged >= (s.attempts * 9) / 10);
-    }
-
-    SECTION("zero-DOF chain: home target verifies trivially")
-    {
-        auto chain = make_zero_dof_chain<double>();
-        REQUIRE(chain.num_joints() == 0);
-
-        const double tol = 1e-6;
-        cartan::convergence_criteria<double> criteria{tol, tol, 500, 1000};
-
-        Eigen::VectorX<double> q(0);
-        auto target = chain.home();
-        REQUIRE(cartan::verify_solution(chain, target, q, criteria));
     }
 }

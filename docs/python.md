@@ -57,13 +57,14 @@ Lie groups | `cartan::so3`, `cartan::se3`, plus SO(2)/SE(2) and frame wrappers |
 Chains | `cartan::screw_axis`, `joint_limits`, `kinematic_chain`, `static_chain` | `cartan.ScrewAxis`, `cartan.JointLimits`, `cartan.KinematicChain` | `python/tutorials/02_fk_and_jacobians.py` | Partial | Python uses runtime dynamic chains. Static-chain templates and joint-tag packs are C++ compile-time facilities.
 FK | `cartan::forward_kinematics` | `cartan.forward_kinematics` | `python/tutorials/01_urdf_walkthrough.py`, `python/tutorials/02_fk_and_jacobians.py` | Bound and tested | Returns `cartan.SE3` directly in Python.
 Jacobians | `cartan::space_jacobian`, `cartan::body_jacobian` | `cartan.space_jacobian`, `cartan.body_jacobian` | `python/tutorials/02_fk_and_jacobians.py` | Bound and tested | Returns NumPy `float64` arrays.
-URDF | `cartan::load_urdf` and `urdf_load_result` | `cartan.load_urdf`, `UrdfLoadResult`, `UrdfMetadata`, `UrdfError` | `python/tutorials/01_urdf_walkthrough.py` | Bound and tested | Available when the extension is built with URDF support.
-Iterative IK | `basic_ik_runner`, `restart_wrapper`, native solve policies | `cartan.solve_ik`, `solve_ik_speed`, `solve_ik_robust`, `IkConfig`, `IkResult` | `python/tutorials/01_urdf_walkthrough.py`, `python/tutorials/03_ik_composition.py` | Bound and tested | Optional argmin-backed functions appear only when the extension is built with argmin support.
+Singularity analysis | `cartan::singular_values`, `condition_number`, `manipulability`, `isotropy`, `is_near_singular` | same names | Python tests | Bound and tested | An entirely zero Jacobian returns `None`; a caller error raises `ValueError`.
+URDF | `cartan::load_urdf`, `load_urdf_transform` and `urdf_load_result` | `cartan.load_urdf`, `load_urdf_transform`, `UrdfLoadResult`, `UrdfMetadata`, `UrdfError`, `UrdfFailure`, `UrdfDiagnostic`, `UrdfSourceLocation` | `python/tutorials/01_urdf_walkthrough.py` | Bound and tested | Available when the extension is built with URDF support.
+Iterative IK | `basic_ik_runner`, `restart_wrapper`, native solve policies | `cartan.solve_ik`, `solve_ik_speed`, `solve_ik_robust`, `IkConfig`, `IkResult` | `python/tutorials/01_urdf_walkthrough.py`, `python/tutorials/03_ik_composition.py` | Bound and tested |
 Analytical IK | Pieper 6R, planar 2R, spatial 3R, Paden-Kahan helpers | `cartan.analytical.solve_pieper_6r`, `solve_planar_2r`, `solve_3r`, `paden_kahan_1/2/3`, `solve_all` | `python/tutorials/03_ik_composition.py`, `docs/api/analytical.md` | Bound and tested | Analytical results expose verified solution lists and status values.
-OPW | `cartan::opw_parameters`, `opw_6r_solver`, `opw_branch` | `cartan.OPWParameters`, `cartan.OPWBranch`, `cartan.analytical.solve_opw_6r` | Python analytical tests; parity table here | Partial | The OPW solver covers offset-shoulder spherical-wrist industrial arms through explicit OPW parameters. `OPWBranch` is exposed as an enum, but branch classification (`classify_branch`) is not yet wired or bound; only the enum's presence is tested.
+OPW | `cartan::opw_parameters`, `opw_6r_solver`, `opw_branch` | `cartan.OPWParameters`, `cartan.OPWBranch`, `cartan.analytical.solve_opw_6r` | Python analytical tests; parity table here | Partial | The OPW solver covers offset-shoulder spherical-wrist industrial arms through explicit OPW parameters. `OPWBranch` is exposed as an enum; `classify_branch` exists in C++ but is not bound, and only the enum's presence is tested.
 Unwrap | `cartan::unwrapped_solver`, `unwrapped_result`, `range_status` | `cartan.UnwrappedResult`, `cartan.RangeStatus`, `solve_unwrapped_opw_6r`, `solve_unwrapped_pieper_6r`, `solve_unwrapped_3r`, `solve_unwrapped_planar_2r` | Python analytical tests; parity table here | Bound and tested | Python functions return every branch with per-solution range tags.
 Exhaustive runner | `cartan::exhaustive_ik_runner` | `cartan.ExhaustiveIKRunner`, `IkPolicy`, `RankingStrategy` | Python exhaustive-runner tests | Bound and tested | Returns FK-verified ranked `IkResult` branches.
-Install/export | CMake package config, install/export targets, scikit-build-core wheel build | `pip install cartan-bindings`, editable install command above | This page and package metadata | In progress | Wheel matrix and publishing workflow are handled separately from tutorial parity.
+Install/export | CMake package config, install/export targets, scikit-build-core wheel build | `pip install cartan-bindings`, editable install command above | This page and package metadata | Available | Wheels for Linux x86_64/aarch64, macOS arm64/x86_64 and Windows x64; published as `cartan-bindings` on PyPI.
 
 ## Tutorial Mirrors
 
@@ -85,7 +86,6 @@ PYTHONPATH=python python python/tutorials/03_ik_composition.py --csv build/pytho
 
 C++ example | Python counterpart | Status | Reason
 --- | --- | --- | ---
-examples/argmin_solvers.cpp | None | C++ only for now | Demonstrates optional C++ backend wiring. Python exposes optional argmin functions when built with argmin support, but no standalone Python example is shipped yet.
 examples/basic_ik.cpp | python/tutorials/01_urdf_walkthrough.py | Mirrored by tutorial | The Python tutorial covers FK-walked target generation, iterative IK, and FK back-verification on a loaded chain.
 examples/fk_jacobian.cpp | python/tutorials/02_fk_and_jacobians.py | Mirrored by tutorial | The Python tutorial prints FK, space Jacobian, and body Jacobian for planar and spatial chains.
 examples/frame_safety.cpp | None | C++ only | Compile-time frame tags are a C++ type-system feature and are not exposed as Python runtime classes.
@@ -93,6 +93,7 @@ examples/ik_composition.cpp | python/tutorials/03_ik_composition.py | Mirrored b
 examples/ik_service_multi.cpp | None | C++ only for now | Demonstrates C++ service-style orchestration around native solver types; Python users compose the bound solver functions directly.
 examples/ik_service_single.cpp | None | C++ only for now | Demonstrates a C++ single-service wrapper over native solver types; Python users call `cartan.solve_ik*` directly.
 examples/lie_basics.cpp | None | No standalone counterpart | Python SO(3)/SE(3) usage is covered in the quick smoke and tests; SO(2)/SE(2) remain C++ only.
+examples/nlopt_policy/nlopt_policy_example.cpp | None | C++ only | Writing a solve policy is a C++ extension point: a policy is a compile-time template parameter of the runner, so there is nothing for a binding to expose. The example wraps a third-party optimizer that only runs to completion.
 examples/tutorials/01_urdf_walkthrough.cpp | python/tutorials/01_urdf_walkthrough.py | Direct mirror | Both load a URDF, FK-walk a reachable target, solve IK, and FK-back-verify the result.
 examples/tutorials/02_fk_and_jacobians.cpp | python/tutorials/02_fk_and_jacobians.py | Direct mirror | Both build planar 3R and spatial 6R chains from screw axes, then print FK and Jacobians.
 examples/tutorials/03_ik_composition.cpp | python/tutorials/03_ik_composition.py | Direct mirror | Both run a deterministic 50-target closed-form versus iterative IK comparison and can emit CSV rows.
@@ -144,6 +145,5 @@ def waypoint(chain: cartan.KinematicChain, q):
 
 ### Dynamics
 
-Dynamics are a separate concern. Use a companion dynamics package such as
-`cartan-serial-dynamics` when it is available, with Cartan supplying poses,
-Jacobians, and IK seeds.
+Dynamics are out of scope. Use a dynamics library such as Pinocchio, with
+Cartan supplying poses, Jacobians, and IK seeds.

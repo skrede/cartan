@@ -16,6 +16,7 @@
 #include "cartan/serial/ik/solver/detail/analytical_gradient.h"
 #include "cartan/serial/ik/detail/convergence.h"
 #include "cartan/serial/ik/detail/stall_detection.h"
+#include "cartan/serial/ik/detail/setup_validation.h"
 #include "cartan/serial/ik/detail/limit_enforcement.h"
 
 #include "cartan/lie/se3.h"
@@ -59,10 +60,16 @@ public:
         int stall_window{10};
     };
 
-    newton_raphson() = default;
+    newton_raphson()
+        : newton_raphson(options{})
+    {
+    }
 
     explicit newton_raphson(const options& opts)
-        : m_options(opts)
+        : m_q(detail::poison_joint_position<scalar_type, joints>())
+        , m_lower(detail::poison_joint_position<scalar_type, joints>())
+        , m_upper(detail::poison_joint_position<scalar_type, joints>())
+        , m_options(opts)
     {
     }
 
@@ -82,12 +89,23 @@ public:
         const convergence_criteria<scalar_type>& criteria,
         const error_weight<scalar_type>& weight)
     {
+        // Half of what the iteration loop below is entitled to assume; the
+        // joint count recorded here is the other half, re-checked against the
+        // chain step() is handed. Latching a failure into the status member is
+        // how a void setup() reports: the loop's running guard refuses to run.
+        if (auto held = cartan::detail::validate_solve_inputs(chain, target, q0); !held)
+        {
+            m_status = held.error();
+            return;
+        }
+
+        m_setup_joints = chain.num_joints();
+
         m_target = target;
         m_q = q0;
         m_criteria = criteria;
         m_weight = weight;
         m_iterations = 0;
-        m_stall_count = 0;
         m_status = ik_status::running;
         m_error_history.clear();
 
@@ -99,8 +117,8 @@ public:
         }
         for (int i = 0; i < n; ++i)
         {
-            m_lower(i) = chain.limits()[static_cast<std::size_t>(i)].position_min;
-            m_upper(i) = chain.limits()[static_cast<std::size_t>(i)].position_max;
+            m_lower(i) = chain.limits()[static_cast<std::size_t>(i)].position_min();
+            m_upper(i) = chain.limits()[static_cast<std::size_t>(i)].position_max();
         }
 
         m_q = m_q.cwiseMax(m_lower).cwiseMin(m_upper);
@@ -112,6 +130,8 @@ public:
 
     step_result<scalar_type> step(const Chain& chain, int N)
     {
+        m_status = cartan::detail::chain_bound_status(m_status, m_setup_joints, chain);
+
         int units = 0;
         while (units < N && m_status == ik_status::running)
         {
@@ -140,8 +160,8 @@ public:
                 break;
             }
 
-            auto fk = forward_kinematics(chain, m_q);
-            auto J_b = body_jacobian(chain, fk);
+            auto fk = forward_kinematics_unchecked(chain, m_q);
+            auto J_b = body_jacobian_unchecked(chain, fk);
             int n = static_cast<int>(J_b.cols());
 
             auto H = (J_b.transpose() * J_b).eval();
@@ -152,19 +172,19 @@ public:
 
             position_type dq = -H.ldlt().solve(grad);
 
-            scalar_type directional_derivative = grad.dot(dq);
             scalar_type alpha = scalar_type(1);
             bool step_accepted = false;
-            position_type q_trial = m_q;
 
             for (int ls = 0; ls < m_options.max_line_search_steps; ++ls)
             {
-                q_trial = (m_q + alpha * dq).cwiseMax(m_lower).cwiseMin(m_upper);
-
+                position_type q_trial = (m_q + alpha * dq).cwiseMax(m_lower).cwiseMin(m_upper);
                 auto trial = ObjectivePolicy::evaluate(chain, m_target, q_trial, m_weight);
-                scalar_type f_trial = trial.objective;
 
-                if (f_trial <= f_current + m_options.line_search_c * alpha * directional_derivative)
+                // Projected-arc Armijo condition (Bertsekas, SIAM J. Control Optim. 20(2), 1982;
+                // Nocedal & Wright section 16.7): the projected displacement already carries the
+                // step length, and a projected arc need not descend, so every trial can be rejected.
+                scalar_type projected_decrease = grad.dot(q_trial - m_q);
+                if (trial.objective <= f_current + m_options.line_search_c * projected_decrease)
                 {
                     m_q = q_trial;
                     m_error_norm = trial.body_error.norm();
@@ -177,9 +197,9 @@ public:
 
             if (!step_accepted)
             {
-                m_q = q_trial;
-                m_error_norm = ObjectivePolicy::evaluate(chain, m_target, m_q, m_weight)
-                    .body_error.norm();
+                m_error_norm = body_error.norm();
+                m_status = ik_status::stalled;
+                break;
             }
 
             auto stall_result = cartan::detail::check_stall_divergence(
@@ -201,14 +221,14 @@ public:
     const position_type& solution() const { return m_q; }
     scalar_type error_norm() const { return m_error_norm; }
     int iterations() const { return m_iterations; }
-    void abort() {}
+    void abort() { m_status = ik_status::aborted; }
     ik_status status() const { return m_status; }
 
 private:
     se3<scalar_type> m_target{se3<scalar_type>::identity()};
-    position_type m_q{};
-    position_type m_lower{};
-    position_type m_upper{};
+    position_type m_q;
+    position_type m_lower;
+    position_type m_upper;
     convergence_criteria<scalar_type> m_criteria{};
     error_weight<scalar_type> m_weight{};
     options m_options{};
@@ -216,8 +236,8 @@ private:
     scalar_type m_initial_error{std::numeric_limits<scalar_type>::max()};
     scalar_type m_error_norm{std::numeric_limits<scalar_type>::max()};
     int m_iterations{};
-    int m_stall_count{};
-    ik_status m_status{ik_status::running};
+    int m_setup_joints{-1};
+    ik_status m_status{ik_status::not_initialized};
 };
 
 }

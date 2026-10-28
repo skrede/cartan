@@ -7,11 +7,11 @@
 ///
 /// One bench-run command produces the entire head-to-head matrix: closed-form
 /// cells (planar_2r_solver, spatial_3r_solver, pieper_6r_solver) alongside the
-/// matched iterative subset (projected_lm, builtin_lm, and optionally
-/// argmin_slsqp) on the same FK-walked target set, plus closed-form-only
-/// workspace coverage cells using a uniform bounding-box target distribution.
-/// Convergence criteria for the iterative subset are bit-identical to the
-/// sibling cross-solver benchmark so cross-bench result joins are valid.
+/// matched iterative subset (projected_lm, builtin_lm) on the same FK-walked
+/// target set, plus closed-form-only workspace coverage cells using a uniform
+/// bounding-box target distribution. Convergence criteria for the iterative
+/// subset are bit-identical to the sibling cross-solver benchmark so
+/// cross-bench result joins are valid.
 
 #include "benchmark_utils.h"
 #include "closed_form_bench_utils.h"
@@ -26,10 +26,6 @@
 #include <cartan/serial/fk/forward_kinematics.h>
 #include <cartan/serial/ik/solver/projected_lm.h>
 #include <cartan/serial/chain/kinematic_chain.h>
-
-#ifdef CARTAN_BUILD_ARGMIN
-#include <cartan/serial/ik/solver/argmin_slsqp.h>
-#endif
 
 #include <benchmark/benchmark.h>
 
@@ -272,32 +268,6 @@ void bm_kr6_sixx_coverage(benchmark::State& state)
         decltype(static_chain), solver_t>(state, static_chain, bbox_ts);
 }
 BENCHMARK(bm_kr6_sixx_coverage)->Iterations(2000)->Unit(benchmark::kMicrosecond);
-
-// ============================================================================
-// --- argmin SLSQP matched-iterative-subset (gated, Pieper robots only) ---
-// ============================================================================
-
-#ifdef CARTAN_BUILD_ARGMIN
-void bm_abb_irb120_argmin_slsqp(benchmark::State& state)
-{
-    using chain_t  = cartan::kinematic_chain<double, 6>;
-    using solver_t = cartan::argmin_slsqp<chain_t>;
-    static auto chain = cartan::fixtures::make_abb_irb120_chain<double>();
-    static target_set<double, 6> ts(chain, num_targets);
-    cartan::fixtures::bm_iterative_solver<chain_t, solver_t>(state, chain, ts);
-}
-BENCHMARK(bm_abb_irb120_argmin_slsqp)->Iterations(2000)->Unit(benchmark::kMicrosecond);
-
-void bm_kr6_sixx_argmin_slsqp(benchmark::State& state)
-{
-    using chain_t  = cartan::kinematic_chain<double, 6>;
-    using solver_t = cartan::argmin_slsqp<chain_t>;
-    static auto chain = cartan::fixtures::make_kr6_sixx_chain<double>();
-    static target_set<double, 6> ts(chain, num_targets);
-    cartan::fixtures::bm_iterative_solver<chain_t, solver_t>(state, chain, ts);
-}
-BENCHMARK(bm_kr6_sixx_argmin_slsqp)->Iterations(2000)->Unit(benchmark::kMicrosecond);
-#endif
 
 // ============================================================================
 // Pieper-class wrist-decoupled solver registered only for ABB IRB120 and

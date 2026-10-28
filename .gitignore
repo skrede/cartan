@@ -1,5 +1,7 @@
 coverage/
 coverage.*
+/coverage-*.xml
+/coverage-*.txt
 *_UnitTest
 .DS_Store
 cmake-build-*/
@@ -20,8 +22,9 @@ moc_*
 *~
 *.exe
 
-*.gdca
+*.gcda
 *.gcno
+*.gcov.json.gz
 qrc_*
 
 *object_script*
@@ -55,6 +58,11 @@ cmake-build-*
 # Top-level compile_commands.json symlink (developer-local; points into build/)
 /compile_commands.json
 
+# Study sweep output: the capture binary's default --out-dir and --sidecar-dir,
+# written into the working directory. Machine-specific timings and seeded targets.
+/study-cells/
+/study-targets/
+
 # Python build / cache
 __pycache__/
 *.py[cod]
@@ -74,6 +82,7 @@ python/cartan/analytical.pyi
 .claude/
 .gemini/
 .planning/
+AGENTS.md
 CLAUDE.md
 GEMINI.md
 

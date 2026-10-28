@@ -96,7 +96,7 @@ private:
                 continue;
             }
             out(i) = cartan::detail::unwrap_to_range_nearest(
-                q(i), limits[idx].position_min, limits[idx].position_max,
+                q(i), limits[idx].position_min(), limits[idx].position_max(),
                 reference(i), tol);
         }
         return out;

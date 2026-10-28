@@ -7,12 +7,13 @@
 /// on the hot path: no enforcement, hard clamping, or null-space projection
 /// toward joint midpoints for redundant chains.
 ///
-/// Reference: Lynch & Park, Modern Robotics, Ch. 6.3 (null-space).
+/// Reference: Siciliano et al., Foundations of Robotics, Sec. 3.6.2, pp. 142-146 (null space).
 
 #include "cartan/serial/chain/joint_state.h"
 #include "cartan/serial/fk/jacobian.h"
 #include "cartan/serial/chain/joint_limits.h"
 #include "cartan/serial/chain/chain_concept.h"
+#include "cartan/serial/fk/singular_spectrum.h"
 
 #include <Eigen/SVD>
 
@@ -23,6 +24,14 @@
 namespace cartan
 {
 
+/// The decomposition an extended enforcement is handed. It runs over a fully
+/// dynamic copy for a chain whose joint count is a runtime value, because a
+/// thin left factor sized from the Jacobian's fixed six rows cannot be resized
+/// to a smaller column count.
+template <typename Scalar, int N>
+using enforcement_svd =
+    Eigen::JacobiSVD<svd_matrix_t<jacobian_matrix<Scalar, N>>>;
+
 /// Concept detecting whether a limits policy has an extended enforce signature
 /// that accepts the body Jacobian and its SVD (for null-space projection).
 template <typename P, typename Chain>
@@ -30,13 +39,13 @@ concept has_extended_enforce = chain<Chain> && requires(
     typename joint_state<typename Chain::scalar_type, Chain::joints>::position_type& q,
     const decltype(std::declval<const Chain&>().limits())& limits,
     const jacobian_matrix<typename Chain::scalar_type, Chain::joints>& J_b,
-    const Eigen::JacobiSVD<jacobian_matrix<typename Chain::scalar_type, Chain::joints>>& svd)
+    const enforcement_svd<typename Chain::scalar_type, Chain::joints>& svd)
 {
     { P::template enforce_extended<Chain>(q, limits, J_b, svd) };
 };
 
 /// No-op limit policy: applies no enforcement.
-/// Use when the stepper itself handles constraints (e.g., SQP with box bounds).
+/// Use when the stepper itself handles constraints (e.g., projected_lm).
 struct no_limits
 {
     template <chain Chain>
@@ -60,8 +69,8 @@ struct clamp_limits
         {
             q(i) = std::clamp(
                 q(i),
-                limits[static_cast<std::size_t>(i)].position_min,
-                limits[static_cast<std::size_t>(i)].position_max);
+                limits[static_cast<std::size_t>(i)].position_min(),
+                limits[static_cast<std::size_t>(i)].position_max());
         }
     }
 };
@@ -74,7 +83,7 @@ struct clamp_limits
 /// the null space to bias joints toward their range midpoints, improving
 /// distance from joint limits without degrading the primary IK task.
 ///
-/// Reference: Lynch & Park, Modern Robotics, Ch. 6.3, p. 235-237.
+/// Reference: Siciliano et al., Foundations of Robotics, Eqs. 3.63 and 3.69, pp. 144-145.
 ///            Liegeois, A., "Automatic Supervisory Control of Configuration
 ///            and Behavior of Multibody Mechanisms," 1977.
 struct null_space_limits
@@ -98,7 +107,7 @@ struct null_space_limits
         typename joint_state<typename Chain::scalar_type, Chain::joints>::position_type& q,
         const auto& limits,
         const jacobian_matrix<typename Chain::scalar_type, Chain::joints>&,
-        const Eigen::JacobiSVD<jacobian_matrix<typename Chain::scalar_type, Chain::joints>>& svd,
+        const enforcement_svd<typename Chain::scalar_type, Chain::joints>& svd,
         typename Chain::scalar_type gain = typename Chain::scalar_type(0.5))
     {
         using Scalar = typename Chain::scalar_type;
@@ -116,10 +125,10 @@ struct null_space_limits
 
         for (int i = 0; i < n; ++i)
         {
-            Scalar q_mid = (limits[static_cast<std::size_t>(i)].position_min
-                          + limits[static_cast<std::size_t>(i)].position_max) / Scalar(2);
-            Scalar q_range = limits[static_cast<std::size_t>(i)].position_max
-                           - limits[static_cast<std::size_t>(i)].position_min;
+            Scalar q_mid = (limits[static_cast<std::size_t>(i)].position_min()
+                          + limits[static_cast<std::size_t>(i)].position_max()) / Scalar(2);
+            Scalar q_range = limits[static_cast<std::size_t>(i)].position_max()
+                           - limits[static_cast<std::size_t>(i)].position_min();
             // Unbounded angular joints have no meaningful midpoint or range
             // for null-space centering. Skip their contribution by writing
             // zero into the per-joint slot; the surrounding accumulator and
